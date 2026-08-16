@@ -54,3 +54,9 @@ class AWSSessionTokenExpiredError(Exception):
 
 class AWSSetUpSessionError(Exception):
     pass
+
+class AWSIAMRoleARNMissingFieldsError(Exception):
+    def __init__(self, file=None, message="Missing fields in IAM Role ARN"):
+        self.file = file
+        self.message = message
+        super().__init__(self.message)
