@@ -8531,10 +8531,87 @@ class FindingAIAnalysisViewSet(BaseRLSViewSet):
 class RemediationPlaybookViewSet(BaseRLSViewSet):
     queryset = RemediationPlaybook.objects.all()
     serializer_class = RemediationPlaybookSerializer
-    filterset_fields = ["script_type", "is_automated", "requires_maintenance_window"]
+    filterset_fields = ["script_type", "approval_status", "is_automated", "requires_maintenance_window"]
     search_fields = ["title", "code_snippet"]
-    ordering_fields = ["inserted_at"]
+    ordering_fields = ["inserted_at", "approved_at", "executed_at"]
     ordering = ["-inserted_at"]
+
+    @extend_schema(
+        summary="Approve remediation playbook for execution (Human-In-The-Loop)",
+        description="Authorizes the Execution Agent to apply the remediation script against cloud infrastructure.",
+        responses={200: RemediationPlaybookSerializer},
+    )
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        playbook = self.get_object()
+        from django.utils import timezone as django_tz
+
+        user = request.user if request.user.is_authenticated else None
+        playbook.approval_status = RemediationPlaybook.ApprovalStatus.APPROVED
+        playbook.approved_by = user
+        playbook.approved_at = django_tz.now()
+        playbook.rejection_reason = None
+        playbook.save(update_fields=["approval_status", "approved_by", "approved_at", "rejection_reason", "updated_at"])
+
+        return Response(
+            data=self.get_serializer(playbook).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        summary="Reject remediation playbook",
+        description="Rejects the proposed remediation script with analyst rationale.",
+        responses={200: RemediationPlaybookSerializer},
+    )
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        playbook = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+        reason = request.data.get("reason", "Rejected by administrator during human review.")
+
+        playbook.approval_status = RemediationPlaybook.ApprovalStatus.REJECTED
+        playbook.rejection_reason = reason
+        playbook.approved_by = user
+        playbook.save(update_fields=["approval_status", "approved_by", "rejection_reason", "updated_at"])
+
+        return Response(
+            data=self.get_serializer(playbook).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        summary="Trigger Execution Agent to apply remediation",
+        description="Executes the approved remediation playbook against target cloud infrastructure. Fails if not approved by a human.",
+    )
+    @action(detail=True, methods=["post"], url_path="execute")
+    def execute(self, request, pk=None):
+        playbook = self.get_object()
+        from ai.execution_agent import execution_agent, ExecutionPermissionError
+
+        user = request.user if request.user.is_authenticated else None
+        try:
+            result = execution_agent.execute(playbook, executed_by=user)
+            return Response(
+                data={
+                    "status": "success",
+                    "playbook": self.get_serializer(playbook).data,
+                    "execution_result": result,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ExecutionPermissionError as e:
+            return Response(
+                {
+                    "errors": [
+                        {
+                            "status": "400",
+                            "title": "Human Approval Required",
+                            "detail": str(e),
+                        }
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class CISOAdvisorConversationViewSet(BaseRLSViewSet):

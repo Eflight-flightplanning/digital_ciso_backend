@@ -4514,6 +4514,15 @@ class FindingAIAnalysisSerializer(serializers.ModelSerializer):
 
 
 class RemediationPlaybookSerializer(serializers.ModelSerializer):
+    approved_by_email = serializers.SerializerMethodField(read_only=True)
+    executed_by_email = serializers.SerializerMethodField(read_only=True)
+
+    def get_approved_by_email(self, obj):
+        return obj.approved_by.email if obj.approved_by else None
+
+    def get_executed_by_email(self, obj):
+        return obj.executed_by.email if obj.executed_by else None
+
     class Meta:
         model = RemediationPlaybook
         fields = [
@@ -4526,10 +4535,32 @@ class RemediationPlaybookSerializer(serializers.ModelSerializer):
             "estimated_downtime_minutes",
             "requires_maintenance_window",
             "is_automated",
+            "approval_status",
+            "approved_by",
+            "approved_by_email",
+            "approved_at",
+            "rejection_reason",
+            "execution_output",
+            "executed_at",
+            "executed_by",
+            "executed_by_email",
             "inserted_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "inserted_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "approval_status",
+            "approved_by",
+            "approved_by_email",
+            "approved_at",
+            "rejection_reason",
+            "execution_output",
+            "executed_at",
+            "executed_by",
+            "executed_by_email",
+            "inserted_at",
+            "updated_at",
+        ]
 
     class JSONAPIMeta:
         resource_name = "remediation-playbooks"

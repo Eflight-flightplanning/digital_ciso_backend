@@ -6817,6 +6817,26 @@ class RemediationPlaybook(RowLevelSecurityProtectedModel):
     code_snippet = models.TextField()
     rollback_snippet = models.TextField(blank=True, null=True)
     estimated_downtime_minutes = models.IntegerField(default=0)
+    class ApprovalStatus(models.TextChoices):
+        PENDING_APPROVAL = "pending_approval", _("Pending Human Approval")
+        APPROVED = "approved", _("Approved by Admin")
+        REJECTED = "rejected", _("Rejected by Admin")
+        EXECUTING = "executing", _("Executing")
+        EXECUTED_SUCCESS = "executed_success", _("Executed Successfully")
+        EXECUTED_FAILED = "executed_failed", _("Execution Failed")
+
+    approval_status = models.CharField(
+        max_length=50,
+        choices=ApprovalStatus.choices,
+        default=ApprovalStatus.PENDING_APPROVAL,
+    )
+    approved_by = models.ForeignKey("User", on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_playbooks")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    execution_output = models.TextField(blank=True, null=True)
+    executed_at = models.DateTimeField(null=True, blank=True)
+    executed_by = models.ForeignKey("User", on_delete=models.SET_NULL, null=True, blank=True, related_name="executed_playbooks")
+
     requires_maintenance_window = models.BooleanField(default=False)
     is_automated = models.BooleanField(default=False)
     
