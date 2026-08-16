@@ -260,6 +260,7 @@ function FindingsPage() {
             >
               <option value="All">All Providers</option>
               <option value="AWS">AWS</option>
+              <option value="OCI">Oracle Cloud (OCI)</option>
               <option value="Azure">Azure</option>
               <option value="GCP">GCP</option>
               <option value="K8s">Kubernetes</option>

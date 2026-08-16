@@ -184,11 +184,12 @@ function ScansPage() {
                   onChange={(e) => setSelectedProvider(e.target.value)}
                   className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none"
                 >
-                  <option value="AWS">AWS (acme-production)</option>
-                  <option value="Azure">Azure (acme-emea)</option>
-                  <option value="GCP">GCP (acme-core)</option>
-                  <option value="K8s">Kubernetes (cluster-prod-1)</option>
-                  <option value="GitHub">GitHub (acme-org)</option>
+                  <option value="AWS">Amazon Web Services (AWS)</option>
+                  <option value="OCI">Oracle Cloud Infrastructure (OCI)</option>
+                  <option value="Azure">Microsoft Azure</option>
+                  <option value="GCP">Google Cloud Platform (GCP)</option>
+                  <option value="K8s">Kubernetes Cluster</option>
+                  <option value="GitHub">GitHub Enterprise</option>
                 </select>
               </div>
 
