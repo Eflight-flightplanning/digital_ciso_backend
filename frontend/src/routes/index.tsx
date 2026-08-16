@@ -99,7 +99,7 @@ function MarketingLandingPage() {
   ];
 
   const howItWorks = [
-    { step: "01", icon: Scan, title: "Connect & Scan", desc: "Connect AWS, Azure, GCP, OCI, or Kubernetes in one click. Prowler continuously audits against 28+ compliance frameworks." },
+    { step: "01", icon: Scan, title: "Connect & Scan", desc: "Connect AWS, Azure, GCP, OCI, or Kubernetes in one click. Continuously audits against 28+ compliance frameworks." },
     { step: "02", icon: BrainCircuit, title: "AI Triage & Analysis", desc: "Spectra AI triages thousands of raw findings in seconds. Extracts root cause, business impact, and toxic attack combinations." },
     { step: "03", icon: UserCheck, title: "Human Authorization", desc: "AI generates production-grade remediation scripts. Nothing executes without explicit human sign-off through the HITL safety gate." },
     { step: "04", icon: Bot, title: "Autonomous Execution", desc: "Once approved, the Execution Agent applies the fix to your cloud infrastructure and verifies the finding is resolved." },
@@ -252,7 +252,7 @@ function MarketingLandingPage() {
         {/* ── Metric Stats Row ── */}
         <div className={`mx-auto mt-16 max-w-5xl grid grid-cols-2 gap-px sm:grid-cols-4 rounded-2xl border overflow-hidden ${isDark ? "border-white/[0.08] bg-white/[0.02]" : "border-slate-200 bg-white shadow-md"}`}>
           {[
-            { value: "28", label: "Compliance Standards", sub: "Prowler-powered continuous audits" },
+            { value: "28", label: "Compliance Standards", sub: "Continuous multi-cloud security audits" },
             { value: "5", label: "Cloud Platforms", sub: "AWS · Azure · GCP · OCI · K8s" },
             { value: "100%", label: "Human Approval Gates", sub: "Zero autonomous execution risk" },
             { value: "10", label: "MCP Tools Exposed", sub: "Open Model Context Protocol API" },
@@ -493,7 +493,7 @@ function MarketingLandingPage() {
               {
                 icon: Award,
                 color: isDark ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-100 text-emerald-700",
-                title: "28 Prowler Compliance Frameworks",
+                title: "28 Continuous Compliance Frameworks",
                 desc: "Continuous auditing for CIS (AWS, Azure, GCP, OCI, K8s), SOC 2, ISO 27001, PCI-DSS, NIST, HIPAA, GDPR, FedRAMP, DORA, NIS2, and MITRE ATT&CK.",
                 link: "/compliance",
                 linkLabel: "View Compliance Matrix",
