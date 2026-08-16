@@ -87,8 +87,13 @@ const initialIntegrations: Integration[] = [
 function IntegrationsPage() {
   const { data: apiIntegrations, isLoading } = useIntegrations();
 
+  const [integrationsList, setIntegrationsList] = useState<Integration[]>(initialIntegrations);
+  const [selectedInteg, setSelectedInteg] = useState<Integration | null>(null);
+  const [endpoint, setEndpoint] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const integrations = (apiIntegrations?.items && apiIntegrations.items.length > 0)
-    ? initialIntegrations.map((item) => {
+    ? integrationsList.map((item) => {
         const found = (apiIntegrations.items as Array<Record<string, unknown>>).find(
           (ai) => (ai.integration_type as string)?.toLowerCase() === item.id.toLowerCase()
         );
@@ -100,17 +105,13 @@ function IntegrationsPage() {
         }
         return item;
       })
-    : initialIntegrations;
-
-  const [selectedInteg, setSelectedInteg] = useState<Integration | null>(null);
-  const [endpoint, setEndpoint] = useState("");
-  const [saving, setSaving] = useState(false);
+    : integrationsList;
 
   const handleSaveConfig = () => {
     if (!selectedInteg) return;
     setSaving(true);
     setTimeout(() => {
-      setIntegrations((prev) =>
+      setIntegrationsList((prev) =>
         prev.map((item) =>
           item.id === selectedInteg.id
             ? { ...item, status: "connected", syncTime: "Configured just now" }

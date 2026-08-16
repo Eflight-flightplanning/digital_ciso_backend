@@ -104,10 +104,10 @@ function AttackPathsPage() {
                   return (
                     <g key={i}>
                       <line
-                        x1={fromNode.x}
-                        y1={fromNode.y}
-                        x2={toNode.x}
-                        y2={toNode.y}
+                        x1={fromNode?.x ?? 20}
+                        y1={fromNode?.y ?? 20}
+                        x2={toNode?.x ?? 50}
+                        y2={toNode?.y ?? 50}
                         stroke={
                           isCritical
                             ? "var(--color-critical)"
@@ -131,7 +131,7 @@ function AttackPathsPage() {
                       key={node.id}
                       onClick={() => setSelectedNode(node.id)}
                       className="cursor-pointer transition-transform duration-200 hover:scale-110"
-                      transform={`translate(${node.x}, ${node.y})`}
+                      transform={`translate(${node?.x ?? 50}, ${node?.y ?? 50})`}
                     >
                       {isSelected && (
                         <circle

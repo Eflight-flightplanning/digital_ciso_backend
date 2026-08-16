@@ -48,7 +48,7 @@ function AIDecisionsPage() {
     })),
   ];
 
-  const decisionList = liveDecisions.length ? liveDecisions : initialDecisions;
+  const decisionList = liveDecisions.length ? liveDecisions : mockDecisions;
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(decisionList[0] ?? null);
 
   const filtered = decisionList.filter((d) => {
