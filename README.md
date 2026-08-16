@@ -123,7 +123,7 @@ Once the server is running, open the interactive Swagger documentation in your b
 | :--- | :--- | :--- |
 | **Interactive Swagger UI** | **[http://localhost:8000/swagger/](http://localhost:8000/swagger/)** | Test all endpoints interactively with "Try it out" and Bearer JWT auth |
 | **ReDoc Documentation** | **[http://localhost:8000/docs/](http://localhost:8000/docs/)** | Clean 3-column reference view of all schemas and endpoints |
-| **Raw OpenAPI Schema** | **[http://localhost:8000/api/v1/schema](http://localhost:8000/api/v1/schema)** | Standard OpenAPI 3.0 JSON specification |
+
 
 ---
 
