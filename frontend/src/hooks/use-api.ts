@@ -84,7 +84,12 @@ export function useFindings(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.findings(params),
     queryFn: async () => {
-      const res = await api.get(`/findings${buildQuery(params)}`);
+      const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
+      const finalParams = {
+        "filter[inserted_at.gte]": defaultDate,
+        ...(params || {}),
+      };
+      const res = await api.get(`/findings${buildQuery(finalParams)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 30 * 1000,
