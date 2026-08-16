@@ -110,7 +110,7 @@ function ProvidersPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Discovered Assets:</span>
                   <span className="mono font-semibold text-foreground">
-                    {p.resources.toLocaleString()}
+                    {(p.resources ?? p.findings_count ?? 0).toLocaleString()}
                   </span>
                 </div>
               </div>

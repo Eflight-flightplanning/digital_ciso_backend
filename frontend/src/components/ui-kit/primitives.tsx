@@ -3,29 +3,31 @@ import { cn } from "@/lib/utils";
 
 /* ---------------- Animated counter ---------------- */
 export function Counter({
-  value,
+  value = 0,
   decimals = 0,
   duration = 1200,
   className,
   suffix = "",
   prefix = "",
 }: {
-  value: number;
+  value?: number;
   decimals?: number;
   duration?: number;
   className?: string;
   suffix?: string;
   prefix?: string;
 }) {
-  const [display, setDisplay] = useState(0);
+  const numVal = typeof value === "number" && !isNaN(value) ? value : 0;
+  const [display, setDisplay] = useState(numVal);
   const raf = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    const val = typeof value === "number" && !isNaN(value) ? value : 0;
     const start = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(value * eased);
+      setDisplay(val * eased);
       if (t < 1) raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
@@ -34,10 +36,12 @@ export function Counter({
     };
   }, [value, duration]);
 
+  const safeDisplay = typeof display === "number" && !isNaN(display) ? display : 0;
+
   return (
     <span className={className}>
       {prefix}
-      {display.toLocaleString(undefined, {
+      {safeDisplay.toLocaleString(undefined, {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
       })}

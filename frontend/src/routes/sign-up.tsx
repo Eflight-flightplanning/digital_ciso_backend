@@ -21,6 +21,7 @@ function SignUpPage() {
   const [email, setEmail] = useState("");
   const [org, setOrg] = useState("");
   const [password, setPassword] = useState("");
+  const [cloud, setCloud] = useState("Multi-Cloud");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

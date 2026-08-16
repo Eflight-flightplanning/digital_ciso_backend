@@ -133,7 +133,7 @@ function ScansPage() {
                 {s.duration}
               </td>
               <td className="mono text-xs font-semibold text-foreground px-4 py-3">
-                {s.resources.toLocaleString()}
+                {(s.resources ?? s.findings_discovered ?? 0).toLocaleString()}
               </td>
               <td className="px-4 py-3">
                 <span
