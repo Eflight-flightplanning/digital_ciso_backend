@@ -93,7 +93,6 @@ function SignUpPage() {
                 <input
                   type="text"
                   required
-                  placeholder="Nadia Harding"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="h-10 w-full rounded-lg border border-border bg-surface-2/60 pr-3 pl-9 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
@@ -108,7 +107,6 @@ function SignUpPage() {
                 <input
                   type="email"
                   required
-                  placeholder="nadia@acme.io"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-10 w-full rounded-lg border border-border bg-surface-2/60 pr-3 pl-9 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
@@ -124,7 +122,6 @@ function SignUpPage() {
                   <input
                     type="text"
                     required
-                    placeholder="Acme Corp"
                     value={org}
                     onChange={(e) => setOrg(e.target.value)}
                     className="h-10 w-full rounded-lg border border-border bg-surface-2/60 pr-3 pl-9 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
@@ -143,6 +140,7 @@ function SignUpPage() {
                   <option>Amazon AWS</option>
                   <option>Microsoft Azure</option>
                   <option>Google Cloud</option>
+                  <option>Oracle Cloud (OCI)</option>
                   <option>Kubernetes</option>
                 </select>
               </div>
@@ -155,7 +153,6 @@ function SignUpPage() {
                 <input
                   type="password"
                   required
-                  placeholder="Min 12 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="h-10 w-full rounded-lg border border-border bg-surface-2/60 pr-3 pl-9 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
