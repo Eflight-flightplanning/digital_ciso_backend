@@ -1,6 +1,3 @@
-﻿import sys
-sys.path.insert(0, r'D:\security_platform')
-
 from config.django.base import *  # noqa
 from config.env import env
 

@@ -211,9 +211,8 @@ class AIAnalysisService:
         Store AI assessment and security decision to database using Django ORM.
         """
         from api.models import AIAssessment, SecurityDecision
-        from api.rls import get_current_tenant
 
-        current_tenant = tenant_id or get_current_tenant()
+        current_tenant = tenant_id  # tenant_id is passed in or None
 
         # Create or update assessment
         assessment, _created = AIAssessment.objects.update_or_create(

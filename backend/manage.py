@@ -5,6 +5,11 @@ import sys
 
 
 def main():
+    # Ensure repository root (containing prowler/) is in sys.path
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.django.devel")
     try:
         from django.core.management import execute_from_command_line

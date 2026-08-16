@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=0.40.0",
+    "httpx>=0.27.0",
+    "openai>=1.40.0",
     "aioboto3",
-    "boto3>=1.43.72",
+    "boto3",
     "cartography>=0.115.0",
     "celery[redis]==5.*",
     "colorama>=0.4.6",
@@ -35,4 +38,6 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "sentry-sdk==2.*",
     "uuid6>=2025.0.1",
+    "reportlab>=5.0.0",
+    "matplotlib>=3.11.1",
 ]

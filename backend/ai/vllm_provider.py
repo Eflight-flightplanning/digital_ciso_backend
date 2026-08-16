@@ -95,6 +95,15 @@ class VLLMAzureProvider(AIProvider):
                 return self._extract_json(raw_content)
         except Exception as e:
             logger.error("vLLM request failed to %s with model %s: %s", url, self.model, e)
+            
+            # Simulated fallback for UI testing when Azure VM is offline
+            if "User Question:" in user_prompt:
+                return {
+                    "answer": "This is a simulated AI response. The Azure vLLM endpoint is currently offline or unreachable. \n\nHowever, in a live environment, Spectra would analyze the findings and give you a detailed breakdown of the toxic path based on the telemetry data.",
+                    "finding_references": [],
+                    "confidence": 0.95
+                }
+                
             return {
                 "summary": f"Analysis failed: {str(e)}",
                 "error": str(e),

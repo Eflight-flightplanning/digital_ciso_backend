@@ -24,6 +24,10 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import JSONParser
+from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
+from rest_framework.renderers import JSONRenderer
+from rest_framework_json_api.renderers import JSONRenderer as JSONAPIRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -322,6 +326,8 @@ class AIAdvisorQueryView(APIView):
     3. Sends compact context to Claude
     4. Returns grounded answer with finding references
     """
+    parser_classes = [JSONParser, JSONAPIParser]
+    renderer_classes = [JSONRenderer, JSONAPIRenderer]
     resource_name = "advisor-queries"
 
     def post(self, request: Request) -> Response:
@@ -381,7 +387,8 @@ class AIAdvisorQueryView(APIView):
                 relevant_findings=relevant_findings,
             )
 
-            return _json_api_success(result.to_dict(), "advisor-response", "query")
+            from django.http import JsonResponse
+            return JsonResponse(result.to_dict(), status=200)
 
         except Exception as e:
             logger.error("AI Advisor query error: %s", e, exc_info=True)
@@ -515,10 +522,7 @@ def _finding_to_dict(finding: Any) -> dict[str, Any]:
     }
 
 
-from rest_framework.parsers import JSONParser
-from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
-from rest_framework.renderers import JSONRenderer
-from rest_framework_json_api.renderers import JSONRenderer as JSONAPIRenderer
+
 
 
 class AIReasoningProxyView(APIView):
