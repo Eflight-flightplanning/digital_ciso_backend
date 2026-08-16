@@ -164,28 +164,28 @@ function MarketingLandingPage() {
         }`}
       >
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
-          {/* Logo & Brand Wordmark */}
+          {/* Brand Logo & Clean Meaningful Subtitle */}
           <Link to="/" className="flex items-center gap-3 group cursor-pointer shrink-0">
             <div className="transition-transform duration-300 group-hover:scale-105">
               <BrandLogo size={42} />
             </div>
             <div className="flex flex-col">
-              <span className={`text-[17px] font-black tracking-tight leading-tight ${isDark ? "text-white" : "text-slate-950"}`}>
+              <span className={`text-lg font-black tracking-tight leading-none ${isDark ? "text-white" : "text-slate-950"}`}>
                 DIGITAL <span className="bg-gradient-to-r from-[#8EC63F] to-[#06B6D4] bg-clip-text text-transparent">CISO</span>
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 leading-tight">
-                Autonomous Cloud Defense
+              <span className="text-[11px] font-bold tracking-wide text-[#8EC63F] leading-none mt-1">
+                AI Cloud Security
               </span>
             </div>
           </Link>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1.5">
+          <nav className="hidden lg:flex items-center gap-2">
             {[
               { label: "Overview", href: "#overview" },
               { label: "How It Works", href: "#how-it-works" },
               { label: "Capabilities", href: "#capabilities" },
-              { label: "Compliance", href: "#compliance" },
+              { label: "Compliance (28)", href: "#compliance" },
               { label: "Integrations", href: "#integrations" },
               { label: "Developer API", href: "#mcp" },
             ].map((item) => (
@@ -241,7 +241,7 @@ function MarketingLandingPage() {
       </header>
 
       {/* ════════════════════════════════════════════════════════════════════
-          HERO SECTION (2-Column Architecture with Spectra AI Decision Gate)
+          HERO SECTION (2-Column Architecture with Enterprise Marketing Visual)
       ════════════════════════════════════════════════════════════════════ */}
       <section id="overview" className="relative isolate overflow-hidden pt-16 pb-24 sm:pt-20 sm:pb-32 px-6 lg:px-8">
         {/* Background Gradients & Pravahya Grid Blur */}
@@ -313,91 +313,103 @@ function MarketingLandingPage() {
               </div>
             </div>
 
-            {/* Right Column: Spectra AI Autonomous CISO Decision Gate */}
+            {/* Right Column: Clean Marketing Presentation Showcase */}
             <div className="relative">
               <div
-                className={`relative overflow-hidden rounded-3xl p-6 sm:p-7 transition-all ${
+                className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 transition-all ${
                   isDark
                     ? "border border-white/15 bg-white/[0.04] backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-                    : "border border-slate-200 bg-white/90 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.06)]"
+                    : "border border-slate-200 bg-white/95 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.06)]"
                 }`}
               >
-                {/* Header with Spectra Engine Badge */}
+                {/* Showcase Header */}
                 <div className={`flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] ring-1 ring-[#8EC63F]/30">
-                      <BrainCircuit className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
-                        Spectra AI · Autonomous CISO
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">Decision Review Queue #2409</div>
-                    </div>
+                    <ShieldCheck className="h-5 w-5 text-[#8EC63F]" />
+                    <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-950'}`}>
+                      Autonomous Security Nervous System
+                    </span>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold text-amber-400">
-                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                    HITL Gate Active
+                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold text-emerald-400">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Continuous Guard
                   </span>
                 </div>
 
-                {/* Active Incident Evaluation */}
-                <div className="mt-4 space-y-3">
-                  <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-rose-400 flex items-center gap-1.5">
-                        <Zap className="h-3.5 w-3.5" /> P1 Critical Exposure
-                      </span>
-                      <span className="font-mono text-[11px] text-slate-400">AWS + OCI Environment</span>
+                {/* 3 Core Architecture Cards */}
+                <div className="mt-5 space-y-3.5">
+                  {/* Card 1: 28 Frameworks */}
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-[#8EC63F]/40' : 'border-slate-200 bg-slate-50/80 hover:border-[#8EC63F] shadow-xs'}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] ring-1 ring-[#8EC63F]/30">
+                          <Award className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+                            28+ Global Compliance Frameworks
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            CIS (AWS/Azure/GCP/OCI/K8s), SOC 2, ISO 27001, PCI-DSS, NIST & HIPAA
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className={`mt-2 text-xs font-bold leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      Public S3 Bucket ACL on <code className="font-mono text-[#8EC63F]">s3:::finance-prod-audit-2026</code>
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-400 leading-relaxed">
-                      Spectra AI triaged toxic combination: Over-privileged IAM role combined with open ingress 0.0.0.0/0. Auto-generated zero-downtime Terraform fix.
-                    </p>
                   </div>
 
-                  {/* AI Generated Terraform Fix Preview */}
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-[11px] text-emerald-400 leading-relaxed shadow-inner">
-                    <div className="text-[10px] text-slate-500 mb-1.5 flex justify-between">
-                      <span>Terraform Remediation Script (Automated)</span>
-                      <span className="text-[#8EC63F]">Validated ✓</span>
+                  {/* Card 2: Spectra AI */}
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-[#06B6D4]/40' : 'border-slate-200 bg-slate-50/80 hover:border-[#06B6D4] shadow-xs'}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#06B6D4]/20 to-[#0A6EDD]/20 text-[#06B6D4] ring-1 ring-[#06B6D4]/30">
+                          <BrainCircuit className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+                            Spectra AI Threat Triage & Attack Paths
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            Instant multi-cloud blast radius calculation and toxic privilege escalation mapping
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <code>{`resource "aws_s3_bucket_public_access_block" "enforce" {
-  bucket = "finance-prod-audit-2026"
-  block_public_acls = true
-  restrict_public_buckets = true
-}`}</code>
+                  </div>
+
+                  {/* Card 3: HITL Safety Gate */}
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-emerald-500/40' : 'border-slate-200 bg-slate-50/80 hover:border-emerald-500 shadow-xs'}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-[#8EC63F]/20 text-emerald-400 ring-1 ring-emerald-500/30">
+                          <Lock className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+                            Human-In-The-Loop (HITL) Execution
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            AI writes Terraform fixes; nothing touches cloud without analyst approval
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Human-In-The-Loop Safety Gate Actions */}
-                <div className="mt-4 pt-3 border-t flex flex-col gap-2.5 ${isDark ? 'border-white/10' : 'border-slate-200'}">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">Blast Radius: <strong className="text-emerald-400">0 Services Disrupted</strong></span>
-                    <span className="text-slate-400">SLA: <strong className="text-amber-400">2h 14m remaining</strong></span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <Link
-                      to="/ai/decisions"
-                      className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#8EC63F] px-3 text-xs font-bold text-[#07090E] shadow-sm transition-all hover:bg-[#9fe046] active:scale-95"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span>Approve & Fix</span>
-                    </Link>
-
-                    <Link
-                      to="/ai/decisions"
-                      className={`flex h-9 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all hover:bg-rose-500/10 hover:border-rose-500/40 hover:text-rose-400 ${
-                        isDark ? "border-white/15 text-slate-300" : "border-slate-300 text-slate-700"
-                      }`}
-                    >
-                      <span>Review Details</span>
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </div>
+                {/* Showcase Footer Trust Badge */}
+                <div className={`mt-5 pt-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    Zero-Agent Cloud Connect
+                  </span>
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    Continuous Audit Trails
+                  </span>
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    Model Context Protocol
+                  </span>
                 </div>
               </div>
             </div>
