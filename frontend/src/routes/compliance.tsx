@@ -5,6 +5,7 @@ import {
   Download,
   Search,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
