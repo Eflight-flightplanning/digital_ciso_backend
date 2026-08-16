@@ -35,18 +35,53 @@ function FindingsPage() {
 
   const rawData: Finding[] = useMemo(() => {
     if (apiFindings?.items && apiFindings.items.length > 0) {
-      return (apiFindings.items as Array<Record<string, unknown>>).map((f) => ({
-        id: (f.uid as string) || (f.id as string) || "FND-00000",
-        title: (f.check_title as string) || (f.title as string) || "Cloud Misconfiguration Finding",
-        severity: ((f.severity as string) || "medium").toLowerCase() as Finding["severity"],
-        status: (f.status as string) || "FAIL",
-        provider: ((f.provider as string) || (f.provider_type as string) || "AWS").toUpperCase(),
-        region: (f.region as string) || "global",
-        service: (f.service as string) || (f.service_name as string) || "Core",
-        resource: (f.resource_name as string) || (f.resource_id as string) || "cloud-resource",
-        scanned: (f.first_seen_at as string) || (f.updated_at as string) || new Date().toISOString(),
-        remediation: (f.remediation_text as string) || (f.remediation as string) || "Follow cloud security best practices to resolve this misconfiguration.",
-      }));
+      return (apiFindings.items as Array<Record<string, unknown>>).map((f) => {
+        const meta = (f.check_metadata as Record<string, any>) || (f.raw_result as Record<string, any>) || {};
+        const uid = String(f.uid || f.id || "");
+
+        let prov = String(meta.provider || f.provider || f.provider_type || "").toUpperCase();
+        if (!prov) {
+          if (uid.includes("prowler-azure-") || uid.includes("/subscriptions/")) prov = "AZURE";
+          else if (uid.includes("prowler-oci-") || uid.includes("ocid1.")) prov = "OCI";
+          else if (uid.includes("prowler-gcp-") || uid.includes("projects/")) prov = "GCP";
+          else if (uid.includes("prowler-kubernetes-") || uid.includes("k8s-")) prov = "K8S";
+          else prov = "AWS";
+        }
+        if (prov === "ORACLECLOUD") prov = "OCI";
+        if (prov === "KUBERNETES") prov = "K8S";
+
+        const title = String(
+          meta.check_title ||
+          f.check_title ||
+          f.title ||
+          (f.check_id ? String(f.check_id).replace(/_/g, " ") : "Cloud Misconfiguration Finding")
+        );
+
+        const service = String(meta.service_name || meta.service || f.service || "Core");
+        const region = String(meta.region || f.region || "global");
+        const resource = String(meta.resource_name || meta.resource_id || f.resource_name || f.resource_id || "cloud-resource");
+        const remediation = String(
+          meta.remediation_text ||
+          meta.remediation ||
+          f.remediation_text ||
+          f.remediation ||
+          (f.status_extended as string) ||
+          "Follow cloud security best practices to resolve this misconfiguration."
+        );
+
+        return {
+          id: uid || (f.id as string) || "FND-00000",
+          title,
+          severity: ((f.severity as string) || "medium").toLowerCase() as Finding["severity"],
+          status: ((f.status as string) || "FAIL").toUpperCase(),
+          provider: prov,
+          region,
+          service,
+          resource,
+          scanned: (f.first_seen_at as string) || (f.inserted_at as string) || (f.updated_at as string) || new Date().toISOString(),
+          remediation,
+        };
+      });
     }
     return [];
   }, [apiFindings]);
