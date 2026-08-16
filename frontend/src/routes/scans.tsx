@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Radar,
@@ -25,23 +25,57 @@ function ScansPage() {
   const { data: apiProviders } = useProviders();
   const launchScanMutation = useLaunchScan();
 
-  const scanList = (apiScans?.items && apiScans.items.length > 0)
-    ? (apiScans.items as Array<Record<string, unknown>>).map((s) => ({
-        id: (s.id as string) || "SCN-00000",
-        provider: ((s.provider_alias as string) || (s.provider as string) || "AWS").toUpperCase(),
-        status: (s.state === "EXECUTING" || s.status === "RUNNING"
-          ? "Running"
-          : s.state === "COMPLETED" || s.status === "COMPLETED"
-            ? "Completed"
-            : s.state === "FAILED"
+  const providerMap = useMemo(() => {
+    const map = new Map<string, { alias: string; provider: string }>();
+    if (apiProviders?.items) {
+      for (const p of apiProviders.items as Array<Record<string, unknown>>) {
+        const provType = String(p.provider || p.provider_type || "AWS").toUpperCase();
+        map.set(String(p.id), {
+          alias: String(p.alias || p.uid || "Cloud Account"),
+          provider: provType === "ORACLECLOUD" ? "OCI" : provType,
+        });
+      }
+    }
+    return map;
+  }, [apiProviders]);
+
+  const scanList = useMemo(() => {
+    if (!apiScans?.items || apiScans.items.length === 0) return [];
+    return (apiScans.items as Array<Record<string, unknown>>).map((s) => {
+      const pId = String(s.provider_id || s.provider || "");
+      const resolvedProvider = providerMap.get(pId);
+
+      const providerLabel = resolvedProvider
+        ? `${resolvedProvider.provider} · ${resolvedProvider.alias}`
+        : (s.name ? String(s.name) : "CLOUD ENVIRONMENT");
+
+      const stateStr = String(s.state || s.status || "available").toLowerCase();
+      const statusLabel =
+        stateStr === "completed"
+          ? "Completed"
+          : stateStr === "executing" || stateStr === "running"
+            ? "Running"
+            : stateStr === "failed"
               ? "Failed"
-              : "Scheduled") as "Completed" | "Running" | "Scheduled" | "Failed",
-        start: (s.started_at as string) || "Recent",
-        duration: (s.duration as string) || "02m 15s",
-        resources: (s.unique_resources_count as number) || (s.resources as number) || 0,
+              : stateStr === "available"
+                ? "Running"
+                : "Scheduled";
+
+      const timeLabel = s.inserted_at
+        ? new Date(String(s.inserted_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : (s.started_at as string) || "Recent";
+
+      return {
+        id: String(s.id || "SCN-00000"),
+        provider: providerLabel,
+        status: statusLabel as "Completed" | "Running" | "Scheduled" | "Failed",
+        start: timeLabel,
+        duration: (s.duration as string) || "Active",
+        resources: (s.unique_resource_count as number) || (s.resources as number) || 0,
         findings: (s.findings_count as number) || (s.findings as number) || 0,
-      }))
-    : [];
+      };
+    });
+  }, [apiScans, providerMap]);
 
   const providers = (apiProviders?.items || []) as Array<Record<string, unknown>>;
   const [modalOpen, setModalOpen] = useState(false);
