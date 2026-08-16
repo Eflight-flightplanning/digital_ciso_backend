@@ -134,7 +134,6 @@ function AIDecisionsPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [executingId, setExecutingId] = useState<string | null>(null);
 
-  // Merge live backend playbooks with fallback items
   const playbooks: ExtendedPlaybook[] = (playbooksRaw?.items && playbooksRaw.items.length > 0)
     ? (playbooksRaw.items as Array<Record<string, unknown>>).map((p) => ({
         id: p.id as string,
@@ -152,7 +151,7 @@ function AIDecisionsPage() {
         risk: 88,
         sla: "4h remaining",
       }))
-    : fallbackPlaybooks;
+    : [];
 
   const [selectedId, setSelectedId] = useState<string>(playbooks[0]?.id || "");
   const selectedPb = playbooks.find((p) => p.id === selectedId) || playbooks[0];

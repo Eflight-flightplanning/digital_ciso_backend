@@ -29,9 +29,9 @@ function ProvidersPage() {
         alias: (p.alias as string) || (p.uid as string) || "cloud-account",
         status: (p.connected === false ? "disconnected" : "connected") as "connected" | "disconnected" | "syncing",
         lastScan: (p.last_scan_at as string) || "Recent",
-        resources: (p.resources_count as number) || (p.findings_count as number) || 85,
+        resources: (p.resources_count as number) || (p.findings_count as number) || 0,
       }))
-    : initialProviders;
+    : [];
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newType, setNewType] = useState("AWS");

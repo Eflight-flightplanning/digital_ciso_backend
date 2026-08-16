@@ -28,10 +28,10 @@ function ResourcesPage() {
         type: (r.type as string) || (r.resource_type as string) || "Cloud Service",
         provider: ((r.provider as string) || (r.provider_type as string) || "AWS").toUpperCase(),
         region: (r.region as string) || "global",
-        tags: typeof r.tags === "object" && r.tags !== null ? Object.keys(r.tags).length : ((r.tag_count as number) || 4),
+        tags: typeof r.tags === "object" && r.tags !== null ? Object.keys(r.tags).length : ((r.tag_count as number) || 0),
         failedFindings: (r.failed_findings_count as number) || 0,
       }))
-    : initialResources;
+    : [];
 
   const [search, setSearch] = useState("");
   const [providerFilter, setProviderFilter] = useState("All");

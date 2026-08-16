@@ -19,7 +19,7 @@ export const Route = createFileRoute("/reports")({
 });
 
 function ReportsPage() {
-  const [reports, setReports] = useState(initialReports);
+  const [reports, setReports] = useState<Array<{ id: string; framework: string; range: string; format: string; created: string; size: string }>>([]);
   const [framework, setFramework] = useState("CIS AWS Foundations");
   const [format, setFormat] = useState("PDF");
   const [range, setRange] = useState("Last 30 Days");

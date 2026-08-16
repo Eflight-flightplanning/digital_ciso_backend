@@ -48,14 +48,14 @@ function FindingsPage() {
         remediation: (f.remediation_text as string) || (f.remediation as string) || "Follow cloud security best practices to resolve this misconfiguration.",
       }));
     }
-    return initialFindings;
+    return [];
   }, [apiFindings]);
 
-  const [data, setData] = useState<Finding[]>(rawData);
+  const [data, setData] = useState<Finding[]>([]);
 
   // Sync with API updates if received
   useEffect(() => {
-    if (apiFindings?.items && apiFindings.items.length > 0) {
+    if (apiFindings?.items) {
       setData(rawData);
     }
   }, [rawData, apiFindings]);
@@ -287,8 +287,30 @@ function FindingsPage() {
         >
           {filtered.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-12 text-center text-xs text-muted-foreground">
-                No findings matching current filters.
+              <td colSpan={9} className="py-16 text-center">
+                <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3.5">
+                    <ShieldAlert className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">No Security Findings Detected</h3>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    This organization tenant is fresh. Connect your cloud account (AWS, Azure, GCP, OCI, or K8s) to trigger continuous audits.
+                  </p>
+                  <div className="mt-5 flex items-center gap-3">
+                    <Link
+                      to="/providers"
+                      className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
+                    >
+                      + Connect Cloud Provider
+                    </Link>
+                    <Link
+                      to="/scans"
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors"
+                    >
+                      View Scans
+                    </Link>
+                  </div>
+                </div>
               </td>
             </tr>
           ) : (

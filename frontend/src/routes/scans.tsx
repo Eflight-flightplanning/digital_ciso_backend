@@ -37,10 +37,10 @@ function ScansPage() {
               : "Scheduled") as "Completed" | "Running" | "Scheduled" | "Failed",
         start: (s.started_at as string) || "Recent",
         duration: (s.duration as string) || "02m 15s",
-        resources: (s.unique_resources_count as number) || (s.resources as number) || 450,
+        resources: (s.unique_resources_count as number) || (s.resources as number) || 0,
         findings: (s.findings_count as number) || (s.findings as number) || 0,
       }))
-    : initialScans;
+    : [];
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState("AWS");

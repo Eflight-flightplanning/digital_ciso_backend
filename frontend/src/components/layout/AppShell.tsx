@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
+import { authStore } from "@/lib/auth";
 import {
   CommandDialog,
   CommandEmpty,
