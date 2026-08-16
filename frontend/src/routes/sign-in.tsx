@@ -26,7 +26,7 @@ function SignInPage() {
     setError(null);
     try {
       await authStore.signIn(email, password);
-      navigate({ to: "/" });
+      navigate({ to: "/findings" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Invalid credentials";
       setError(msg);

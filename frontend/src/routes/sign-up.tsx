@@ -31,7 +31,7 @@ function SignUpPage() {
     setError(null);
     try {
       await authStore.signUp(email, password, name, org);
-      navigate({ to: "/" });
+      navigate({ to: "/findings" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       setError(msg);

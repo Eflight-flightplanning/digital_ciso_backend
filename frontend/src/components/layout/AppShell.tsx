@@ -48,7 +48,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavSection = { label?: string; items: NavItem[] };
 
 export const navSections: NavSection[] = [
-  { items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }] },
+  { items: [{ to: "/findings", label: "Dashboard", icon: LayoutDashboard }] },
   {
     label: "Security",
     items: [
@@ -215,13 +215,13 @@ function Sidebar({
       {/* User Profile Footer */}
       <div className={cn("border-t border-sidebar-border p-3", collapsed && "flex justify-center")}>
         <Link to="/profile" className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
-            NH
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
+            {authStore.getState().user?.name ? authStore.getState().user!.name.slice(0, 2).toUpperCase() : "SA"}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">Nadia Harding</span>
-              <span className="block text-[10px] text-muted-foreground">CISO</span>
+              <span className="block truncate text-xs font-semibold">{authStore.getState().user?.name || "Security Administrator"}</span>
+              <span className="block text-[10px] text-muted-foreground">{authStore.getState().user?.role || "CISO"}</span>
             </span>
           )}
           {!collapsed && <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
