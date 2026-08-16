@@ -153,11 +153,8 @@ function MarketingLandingPage() {
           : "bg-[#F8FAFC] text-[#0F172A] selection:bg-[#8EC63F] selection:text-black"
       }`}
     >
-      {/* Top Brand Ambient Glow Line */}
-      <div className="fixed inset-x-0 top-0 z-[60] h-1 origin-left bg-gradient-to-r from-[#8EC63F] via-[#06B6D4] to-[#0A6EDD]" />
-
       {/* ════════════════════════════════════════════════════════════════════
-          HEADER (Pravahya-Style Floating Glass Navbar)
+          HEADER (Clean Enterprise Floating Navbar)
       ════════════════════════════════════════════════════════════════════ */}
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-all duration-300 ${
@@ -166,38 +163,38 @@ function MarketingLandingPage() {
             : "border-slate-200/80 bg-white/90 shadow-[0_4px_20px_rgba(0,0,0,0.04)]"
         }`}
       >
-        <div className="mx-auto flex h-[74px] max-w-7xl items-center justify-between px-6 lg:px-8">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
           {/* Logo & Brand Wordmark */}
-          <Link to="/" className="flex items-center gap-3.5 group cursor-pointer">
+          <Link to="/" className="flex items-center gap-3 group cursor-pointer shrink-0">
             <div className="transition-transform duration-300 group-hover:scale-105">
-              <BrandLogo size={40} />
+              <BrandLogo size={42} />
             </div>
             <div className="flex flex-col">
-              <span className={`text-[17px] font-black tracking-tight leading-none ${isDark ? "text-white" : "text-slate-900"}`}>
+              <span className={`text-[17px] font-black tracking-tight leading-tight ${isDark ? "text-white" : "text-slate-950"}`}>
                 DIGITAL <span className="bg-gradient-to-r from-[#8EC63F] to-[#06B6D4] bg-clip-text text-transparent">CISO</span>
               </span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 leading-none mt-1">
-                Innovate · Protect · Evolve
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 leading-tight">
+                Autonomous Cloud Defense
               </span>
             </div>
           </Link>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1.5">
             {[
               { label: "Overview", href: "#overview" },
               { label: "How It Works", href: "#how-it-works" },
               { label: "Capabilities", href: "#capabilities" },
-              { label: "Compliance (28)", href: "#compliance" },
+              { label: "Compliance", href: "#compliance" },
               { label: "Integrations", href: "#integrations" },
-              { label: "MCP Gateway", href: "#mcp" },
+              { label: "Developer API", href: "#mcp" },
             ].map((item) => (
               <a
                 key={item.label}
                 href={item.href}
                 className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-200 ${
                   isDark
-                    ? "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                    ? "text-slate-300 hover:bg-white/[0.08] hover:text-white"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                 }`}
               >
@@ -207,15 +204,15 @@ function MarketingLandingPage() {
           </nav>
 
           {/* Auth & Theme Toggle Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {/* Theme Switcher Button */}
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
               className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200 active:scale-95 cursor-pointer ${
                 isDark
-                  ? "border-white/10 bg-white/[0.05] text-amber-300 hover:bg-white/10"
-                  : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 shadow-xs"
+                  ? "border-white/15 bg-white/[0.05] text-amber-300 hover:bg-white/10"
+                  : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 shadow-xs"
               }`}
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -225,7 +222,7 @@ function MarketingLandingPage() {
               to="/sign-in"
               className={`hidden sm:inline-flex h-10 items-center justify-center rounded-full border px-5 text-[13px] font-bold transition-all duration-200 active:scale-95 ${
                 isDark
-                  ? "border-white/15 bg-white/[0.04] text-white hover:border-white/30 hover:bg-white/[0.08]"
+                  ? "border-white/20 bg-white/[0.04] text-white hover:border-white/30 hover:bg-white/[0.08]"
                   : "border-slate-300 bg-white text-slate-800 hover:bg-slate-100 shadow-xs"
               }`}
             >
@@ -244,7 +241,7 @@ function MarketingLandingPage() {
       </header>
 
       {/* ════════════════════════════════════════════════════════════════════
-          HERO SECTION (Pravahya 2-Column High-Impact Architecture)
+          HERO SECTION (2-Column Architecture with Spectra AI Decision Gate)
       ════════════════════════════════════════════════════════════════════ */}
       <section id="overview" className="relative isolate overflow-hidden pt-16 pb-24 sm:pt-20 sm:pb-32 px-6 lg:px-8">
         {/* Background Gradients & Pravahya Grid Blur */}
@@ -257,28 +254,29 @@ function MarketingLandingPage() {
         </div>
 
         <div className="mx-auto max-w-7xl">
-          <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_1fr] lg:gap-14">
-            {/* Left Column: Headline, Pill & CTAs */}
+          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-12">
+            {/* Left Column: Headline, Subtext & CTAs */}
             <div className="flex flex-col items-start gap-7">
               {/* Badge Pill */}
-              <div className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-xs ${isDark ? 'border-white/15 bg-white/10 text-white/90' : 'border-slate-200 bg-white text-slate-800'}">
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-xs ${isDark ? 'border-white/15 bg-white/10 text-white/90' : 'border-slate-200 bg-white text-slate-800'}`}>
                 <span className="rounded-full bg-[#8EC63F] px-2.5 py-0.5 text-[0.65rem] font-black uppercase tracking-wider text-[#07090E]">
                   Autonomous CISO
                 </span>
-                <span>Enterprise Multi-Cloud Defense · 28 Frameworks</span>
+                <span>Continuous Cloud Auditing · 28 Frameworks</span>
               </div>
 
-              {/* Pravahya-Style Bold Display Headline */}
+              {/* High-Impact Executive Headline */}
               <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.08] ${isDark ? "text-white" : "text-slate-950"}`}>
-                Autonomous Cloud Security that carries{" "}
+                Autonomous Cloud Security &{" "}
                 <span className="bg-gradient-to-r from-[#8EC63F] via-[#06B6D4] to-[#0A6EDD] bg-clip-text text-transparent">
-                  real executive weight.
-                </span>
+                  Continuous Compliance
+                </span>{" "}
+                for Enterprise.
               </h1>
 
-              {/* Specialisation Subhead */}
-              <p className={`text-lg sm:text-xl font-medium leading-relaxed max-w-xl ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                Engineered for enterprises where cloud compliance cannot fail. Continuous auditing across <strong>28 standards</strong>, instant AI triage, and <strong>Human-In-The-Loop (HITL)</strong> automated remediation across <strong>AWS, Azure, GCP, OCI & Kubernetes</strong>.
+              {/* Subhead */}
+              <p className={`text-lg font-medium leading-relaxed max-w-xl ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                Continuous compliance auditing across <strong>28 global standards</strong>, instant AI threat triage, toxic attack path discovery, and <strong>Human-In-The-Loop (HITL)</strong> automated remediation across <strong>AWS, Azure, GCP, OCI & Kubernetes</strong>.
               </p>
 
               {/* Primary Action Buttons */}
@@ -306,7 +304,7 @@ function MarketingLandingPage() {
 
               {/* Multi-Cloud Trust Indicator */}
               <div className="pt-2 flex flex-wrap items-center gap-6 text-xs font-semibold text-slate-400">
-                <span className="uppercase tracking-widest text-[10px] text-slate-500 font-bold">Supported Platforms:</span>
+                <span className="uppercase tracking-widest text-[10px] text-slate-500 font-bold">Cloud Coverage:</span>
                 <span className={`flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-800"}`}><Cloud className="h-4 w-4 text-[#FF9900]" /> AWS</span>
                 <span className={`flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-800"}`}><Cloud className="h-4 w-4 text-[#0078D4]" /> Azure</span>
                 <span className={`flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-800"}`}><Cloud className="h-4 w-4 text-[#4285F4]" /> GCP</span>
@@ -315,66 +313,91 @@ function MarketingLandingPage() {
               </div>
             </div>
 
-            {/* Right Column: Pravahya-Style "At a glance" Glassmorphic Bento */}
+            {/* Right Column: Spectra AI Autonomous CISO Decision Gate */}
             <div className="relative">
               <div
-                className={`relative overflow-hidden rounded-3xl p-8 sm:p-9 transition-all ${
+                className={`relative overflow-hidden rounded-3xl p-6 sm:p-7 transition-all ${
                   isDark
                     ? "border border-white/15 bg-white/[0.04] backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
                     : "border border-slate-200 bg-white/90 backdrop-blur-2xl shadow-[0_20px_40px_rgba(0,0,0,0.06)]"
                 }`}
               >
-                {/* Internal Ambient Radial Blur */}
-                <div aria-hidden="true" className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-[#8EC63F]/20 blur-3xl" />
+                {/* Header with Spectra Engine Badge */}
+                <div className={`flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] ring-1 ring-[#8EC63F]/30">
+                      <BrainCircuit className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+                        Spectra AI · Autonomous CISO
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">Decision Review Queue #2409</div>
+                    </div>
+                  </div>
+                  <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold text-amber-400">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                    HITL Gate Active
+                  </span>
+                </div>
 
-                <div className="relative flex flex-col gap-7">
-                  <div className="flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/10' : 'border-slate-200'}">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F]">
-                      Autonomous Posture · At a glance
+                {/* Active Incident Evaluation */}
+                <div className="mt-4 space-y-3">
+                  <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-rose-400 flex items-center gap-1.5">
+                        <Zap className="h-3.5 w-3.5" /> P1 Critical Exposure
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-400">AWS + OCI Environment</span>
+                    </div>
+                    <div className={`mt-2 text-xs font-bold leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      Public S3 Bucket ACL on <code className="font-mono text-[#8EC63F]">s3:::finance-prod-audit-2026</code>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-400 leading-relaxed">
+                      Spectra AI triaged toxic combination: Over-privileged IAM role combined with open ingress 0.0.0.0/0. Auto-generated zero-downtime Terraform fix.
                     </p>
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                      Live Nervous System
-                    </span>
                   </div>
 
-                  <dl className="grid grid-cols-2 gap-x-6 gap-y-8">
-                    {/* Stat 1 */}
-                    <div className="flex flex-col gap-1">
-                      <dd className={`text-4xl sm:text-5xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
-                        28<span className="text-[#8EC63F]">+</span>
-                      </dd>
-                      <p className={`text-sm font-bold ${isDark ? "text-white/90" : "text-slate-800"}`}>Compliance Standards</p>
-                      <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>CIS, SOC 2, ISO, PCI, NIST, HIPAA & OCI</p>
+                  {/* AI Generated Terraform Fix Preview */}
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-3.5 font-mono text-[11px] text-emerald-400 leading-relaxed shadow-inner">
+                    <div className="text-[10px] text-slate-500 mb-1.5 flex justify-between">
+                      <span>Terraform Remediation Script (Automated)</span>
+                      <span className="text-[#8EC63F]">Validated ✓</span>
                     </div>
+                    <code>{`resource "aws_s3_bucket_public_access_block" "enforce" {
+  bucket = "finance-prod-audit-2026"
+  block_public_acls = true
+  restrict_public_buckets = true
+}`}</code>
+                  </div>
+                </div>
 
-                    {/* Stat 2 */}
-                    <div className="flex flex-col gap-1">
-                      <dd className={`text-4xl sm:text-5xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
-                        5
-                      </dd>
-                      <p className={`text-sm font-bold ${isDark ? "text-white/90" : "text-slate-800"}`}>Cloud Environments</p>
-                      <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>AWS, Azure, GCP, OCI & Kubernetes</p>
-                    </div>
+                {/* Human-In-The-Loop Safety Gate Actions */}
+                <div className="mt-4 pt-3 border-t flex flex-col gap-2.5 ${isDark ? 'border-white/10' : 'border-slate-200'}">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Blast Radius: <strong className="text-emerald-400">0 Services Disrupted</strong></span>
+                    <span className="text-slate-400">SLA: <strong className="text-amber-400">2h 14m remaining</strong></span>
+                  </div>
 
-                    {/* Stat 3 */}
-                    <div className="flex flex-col gap-1">
-                      <dd className={`text-4xl sm:text-5xl font-black tracking-tight text-emerald-400`}>
-                        100%
-                      </dd>
-                      <p className={`text-sm font-bold ${isDark ? "text-white/90" : "text-slate-800"}`}>HITL Approval Gates</p>
-                      <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>Zero unauthorized infrastructure changes</p>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <Link
+                      to="/ai/decisions"
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#8EC63F] px-3 text-xs font-bold text-[#07090E] shadow-sm transition-all hover:bg-[#9fe046] active:scale-95"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>Approve & Fix</span>
+                    </Link>
 
-                    {/* Stat 4 */}
-                    <div className="flex flex-col gap-1">
-                      <dd className={`text-4xl sm:text-5xl font-black tracking-tight text-[#06B6D4]`}>
-                        &lt; 15m
-                      </dd>
-                      <p className={`text-sm font-bold ${isDark ? "text-white/90" : "text-slate-800"}`}>Mean MTTR</p>
-                      <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>AI-generated Terraform & CLI fixes</p>
-                    </div>
-                  </dl>
+                    <Link
+                      to="/ai/decisions"
+                      className={`flex h-9 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all hover:bg-rose-500/10 hover:border-rose-500/40 hover:text-rose-400 ${
+                        isDark ? "border-white/15 text-slate-300" : "border-slate-300 text-slate-700"
+                      }`}
+                    >
+                      <span>Review Details</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
