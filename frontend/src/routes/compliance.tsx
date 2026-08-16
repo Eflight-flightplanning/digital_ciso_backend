@@ -175,10 +175,10 @@ function CompliancePage() {
     return [];
   }, [apiProviders]);
 
-  // Selected cloud filter: Defaults to "ALL_SCANNED" if providers exist, otherwise "ALL"
   const [selectedProviderFilter, setSelectedProviderFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"cards" | "matrix">("cards");
+  const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
 
   // Live API compliance data map
   const liveComplianceMap = useMemo(() => {
