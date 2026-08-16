@@ -291,8 +291,24 @@ export function AppShell({
   subtitle?: string;
   actions?: ReactNode;
 }) {
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        navigate({ to: "/sign-in" });
+        return;
+      }
+      try {
+        const raw = localStorage.getItem("auth_user");
+        if (raw) setCurrentUser(JSON.parse(raw));
+      } catch {}
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -331,12 +347,15 @@ export function AppShell({
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
-                NH
+              <button className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/40">
+                {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : "AD"}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">Nadia Harding</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="text-xs">
+                <span className="font-bold block">{currentUser?.name || "Security Admin"}</span>
+                <span className="text-[10px] text-muted-foreground font-mono">{currentUser?.email || "admin@securityplatform.com"}</span>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link to="/profile">
@@ -350,9 +369,17 @@ export function AppShell({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/sign-in">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("auth_user");
+                    localStorage.removeItem("refresh_token");
+                    navigate({ to: "/sign-in" });
+                  }}
+                  className="flex w-full items-center px-2 py-1.5 text-xs text-critical hover:bg-critical/10 rounded cursor-pointer"
+                >
                   <LogOut className="mr-2 h-3.5 w-3.5" /> Logout
-                </Link>
+                </button>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
