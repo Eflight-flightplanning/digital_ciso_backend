@@ -408,7 +408,7 @@ function DashboardPage() {
                     </div>
 
                     <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-[11px]">
-                      <span className="text-muted-foreground">SLA: {d.sla.slice(11, 16)}</span>
+                      <span className="text-muted-foreground">SLA: {d.sla ? d.sla.slice(11, 16) : '2h'}</span>
                       <Link
                         to="/ai/decisions"
                         className="inline-flex items-center gap-1 text-primary hover:underline font-medium"

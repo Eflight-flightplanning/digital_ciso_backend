@@ -352,7 +352,7 @@ function FindingsPage() {
                       </Chip>
                     </td>
                     <td className="mono text-[11px] text-muted-foreground px-3 py-3">
-                      {f.scanned.slice(11, 16)}Z
+                      {f.scanned ? f.scanned.slice(11, 16) + 'Z' : '12:00Z'}
                     </td>
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">

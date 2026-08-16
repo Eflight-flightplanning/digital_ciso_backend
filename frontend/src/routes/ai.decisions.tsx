@@ -194,7 +194,7 @@ function AIDecisionsPage() {
                     </Chip>
                   </td>
                   <td className="mono text-[11px] text-muted-foreground px-3 py-3">
-                    {d.sla.slice(11, 16)}Z
+                    {d.sla ? d.sla.slice(11, 16) + 'Z' : '2h'}
                   </td>
                   <td className="px-3 py-3">
                     <Chip

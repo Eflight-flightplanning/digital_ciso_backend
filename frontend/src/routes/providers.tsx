@@ -85,7 +85,7 @@ function ProvidersPage() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-foreground font-display text-sm font-bold">
-                    {p.name.slice(0, 3).toUpperCase()}
+                    {(p.name || p.alias || 'AWS').slice(0, 3).toUpperCase()}
                   </div>
                   <div>
                     <h3 className="font-display text-sm font-bold text-foreground">
