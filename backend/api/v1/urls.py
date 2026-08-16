@@ -1,3 +1,4 @@
+from .report_views import ExecutiveReportView
 from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
 from api.v1.views import (
@@ -127,6 +128,9 @@ integrations_router.register(
 )
 
 urlpatterns = [
+    # White-Labeled Reports
+    path("reports/executive-summary", ExecutiveReportView.as_view(), name="executive-report"),
+    path("reports/executive-summary/", ExecutiveReportView.as_view(), name="executive-report-slash"),
     # JWT Token Authentication (Email + Password)
     path("tokens", CustomTokenObtainView.as_view(), name="token-obtain"),
     path("tokens/refresh", CustomTokenRefreshView.as_view(), name="token-refresh"),
@@ -188,14 +192,17 @@ urlpatterns = [
         ),
         name="lighthouse-configurations",
     ),
+    path("schema", SchemaView.as_view(), name="schema"),
+    path("swagger", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger"),
+    path("docs", SpectacularRedocView.as_view(url_name="schema"), name="docs"),
+    # Reports & Digital CISO — AI endpoints
+    path("reports/executive-summary", ExecutiveReportView.as_view(), name="executive-report"),
+    path("reports/executive-summary/", ExecutiveReportView.as_view(), name="executive-report-slash"),
+    path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
+    path("mcp/", MCPGatewayView.as_view(), name="mcp-gateway-v1-slash"),
+    path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
     path("", include(router.urls)),
     path("", include(tenants_router.urls)),
     path("", include(users_router.urls)),
     path("", include(integrations_router.urls)),
-    path("schema", SchemaView.as_view(), name="schema"),
-    path("swagger", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger"),
-    path("docs", SpectacularRedocView.as_view(url_name="schema"), name="docs"),
-    # Digital CISO — AI endpoints
-    path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
-    path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
 ]
