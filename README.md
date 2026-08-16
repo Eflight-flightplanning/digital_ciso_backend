@@ -262,22 +262,3 @@ curl -X POST http://localhost:8000/api/v1/ai/findings/3e59acc5-3bdd-499e-8fd1-3e
 
 ---
 
-## 🗺️ Frontend Route to Backend API Matrix
-
-| Frontend Route (`frontend/src/routes/`) | Component / Purpose | Backend API Endpoint |
-| :--- | :--- | :--- |
-| **`sign-in.tsx`** | JWT Auth & Switch Tenant | `POST /api/v1/tokens`<br>`POST /api/v1/tokens/refresh` |
-| **`sign-up.tsx`** | Account Provisioning | `POST /api/v1/users` |
-| **`index.tsx`** | Command Center Dashboard | `GET /api/v1/tenants`<br>`GET /api/v1/compliance-overviews` |
-| **`findings.tsx`** | Findings Triage & Playbooks | `GET /api/v1/findings`<br>`GET /api/v1/remediation-playbooks` |
-| **`compliance.tsx`** | Compliance Matrix (CIS, SOC 2, ISO) | `GET /api/v1/compliance-overviews` |
-| **`attack-paths.tsx`**| Toxic Attack Graph & Kill-Chain | `GET /api/v1/attack-paths-scans` |
-| **`scans.tsx`** | Assessment Runner & Schedules | `GET/POST /api/v1/scans`<br>`GET /api/v1/schedules` |
-| **`resources.tsx`** | Multi-Cloud Inventory (AWS/Azure/GCP) | `GET /api/v1/resources` |
-| **`providers.tsx`** | Cloud Connections & Secrets | `GET/POST /api/v1/providers`<br>`GET /api/v1/provider-groups` |
-| **`users.tsx`** | RBAC, Roles & Team Management | `GET/POST /api/v1/users`<br>`GET /api/v1/roles` |
-| **`integrations.tsx`**| Webhooks, Jira, Slack, SIEM | `GET/POST /api/v1/integrations`<br>`GET /api/v1/processors` |
-| **`profile.tsx`** | User Settings & Security API Keys | `GET /api/v1/users/me`<br>`GET/POST /api/v1/api-keys` |
-| **`ai/advisor.tsx`** | **Spectra**: Threat Engine & Qwen | `POST /api/v1/ai/reasoning`<br>`POST /api/v1/ai/advisor/query` |
-| **`ai/decisions.tsx`**| **Aegis**: Decision Log & HITL Queue | `GET /api/v1/decision-logs`<br>`GET /api/v1/hitl-reviews` |
-| **`ai/settings.tsx`** | **Phantom**: vLLM Settings | `GET/POST /api/v1/tenant-llm-configs` |
