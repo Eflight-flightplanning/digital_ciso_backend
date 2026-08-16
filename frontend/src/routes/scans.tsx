@@ -14,7 +14,7 @@ import {
   Dot,
 } from "@/components/ui-kit/primitives";
 import { scans as initialScans } from "@/lib/mock";
-import { useScans, useLaunchScan } from "@/hooks/use-api";
+import { useScans, useLaunchScan, useProviders } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/scans")({
   component: ScansPage,
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/scans")({
 
 function ScansPage() {
   const { data: apiScans, isLoading } = useScans();
+  const { data: apiProviders } = useProviders();
   const launchScanMutation = useLaunchScan();
 
   const scanList = (apiScans?.items && apiScans.items.length > 0)
@@ -42,23 +43,37 @@ function ScansPage() {
       }))
     : [];
 
+  const providers = (apiProviders?.items || []) as Array<Record<string, unknown>>;
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState("AWS");
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [selectedProfile, setSelectedProfile] = useState("Full Assessment");
   const [launching, setLaunching] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Default to first provider when available
+  useEffect(() => {
+    if (providers.length > 0 && !selectedProviderId) {
+      setSelectedProviderId(String(providers[0].id));
+    }
+  }, [providers, selectedProviderId]);
 
   const handleLaunchScan = async () => {
+    if (!selectedProviderId && providers.length === 0) {
+      setErrorMsg("Please connect a cloud provider first.");
+      return;
+    }
     setLaunching(true);
+    setErrorMsg(null);
     try {
       await launchScanMutation.mutateAsync({
-        providerId: selectedProvider,
+        providerId: selectedProviderId || String(providers[0]?.id),
+        name: `${selectedProfile} — ${new Date().toLocaleDateString()}`,
       });
       setLaunching(false);
       setModalOpen(false);
-    } catch {
-      // Fallback for demo
+    } catch (err: unknown) {
       setLaunching(false);
-      setModalOpen(false);
+      setErrorMsg(err instanceof Error ? err.message : "Failed to launch scan.");
     }
   };
 
@@ -178,20 +193,34 @@ function ScansPage() {
 
             <div className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="section-label mb-1 block">Cloud Provider</label>
-                <select
-                  value={selectedProvider}
-                  onChange={(e) => setSelectedProvider(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none"
-                >
-                  <option value="AWS">Amazon Web Services (AWS)</option>
-                  <option value="OCI">Oracle Cloud Infrastructure (OCI)</option>
-                  <option value="Azure">Microsoft Azure</option>
-                  <option value="GCP">Google Cloud Platform (GCP)</option>
-                  <option value="K8s">Kubernetes Cluster</option>
-                  <option value="GitHub">GitHub Enterprise</option>
-                </select>
+                <label className="section-label mb-1 block">Connected Cloud Environment</label>
+                {providers.length > 0 ? (
+                  <select
+                    value={selectedProviderId}
+                    onChange={(e) => setSelectedProviderId(e.target.value)}
+                    className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none"
+                  >
+                    {providers.map((p) => (
+                      <option key={String(p.id)} value={String(p.id)}>
+                        {String(p.alias || p.provider).toUpperCase()} ({String(p.uid || p.provider)})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-border/80 bg-surface-2/60 p-3 text-xs">
+                    <p className="text-muted-foreground">No cloud providers connected yet.</p>
+                    <Link to="/providers" className="mt-1 inline-block text-primary font-bold hover:underline">
+                      + Connect AWS, OCI, Azure, or GCP in Providers tab →
+                    </Link>
+                  </div>
+                )}
               </div>
+
+              {errorMsg && (
+                <div className="rounded-lg border border-critical/40 bg-critical/10 p-2.5 text-xs text-critical">
+                  {errorMsg}
+                </div>
+              )}
 
               <div>
                 <label className="section-label mb-1 block">Assessment Profile</label>

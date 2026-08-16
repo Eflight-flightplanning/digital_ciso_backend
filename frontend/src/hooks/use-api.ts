@@ -242,11 +242,23 @@ export function useScans(params?: Record<string, string>) {
 export function useLaunchScan() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ providerId, checks }: { providerId: string; checks?: string[] }) =>
-      api.post(
-        "/scans",
-        jsonApiBody("scans", { provider_id: providerId, checks: checks ?? [] }),
-      ),
+    mutationFn: ({ providerId, name }: { providerId: string; name?: string; checks?: string[] }) =>
+      api.post("/scans", {
+        data: {
+          type: "scans",
+          attributes: {
+            name: name || "Multi-Cloud Security Assessment",
+          },
+          relationships: {
+            provider: {
+              data: {
+                type: "providers",
+                id: providerId,
+              },
+            },
+          },
+        },
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.scans() }),
   });
 }
@@ -257,7 +269,12 @@ export function useResources(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.resources(params),
     queryFn: async () => {
-      const res = await api.get(`/resources${buildQuery(params)}`);
+      const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
+      const finalParams = {
+        "filter[updated_at.gte]": defaultDate,
+        ...(params || {}),
+      };
+      const res = await api.get(`/resources${buildQuery(finalParams)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 2 * 60 * 1000,
