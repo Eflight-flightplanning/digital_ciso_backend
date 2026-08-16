@@ -326,3 +326,59 @@ export function useAttackPaths() {
     staleTime: 60 * 1000,
   });
 }
+
+
+// ─── Human-In-The-Loop (HITL) Playbooks & Execution ────────────────────────
+
+export function useRemediationPlaybooks(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: ["remediation-playbooks", params ?? {}],
+    queryFn: async () => {
+      const qs = buildQuery(params);
+      const res = await api.get(`/remediation-playbooks${qs}`);
+      return { items: unwrapList(res), meta: unwrapMeta(res) };
+    },
+    staleTime: 10 * 1000,
+  });
+}
+
+export function useApprovePlaybook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      return await api.post(`/remediation-playbooks/${id}/approve`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["remediation-playbooks"] });
+      queryClient.invalidateQueries({ queryKey: qk.decisionLogs() });
+    },
+  });
+}
+
+export function useRejectPlaybook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      return await api.post(`/remediation-playbooks/${id}/reject`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["remediation-playbooks"] });
+      queryClient.invalidateQueries({ queryKey: qk.decisionLogs() });
+    },
+  });
+}
+
+export function useExecutePlaybook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      return await api.post(`/remediation-playbooks/${id}/execute`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["remediation-playbooks"] });
+      queryClient.invalidateQueries({ queryKey: qk.findings() });
+      queryClient.invalidateQueries({ queryKey: qk.decisionLogs() });
+    },
+  });
+}
+
