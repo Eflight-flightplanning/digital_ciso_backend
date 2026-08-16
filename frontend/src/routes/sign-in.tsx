@@ -123,28 +123,7 @@ function SignInPage() {
             </button>
           </form>
 
-          {/* Social / SSO Auth */}
-          <div className="mt-5 border-t border-border/80 pt-4">
-            <span className="section-label mb-3 block text-center">
-              Or Authenticate Via SSO
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/" })}
-                className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-4 text-xs font-medium text-foreground transition-colors hover:border-primary/40"
-              >
-                <span>GitHub SSO</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/" })}
-                className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface-2 px-4 text-xs font-medium text-foreground transition-colors hover:border-primary/40"
-              >
-                <span>Google OAuth</span>
-              </button>
-            </div>
-          </div>
+
         </div>
 
         {/* Sign Up Link */}
