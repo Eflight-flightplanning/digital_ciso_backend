@@ -1,4 +1,4 @@
-# Digital CISO & Cloud Security Platform 🛡️
+# Digital CISO & Cloud Security Platform 
 
 An enterprise-grade, multi-tenant Cloud Security Posture Management (CSPM) and automated **Digital CISO** platform built on **Django 5.1**, **PostgreSQL** (with Row-Level Security), **Celery**, and **Qwen 3.5 (9B)** hosted on **Azure VM with vLLM**.
 
