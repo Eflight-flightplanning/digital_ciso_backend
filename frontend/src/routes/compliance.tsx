@@ -433,13 +433,13 @@ function CompliancePage() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
-                  <Link
-                    to="/scans"
+                  <button
+                    onClick={() => setSelectedFramework(fw.id)}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                   >
-                    <Zap className="h-3 w-3" />
-                    <span>Run Check</span>
-                  </Link>
+                    <span>Audit Breakdown</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
                   <Link
                     to="/findings"
                     className="text-xs text-muted-foreground hover:text-foreground font-medium"
@@ -480,15 +480,110 @@ function CompliancePage() {
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right">
-                    <Link to="/scans" className="text-primary hover:underline font-semibold text-xs">
-                      Scan →
-                    </Link>
+                    <button
+                      onClick={() => setSelectedFramework(fw.id)}
+                      className="text-primary hover:underline font-semibold text-xs"
+                    >
+                      Audit Details →
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </Panel>
+      )}
+
+      {/* ── Framework Audit Detail Modal ── */}
+      {selectedFramework && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-xl rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            {(() => {
+              const fw = SUPPORTED_FRAMEWORKS.find((f) => f.id === selectedFramework);
+              if (!fw) return null;
+              const liveData = liveComplianceMap.get(fw.id.toLowerCase());
+              const pct = liveData?.passRate ? Math.round(liveData.passRate * 100) : 0;
+
+              return (
+                <div>
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="mono rounded bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-primary">
+                          {fw.provider}
+                        </span>
+                        <span className="mono text-[10px] text-muted-foreground font-semibold">
+                          {fw.version}
+                        </span>
+                      </div>
+                      <h3 className="font-display text-sm font-bold text-foreground mt-1">
+                        {fw.name}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setSelectedFramework(null)}
+                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                    {fw.description}
+                  </p>
+
+                  <div className="mt-4 space-y-2.5 max-h-[300px] overflow-y-auto pr-1 text-xs">
+                    <div className="rounded-lg border border-border/80 bg-surface-2/40 p-3">
+                      <div className="flex items-center justify-between font-semibold text-foreground">
+                        <span>Identity, IAM & Access Control</span>
+                        <Chip tone="success">Pre-Mapped</Chip>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        MFA enforcement, credential rotation, least-privilege IAM policies, and root account isolation.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-border/80 bg-surface-2/40 p-3">
+                      <div className="flex items-center justify-between font-semibold text-foreground">
+                        <span>Storage & Data Protection at Rest</span>
+                        <Chip tone="info">Pre-Mapped</Chip>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Customer-managed KMS encryption, public access block enforcement, object versioning & lifecycle rules.
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-border/80 bg-surface-2/40 p-3">
+                      <div className="flex items-center justify-between font-semibold text-foreground">
+                        <span>Logging, Audit Trails & Network Perimeter</span>
+                        <Chip tone="info">Pre-Mapped</Chip>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        VPC Flow Logs, CloudTrail / Audit Service multi-region logging, security list ingress restrictions.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-end gap-3 border-t border-border pt-3">
+                    <button
+                      onClick={() => setSelectedFramework(null)}
+                      className="h-9 rounded-lg border border-border bg-surface-2 px-5 text-xs font-semibold text-foreground hover:bg-surface-2/80"
+                    >
+                      Close
+                    </button>
+                    <Link
+                      to="/scans"
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
+                    >
+                      <Zap className="h-3.5 w-3.5" />
+                      <span>Run Framework Audit</span>
+                    </Link>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
     </AppShell>
   );

@@ -191,7 +191,7 @@ function AIAdvisorPage() {
           <Panel index={1} className="p-3">
             <span className="section-label mb-2 block">Environment Scope</span>
             <div className="flex flex-wrap gap-1">
-              {["All", "AWS", "Azure", "GCP", "K8s"].map((p) => (
+              {["All", "AWS", "OCI", "Azure", "GCP", "K8s"].map((p) => (
                 <button
                   key={p}
                   onClick={() => setProviderFilter(p)}
