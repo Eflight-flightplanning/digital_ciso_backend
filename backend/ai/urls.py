@@ -10,6 +10,7 @@ from .views import (
     AIReasoningProxyView,
     AIRemediationGeneratorView,
 )
+from .mcp_views import MCPGatewayView
 
 # /api/v1/ai/...
 ai_urlpatterns = [
@@ -55,5 +56,11 @@ ai_urlpatterns = [
         "reasoning",
         AIReasoningProxyView.as_view(),
         name="ai-reasoning-proxy",
+    ),
+    # Model Context Protocol (MCP) Gateway
+    path(
+        "mcp",
+        MCPGatewayView.as_view(),
+        name="mcp-gateway",
     ),
 ]

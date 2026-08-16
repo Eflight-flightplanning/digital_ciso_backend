@@ -1,3 +1,4 @@
+from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
 from api.v1.views import (
     TenantLLMConfigViewSet,
@@ -195,5 +196,6 @@ urlpatterns = [
     path("swagger", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger"),
     path("docs", SpectacularRedocView.as_view(url_name="schema"), name="docs"),
     # Digital CISO — AI endpoints
+    path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
     path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
 ]
