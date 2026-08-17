@@ -1504,30 +1504,33 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
         )
 
     def destroy(self, request, *args, pk=None, **kwargs):
-        provider = get_object_or_404(Provider, pk=pk)
+        provider = Provider.all_objects.filter(pk=pk, tenant_id=self.request.tenant_id).first()
+        if not provider:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
         provider.is_deleted = True
-        provider.save()
+        try:
+            provider.save(update_fields=["is_deleted", "updated_at"])
+        except Exception:
+            pass
+
         task_name = f"scan-perform-scheduled-{pk}"
         try:
             PeriodicTask.objects.using(MainRouter.admin_db).filter(name=task_name).update(enabled=False)
         except Exception as e:
             logger.warning("Failed to disable periodic task %s: %s", task_name, e)
 
-        with transaction.atomic():
-            task = delete_provider_task.delay(
-                provider_id=pk, tenant_id=self.request.tenant_id
-            )
-        prowler_task = Task.objects.get(id=task.id)
-        serializer = TaskSerializer(prowler_task)
-        return Response(
-            data=serializer.data,
-            status=status.HTTP_202_ACCEPTED,
-            headers={
-                "Content-Location": reverse(
-                    "task-detail", kwargs={"pk": prowler_task.id}
-                )
-            },
-        )
+        try:
+            from tasks.jobs.deletion import delete_provider
+            delete_provider(self.request.tenant_id, str(pk))
+        except Exception as e:
+            logger.warning("Synchronous provider deletion error, enqueuing async task: %s", e)
+            try:
+                delete_provider_task.delay(provider_id=pk, tenant_id=self.request.tenant_id)
+            except Exception:
+                pass
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema_view(

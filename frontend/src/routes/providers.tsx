@@ -88,12 +88,18 @@ function ProvidersPage() {
       setDeletingProvider(null);
       refetch();
     } catch (err: any) {
-      if (err?.message?.includes("404") || err?.message?.includes("Not Found")) {
+      const msg = String(err?.message || "");
+      if (
+        msg.includes("404") ||
+        msg.includes("Not Found") ||
+        msg.includes("No Provider matches") ||
+        msg.includes("does not exist")
+      ) {
         setDeletingProvider(null);
         refetch();
         return;
       }
-      alert(`Failed to delete provider: ${err?.message || "Unknown error"}`);
+      alert(`Failed to delete provider: ${msg || "Unknown error"}`);
     }
   };
 
