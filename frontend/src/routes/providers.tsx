@@ -26,7 +26,7 @@ import {
   Chip,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useProviders, useCreateProvider, useDeleteProvider } from "@/hooks/use-api";
+import { useProviders, useCreateProvider, useDeleteProvider, useCreateProviderSecret } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/providers")({
   component: ProvidersPage,
@@ -49,6 +49,7 @@ function ProvidersPage() {
   const { data: apiProviders, isLoading, refetch } = useProviders();
   const createProviderMutation = useCreateProvider();
   const deleteProviderMutation = useDeleteProvider();
+  const createProviderSecretMutation = useCreateProviderSecret();
 
   const providerList: ProviderItem[] = (apiProviders?.items && apiProviders.items.length > 0)
     ? (apiProviders.items as Array<Record<string, unknown>>).map((p) => ({
@@ -87,6 +88,11 @@ function ProvidersPage() {
       setDeletingProvider(null);
       refetch();
     } catch (err: any) {
+      if (err?.message?.includes("404") || err?.message?.includes("Not Found")) {
+        setDeletingProvider(null);
+        refetch();
+        return;
+      }
       alert(`Failed to delete provider: ${err?.message || "Unknown error"}`);
     }
   };
@@ -165,61 +171,80 @@ function ProvidersPage() {
     setErrorMsg(null);
 
     try {
-      let uid = "";
-      let credentials: Record<string, string> = {};
+      let secretPayload: Record<string, unknown> | null = null;
+      let secretType = "static";
 
       if (activeTab === "AWS") {
         uid = awsAuthMode === "role" ? awsRoleArn : awsAccessKey;
-        credentials = {
-          auth_mode: awsAuthMode,
-          role_arn: awsRoleArn,
-          external_id: awsExternalId,
-          access_key: awsAccessKey,
-          secret_key: awsSecretKey,
-          region: awsRegion,
-        };
+        if (awsAuthMode === "role" && awsRoleArn) {
+          secretType = "role";
+          secretPayload = { role_arn: awsRoleArn, external_id: awsExternalId };
+        } else if (awsAccessKey && awsSecretKey) {
+          secretType = "static";
+          secretPayload = { aws_access_key_id: awsAccessKey, aws_secret_access_key: awsSecretKey };
+        }
       } else if (activeTab === "AZURE") {
         uid = azureSubscriptionId || azureClientId;
-        credentials = {
-          tenant_id: azureTenantId,
-          client_id: azureClientId,
-          client_secret: azureClientSecret,
-          subscription_id: azureSubscriptionId,
-        };
+        if (azureClientId && azureClientSecret && azureTenantId) {
+          secretType = "static";
+          secretPayload = {
+            client_id: azureClientId,
+            client_secret: azureClientSecret,
+            tenant_id: azureTenantId,
+          };
+        }
       } else if (activeTab === "GCP") {
         uid = gcpProjectId;
-        credentials = {
-          project_id: gcpProjectId,
-          service_account_key: gcpServiceAccountKey,
-        };
+        if (gcpProjectId && gcpServiceAccountKey) {
+          secretType = "static";
+          secretPayload = {
+            project_id: gcpProjectId,
+            service_account_key: gcpServiceAccountKey,
+          };
+        }
       } else if (activeTab === "OCI") {
         uid = ociTenancyOcid;
-        credentials = {
-          tenancy_ocid: ociTenancyOcid,
-          user_ocid: ociUserOcid,
-          fingerprint: ociFingerprint,
-          private_key: ociPrivateKey,
-          region: ociRegion,
-        };
+        if (ociTenancyOcid && ociUserOcid && ociFingerprint && ociPrivateKey) {
+          secretType = "static";
+          secretPayload = {
+            tenancy_ocid: ociTenancyOcid,
+            user_ocid: ociUserOcid,
+            fingerprint: ociFingerprint,
+            private_key: ociPrivateKey,
+          };
+        }
       } else if (activeTab === "KUBERNETES") {
         uid = k8sClusterName;
-        credentials = {
-          cluster_name: k8sClusterName,
-          kubeconfig: k8sKubeconfig,
-        };
+        if (k8sKubeconfig) {
+          secretType = "static";
+          secretPayload = { kubeconfig: k8sKubeconfig };
+        }
       } else if (activeTab === "GITHUB") {
         uid = githubOrg;
-        credentials = {
-          org: githubOrg,
-          token: githubToken,
-        };
+        if (githubToken) {
+          secretType = "static";
+          secretPayload = { token: githubToken };
+        }
       }
 
-      await createProviderMutation.mutateAsync({
+      const res = await createProviderMutation.mutateAsync({
         provider: activeTab === "OCI" ? "oraclecloud" : activeTab.toLowerCase(),
         uid: uid || alias,
         alias: alias.trim(),
       });
+
+      const newProviderId = (res as any)?.data?.id || (res as any)?.id;
+      if (newProviderId && secretPayload) {
+        try {
+          await createProviderSecretMutation.mutateAsync({
+            providerId: newProviderId,
+            secretType,
+            secret: secretPayload,
+          });
+        } catch (secErr) {
+          console.warn("Could not attach provider secret:", secErr);
+        }
+      }
 
       setSuccessMsg(`Successfully connected ${activeTab} environment: ${alias}`);
       setTimeout(() => {

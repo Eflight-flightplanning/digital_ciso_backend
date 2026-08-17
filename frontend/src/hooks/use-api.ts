@@ -241,6 +241,36 @@ export function useDeleteProvider() {
   });
 }
 
+export function useCreateProviderSecret() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      providerId,
+      secretType = "static",
+      secret,
+    }: {
+      providerId: string;
+      secretType?: string;
+      secret: Record<string, unknown>;
+    }) =>
+      api.post(
+        `/providers/${providerId}/secret`,
+        jsonApiBody(
+          "provider-secrets",
+          {
+            name: `secret-${providerId.slice(0, 8)}`,
+            secret_type: secretType,
+            secret,
+          },
+          {
+            provider: { data: { type: "providers", id: providerId } },
+          }
+        )
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.providers() }),
+  });
+}
+
 // ─── Scans ────────────────────────────────────────────────────────────────
 
 export function useScans(params?: Record<string, string>) {
