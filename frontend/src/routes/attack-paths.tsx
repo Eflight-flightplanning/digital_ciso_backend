@@ -8,6 +8,8 @@ import {
   Key,
   Database,
   Globe,
+  ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -15,20 +17,98 @@ import {
   PanelTitle,
   Chip,
 } from "@/components/ui-kit/primitives";
-import { attackNodes, attackEdges } from "@/lib/mock";
-import { useAttackPaths } from "@/hooks/use-api";
+import { useAttackPaths, useFindings } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/attack-paths")({
   component: AttackPathsPage,
 });
 
+interface AttackNode {
+  id: string;
+  label: string;
+  kind: "entry" | "compute" | "identity" | "crown";
+  x: number;
+  y: number;
+  provider: string;
+  resourceName: string;
+  exposure: string;
+  findingId: string;
+  findingTitle: string;
+  stepNumber: number;
+  stepDescription: string;
+}
+
+const azureAttackNodes: AttackNode[] = [
+  {
+    id: "internet",
+    label: "Internet (Adversary)",
+    kind: "entry",
+    x: 15,
+    y: 50,
+    provider: "Global",
+    resourceName: "0.0.0.0/0 (Public Internet)",
+    exposure: "Public Ingress Point",
+    findingId: "AZ-NSG-5163E1",
+    findingTitle: "Public Network Ingress on Central India Subnet",
+    stepNumber: 1,
+    stepDescription: "Adversary probes public IP range targeting exposed ports in Central India region.",
+  },
+  {
+    id: "vm-runner",
+    label: "Azure VM (Digital-CISO-LLM)",
+    kind: "compute",
+    x: 42,
+    y: 35,
+    provider: "Azure",
+    resourceName: "Digital-CISO-LLM (Central India)",
+    exposure: "Public IP / NSG Ingress",
+    findingId: "AZ-VM-45CC00",
+    findingTitle: "VM Trusted Launch and Secure Boot unconfigured",
+    stepNumber: 2,
+    stepDescription: "Compromises VM execution environment lacking Trusted Launch & vTPM integrity.",
+  },
+  {
+    id: "identity",
+    label: "Entra ID Managed Identity",
+    kind: "identity",
+    x: 65,
+    y: 65,
+    provider: "Azure",
+    resourceName: "id-centralindia-ciso (Contributor)",
+    exposure: "Subscription Contributor Role",
+    findingId: "AZ-IAM-2A3B4C",
+    findingTitle: "Excessive IAM Role Permissions on Subscription",
+    stepNumber: 3,
+    stepDescription: "Harvests Azure Instance Metadata Service (IMDS) token for Contributor role.",
+  },
+  {
+    id: "storage-db",
+    label: "Azure SQL & Production Storage",
+    kind: "crown",
+    x: 88,
+    y: 50,
+    provider: "Azure",
+    resourceName: "rg-production (Azure SQL / Cosmos DB)",
+    exposure: "Crown Jewel (Customer Telemetry)",
+    findingId: "AZ-SQL-12E3F4",
+    findingTitle: "Defender for Azure SQL Databases disabled",
+    stepNumber: 4,
+    stepDescription: "Accesses production databases lacking Microsoft Defender Threat Protection & TDE.",
+  },
+];
+
+const azureAttackEdges = [
+  { from: "internet", to: "vm-runner", critical: true },
+  { from: "vm-runner", to: "identity", critical: true },
+  { from: "identity", to: "storage-db", critical: true },
+];
+
 function AttackPathsPage() {
-  const { data: apiAttackPaths, isLoading } = useAttackPaths();
-  const [selectedNode, setSelectedNode] = useState<string>("runner");
+  const [selectedNode, setSelectedNode] = useState<string>("vm-runner");
   const [remediated, setRemediated] = useState(false);
   const [remediating, setRemediating] = useState(false);
 
-  const activeNode = attackNodes.find((n) => n.id === selectedNode) || attackNodes[0];
+  const activeNode = azureAttackNodes.find((n) => n.id === selectedNode) || azureAttackNodes[1];
 
   const handleBreakChain = () => {
     setRemediating(true);
@@ -71,13 +151,13 @@ function AttackPathsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3">
               <div>
                 <h3 className="font-display text-sm font-bold text-foreground flex items-center gap-2">
-                  <span>Topology Attack Graph</span>
+                  <span>Azure Topology Attack Graph</span>
                   <Chip tone={remediated ? "success" : "critical"}>
-                    {remediated ? "0 Active Paths" : "1 Toxic Path"}
+                    {remediated ? "0 Active Paths" : "1 Toxic Path (Central India)"}
                   </Chip>
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
-                  Click any node to inspect exposure surface and blast radius
+                  Click any node to inspect exposure surface, IAM permissions, and blast radius
                 </p>
               </div>
 
@@ -96,9 +176,9 @@ function AttackPathsPage() {
             <div className="relative mt-3 h-[420px] w-full overflow-hidden rounded-lg border border-border bg-surface-2/30">
               <svg viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="none">
                 {/* Draw Edges */}
-                {attackEdges.map((edge, i) => {
-                  const fromNode = attackNodes.find((n) => n.id === edge.from)!;
-                  const toNode = attackNodes.find((n) => n.id === edge.to)!;
+                {azureAttackEdges.map((edge, i) => {
+                  const fromNode = azureAttackNodes.find((n) => n.id === edge.from)!;
+                  const toNode = azureAttackNodes.find((n) => n.id === edge.to)!;
                   const isCritical = edge.critical && !remediated;
 
                   return (
@@ -121,7 +201,7 @@ function AttackPathsPage() {
                 })}
 
                 {/* Draw Nodes */}
-                {attackNodes.map((node) => {
+                {azureAttackNodes.map((node) => {
                   const isSelected = selectedNode === node.id;
                   const isCrown = node.kind === "crown";
                   const isEntry = node.kind === "entry";
@@ -178,8 +258,8 @@ function AttackPathsPage() {
           </div>
 
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/60 pt-3">
-            <span>Shortest path: 3 hops (Internet → S3)</span>
-            <span>Blast radius: {remediated ? "0 assets" : "14 connected assets"}</span>
+            <span>Shortest path: 3 hops (Internet → Central India VM → Production Storage)</span>
+            <span>Blast radius: {remediated ? "0 assets" : "38 Azure assets (eflight-azure)"}</span>
           </div>
         </Panel>
 
@@ -188,7 +268,7 @@ function AttackPathsPage() {
           {/* Node Inspector */}
           <Panel index={1} className="p-5">
             <PanelTitle
-              title="Asset & Risk Inspector"
+              title="Azure Asset & Risk Inspector"
               hint="Detailed graph node telemetry"
             />
 
@@ -210,26 +290,28 @@ function AttackPathsPage() {
                     {activeNode.label}
                   </h4>
                   <span className="mono text-[10px] text-muted-foreground uppercase">
-                    Class: {activeNode.kind}
+                    Class: {activeNode.kind} · {activeNode.provider}
                   </span>
                 </div>
               </div>
 
               <div className="mt-3 space-y-2 border-t border-border/60 pt-2.5 text-xs">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Resource Target:</span>
+                  <code className="mono font-semibold text-foreground truncate max-w-[200px]">
+                    {activeNode.resourceName}
+                  </code>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Exposure Surface:</span>
                   <Chip
                     tone={
-                      activeNode.id === "runner" || activeNode.id === "internet"
+                      activeNode.kind === "entry" || activeNode.kind === "compute"
                         ? "critical"
                         : "high"
                     }
                   >
-                    {activeNode.id === "runner"
-                      ? "Public IP (0.0.0.0/0)"
-                      : activeNode.id === "s3"
-                        ? "Private (Crown Jewel)"
-                        : "Internal VPC"}
+                    {activeNode.exposure}
                   </Chip>
                 </div>
                 <div className="flex justify-between">
@@ -238,7 +320,7 @@ function AttackPathsPage() {
                     to="/findings"
                     className="text-primary hover:underline mono font-medium"
                   >
-                    FND-40266
+                    {activeNode.findingId}
                   </Link>
                 </div>
               </div>
@@ -246,38 +328,40 @@ function AttackPathsPage() {
 
             {/* Kill Chain Sequence */}
             <div className="mt-4">
-              <span className="section-label mb-2 block">Kill Chain Propagation</span>
+              <span className="section-label mb-2 block">Kill Chain Propagation (MITRE ATT&CK)</span>
               <div className="space-y-2 text-xs">
-                <div className="rounded border border-border/80 bg-surface-2/30 p-2.5">
-                  <span className="mono text-[10px] font-bold text-critical block">
-                    1. Ingress: Port 3389 Open to Internet
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    CI runner accepts unauthenticated inbound traffic.
-                  </span>
-                </div>
-                <div className="rounded border border-border/80 bg-surface-2/30 p-2.5">
-                  <span className="mono text-[10px] font-bold text-high block">
-                    2. IAM Escalation: ci-deployer Role
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Harvests temporary STS credentials to assume AdministratorAccess.
-                  </span>
-                </div>
-                <div className="rounded border border-border/80 bg-surface-2/30 p-2.5">
-                  <span className="mono text-[10px] font-bold text-info block">
-                    3. Exfiltration: S3 Billing Bucket
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    Read access on prod-billing-exports customer data.
-                  </span>
-                </div>
+                {azureAttackNodes.map((node) => (
+                  <div
+                    key={node.id}
+                    onClick={() => setSelectedNode(node.id)}
+                    className={`cursor-pointer rounded border p-2.5 transition-all ${
+                      selectedNode === node.id
+                        ? "border-primary bg-surface-2/80 shadow-sm"
+                        : "border-border/80 bg-surface-2/30 hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`mono text-[10px] font-bold ${
+                        node.kind === "crown" ? "text-info" : node.kind === "entry" ? "text-critical" : "text-high"
+                      }`}>
+                        {node.stepNumber}. {node.label}
+                      </span>
+                      <span className="mono text-[9px] text-muted-foreground">{node.findingId}</span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground mt-0.5 block leading-relaxed">
+                      {node.stepDescription}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
             <Link
               to="/ai/advisor"
-              search={{ prompt: `Analyze toxic attack path involving ${activeNode.label}` }}
+              search={{
+                prompt: `Analyze toxic attack path involving ${activeNode.label} (${activeNode.resourceName}). What is the blast radius and remediation playbook?`,
+                provider: "azure",
+              }}
               className="mt-4 flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 px-5 text-xs font-semibold text-foreground hover:bg-surface-2/80 transition-colors"
             >
               <Sparkles className="h-3.5 w-3.5 text-primary" />

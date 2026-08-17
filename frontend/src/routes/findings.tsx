@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Zap,
   Copy,
+  Check,
   Terminal,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -24,6 +25,22 @@ import {
 } from "@/components/ui-kit/primitives";
 import { findings as initialFindings, type Finding } from "@/lib/mock";
 import { useFindings, useAnalyzeFinding } from "@/hooks/use-api";
+
+export function formatFindingId(rawId: string): string {
+  if (!rawId) return "FND-0000";
+  if (rawId.startsWith("prowler-")) {
+    const parts = rawId.split("-");
+    const prov = parts[1]?.toUpperCase() || "AZ";
+    const shortProv = prov === "AZURE" ? "AZ" : prov === "ORACLECLOUD" ? "OCI" : prov;
+    const checkWord = parts[2] ? parts[2].split("_").slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") : "";
+    const hash = parts[parts.length - 1] ? parts[parts.length - 1].slice(-6).toUpperCase() : rawId.slice(-6).toUpperCase();
+    return `${shortProv}-${checkWord ? checkWord + "-" : ""}${hash}`;
+  }
+  if (rawId.length > 18) {
+    return `FND-${rawId.slice(-6).toUpperCase()}`;
+  }
+  return rawId;
+}
 
 export const Route = createFileRoute("/findings")({
   component: FindingsPage,
@@ -116,7 +133,10 @@ function FindingsPage() {
           item.service.toLowerCase().includes(query);
         if (!matches) return false;
       }
-      if (selectedProvider !== "All" && item.provider !== selectedProvider) {
+      if (
+        selectedProvider !== "All" &&
+        item.provider.toUpperCase() !== selectedProvider.toUpperCase()
+      ) {
         return false;
       }
       if (
@@ -369,8 +389,32 @@ function FindingsPage() {
                         <ChevronRight className="h-4 w-4" />
                       )}
                     </td>
-                    <td className="mono px-3 py-3 text-xs font-semibold text-foreground">
-                      {f.id}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          title={f.id}
+                          className="mono inline-flex items-center rounded-md bg-surface-2 px-2 py-1 text-[11px] font-bold text-foreground ring-1 ring-border/80"
+                        >
+                          {formatFindingId(f.id)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(f.id);
+                            setCopiedId(f.id);
+                            setTimeout(() => setCopiedId(null), 2000);
+                          }}
+                          title={`Copy Raw UID: ${f.id}`}
+                          className="rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {copiedId === f.id ? (
+                            <Check className="h-3 w-3 text-success" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <Chip tone={severityTone(f.severity)}>
@@ -427,9 +471,12 @@ function FindingsPage() {
                         </button>
                         <Link
                           to="/ai/advisor"
-                          search={{ prompt: `Analyze finding ${f.id}: ${f.title}` }}
+                          search={{
+                            prompt: `Analyze finding ${formatFindingId(f.id)}: ${f.title} on resource ${f.resource}. What is the toxic risk and how do we remediate it?`,
+                            provider: f.provider.toLowerCase(),
+                          }}
                           title="Ask Spectra"
-                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-primary"
                         >
                           <Sparkles className="h-3.5 w-3.5" />
                         </Link>
@@ -464,10 +511,14 @@ function FindingsPage() {
                             <div className="flex items-center gap-2.5">
                               <Link
                                 to="/ai/advisor"
+                                search={{
+                                  prompt: `Analyze finding ${formatFindingId(f.id)}: ${f.title} on resource ${f.resource}. What is the toxic risk and how do we remediate it?`,
+                                  provider: f.provider.toLowerCase(),
+                                }}
                                 className="inline-flex h-9 min-w-[160px] items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground transition-colors hover:bg-surface-2/80 active:scale-95"
                               >
                                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                                <span>Analyze with Spectra</span>
+                                <span>Ask Spectra</span>
                               </Link>
 
                               <button

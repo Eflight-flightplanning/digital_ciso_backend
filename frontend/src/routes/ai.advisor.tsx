@@ -17,6 +17,12 @@ import {
 import { useAIAdvisorQuery } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/advisor")({
+  validateSearch: (search: Record<string, unknown>): { prompt?: string; provider?: string } => {
+    return {
+      prompt: search.prompt ? String(search.prompt) : undefined,
+      provider: search.provider ? String(search.provider) : undefined,
+    };
+  },
   component: AIAdvisorPage,
 });
 
@@ -43,10 +49,13 @@ const initialMessages: ChatMessage[] = [
 ];
 
 function AIAdvisorPage() {
+  const searchParams = Route.useSearch();
+  const autoTriggeredRef = useRef(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [providerFilter, setProviderFilter] = useState("All");
+  const [providerFilter, setProviderFilter] = useState(searchParams.provider ? searchParams.provider.toUpperCase() === "AZURE" ? "Azure" : searchParams.provider : "All");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const advisorMutation = useAIAdvisorQuery();
 
@@ -159,6 +168,13 @@ function AIAdvisorPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (searchParams.prompt && !autoTriggeredRef.current) {
+      autoTriggeredRef.current = true;
+      handleSend(searchParams.prompt);
+    }
+  }, [searchParams]);
 
   return (
     <AppShell
