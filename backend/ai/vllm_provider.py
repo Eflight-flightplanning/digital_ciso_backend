@@ -214,7 +214,7 @@ class VLLMAzureProvider(AIProvider):
         relevant_findings: list[dict[str, Any]],
     ) -> AdvisorOutput:
         """Answer CISO security queries grounded in real cloud findings."""
-        context_str = json.dumps(relevant_findings[:15], indent=2)
+        context_str = json.dumps(relevant_findings[:35], indent=2)
         user_prompt = f"Active Findings:\n{context_str}\n\nUser Question: {question}"
         data = self._call_vllm_chat(
             system_prompt=ADVISOR_SYSTEM_PROMPT,

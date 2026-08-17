@@ -305,13 +305,16 @@ class ClaudeProvider(AIProvider):
         finding_summaries = [
             {
                 "id": f.get("finding_id"),
+                "uid": f.get("uid"),
                 "check_id": f.get("check_id"),
                 "severity": f.get("severity"),
                 "status": f.get("status"),  # PASS/FAIL — from Prowler, immutable
                 "summary": f.get("check_title"),
-                "resource": f.get("resource", {}).get("name"),
+                "details": f.get("status_extended"),
+                "remediation": f.get("remediation"),
+                "resource": f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else f.get("resource"),
             }
-            for f in relevant_findings[:15]  # Limit context
+            for f in relevant_findings[:35]  # Generous context
         ]
 
         user_message = json.dumps(

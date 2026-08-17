@@ -398,21 +398,17 @@ class AIAdvisorQueryView(APIView):
 def _retrieve_relevant_findings(
     request: Request,
     question: str,
-    limit: int = 15,
+    limit: int = 35,
     provider: str | None = None,
 ) -> list[dict]:
     """
-    Retrieve a compact list of relevant findings for the AI Advisor.
-
-    Filters by provider when specified so the advisor answers are scoped
-    to a single cloud (aws, azure, gcp, kubernetes, github, m365).
-
-    Simple implementation: return top-N FAIL findings by severity.
-    TODO: In Phase 5, implement semantic search/retrieval.
+    Retrieve a comprehensive, relevant list of findings for the AI Advisor.
+    Prioritizes findings that match keywords, check IDs, or resource names in the query,
+    then pads with top-severity failing findings.
     """
     try:
         from contextlib import nullcontext
-        from django.db.models import Case, IntegerField, Value, When
+        from django.db.models import Case, IntegerField, Q, Value, When
 
         from api.db_utils import rls_transaction
         from api.models import Finding
@@ -433,35 +429,87 @@ def _retrieve_relevant_findings(
 
             # Apply provider scope filter when requested
             if provider:
-                qs = qs.filter(scan__provider__provider=provider)
+                qs = qs.filter(scan__provider__provider__iexact=provider)
 
-            # Order by severity priority (critical first) rather than alphabetically
-            severity_order = Case(
-                When(severity="critical", then=Value(0)),
-                When(severity="high", then=Value(1)),
-                When(severity="medium", then=Value(2)),
-                When(severity="low", then=Value(3)),
-                default=Value(4),
-                output_field=IntegerField(),
-            )
-            findings_qs = qs.annotate(severity_rank=severity_order).order_by("severity_rank")[:limit]
+            # Keyword matching: extract meaningful terms from question
+            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
+            stop_words = {
+                "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
+                "the", "with", "for", "show", "give", "tell", "about", "which", "are",
+                "from", "that", "this", "can", "our", "all", "does", "have"
+            }
+            meaningful_keywords = [w for w in words if w.lower() not in stop_words]
 
-            result = []
-            for f in findings_qs:
-                first_resource = f.resources.first()
-                prov = f.scan.provider if f.scan else None
-                result.append(
-                    {
-                        "finding_id": str(f.id),
-                        "check_id": f.check_id,
-                        "check_title": f.check_metadata.get("checktitle", "") if f.check_metadata else "",
-                        "severity": f.severity,
-                        "status": f.status,  # Prowler PASS/FAIL — immutable
-                        "provider": prov.provider if prov else "",
-                        "resource": {"name": first_resource.name if first_resource else ""},
-                    }
+            matching_ids = set()
+            matching_findings = []
+
+            if meaningful_keywords:
+                q_obj = Q()
+                for kw in meaningful_keywords:
+                    q_obj |= (
+                        Q(check_id__icontains=kw)
+                        | Q(status_extended__icontains=kw)
+                        | Q(uid__icontains=kw)
+                        | Q(resources__name__icontains=kw)
+                        | Q(resources__uid__icontains=kw)
+                    )
+
+                matched_qs = qs.filter(q_obj).distinct()[:limit]
+                for f in matched_qs:
+                    matching_ids.add(f.id)
+                    first_resource = f.resources.first()
+                    prov = f.scan.provider if f.scan else None
+                    matching_findings.append(
+                        {
+                            "finding_id": str(f.id),
+                            "uid": f.uid or "",
+                            "check_id": f.check_id,
+                            "check_title": f.check_metadata.get("checktitle", "") if f.check_metadata else "",
+                            "severity": f.severity,
+                            "status": f.status,
+                            "status_extended": f.status_extended or "",
+                            "remediation": f.check_metadata.get("remediation_text", "") if f.check_metadata else "",
+                            "provider": prov.provider if prov else "",
+                            "resource": {"name": first_resource.name if first_resource else ""},
+                        }
+                    )
+
+            # Fill remaining slots with top severity findings
+            remaining_limit = max(0, limit - len(matching_findings))
+            if remaining_limit > 0:
+                severity_order = Case(
+                    When(severity="critical", then=Value(0)),
+                    When(severity="high", then=Value(1)),
+                    When(severity="medium", then=Value(2)),
+                    When(severity="low", then=Value(3)),
+                    default=Value(4),
+                    output_field=IntegerField(),
                 )
-            return result
+                fill_qs = (
+                    qs.exclude(id__in=matching_ids)
+                    .annotate(severity_rank=severity_order)
+                    .order_by("severity_rank")[:remaining_limit]
+                )
+
+                for f in fill_qs:
+                    first_resource = f.resources.first()
+                    prov = f.scan.provider if f.scan else None
+                    matching_findings.append(
+                        {
+                            "finding_id": str(f.id),
+                            "uid": f.uid or "",
+                            "check_id": f.check_id,
+                            "check_title": f.check_metadata.get("checktitle", "") if f.check_metadata else "",
+                            "severity": f.severity,
+                            "status": f.status,
+                            "status_extended": f.status_extended or "",
+                            "remediation": f.check_metadata.get("remediation_text", "") if f.check_metadata else "",
+                            "provider": prov.provider if prov else "",
+                            "resource": {"name": first_resource.name if first_resource else ""},
+                        }
+                    )
+
+            return matching_findings
     except Exception as e:
         logger.warning("Failed to retrieve findings for advisor: %s", e)
         return []

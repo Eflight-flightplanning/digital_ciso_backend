@@ -472,7 +472,7 @@ function FindingsPage() {
                         <Link
                           to="/ai/advisor"
                           search={{
-                            prompt: `Analyze finding ${formatFindingId(f.id)}: ${f.title} on resource ${f.resource}. What is the toxic risk and how do we remediate it?`,
+                            prompt: `Analyze finding ${f.title} (${f.id}) on resource ${f.resource}. What is the security risk and step-by-step remediation?`,
                             provider: f.provider.toLowerCase(),
                           }}
                           title="Ask Spectra"
@@ -512,7 +512,7 @@ function FindingsPage() {
                               <Link
                                 to="/ai/advisor"
                                 search={{
-                                  prompt: `Analyze finding ${formatFindingId(f.id)}: ${f.title} on resource ${f.resource}. What is the toxic risk and how do we remediate it?`,
+                                  prompt: `Analyze finding ${f.title} (${f.id}) on resource ${f.resource}. What is the security risk and step-by-step remediation?`,
                                   provider: f.provider.toLowerCase(),
                                 }}
                                 className="inline-flex h-9 min-w-[160px] items-center justify-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground transition-colors hover:bg-surface-2/80 active:scale-95"
