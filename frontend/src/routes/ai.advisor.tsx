@@ -36,32 +36,9 @@ const initialMessages: ChatMessage[] = [
     id: "msg-1",
     sender: "assistant",
     content:
-      "Spectra Threat Analysis Engine active. Ingesting live findings from 6 cloud environments. Ask any question regarding posture, toxic attack paths, or finding triage.",
-    timestamp: "10:14 AM",
-    confidence: 0.98,
-  },
-  {
-    id: "msg-2",
-    sender: "user",
-    content: "What are the most critical toxic paths currently exposing production assets?",
-    timestamp: "10:15 AM",
-  },
-  {
-    id: "msg-3",
-    sender: "assistant",
-    content:
-      "Correlated 1 critical path exposing customer billing data on AWS production:",
-    timestamp: "10:15 AM",
-    spectra:
-      "Spectra identified an unsegmented CI runner with port 3389 open to the internet. The attached IAM instance profile can assume the 'ci-deployer' role, which has an open wildcard trust policy to AdministratorAccess. This yields an unauthenticated 3-hop path to the 'prod-billing-exports' S3 bucket.",
-    aegis:
-      "Aegis recommends immediately revoking the open ingress rule on security group sg-0d81ba91f2c7 and scoping the trust policy. Priority: P1 (SLA: 4h). Assigned to: Platform SecOps.",
-    confidence: 0.96,
-    findings: [
-      { id: "FND-40281", name: "S3 bucket allows public read access via ACL", severity: "critical" },
-      { id: "FND-40277", name: "IAM role AdministratorAccess assumable by any account", severity: "critical" },
-      { id: "FND-40266", name: "Security group exposes RDP (3389) to 0.0.0.0/0", severity: "high" },
-    ],
+      "Spectra Threat Analysis & Security Advisor Engine initialized. Ingesting live telemetry from your connected Microsoft Azure subscription (eflight-azure). Ask any question regarding cloud security posture, Defender for Cloud gaps, CIS benchmark failures, or toxic attack paths.",
+    timestamp: "Live",
+    confidence: 1.0,
   },
 ];
 
