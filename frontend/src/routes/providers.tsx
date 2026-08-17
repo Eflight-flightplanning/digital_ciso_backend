@@ -209,9 +209,12 @@ function ProvidersPage() {
         if (ociTenancyOcid && ociUserOcid && ociFingerprint && ociPrivateKey) {
           secretType = "static";
           secretPayload = {
+            tenancy: ociTenancyOcid,
             tenancy_ocid: ociTenancyOcid,
+            user: ociUserOcid,
             user_ocid: ociUserOcid,
             fingerprint: ociFingerprint,
+            key_content: ociPrivateKey,
             private_key: ociPrivateKey,
           };
         }

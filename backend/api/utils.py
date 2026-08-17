@@ -244,11 +244,21 @@ def get_prowler_provider_kwargs(
             "filter_accounts": [provider.uid],
         }
     elif provider.provider == Provider.ProviderChoices.ORACLECLOUD.value:
-        if isinstance(prowler_provider_kwargs.get("region"), str):
-            prowler_provider_kwargs = {
-                **prowler_provider_kwargs,
-                "region": {prowler_provider_kwargs["region"]},
-            }
+        prowler_provider_kwargs = dict(prowler_provider_kwargs)
+        tenancy = prowler_provider_kwargs.pop("tenancy_ocid", None) or prowler_provider_kwargs.pop("tenancy", None)
+        user = prowler_provider_kwargs.pop("user_ocid", None) or prowler_provider_kwargs.pop("user", None)
+        key_content = prowler_provider_kwargs.pop("private_key", None) or prowler_provider_kwargs.pop("key_content", None)
+        region = prowler_provider_kwargs.pop("region", None)
+
+        prowler_provider_kwargs["tenancy"] = tenancy or provider.uid
+        if user:
+            prowler_provider_kwargs["user"] = user
+        if key_content:
+            prowler_provider_kwargs["key_content"] = key_content
+        if isinstance(region, str) and region:
+            prowler_provider_kwargs["region"] = {region}
+        elif isinstance(region, (list, set)):
+            prowler_provider_kwargs["region"] = set(region)
     elif provider.provider == Provider.ProviderChoices.OPENSTACK.value:
         # clouds_yaml_content, clouds_yaml_cloud and provider_id are validated
         # in the provider itself, so it's not needed here.
@@ -393,6 +403,24 @@ def prowler_provider_connection_test(provider: Provider) -> Connection:
         if prowler_provider_kwargs.get("registry_token"):
             image_kwargs["registry_token"] = prowler_provider_kwargs["registry_token"]
         return prowler_provider.test_connection(**image_kwargs)
+    elif provider.provider == Provider.ProviderChoices.ORACLECLOUD.value:
+        oci_kwargs = dict(prowler_provider_kwargs)
+        tenancy = oci_kwargs.pop("tenancy_ocid", None) or oci_kwargs.pop("tenancy", None)
+        user = oci_kwargs.pop("user_ocid", None) or oci_kwargs.pop("user", None)
+        key_content = oci_kwargs.pop("private_key", None) or oci_kwargs.pop("key_content", None)
+        region = oci_kwargs.pop("region", None)
+
+        oci_kwargs["tenancy"] = tenancy or provider.uid
+        if user:
+            oci_kwargs["user"] = user
+        if key_content:
+            oci_kwargs["key_content"] = key_content
+        if isinstance(region, str) and region:
+            oci_kwargs["region"] = {region}
+        elif isinstance(region, (list, set)):
+            oci_kwargs["region"] = set(region)
+        oci_kwargs["raise_on_exception"] = False
+        return prowler_provider.test_connection(**oci_kwargs)
     else:
         return prowler_provider.test_connection(
             **prowler_provider_kwargs,
