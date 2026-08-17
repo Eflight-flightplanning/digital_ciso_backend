@@ -367,14 +367,36 @@ class AIAdvisorQueryView(APIView):
             clean_question = sanitizer.sanitize_string(question)
 
             # Optional provider scope filter — body is JSON:API: {data:{attributes:{provider}}}
-            _attrs = request.data.get("data", {}).get("attributes", {})
-            provider_filter = _attrs.get("provider") or request.data.get("provider")
-            if provider_filter and str(provider_filter).strip().lower() in (
-                "aws", "azure", "gcp", "kubernetes", "github", "m365", "oraclecloud"
-            ):
-                provider_filter = str(provider_filter).strip().lower()
-            else:
-                provider_filter = None
+            _attrs = request.data.get("data", {}).get("attributes", {}) if isinstance(request.data, dict) else {}
+            raw_prov = _attrs.get("provider") or (request.data.get("provider") if isinstance(request.data, dict) else None)
+
+            provider_filter = None
+            if raw_prov:
+                p_lower = str(raw_prov).strip().lower()
+                if p_lower in ("oci", "oracle", "oraclecloud"):
+                    provider_filter = "oraclecloud"
+                elif p_lower in ("azure", "az"):
+                    provider_filter = "azure"
+                elif p_lower in ("aws", "amazon"):
+                    provider_filter = "aws"
+                elif p_lower in ("gcp", "google"):
+                    provider_filter = "gcp"
+                elif p_lower in ("k8s", "kubernetes"):
+                    provider_filter = "kubernetes"
+                elif p_lower in ("github", "m365"):
+                    provider_filter = p_lower
+
+            # Natural Language Provider Intent Detection from question
+            if not provider_filter:
+                q_lower = clean_question.lower()
+                if any(k in q_lower for k in ("oci", "oracle", "oraclecloud", "tenancy", "compartment", "vcn")):
+                    provider_filter = "oraclecloud"
+                elif any(k in q_lower for k in ("azure", "defender", "virtual machine", "vnet", "nsg", "entra")):
+                    provider_filter = "azure"
+                elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role")):
+                    provider_filter = "aws"
+                elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery")):
+                    provider_filter = "gcp"
 
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
@@ -429,19 +451,62 @@ def _retrieve_relevant_findings(
 
             # Apply provider scope filter when requested
             if provider:
-                qs = qs.filter(scan__provider__provider__iexact=provider)
+                if provider == "oraclecloud":
+                    qs = qs.filter(Q(scan__provider__provider__iexact="oraclecloud") | Q(uid__icontains="prowler-oraclecloud") | Q(uid__icontains="oci"))
+                elif provider == "azure":
+                    qs = qs.filter(Q(scan__provider__provider__iexact="azure") | Q(uid__icontains="prowler-azure"))
+                elif provider == "aws":
+                    qs = qs.filter(Q(scan__provider__provider__iexact="aws") | Q(uid__icontains="prowler-aws"))
+                elif provider == "gcp":
+                    qs = qs.filter(Q(scan__provider__provider__iexact="gcp") | Q(uid__icontains="prowler-gcp"))
+                else:
+                    qs = qs.filter(scan__provider__provider__iexact=provider)
 
             # Keyword matching: extract meaningful terms from question
             words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
             stop_words = {
                 "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
                 "the", "with", "for", "show", "give", "tell", "about", "which", "are",
-                "from", "that", "this", "can", "our", "all", "does", "have"
+                "from", "that", "this", "can", "our", "all", "does", "have", "oci",
+                "azure", "aws", "gcp", "cloud", "oracle"
             }
             meaningful_keywords = [w for w in words if w.lower() not in stop_words]
 
             matching_ids = set()
             matching_findings = []
+
+            def _serialize_finding(f):
+                meta = f.check_metadata or {}
+                first_resource = f.resources.first()
+                res_name = getattr(f, "resource_name", None) or (first_resource.name if first_resource else "")
+                if not res_name and f.uid:
+                    parts = f.uid.split("-")
+                    if len(parts) > 1:
+                        res_name = parts[-1]
+
+                prov = f.scan.provider.provider if (f.scan and f.scan.provider) else ("oraclecloud" if "oracle" in (f.uid or "") else "azure")
+                title = meta.get("checktitle") or meta.get("check_title") or meta.get("CheckTitle") or f.check_id.replace("_", " ")
+
+                rem = ""
+                if isinstance(meta.get("remediation"), dict):
+                    rem = meta["remediation"].get("recommendation", {}).get("text") or meta["remediation"].get("code", {}).get("cli") or ""
+                elif isinstance(meta.get("remediation"), str):
+                    rem = meta["remediation"]
+                elif meta.get("remediation_text"):
+                    rem = meta["remediation_text"]
+
+                return {
+                    "finding_id": str(f.id),
+                    "uid": f.uid or "",
+                    "check_id": f.check_id,
+                    "check_title": title,
+                    "severity": f.severity,
+                    "status": f.status,
+                    "status_extended": f.status_extended or "",
+                    "remediation": rem,
+                    "provider": prov,
+                    "resource": {"name": res_name or "Cloud Resource"},
+                }
 
             if meaningful_keywords:
                 q_obj = Q()
@@ -457,22 +522,7 @@ def _retrieve_relevant_findings(
                 matched_qs = qs.filter(q_obj).distinct()[:limit]
                 for f in matched_qs:
                     matching_ids.add(f.id)
-                    first_resource = f.resources.first()
-                    prov = f.scan.provider if f.scan else None
-                    matching_findings.append(
-                        {
-                            "finding_id": str(f.id),
-                            "uid": f.uid or "",
-                            "check_id": f.check_id,
-                            "check_title": f.check_metadata.get("checktitle", "") if f.check_metadata else "",
-                            "severity": f.severity,
-                            "status": f.status,
-                            "status_extended": f.status_extended or "",
-                            "remediation": f.check_metadata.get("remediation_text", "") if f.check_metadata else "",
-                            "provider": prov.provider if prov else "",
-                            "resource": {"name": first_resource.name if first_resource else ""},
-                        }
-                    )
+                    matching_findings.append(_serialize_finding(f))
 
             # Fill remaining slots with top severity findings
             remaining_limit = max(0, limit - len(matching_findings))
@@ -492,22 +542,7 @@ def _retrieve_relevant_findings(
                 )
 
                 for f in fill_qs:
-                    first_resource = f.resources.first()
-                    prov = f.scan.provider if f.scan else None
-                    matching_findings.append(
-                        {
-                            "finding_id": str(f.id),
-                            "uid": f.uid or "",
-                            "check_id": f.check_id,
-                            "check_title": f.check_metadata.get("checktitle", "") if f.check_metadata else "",
-                            "severity": f.severity,
-                            "status": f.status,
-                            "status_extended": f.status_extended or "",
-                            "remediation": f.check_metadata.get("remediation_text", "") if f.check_metadata else "",
-                            "provider": prov.provider if prov else "",
-                            "resource": {"name": first_resource.name if first_resource else ""},
-                        }
-                    )
+                    matching_findings.append(_serialize_finding(f))
 
             return matching_findings
     except Exception as e:

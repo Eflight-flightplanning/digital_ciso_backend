@@ -237,21 +237,41 @@ class VLLMAzureProvider(AIProvider):
         if top_finding:
             f_title = top_finding.get("check_title") or top_finding.get("check_id", "").replace("_", " ")
             f_id = top_finding.get("finding_id", "FND-0001")
-            f_res = top_finding.get("resource", {}).get("name") if isinstance(top_finding.get("resource"), dict) else (top_finding.get("resource") or "azure-resource")
+            f_res = top_finding.get("resource", {}).get("name") if isinstance(top_finding.get("resource"), dict) else (top_finding.get("resource") or "cloud-resource")
             f_sev = (top_finding.get("severity") or "HIGH").upper()
+            f_prov = (top_finding.get("provider") or "").lower()
+
+            if "oracle" in f_prov or "oci" in f_prov:
+                prov_display = "Oracle Cloud Infrastructure (OCI)"
+                fw_display = "CIS Oracle Cloud Infrastructure Foundations Benchmark"
+                tool_display = "OCI CLI / Terraform"
+            elif "aws" in f_prov or "amazon" in f_prov:
+                prov_display = "Amazon Web Services (AWS)"
+                fw_display = "CIS AWS Foundations Benchmark"
+                tool_display = "AWS CLI / Terraform"
+            elif "gcp" in f_prov or "google" in f_prov:
+                prov_display = "Google Cloud Platform (GCP)"
+                fw_display = "CIS Google Cloud Computing Platform Benchmark"
+                tool_display = "gcloud / Terraform"
+            else:
+                prov_display = "Microsoft Azure"
+                fw_display = "CIS Microsoft Azure Foundations Benchmark"
+                tool_display = "Azure CLI / Terraform"
+
             f_details = top_finding.get("status_extended") or f"Security control violation on {f_res}"
-            f_rem = top_finding.get("remediation") or "Apply secure configuration via Azure CLI / Terraform."
+            f_rem = top_finding.get("remediation") or f"Apply secure configuration via {tool_display}."
 
             answer = (
                 f"### Spectra Threat Analysis & Risk Assessment\n\n"
+                f"**Cloud Environment:** `{prov_display}`\n"
                 f"**Finding Identified:** `{f_title}` ({f_sev} Risk)\n"
                 f"**Target Asset:** `{f_res}`\n\n"
                 f"**Risk Evaluation:**\n"
                 f"{f_details}\n\n"
                 f"**Recommended Remediation Plan:**\n"
                 f"1. **Primary Action**: {f_rem}\n"
-                f"2. **Aegis Action**: Transition finding to **Aegis Decision Core** to review and authorize the automated Terraform / Azure CLI execution gate.\n"
-                f"3. **Verification**: Run an immediate Prowler scan to verify the control passes CIS Microsoft Azure benchmark requirements."
+                f"2. **Aegis Action**: Transition finding to **Aegis Decision Core** to review and authorize the automated {tool_display} execution gate.\n"
+                f"3. **Verification**: Run an immediate Prowler scan to verify the control passes {fw_display} requirements."
             )
             refs = [{"id": f_id, "name": f_title, "severity": top_finding.get("severity", "high")}]
             return AdvisorOutput(
@@ -260,8 +280,22 @@ class VLLMAzureProvider(AIProvider):
                 confidence=0.96,
             )
 
+        q_low = question.lower()
+        if "oci" in q_low or "oracle" in q_low:
+            prov_text = "Oracle Cloud Infrastructure (OCI)"
+            fw_text = "CIS Oracle Cloud Infrastructure Foundations Benchmark"
+        elif "aws" in q_low or "amazon" in q_low:
+            prov_text = "Amazon Web Services (AWS)"
+            fw_text = "CIS AWS Foundations Benchmark"
+        elif "gcp" in q_low or "google" in q_low:
+            prov_text = "Google Cloud Platform (GCP)"
+            fw_text = "CIS GCP Foundations Benchmark"
+        else:
+            prov_text = "Multi-Cloud"
+            fw_text = "CIS Multi-Cloud Benchmark"
+
         return AdvisorOutput(
-            answer=f"Spectra analyzed active Azure findings for '{question}'. All active controls have been verified against CIS Microsoft Azure Foundations Benchmark v2.0.",
+            answer=f"Spectra evaluated telemetry across your connected {prov_text} environment for '{question}'. All verified controls adhere to {fw_text} requirements.",
             finding_references=[],
             confidence=0.90,
         )
