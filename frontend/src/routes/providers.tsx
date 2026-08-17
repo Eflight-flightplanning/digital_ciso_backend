@@ -50,18 +50,21 @@ function ProvidersPage() {
   const createProviderMutation = useCreateProvider();
   const deleteProviderMutation = useDeleteProvider();
   const createProviderSecretMutation = useCreateProviderSecret();
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const providerList: ProviderItem[] = (apiProviders?.items && apiProviders.items.length > 0)
-    ? (apiProviders.items as Array<Record<string, unknown>>).map((p) => ({
-        id: (p.id as string) || (p.uid as string) || "p-001",
-        name: ((p.provider as string) || (p.provider_type as string) || "AWS").toUpperCase(),
-        alias: (p.alias as string) || (p.uid as string) || "cloud-account",
-        status: (p.connected === false ? "disconnected" : "connected") as "connected" | "disconnected" | "syncing",
-        lastScan: (p.last_scan_at as string) || "Never",
-        resources: (p.resources_count as number) || (p.findings_count as number) || 0,
-        uid: (p.uid as string) || "",
-        raw: p,
-      }))
+    ? (apiProviders.items as Array<Record<string, unknown>>)
+        .filter((p) => !deletedIds.has((p.id as string) || (p.uid as string)))
+        .map((p) => ({
+          id: (p.id as string) || (p.uid as string) || "p-001",
+          name: ((p.provider as string) || (p.provider_type as string) || "AWS").toUpperCase(),
+          alias: (p.alias as string) || (p.uid as string) || "cloud-account",
+          status: (p.connected === false ? "disconnected" : "connected") as "connected" | "disconnected" | "syncing",
+          lastScan: (p.last_scan_at as string) || "Never",
+          resources: (p.resources_count as number) || (p.findings_count as number) || 0,
+          uid: (p.uid as string) || "",
+          raw: p,
+        }))
     : [];
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,12 +86,14 @@ function ProvidersPage() {
 
   const handleConfirmDelete = async () => {
     if (!deletingProvider) return;
+    const targetId = deletingProvider.id;
+    setDeletedIds((prev) => new Set([...prev, targetId]));
+    setDeletingProvider(null);
     try {
-      await deleteProviderMutation.mutateAsync(deletingProvider.id);
+      await deleteProviderMutation.mutateAsync(targetId);
     } catch (err: any) {
       console.warn("Delete provider mutation:", err);
     } finally {
-      setDeletingProvider(null);
       refetch();
     }
   };

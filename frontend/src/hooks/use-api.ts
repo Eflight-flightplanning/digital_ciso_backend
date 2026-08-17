@@ -209,7 +209,8 @@ export function useProviders() {
       const res = await api.get("/providers");
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 

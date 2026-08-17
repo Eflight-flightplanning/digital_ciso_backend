@@ -1097,7 +1097,19 @@ def perform_prowler_scan(
 
     with rls_transaction(tenant_id):
         provider_instance = Provider.objects.get(pk=provider_id)
-        scan_instance = Scan.objects.get(pk=scan_id)
+        # select_for_update() holds the row lock for the duration of this
+        # transaction so that only one of the two concurrent dispatch paths
+        # (Celery task vs. direct-thread fallback, see
+        # enqueue_scan_execution_on_commit) actually executes the scan; the
+        # other blocks here and then sees state already claimed below.
+        scan_instance = Scan.objects.select_for_update().get(pk=scan_id)
+        if scan_instance.state in (StateChoices.EXECUTING, StateChoices.COMPLETED):
+            logger.warning(
+                "Scan %s already %s; skipping duplicate execution",
+                scan_id,
+                scan_instance.state,
+            )
+            return ScanTaskSerializer(scan_instance).data
         scan_instance.state = StateChoices.EXECUTING
         scan_instance.started_at = datetime.now(tz=UTC)
         _save_scan_instance(
