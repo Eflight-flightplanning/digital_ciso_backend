@@ -301,8 +301,8 @@ export function useScans(params?: Record<string, string>) {
       const res = await api.get(`/scans${buildQuery(params)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
-    staleTime: 15 * 1000,
-    refetchInterval: 30 * 1000, // auto-refresh for running scans
+    staleTime: 2 * 1000,
+    refetchInterval: 4 * 1000, // fast live refresh for running scans
   });
 }
 

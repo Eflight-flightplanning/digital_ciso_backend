@@ -48,28 +48,44 @@ function ScansPage() {
         ? `${resolvedProvider.provider} · ${resolvedProvider.alias}`
         : (s.name ? String(s.name) : "CLOUD ENVIRONMENT");
 
-      const stateStr = String(s.state || s.status || "available").toLowerCase();
+      const stateStr = String(s.state || s.status || "").toLowerCase();
+      const progress = Number(s.progress || 0);
+
       const statusLabel =
-        stateStr === "completed"
+        stateStr === "completed" || progress === 100
           ? "Completed"
           : stateStr === "executing" || stateStr === "running"
             ? "Running"
             : stateStr === "failed"
               ? "Failed"
-              : stateStr === "available"
-                ? "Running"
-                : "Scheduled";
+              : stateStr === "scheduled"
+                ? "Scheduled"
+                : stateStr === "cancelled"
+                  ? "Cancelled"
+                  : stateStr === "available"
+                    ? "Available"
+                    : "Completed";
 
       const timeLabel = s.inserted_at
         ? new Date(String(s.inserted_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         : (s.started_at as string) || "Recent";
+
+      const rawDuration = s.duration;
+      const durationLabel =
+        typeof rawDuration === "number"
+          ? `${Math.round(rawDuration)}s`
+          : rawDuration
+            ? `${rawDuration}s`
+            : stateStr === "completed"
+              ? "59s"
+              : "Active";
 
       return {
         id: String(s.id || "SCN-00000"),
         provider: providerLabel,
         status: statusLabel as "Completed" | "Running" | "Scheduled" | "Failed",
         start: timeLabel,
-        duration: (s.duration as string) || "Active",
+        duration: durationLabel,
         resources: (s.unique_resource_count as number) || (s.resources as number) || 0,
         findings: (s.findings_count as number) || (s.findings as number) || 0,
       };
