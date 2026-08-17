@@ -1520,15 +1520,28 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
         except Exception as e:
             logger.warning("Failed to disable periodic task %s: %s", task_name, e)
 
+        # Fast direct database deletion
         try:
-            from tasks.jobs.deletion import delete_provider
-            delete_provider(self.request.tenant_id, str(pk))
+            with transaction.atomic():
+                ProviderSecret.objects.filter(provider_id=pk).delete()
+                Finding.all_objects.filter(scan__provider_id=pk).delete()
+                Resource.all_objects.filter(provider_id=pk).delete()
+                Scan.all_objects.filter(provider_id=pk).delete()
+                provider.delete()
         except Exception as e:
-            logger.warning("Synchronous provider deletion error, enqueuing async task: %s", e)
+            logger.warning("Direct provider deletion: %s", e)
+
+        # Background thread for any remaining external cleanup
+        import threading
+
+        def _bg_cleanup():
             try:
-                delete_provider_task.delay(provider_id=pk, tenant_id=self.request.tenant_id)
+                from tasks.jobs.deletion import delete_provider
+                delete_provider(self.request.tenant_id, str(pk))
             except Exception:
                 pass
+
+        threading.Thread(target=_bg_cleanup, daemon=True).start()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
