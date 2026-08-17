@@ -119,7 +119,7 @@ function FindingsPage() {
         if (uid.startsWith("prowler-")) {
           if (!region || region === "global") {
             const possibleRegion = uidParts[uidParts.length - 2];
-            if (possibleRegion && !possibleRegion.includes("ab5c") && possibleRegion.length > 2) {
+            if (possibleRegion && !possibleRegion.includes("ab5c") && !possibleRegion.includes("ocid1") && possibleRegion.length > 2) {
               region = possibleRegion;
             }
           }
@@ -130,14 +130,16 @@ function FindingsPage() {
             }
           }
         }
-        if (!region || region === "global") region = "centralindia";
+        if (!region || region === "global") {
+          region = prov === "OCI" ? "uk-london-1" : "centralindia";
+        }
         if (!resource || resource === "cloud-resource") {
           const statusExt = String(f.status_extended || "");
-          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription)\s+'?([a-zA-Z0-9_\-]+)'?/i);
+          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription|policy|domain)\s+'?([a-zA-Z0-9_\-\s]+)'?/i);
           if (match && match[1]) {
-            resource = match[1];
+            resource = match[1].trim();
           } else {
-            resource = "Digital-CISO-LLM";
+            resource = prov === "OCI" ? "OCI Tenancy" : "Digital-CISO-LLM";
           }
         }
 
