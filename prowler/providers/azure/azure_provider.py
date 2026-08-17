@@ -16,10 +16,16 @@ from azure.identity import (
     DefaultAzureCredential,
     InteractiveBrowserCredential,
 )
-from azure.mgmt.resource import ResourceManagementClient
+try:
+    from azure.mgmt.resource import ResourceManagementClient
+except ImportError:
+    from azure.mgmt.resource.resources import ResourceManagementClient
 from azure.mgmt.subscription import SubscriptionClient
 from colorama import Fore, Style
-from msgraph import GraphServiceClient
+try:
+    from msgraph import GraphServiceClient
+except ImportError:
+    GraphServiceClient = None
 
 from prowler.config.config import (
     default_config_file_path,
