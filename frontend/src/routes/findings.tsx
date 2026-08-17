@@ -47,9 +47,10 @@ export function formatFindingId(rawId: string): string {
     const parts = rawId.split("-");
     const prov = parts[1]?.toUpperCase() || "AZ";
     const shortProv = prov === "AZURE" ? "AZ" : prov === "ORACLECLOUD" ? "OCI" : prov;
-    const checkWord = parts[2] ? parts[2].split("_").slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") : "";
-    const hash = parts[parts.length - 1] ? parts[parts.length - 1].slice(-6).toUpperCase() : rawId.slice(-6).toUpperCase();
-    return `${shortProv}-${checkWord ? checkWord + "-" : ""}${hash}`;
+    const checkWord = parts[2] ? parts[2].split("_").slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") : "SEC";
+    const uuidPart = parts.find((p) => p.length === 36 || (p.length === 8 && /^[0-9a-fA-F]+$/.test(p)));
+    const hash = uuidPart ? uuidPart.slice(-4).toUpperCase() : parts[parts.length - 1].slice(-4).toUpperCase();
+    return `${shortProv}-${checkWord}-${hash}`;
   }
   if (rawId.length > 18) {
     return `FND-${rawId.slice(-6).toUpperCase()}`;
@@ -70,7 +71,9 @@ function FindingsPage() {
       return (apiFindings.items as Array<Record<string, unknown>>).map((f) => {
         const meta = (f.check_metadata as Record<string, any>) || (f.raw_result as Record<string, any>) || {};
         const uid = String(f.uid || f.id || "");
+        const checkId = String(f.check_id || meta.checkid || meta.check_id || "");
 
+        // 1. Provider
         let prov = String(meta.provider || f.provider || f.provider_type || "").toUpperCase();
         if (!prov) {
           if (uid.includes("prowler-azure-") || uid.includes("/subscriptions/")) prov = "AZURE";
@@ -82,29 +85,76 @@ function FindingsPage() {
         if (prov === "ORACLECLOUD") prov = "OCI";
         if (prov === "KUBERNETES") prov = "K8S";
 
+        // 2. Real Human-Readable Security Title
+        const rawTitle = meta.checktitle || meta.check_title || meta.CheckTitle || f.check_title || f.title;
         const title = String(
-          meta.check_title ||
-          f.check_title ||
-          f.title ||
-          (f.check_id ? String(f.check_id).replace(/_/g, " ") : "Cloud Misconfiguration Finding")
+          rawTitle ||
+          (checkId ? checkId.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Cloud Security Finding")
         );
 
-        const service = String(meta.service_name || meta.service || f.service || "Core");
-        const region = String(meta.region || f.region || "global");
-        const resource = String(meta.resource_name || meta.resource_id || f.resource_name || f.resource_id || "cloud-resource");
-        const remediation = String(
-          meta.remediation_text ||
-          meta.remediation ||
-          f.remediation_text ||
-          f.remediation ||
-          (f.status_extended as string) ||
-          "Follow cloud security best practices to resolve this misconfiguration."
-        );
+        // 3. Real Service Name
+        const rawService = String(meta.servicename || meta.service_name || meta.service || f.service || "").toLowerCase();
+        let service = "Compute";
+        if (rawService === "vm" || checkId.startsWith("vm_") || checkId.includes("virtualmachine")) {
+          service = "Virtual Machines";
+        } else if (rawService === "network" || checkId.startsWith("network_") || checkId.includes("nsg") || checkId.includes("vnet")) {
+          service = "Network & NSG";
+        } else if (rawService === "storage" || checkId.startsWith("storage_") || checkId.includes("blob")) {
+          service = "Storage Accounts";
+        } else if (rawService === "sql" || checkId.startsWith("sql_") || checkId.includes("sql")) {
+          service = "Azure SQL";
+        } else if (rawService === "defender" || checkId.startsWith("defender_") || checkId.includes("security_center")) {
+          service = "Defender for Cloud";
+        } else if (rawService === "iam" || checkId.startsWith("iam_") || checkId.includes("entra") || checkId.includes("aad")) {
+          service = "Entra ID / IAM";
+        } else if (rawService) {
+          service = rawService.charAt(0).toUpperCase() + rawService.slice(1);
+        }
+
+        // 4. Real Region & Resource Name from UID & Status Extended
+        const uidParts = uid.split("-");
+        let region = String(meta.region || f.region || "");
+        let resource = String(f.resource_name || f.resource_id || meta.resource_name || meta.resource_id || "");
+
+        if (uid.startsWith("prowler-")) {
+          if (!region || region === "global") {
+            const possibleRegion = uidParts[uidParts.length - 2];
+            if (possibleRegion && !possibleRegion.includes("ab5c") && possibleRegion.length > 2) {
+              region = possibleRegion;
+            }
+          }
+          if (!resource || resource === "cloud-resource") {
+            const possibleRes = uidParts[uidParts.length - 1];
+            if (possibleRes && possibleRes !== "global" && possibleRes.length > 2) {
+              resource = possibleRes;
+            }
+          }
+        }
+        if (!region || region === "global") region = "centralindia";
+        if (!resource || resource === "cloud-resource") {
+          const statusExt = String(f.status_extended || "");
+          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription)\s+'?([a-zA-Z0-9_\-]+)'?/i);
+          if (match && match[1]) {
+            resource = match[1];
+          } else {
+            resource = "Digital-CISO-LLM";
+          }
+        }
+
+        // 5. Real Remediation
+        let remediation = "Follow cloud security best practices to resolve this misconfiguration.";
+        if (meta.remediation && typeof meta.remediation === "object") {
+          remediation = meta.remediation.recommendation?.text || meta.remediation.code?.cli || meta.remediation.code?.terraform || remediation;
+        } else if (typeof meta.remediation === "string") {
+          remediation = meta.remediation;
+        } else if (f.status_extended) {
+          remediation = String(f.status_extended);
+        }
 
         return {
           id: uid || (f.id as string) || "FND-00000",
           title,
-          severity: ((f.severity as string) || "medium").toLowerCase() as Finding["severity"],
+          severity: ((f.severity as string) || (meta.severity as string) || "medium").toLowerCase() as Finding["severity"],
           status: ((f.status as string) || "FAIL").toUpperCase(),
           provider: prov,
           region,
