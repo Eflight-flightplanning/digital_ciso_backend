@@ -49,7 +49,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavSection = { label?: string; items: NavItem[] };
 
 export const navSections: NavSection[] = [
-  { items: [{ to: "/findings", label: "Dashboard", icon: LayoutDashboard }] },
+  { items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   {
     label: "Security",
     items: [

@@ -526,7 +526,13 @@ def perform_scan_task(
             provider_id=provider_id,
             checks_to_execute=checks_to_execute,
         )
-        _perform_scan_complete_tasks(tenant_id, scan_id, provider_id)
+        # perform_prowler_scan returns None when it detected the scan was
+        # already claimed by a concurrent runner (Celery vs. the direct
+        # thread fallback in enqueue_scan_execution_on_commit) and skipped
+        # execution. Only the runner that actually executed the scan should
+        # fire post-scan completion tasks.
+        if result is not None:
+            _perform_scan_complete_tasks(tenant_id, scan_id, provider_id)
         return result
     finally:
         _dispatch_next_queued_provider_scan_best_effort(tenant_id, provider_id)
@@ -635,7 +641,8 @@ def perform_scheduled_scan_task(self, tenant_id: str, provider_id: str):
             scan_id=str(scan_instance.id),
             provider_id=provider_id,
         )
-        _perform_scan_complete_tasks(tenant_id, str(scan_instance.id), provider_id)
+        if result is not None:
+            _perform_scan_complete_tasks(tenant_id, str(scan_instance.id), provider_id)
         return result
     finally:
         _ensure_next_scheduled_scan_best_effort(

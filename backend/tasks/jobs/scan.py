@@ -1109,7 +1109,12 @@ def perform_prowler_scan(
                 scan_id,
                 scan_instance.state,
             )
-            return ScanTaskSerializer(scan_instance).data
+            # Return None (not the serialized scan) so callers can tell this
+            # was a no-op skip and must NOT fire post-scan completion tasks
+            # (compliance scoring, findings aggregation, reports, etc.) —
+            # the winning path is still executing and hasn't written the
+            # real findings yet.
+            return None
         scan_instance.state = StateChoices.EXECUTING
         scan_instance.started_at = datetime.now(tz=UTC)
         _save_scan_instance(

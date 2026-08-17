@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AttackPathsRouteImport } from './routes/attack-paths'
 import { Route as ComplianceRouteImport } from './routes/compliance'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FindingsRouteImport } from './routes/findings'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -39,6 +40,11 @@ const AttackPathsRoute = AttackPathsRouteImport.update({
 const ComplianceRoute = ComplianceRouteImport.update({
   id: '/compliance',
   path: '/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FindingsRoute = FindingsRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/attack-paths': typeof AttackPathsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
   '/profile': typeof ProfileRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/attack-paths': typeof AttackPathsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
   '/profile': typeof ProfileRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/attack-paths': typeof AttackPathsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
   '/profile': typeof ProfileRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attack-paths'
     | '/compliance'
+    | '/dashboard'
     | '/findings'
     | '/integrations'
     | '/profile'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attack-paths'
     | '/compliance'
+    | '/dashboard'
     | '/findings'
     | '/integrations'
     | '/profile'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/'
     | '/attack-paths'
     | '/compliance'
+    | '/dashboard'
     | '/findings'
     | '/integrations'
     | '/profile'
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AttackPathsRoute: typeof AttackPathsRoute
   ComplianceRoute: typeof ComplianceRoute
+  DashboardRoute: typeof DashboardRoute
   FindingsRoute: typeof FindingsRoute
   IntegrationsRoute: typeof IntegrationsRoute
   ProfileRoute: typeof ProfileRoute
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/compliance'
       fullPath: '/compliance'
       preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/findings': {
@@ -359,6 +379,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AttackPathsRoute: AttackPathsRoute,
   ComplianceRoute: ComplianceRoute,
+  DashboardRoute: DashboardRoute,
   FindingsRoute: FindingsRoute,
   IntegrationsRoute: IntegrationsRoute,
   ProfileRoute: ProfileRoute,
