@@ -1790,6 +1790,19 @@ class ScanViewSet(BaseRLSViewSet):
 
         return super().get_serializer_class()
 
+    def perform_create(self, serializer):
+        scan = serializer.save()
+        try:
+            from tasks.tasks import enqueue_scan_execution_on_commit, initialize_task
+            import uuid
+            task_id = str(uuid.uuid4())
+            prowler_task = initialize_task(str(scan.tenant_id), task_id, task_name="scan-perform")
+            scan.task = prowler_task
+            scan.save(update_fields=["task"])
+            enqueue_scan_execution_on_commit(str(scan.tenant_id), scan, task_id)
+        except Exception as e:
+            logger.warning("Error queuing scan execution on create: %s", e)
+
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(

@@ -254,7 +254,7 @@ export function useCreateProviderSecret() {
       secret: Record<string, unknown>;
     }) =>
       api.post(
-        `/providers/${providerId}/secret`,
+        "/providers/secrets",
         jsonApiBody(
           "provider-secrets",
           {
