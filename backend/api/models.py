@@ -640,27 +640,14 @@ class Provider(RowLevelSecurityProtectedModel):
 
 
     @staticmethod
-
     def validate_azure_uid(value):
-
         try:
-
-            val = UUID(value, version=4)
-
-            if str(val) != value:
-
-                raise ValueError
-
-        except ValueError:
-
+            val = UUID(str(value).strip())
+        except (ValueError, AttributeError, TypeError):
             raise ModelValidationError(
-
                 detail="Azure provider ID must be a valid UUID.",
-
                 code="azure-uid",
-
                 pointer="/data/attributes/uid",
-
             )
 
 

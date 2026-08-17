@@ -1011,6 +1011,8 @@ class ProviderCreateSerializer(RLSSerializer, BaseWriteSerializer):
         secret = validated_data.pop("secret", None)
         secret_type = validated_data.pop("secret_type", "static")
         try:
+            if "tenant" not in validated_data and hasattr(self.context.get("request"), "tenant_id"):
+                validated_data["tenant_id"] = self.context["request"].tenant_id
             provider = super().create(validated_data)
             if secret and isinstance(secret, dict):
                 from api.models import ProviderSecret
