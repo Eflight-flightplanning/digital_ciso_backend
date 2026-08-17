@@ -61,8 +61,8 @@ function FindingsPage() {
           if (uid.includes("prowler-azure-") || uid.includes("/subscriptions/")) prov = "AZURE";
           else if (uid.includes("prowler-oci-") || uid.includes("ocid1.")) prov = "OCI";
           else if (uid.includes("prowler-gcp-") || uid.includes("projects/")) prov = "GCP";
-          else if (uid.includes("prowler-kubernetes-") || uid.includes("k8s-")) prov = "K8S";
-          else prov = "AWS";
+          else if (uid.includes("prowler-aws-") || uid.includes("arn:aws:")) prov = "AWS";
+          else prov = "AZURE";
         }
         if (prov === "ORACLECLOUD") prov = "OCI";
         if (prov === "KUBERNETES") prov = "K8S";
