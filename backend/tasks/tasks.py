@@ -181,16 +181,37 @@ def enqueue_scan_execution_on_commit(
     scan: Scan,
     task_id: str,
 ) -> None:
-    transaction.on_commit(
-        lambda: perform_scan_task.apply_async(
-            kwargs={
-                "tenant_id": str(tenant_id),
-                "scan_id": str(scan.id),
-                "provider_id": str(scan.provider_id),
-            },
-            task_id=str(task_id),
-        )
-    )
+    def _dispatch():
+        try:
+            perform_scan_task.apply_async(
+                kwargs={
+                    "tenant_id": str(tenant_id),
+                    "scan_id": str(scan.id),
+                    "provider_id": str(scan.provider_id),
+                },
+                task_id=str(task_id),
+            )
+        except Exception:
+            pass
+
+        import threading
+        from tasks.jobs.scan import perform_prowler_scan
+
+        def _run_scan_thread():
+            try:
+                perform_prowler_scan(
+                    tenant_id=str(tenant_id),
+                    scan_id=str(scan.id),
+                    provider_id=str(scan.provider_id),
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger("tasks.jobs.scan").error("Threaded scan execution failed: %s", e)
+
+        t = threading.Thread(target=_run_scan_thread, daemon=True)
+        t.start()
+
+    transaction.on_commit(_dispatch)
 
 
 def _get_queued_scheduled_scan(tenant_id: str, provider_id: str):
