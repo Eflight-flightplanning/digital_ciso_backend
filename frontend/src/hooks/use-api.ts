@@ -86,6 +86,7 @@ export function useFindings(params?: Record<string, string>) {
     queryFn: async () => {
       const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
       const finalParams = {
+        "page[size]": "500",
         "filter[inserted_at.gte]": defaultDate,
         ...(params || {}),
       };
@@ -330,6 +331,7 @@ export function useResources(params?: Record<string, string>) {
     queryFn: async () => {
       const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
       const finalParams = {
+        "page[size]": "500",
         "filter[updated_at.gte]": defaultDate,
         ...(params || {}),
       };
