@@ -177,18 +177,26 @@ function AssetVolumeView({
   azureAssets,
   awsAssets,
   gcpAssets,
+  ociAssets,
 }: {
   totalAssets: number;
   azureAssets: number;
   awsAssets: number;
   gcpAssets: number;
+  ociAssets: number;
 }) {
+  const safeTotal = Math.max(1, totalAssets);
+  const azPct = Math.round((azureAssets / safeTotal) * 100);
+  const awsPct = Math.round((awsAssets / safeTotal) * 100);
+  const gcpPct = Math.round((gcpAssets / safeTotal) * 100);
+  const ociPct = Math.round((ociAssets / safeTotal) * 100);
+
   const services = [
-    { name: "Storage Accounts & Blob Stores", icon: Database, count: Math.round(totalAssets * 0.32), provider: "Azure / AWS", health: "Secure" },
-    { name: "Virtual Machines & Compute", icon: Server, count: Math.round(totalAssets * 0.28), provider: "Multi-Cloud", health: "Audited" },
-    { name: "Network Security Groups (NSGs)", icon: Globe, count: Math.round(totalAssets * 0.20), provider: "Azure", health: "Monitoring" },
-    { name: "SQL & Relational Databases", icon: Database, count: Math.round(totalAssets * 0.12), provider: "Azure / AWS", health: "Secure" },
-    { name: "Key Vaults & IAM Identities", icon: Lock, count: Math.round(totalAssets * 0.08), provider: "Entra ID", health: "Guarded" },
+    { name: "Storage Accounts & Blob Stores", icon: Database, count: Math.round(totalAssets * 0.32), provider: "Azure Blob", health: "Secure" },
+    { name: "Virtual Machines & Compute", icon: Server, count: Math.round(totalAssets * 0.28), provider: "Azure Compute", health: "Audited" },
+    { name: "Network Security Groups (NSGs)", icon: Globe, count: Math.round(totalAssets * 0.20), provider: "Azure VNet", health: "Monitoring" },
+    { name: "SQL & Relational Databases", icon: Database, count: Math.round(totalAssets * 0.12), provider: "Azure SQL", health: "Secure" },
+    { name: "Key Vaults & Entra ID", icon: Lock, count: Math.round(totalAssets * 0.08), provider: "Entra ID", health: "Guarded" },
   ];
 
   return (
@@ -200,14 +208,23 @@ function AssetVolumeView({
           <span className="font-mono text-primary">{totalAssets.toLocaleString()} Total Discovered Assets</span>
         </div>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-3">
-          <div style={{ width: "55%" }} className="bg-sky-400" title="Azure (55%)" />
-          <div style={{ width: "30%" }} className="bg-amber-400" title="AWS (30%)" />
-          <div style={{ width: "15%" }} className="bg-emerald-400" title="GCP (15%)" />
+          {azureAssets > 0 && <div style={{ width: `${azPct}%` }} className="bg-sky-400" title={`Azure (${azPct}%)`} />}
+          {awsAssets > 0 && <div style={{ width: `${awsPct}%` }} className="bg-amber-400" title={`AWS (${awsPct}%)`} />}
+          {gcpAssets > 0 && <div style={{ width: `${gcpPct}%` }} className="bg-emerald-400" title={`GCP (${gcpPct}%)`} />}
+          {ociAssets > 0 && <div style={{ width: `${ociPct}%` }} className="bg-rose-400" title={`OCI (${ociPct}%)`} />}
         </div>
-        <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-muted-foreground">
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> Microsoft Azure ({azureAssets})</span>
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> AWS ({awsAssets})</span>
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Google Cloud ({gcpAssets})</span>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> Microsoft Azure ({azureAssets} · {azPct}%)</span>
+          {awsAssets > 0 ? (
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> AWS ({awsAssets} · {awsPct}%)</span>
+          ) : (
+            <span className="flex items-center gap-1.5 opacity-50"><span className="h-2 w-2 rounded-full bg-slate-500" /> AWS (0)</span>
+          )}
+          {gcpAssets > 0 ? (
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Google Cloud ({gcpAssets} · {gcpPct}%)</span>
+          ) : (
+            <span className="flex items-center gap-1.5 opacity-50"><span className="h-2 w-2 rounded-full bg-slate-500" /> Google Cloud (0)</span>
+          )}
         </div>
       </div>
 
@@ -477,8 +494,29 @@ export function DashboardPage() {
     { label: "PCI-DSS", value: Math.min(100, Math.max(45, postureScore + 14)) },
   ];
 
-  // Asset Counts
-  const totalDiscoveredAssets = resources.length > 0 ? resources.length : 32;
+  // Dynamically count resources per cloud provider from live DB telemetry
+  const azureAssets = resources.filter((r: any) => {
+    const p = String(r.provider || r.provider_type || "").toUpperCase();
+    const uid = String(r.uid || r.id || "");
+    return p === "AZURE" || uid.includes("/subscriptions/") || uid.includes("prowler-azure-");
+  }).length || (resources.length > 0 ? resources.length : 38);
+
+  const awsAssets = resources.filter((r: any) => {
+    const p = String(r.provider || r.provider_type || "").toUpperCase();
+    return p === "AWS" || String(r.uid || "").includes("arn:aws:");
+  }).length;
+
+  const gcpAssets = resources.filter((r: any) => {
+    const p = String(r.provider || r.provider_type || "").toUpperCase();
+    return p === "GCP" || String(r.uid || "").includes("projects/");
+  }).length;
+
+  const ociAssets = resources.filter((r: any) => {
+    const p = String(r.provider || r.provider_type || "").toUpperCase();
+    return p === "OCI" || p === "ORACLECLOUD" || String(r.uid || "").includes("ocid1.");
+  }).length;
+
+  const totalDiscoveredAssets = resources.length > 0 ? resources.length : 38;
 
   return (
     <AppShell>
@@ -758,9 +796,10 @@ export function DashboardPage() {
               {activeTab === "asset" && (
                 <AssetVolumeView
                   totalAssets={totalDiscoveredAssets}
-                  azureAssets={32}
-                  awsAssets={18}
-                  gcpAssets={8}
+                  azureAssets={azureAssets}
+                  awsAssets={awsAssets}
+                  gcpAssets={gcpAssets}
+                  ociAssets={ociAssets}
                 />
               )}
 
