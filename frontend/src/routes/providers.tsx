@@ -177,6 +177,7 @@ function ProvidersPage() {
     setErrorMsg(null);
 
     try {
+      let uid = "";
       let secretPayload: Record<string, unknown> | null = null;
       let secretType = "static";
 
