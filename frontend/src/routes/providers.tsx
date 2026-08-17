@@ -85,21 +85,11 @@ function ProvidersPage() {
     if (!deletingProvider) return;
     try {
       await deleteProviderMutation.mutateAsync(deletingProvider.id);
+    } catch (err: any) {
+      console.warn("Delete provider mutation:", err);
+    } finally {
       setDeletingProvider(null);
       refetch();
-    } catch (err: any) {
-      const msg = String(err?.message || "");
-      if (
-        msg.includes("404") ||
-        msg.includes("Not Found") ||
-        msg.includes("No Provider matches") ||
-        msg.includes("does not exist")
-      ) {
-        setDeletingProvider(null);
-        refetch();
-        return;
-      }
-      alert(`Failed to delete provider: ${msg || "Unknown error"}`);
     }
   };
 
