@@ -181,16 +181,48 @@ def enqueue_scan_execution_on_commit(
     scan: Scan,
     task_id: str,
 ) -> None:
-    transaction.on_commit(
-        lambda: perform_scan_task.apply_async(
-            kwargs={
-                "tenant_id": str(tenant_id),
-                "scan_id": str(scan.id),
-                "provider_id": str(scan.provider_id),
-            },
-            task_id=str(task_id),
-        )
-    )
+    """
+    Run the scan directly in a background thread instead of dispatching to
+    Celery. This bypasses the broker/worker entirely for the top-level scan
+    execution — the UI's own polling gates on Scan.state (written directly
+    by perform_prowler_scan below), not on the Celery TaskResult, so demo
+    reliability no longer depends on a separate worker process picking up
+    the task in time.
+    """
+    def _dispatch():
+        import threading
+
+        def _run_scan_thread():
+            try:
+                with rls_transaction(tenant_id):
+                    if not Provider.objects.filter(pk=scan.provider_id).exists():
+                        logger.warning(
+                            "scan-perform skipped: provider %s no longer exists "
+                            "(tenant=%s, scan=%s)",
+                            scan.provider_id,
+                            tenant_id,
+                            scan.id,
+                        )
+                        return
+                result = perform_prowler_scan(
+                    tenant_id=str(tenant_id),
+                    scan_id=str(scan.id),
+                    provider_id=str(scan.provider_id),
+                )
+                if result is not None:
+                    _perform_scan_complete_tasks(
+                        tenant_id, str(scan.id), str(scan.provider_id)
+                    )
+            except Exception as e:
+                logger.error("Direct scan execution failed for %s: %s", scan.id, e)
+            finally:
+                _dispatch_next_queued_provider_scan_best_effort(
+                    tenant_id, str(scan.provider_id)
+                )
+
+        threading.Thread(target=_run_scan_thread, daemon=True).start()
+
+    transaction.on_commit(_dispatch)
 
 
 def _get_queued_scheduled_scan(tenant_id: str, provider_id: str):

@@ -65,14 +65,6 @@ const initialMessages: ChatMessage[] = [
   },
 ];
 
-const suggestedQueries = [
-  "What should we remediate first today?",
-  "Show high-risk production S3 buckets.",
-  "Which IAM roles have privilege escalation paths?",
-  "Evaluate CIS AWS Foundations failure points.",
-  "Which findings are currently breaching SLA deadlines?",
-];
-
 function AIAdvisorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -80,6 +72,58 @@ function AIAdvisorPage() {
   const [providerFilter, setProviderFilter] = useState("All");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const advisorMutation = useAIAdvisorQuery();
+
+  const suggestedQueries = useMemo(() => {
+    switch (providerFilter.toUpperCase()) {
+      case "AZURE":
+        return [
+          "What should we remediate first on Azure today?",
+          "Show high-risk Microsoft Defender for Cloud failures.",
+          "Audit Entra ID IAM accounts and privilege escalation.",
+          "Evaluate CIS Microsoft Azure Foundations Benchmark failures.",
+          "Which Azure Storage accounts allow anonymous blob access?",
+        ];
+      case "OCI":
+        return [
+          "What should we remediate first on Oracle Cloud today?",
+          "Show open Object Storage buckets and VCN ingress rules.",
+          "Audit OCI Tenancy Compartment policies and IAM groups.",
+          "Evaluate CIS OCI Benchmark failure points.",
+          "Which OCI Compute instances have public IPs directly exposed?",
+        ];
+      case "GCP":
+        return [
+          "What should we remediate first on Google Cloud today?",
+          "Audit GCP Service Account keys with excessive permissions.",
+          "Show public Cloud Storage buckets and open VPC firewalls.",
+          "Evaluate CIS Google Cloud Platform Benchmark failures.",
+          "Which GCP IAM service accounts have Admin privileges?",
+        ];
+      case "AWS":
+        return [
+          "What should we remediate first on AWS today?",
+          "Show high-risk production S3 buckets and open Security Groups.",
+          "Which IAM roles have privilege escalation paths?",
+          "Evaluate CIS AWS Foundations Benchmark failure points.",
+          "Which findings are currently breaching SLA deadlines?",
+        ];
+      case "K8S":
+        return [
+          "Audit Kubernetes API Server and RBAC cluster roles.",
+          "Which pods run with privileged securityContext enabled?",
+          "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.",
+          "Are any worker nodes running with insecure Kubelet ports?",
+        ];
+      default:
+        return [
+          "What should we remediate first across our clouds today?",
+          "Show high-risk Azure, AWS, and OCI misconfigurations.",
+          "Which IAM roles have privilege escalation paths?",
+          "Evaluate multi-cloud CIS Foundations failure points.",
+          "Which findings are currently breaching SLA deadlines?",
+        ];
+    }
+  }, [providerFilter]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
