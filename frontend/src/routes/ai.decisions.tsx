@@ -89,37 +89,12 @@ function AIDecisionsPage() {
   const playbooks: ExtendedPlaybook[] = useMemo(() => {
     let list: ExtendedPlaybook[] = [];
 
-    if (playbooksRaw?.items && playbooksRaw.items.length > 0) {
-      list = (playbooksRaw.items as Array<Record<string, unknown>>).map((p) => {
-        const rawStatus = String(p.approval_status || "pending_approval").toLowerCase();
-        let normalizedStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" = "PENDING_APPROVAL";
-        if (rawStatus.includes("pending")) normalizedStatus = "PENDING_APPROVAL";
-        else if (rawStatus.includes("approved")) normalizedStatus = "APPROVED";
-        else if (rawStatus.includes("rejected")) normalizedStatus = "REJECTED";
-        else if (rawStatus.includes("exec")) normalizedStatus = "EXECUTED";
-
-        return {
-          id: p.id as string,
-          title: (p.title as string) || "Remediation Playbook",
-          finding: (p.title as string) || "Cloud Misconfiguration Finding",
-          script_type: (p.script_type as string) || "terraform",
-          code_snippet: (p.code_snippet as string) || "",
-          rollback_snippet: (p.rollback_snippet as string) || "",
-          approval_status: normalizedStatus,
-          approved_by: (p.approved_by as string) || (normalizedStatus === "APPROVED" || normalizedStatus === "EXECUTED" ? "admin@securityplatform.com" : ""),
-          approved_at: (p.approved_at as string) || "",
-          executed_at: (p.executed_at as string) || "",
-          execution_log: (p.execution_log as string) || (p.execution_output as string) || "",
-          priority: "P1",
-          risk: 88,
-          sla: "4h remaining",
-        };
-      });
-    } else if (realFindings.length > 0) {
+    // Map all failed realFindings (all 53 Azure security violations)
+    if (realFindings.length > 0) {
       const failed = realFindings.filter((f: any) => f.status === "FAIL");
-      list = failed.slice(0, 10).map((f: any, i: number) => {
+      list = failed.map((f: any, i: number) => {
         const checkId = f.check_id || `check_${i + 1}`;
-        const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || checkId.replace(/_/g, " ");
+        const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
         const resName = f.resource_name || f.resource?.name || "azure-subscription-resource";
 
         let snippet = "";
@@ -150,24 +125,70 @@ function AIDecisionsPage() {
           scriptType = "terraform";
           snippet = `resource "azurerm_storage_account" "secure_storage" {\n  name                     = "${resName.slice(0, 20)}"\n  enable_https_traffic_only = true\n  min_tls_version           = "TLS1_2"\n  allow_nested_items_to_be_public = false\n}`;
           rollback = `# Revert storage account access policies`;
+        } else if (checkId.includes("vm_trusted_launch")) {
+          scriptType = "azure_cli";
+          snippet = `az vm update --resource-group "rg-production" --name "${resName}" --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true`;
+          rollback = `# Revert Trusted Launch settings for VM`;
         } else {
           scriptType = "terraform";
           snippet = `# Automated Remediation for ${checkId}\n# Enforcing strict CIS Microsoft Azure Benchmark Compliance\nresource "azurerm_security_center_setting" "setting_${i}" {\n  setting_name = "MCAS"\n  enabled      = true\n}`;
           rollback = `# Rollback automated configuration`;
         }
 
+        const existingDbPlaybook = (playbooksRaw?.items as Array<Record<string, unknown>> | undefined)?.find(
+          (p) => p.finding_id === f.id || p.title?.toString().toLowerCase().includes(checkId.toLowerCase())
+        );
+
+        let normalizedStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" = "PENDING_APPROVAL";
+        if (existingDbPlaybook) {
+          const rawStatus = String(existingDbPlaybook.approval_status || "pending_approval").toLowerCase();
+          if (rawStatus.includes("approved")) normalizedStatus = "APPROVED";
+          else if (rawStatus.includes("rejected")) normalizedStatus = "REJECTED";
+          else if (rawStatus.includes("exec")) normalizedStatus = "EXECUTED";
+        }
+
         return {
           id: f.id || `pb-real-${i}`,
           title: `Remediate ${checkId.replace(/_/g, " ")}`,
           finding: title,
-          script_type: scriptType,
-          code_snippet: snippet,
-          rollback_snippet: rollback,
-          approval_status: "PENDING_APPROVAL",
+          script_type: existingDbPlaybook?.script_type ? String(existingDbPlaybook.script_type) : scriptType,
+          code_snippet: existingDbPlaybook?.code_snippet ? String(existingDbPlaybook.code_snippet) : snippet,
+          rollback_snippet: existingDbPlaybook?.rollback_snippet ? String(existingDbPlaybook.rollback_snippet) : rollback,
+          approval_status: normalizedStatus,
+          approved_by: normalizedStatus === "APPROVED" || normalizedStatus === "EXECUTED" ? "admin@securityplatform.com" : "",
+          approved_at: existingDbPlaybook?.approved_at ? String(existingDbPlaybook.approved_at) : "",
+          executed_at: existingDbPlaybook?.executed_at ? String(existingDbPlaybook.executed_at) : "",
+          execution_log: existingDbPlaybook?.execution_log ? String(existingDbPlaybook.execution_log) : "",
           priority: f.severity === "critical" ? "P1" : f.severity === "high" ? "P1" : "P2",
           risk: f.severity === "critical" ? 96 : f.severity === "high" ? 88 : 65,
           sla: f.severity === "critical" ? "2h remaining" : "4h remaining",
           inserted_at: f.inserted_at || new Date().toISOString(),
+        };
+      });
+    } else if (playbooksRaw?.items && playbooksRaw.items.length > 0) {
+      list = (playbooksRaw.items as Array<Record<string, unknown>>).map((p) => {
+        const rawStatus = String(p.approval_status || "pending_approval").toLowerCase();
+        let normalizedStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" = "PENDING_APPROVAL";
+        if (rawStatus.includes("pending")) normalizedStatus = "PENDING_APPROVAL";
+        else if (rawStatus.includes("approved")) normalizedStatus = "APPROVED";
+        else if (rawStatus.includes("rejected")) normalizedStatus = "REJECTED";
+        else if (rawStatus.includes("exec")) normalizedStatus = "EXECUTED";
+
+        return {
+          id: p.id as string,
+          title: (p.title as string) || "Remediation Playbook",
+          finding: (p.title as string) || "Cloud Misconfiguration Finding",
+          script_type: (p.script_type as string) || "terraform",
+          code_snippet: (p.code_snippet as string) || "",
+          rollback_snippet: (p.rollback_snippet as string) || "",
+          approval_status: normalizedStatus,
+          approved_by: (p.approved_by as string) || (normalizedStatus === "APPROVED" || normalizedStatus === "EXECUTED" ? "admin@securityplatform.com" : ""),
+          approved_at: (p.approved_at as string) || "",
+          executed_at: (p.executed_at as string) || "",
+          execution_log: (p.execution_log as string) || (p.execution_output as string) || "",
+          priority: "P1",
+          risk: 88,
+          sla: "4h remaining",
         };
       });
     } else {

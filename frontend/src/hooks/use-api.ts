@@ -138,11 +138,15 @@ export function useAIAdvisorQuery() {
 
 // ─── Decision Logs ────────────────────────────────────────────────────────
 
-export function useDecisionLogs() {
+export function useDecisionLogs(params?: Record<string, string>) {
   return useQuery({
-    queryKey: qk.decisionLogs(),
+    queryKey: qk.decisionLogs(params),
     queryFn: async () => {
-      const res = await api.get("/decision-logs");
+      const finalParams = {
+        "page[size]": "500",
+        ...(params || {}),
+      };
+      const res = await api.get(`/decision-logs${buildQuery(finalParams)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 30 * 1000,
@@ -412,8 +416,11 @@ export function useRemediationPlaybooks(params?: Record<string, string>) {
   return useQuery({
     queryKey: ["remediation-playbooks", params ?? {}],
     queryFn: async () => {
-      const qs = buildQuery(params);
-      const res = await api.get(`/remediation-playbooks${qs}`);
+      const finalParams = {
+        "page[size]": "500",
+        ...(params || {}),
+      };
+      const res = await api.get(`/remediation-playbooks${buildQuery(finalParams)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 10 * 1000,
