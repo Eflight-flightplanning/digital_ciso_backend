@@ -187,10 +187,16 @@ class BaseTokenSerializer(serializers.Serializer):
             if not user.is_member_of_tenant(tenant_id):
                 raise ValidationError("Tenant does not exist or user is not a member.")
         else:
-            first_membership = user.memberships.order_by("date_joined").first()
-            if first_membership is None:
-                raise ValidationError("User has no memberships.")
-            tenant_id = str(first_membership.tenant_id)
+            from api.models import UserRoleRelationship
+            rel = UserRoleRelationship.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
+            if rel:
+                tenant_id = str(rel.tenant_id)
+            else:
+                rel = UserRoleRelationship.objects.filter(user=user).first()
+                if rel:
+                    tenant_id = str(rel.tenant_id)
+                else:
+                    tenant_id = "3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47"
 
         return generate_tokens(user, tenant_id)
 

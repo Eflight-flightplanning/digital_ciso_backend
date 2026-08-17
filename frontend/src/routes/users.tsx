@@ -11,7 +11,6 @@ import {
   DataTable,
   Row,
 } from "@/components/ui-kit/primitives";
-import { users as initialUsers } from "@/lib/mock";
 import { useUsers, useRoles } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/users")({
@@ -26,11 +25,19 @@ function UsersPage() {
     ? (apiUsers.items as Array<Record<string, unknown>>).map((u) => ({
         email: (u.email as string) || "user@acme.io",
         name: (u.name as string) || (u.email as string)?.split("@")[0] || "Team Member",
-        role: (u.role as string) || ((u.is_superuser || u.is_staff) ? "Admin" : "Member"),
+        role: (u.role as string) || ((u.is_superuser || u.is_staff) ? "Security Admin" : "Auditor"),
         lastLogin: u.last_login ? new Date(u.last_login as string).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active",
         status: u.is_active !== false ? "Active" : "Suspended",
       }))
-    : initialUsers;
+    : [
+        {
+          email: "admin@securityplatform.com",
+          name: "Alex CISO",
+          role: "Security Admin",
+          lastLogin: "Active Now",
+          status: "Active",
+        },
+      ];
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");

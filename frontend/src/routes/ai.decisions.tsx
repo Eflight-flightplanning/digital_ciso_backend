@@ -26,7 +26,6 @@ import {
   Row,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { decisions as mockDecisions, type Decision } from "@/lib/mock";
 import { useFindings, useDecisionLogs, useRemediationPlaybooks, useApprovePlaybook, useRejectPlaybook, useExecutePlaybook } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/decisions")({

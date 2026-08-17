@@ -13,7 +13,6 @@ import {
   Chip,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { scans as initialScans } from "@/lib/mock";
 import { useScans, useLaunchScan, useProviders } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/scans")({
@@ -29,9 +28,9 @@ function ScansPage() {
     const map = new Map<string, { alias: string; provider: string }>();
     if (apiProviders?.items) {
       for (const p of apiProviders.items as Array<Record<string, unknown>>) {
-        const provType = String(p.provider || p.provider_type || "AWS").toUpperCase();
+        const provType = String(p.provider || p.provider_type || "AZURE").toUpperCase();
         map.set(String(p.id), {
-          alias: String(p.alias || p.uid || "Cloud Account"),
+          alias: String(p.alias || p.uid || "Azure Cloud Account"),
           provider: provType === "ORACLECLOUD" ? "OCI" : provType,
         });
       }

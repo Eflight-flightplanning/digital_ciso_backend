@@ -23,8 +23,23 @@ import {
   Row,
   severityTone,
 } from "@/components/ui-kit/primitives";
-import { findings as initialFindings, type Finding } from "@/lib/mock";
 import { useFindings, useAnalyzeFinding } from "@/hooks/use-api";
+
+export interface Finding {
+  id: string;
+  check_id?: string;
+  title: string;
+  severity: "critical" | "high" | "medium" | "low" | "informational";
+  status: "FAIL" | "PASS" | "MUTED" | string;
+  status_extended?: string;
+  resource: string;
+  resource_id?: string;
+  provider: string;
+  region: string;
+  service: string;
+  scanned: string;
+  remediation: string;
+}
 
 export function formatFindingId(rawId: string): string {
   if (!rawId) return "FND-0000";
@@ -115,7 +130,7 @@ function FindingsPage() {
   const [analysisStatus, setAnalysisStatus] = useState<Record<string, string>>({});
 
   const data: Finding[] = useMemo(() => {
-    const base = rawData.length > 0 ? rawData : (initialFindings as Finding[]);
+    const base = rawData;
     return base.map((f) => {
       if (remediatedIds.includes(f.id)) {
         return { ...f, status: "PASS" };
