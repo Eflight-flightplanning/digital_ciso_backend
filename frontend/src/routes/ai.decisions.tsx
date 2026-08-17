@@ -54,24 +54,19 @@ interface ExtendedPlaybook {
 
 const fallbackPlaybooks: ExtendedPlaybook[] = [
   {
-    id: "pb-s3-01",
-    title: "Enforce S3 Block Public Access & Revoke Public ACL",
-    finding: "S3 Bucket Public Read Access Enabled",
+    id: "pb-azure-01",
+    title: "Remediate Defender for App Services",
+    finding: "Microsoft Defender for App Services Disabled",
     script_type: "terraform",
     approval_status: "PENDING_APPROVAL",
     priority: "P1",
-    risk: 95,
-    sla: "2h remaining",
-    code_snippet: `resource "aws_s3_bucket_public_access_block" "block_public" {
-  bucket = "corp-confidential-finance-2026"
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+    risk: 92,
+    sla: "4h remaining",
+    code_snippet: `resource "azurerm_security_center_subscription_pricing" "app_services" {
+  tier          = "Standard"
+  resource_type = "AppServices"
 }`,
-    rollback_snippet: `# Rollback to previous bucket configuration
-aws s3api put-public-access-block --bucket corp-confidential-finance-2026 --public-access-block-configuration "BlockPublicAcls=false"`,
+    rollback_snippet: `# Rollback Defender tier to Free\naz security pricing create -n "AppServices" --tier "Free"`,
     inserted_at: new Date().toISOString(),
   },
 ];
