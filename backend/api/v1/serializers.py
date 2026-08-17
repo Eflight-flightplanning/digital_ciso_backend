@@ -982,12 +982,17 @@ class ProviderIncludeSerializer(RLSSerializer):
 
 
 class ProviderCreateSerializer(RLSSerializer, BaseWriteSerializer):
+    secret = serializers.JSONField(required=False, write_only=True)
+    secret_type = serializers.CharField(required=False, write_only=True)
+
     class Meta:
         model = Provider
         fields = [
             "alias",
             "provider",
             "uid",
+            "secret",
+            "secret_type",
             # "scanner_args"
         ]
         extra_kwargs = {
@@ -1003,8 +1008,22 @@ class ProviderCreateSerializer(RLSSerializer, BaseWriteSerializer):
         }
 
     def create(self, validated_data):
+        secret = validated_data.pop("secret", None)
+        secret_type = validated_data.pop("secret_type", "static")
         try:
-            return super().create(validated_data)
+            provider = super().create(validated_data)
+            if secret and isinstance(secret, dict):
+                from api.models import ProviderSecret
+                ProviderSecret.objects.update_or_create(
+                    provider=provider,
+                    tenant_id=provider.tenant_id,
+                    defaults={
+                        "name": f"secret-{str(provider.id)[:8]}",
+                        "secret_type": secret_type,
+                        "secret": secret,
+                    },
+                )
+            return provider
         except DjangoValidationError as e:
             if "unique_provider_uids" in str(e):
                 raise ConflictException(

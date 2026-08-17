@@ -224,24 +224,13 @@ function ProvidersPage() {
         }
       }
 
-      const res = await createProviderMutation.mutateAsync({
+      await createProviderMutation.mutateAsync({
         provider: activeTab === "OCI" ? "oraclecloud" : activeTab.toLowerCase(),
         uid: uid || alias,
         alias: alias.trim(),
+        secret: secretPayload || undefined,
+        secret_type: secretType,
       });
-
-      const newProviderId = (res as any)?.data?.id || (res as any)?.id;
-      if (newProviderId && secretPayload) {
-        try {
-          await createProviderSecretMutation.mutateAsync({
-            providerId: newProviderId,
-            secretType,
-            secret: secretPayload,
-          });
-        } catch (secErr) {
-          console.warn("Could not attach provider secret:", secErr);
-        }
-      }
 
       setSuccessMsg(`Successfully connected ${activeTab} environment: ${alias}`);
       setTimeout(() => {

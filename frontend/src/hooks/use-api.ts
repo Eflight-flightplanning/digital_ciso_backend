@@ -220,12 +220,24 @@ export function useCreateProvider() {
       provider,
       uid,
       alias,
+      secret,
+      secret_type = "static",
     }: {
       provider: string;
       uid: string;
       alias: string;
+      secret?: Record<string, unknown>;
+      secret_type?: string;
     }) =>
-      api.post("/providers", jsonApiBody("providers", { provider, uid, alias })),
+      api.post(
+        "/providers",
+        jsonApiBody("providers", {
+          provider,
+          uid,
+          alias,
+          ...(secret ? { secret, secret_type } : {}),
+        })
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.providers() }),
   });
 }
