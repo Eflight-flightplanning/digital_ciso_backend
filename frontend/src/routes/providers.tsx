@@ -121,7 +121,7 @@ function ProvidersPage() {
   const [ociUserOcid, setOciUserOcid] = useState("");
   const [ociFingerprint, setOciFingerprint] = useState("");
   const [ociPrivateKey, setOciPrivateKey] = useState("");
-  const [ociRegion, setOciRegion] = useState("us-ashburn-1");
+  const [ociRegion, setOciRegion] = useState("uk-london-1");
 
   // Kubernetes Fields
   const [k8sClusterName, setK8sClusterName] = useState("");
@@ -149,6 +149,7 @@ function ProvidersPage() {
     setOciUserOcid("");
     setOciFingerprint("");
     setOciPrivateKey("");
+    setOciRegion("uk-london-1");
     setK8sClusterName("");
     setK8sKubeconfig("");
     setGithubOrg("");
@@ -667,6 +668,7 @@ function ProvidersPage() {
                       onChange={(e) => setOciRegion(e.target.value)}
                       className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
                     >
+                      <option value="uk-london-1">uk-london-1 (UK South - London) ★</option>
                       <option value="ap-mumbai-1">ap-mumbai-1 (India West - Mumbai)</option>
                       <option value="ap-hyderabad-1">ap-hyderabad-1 (India South - Hyderabad)</option>
                       <option value="us-ashburn-1">us-ashburn-1 (US East - Ashburn)</option>
@@ -674,7 +676,6 @@ function ProvidersPage() {
                       <option value="us-sanjose-1">us-sanjose-1 (US West - San Jose)</option>
                       <option value="us-chicago-1">us-chicago-1 (US Central - Chicago)</option>
                       <option value="eu-frankfurt-1">eu-frankfurt-1 (Germany Central - Frankfurt)</option>
-                      <option value="uk-london-1">uk-london-1 (UK South - London)</option>
                       <option value="eu-amsterdam-1">eu-amsterdam-1 (Netherlands - Amsterdam)</option>
                       <option value="ap-singapore-1">ap-singapore-1 (Singapore)</option>
                       <option value="ap-tokyo-1">ap-tokyo-1 (Japan East - Tokyo)</option>

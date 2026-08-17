@@ -320,12 +320,17 @@ class OraclecloudProvider(Provider):
 
                 logger.info("Using API key credentials from direct parameters")
 
+                if isinstance(region, (set, list, tuple)):
+                    region_str = next(iter(region), None)
+                else:
+                    region_str = region
+
                 # Create config dict from provided credentials
                 config = {
                     "user": user,
                     "fingerprint": fingerprint,
                     "tenancy": tenancy,
-                    "region": region or OraclecloudProvider._bootstrap_region,
+                    "region": region_str or OraclecloudProvider._bootstrap_region,
                 }
 
                 # Handle private key
