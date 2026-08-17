@@ -230,6 +230,17 @@ export function useCreateProvider() {
   });
 }
 
+export function useDeleteProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/providers/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.providers() });
+      qc.invalidateQueries({ queryKey: qk.scans() });
+    },
+  });
+}
+
 // ─── Scans ────────────────────────────────────────────────────────────────
 
 export function useScans(params?: Record<string, string>) {

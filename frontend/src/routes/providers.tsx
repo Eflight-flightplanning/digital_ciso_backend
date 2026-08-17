@@ -13,6 +13,12 @@ import {
   AlertCircle,
   ExternalLink,
   Layers,
+  Trash2,
+  Eye,
+  Info,
+  Copy,
+  Check,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -20,7 +26,7 @@ import {
   Chip,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useProviders, useCreateProvider } from "@/hooks/use-api";
+import { useProviders, useCreateProvider, useDeleteProvider } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/providers")({
   component: ProvidersPage,
@@ -28,11 +34,23 @@ export const Route = createFileRoute("/providers")({
 
 type ProviderType = "AWS" | "AZURE" | "GCP" | "OCI" | "KUBERNETES" | "GITHUB";
 
+interface ProviderItem {
+  id: string;
+  name: string;
+  alias: string;
+  status: "connected" | "disconnected" | "syncing";
+  lastScan: string;
+  resources: number;
+  uid: string;
+  raw?: Record<string, unknown>;
+}
+
 function ProvidersPage() {
   const { data: apiProviders, isLoading, refetch } = useProviders();
   const createProviderMutation = useCreateProvider();
+  const deleteProviderMutation = useDeleteProvider();
 
-  const providerList = (apiProviders?.items && apiProviders.items.length > 0)
+  const providerList: ProviderItem[] = (apiProviders?.items && apiProviders.items.length > 0)
     ? (apiProviders.items as Array<Record<string, unknown>>).map((p) => ({
         id: (p.id as string) || (p.uid as string) || "p-001",
         name: ((p.provider as string) || (p.provider_type as string) || "AWS").toUpperCase(),
@@ -41,15 +59,37 @@ function ProvidersPage() {
         lastScan: (p.last_scan_at as string) || "Never",
         resources: (p.resources_count as number) || (p.findings_count as number) || 0,
         uid: (p.uid as string) || "",
+        raw: p,
       }))
     : [];
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedConfigProvider, setSelectedConfigProvider] = useState<ProviderItem | null>(null);
+  const [deletingProvider, setDeletingProvider] = useState<ProviderItem | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<ProviderType>("AWS");
   const [alias, setAlias] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const handleCopy = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingProvider) return;
+    try {
+      await deleteProviderMutation.mutateAsync(deletingProvider.id);
+      setDeletingProvider(null);
+      refetch();
+    } catch (err: any) {
+      alert(`Failed to delete provider: ${err?.message || "Unknown error"}`);
+    }
+  };
 
   // AWS Fields
   const [awsAuthMode, setAwsAuthMode] = useState<"role" | "keys">("role");
@@ -342,19 +382,39 @@ function ProvidersPage() {
               </div>
 
               <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
-                <Link
-                  to="/scans"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                >
-                  <Zap className="h-3 w-3" />
-                  <span>Scan Now</span>
-                </Link>
-                <Link
-                  to="/resources"
-                  className="text-xs text-muted-foreground hover:text-foreground font-medium"
-                >
-                  View Assets →
-                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedConfigProvider(p)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2/70 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors"
+                    title="View Provider Configuration"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>Config</span>
+                  </button>
+                  <Link
+                    to="/scans"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    <span>Scan</span>
+                  </Link>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/resources"
+                    className="text-xs text-muted-foreground hover:text-foreground font-medium"
+                  >
+                    Assets →
+                  </Link>
+                  <button
+                    onClick={() => setDeletingProvider(p)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-muted-foreground hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                    title="Delete / Disconnect Provider"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </Panel>
           ))}
@@ -748,6 +808,219 @@ function ProvidersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── View Provider Configuration Modal ── */}
+      {selectedConfigProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-xl rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-surface-2/50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-display text-sm font-bold">
+                  {selectedConfigProvider.name.slice(0, 3)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-display text-sm font-bold text-foreground">
+                      {selectedConfigProvider.alias}
+                    </h3>
+                    <Chip tone={selectedConfigProvider.status === "connected" ? "success" : "critical"}>
+                      <Dot tone={selectedConfigProvider.status === "connected" ? "success" : "critical"} />
+                      {selectedConfigProvider.status}
+                    </Chip>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedConfigProvider.name} Cloud Provider Configuration
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedConfigProvider(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Configuration Fields Grid */}
+              <div className="space-y-3 rounded-xl border border-border bg-surface-2/40 p-4 text-xs">
+                <div>
+                  <span className="text-muted-foreground block text-[11px] font-medium mb-1">Provider Alias / Name</span>
+                  <div className="font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
+                    {selectedConfigProvider.alias}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-muted-foreground text-[11px] font-medium">
+                      Cloud Resource Identifier (UID / Subscription / Tenancy OCID)
+                    </span>
+                    <button
+                      onClick={() => handleCopy(selectedConfigProvider.uid, "uid")}
+                      className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                    >
+                      {copiedField === "uid" ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copy UID</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="font-mono text-[11px] text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60 break-all select-all">
+                    {selectedConfigProvider.uid || "N/A"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-muted-foreground text-[11px] font-medium">Internal System Provider ID</span>
+                    <button
+                      onClick={() => handleCopy(selectedConfigProvider.id, "id")}
+                      className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                    >
+                      {copiedField === "id" ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copy ID</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="font-mono text-[11px] text-muted-foreground bg-surface px-3 py-2 rounded-lg border border-border/60 break-all select-all">
+                    {selectedConfigProvider.id}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <span className="text-muted-foreground block text-[11px] font-medium mb-1">Provider Type</span>
+                    <div className="font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
+                      {selectedConfigProvider.name}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[11px] font-medium mb-1">Discovered Assets</span>
+                    <div className="mono font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
+                      {selectedConfigProvider.resources.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-muted-foreground block text-[11px] font-medium mb-1">Last Assessment Status</span>
+                  <div className="font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
+                    {selectedConfigProvider.lastScan}
+                  </div>
+                </div>
+              </div>
+
+              {/* Security & Audit Capabilities */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-center gap-2 text-primary font-bold text-xs mb-1.5">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Prowler Continuous Audit Active</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  This connector supports continuous CIS benchmark scanning, asset graph ingestion, and Spectra AI automated remediation procedures.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-border px-6 py-4 bg-surface-2/30">
+              <button
+                onClick={() => {
+                  const p = selectedConfigProvider;
+                  setSelectedConfigProvider(null);
+                  setDeletingProvider(p);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3.5 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Provider</span>
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedConfigProvider(null)}
+                  className="rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-2/80"
+                >
+                  Close
+                </button>
+                <Link
+                  to="/scans"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  <span>Launch Assessment</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Provider Confirmation Modal ── */}
+      {deletingProvider && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl border border-red-500/30 bg-surface shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-500 mb-4">
+              <Trash2 className="h-6 w-6" />
+            </div>
+
+            <h3 className="font-display text-base font-bold text-foreground">
+              Disconnect & Delete Provider?
+            </h3>
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to remove <strong className="text-foreground">{deletingProvider.alias}</strong> (<span className="mono">{deletingProvider.name}</span>)? This will disconnect the cloud account connector from your tenant and unregister active scheduled scans.
+            </p>
+
+            <div className="mt-4 rounded-lg bg-surface-2 p-3 font-mono text-[11px] text-muted-foreground break-all">
+              UID: {deletingProvider.uid || deletingProvider.id}
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleteProviderMutation.isPending}
+                onClick={() => setDeletingProvider(null)}
+                className="h-9 rounded-lg border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground hover:bg-surface-2/80"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteProviderMutation.isPending}
+                onClick={handleConfirmDelete}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-5 text-xs font-bold text-white shadow-sm hover:bg-red-700 active:scale-95 disabled:opacity-50"
+              >
+                {deleteProviderMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Confirm Delete</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
