@@ -123,7 +123,41 @@ function SignInPage() {
             </button>
           </form>
 
+          {/* Quick Demo Login Helpers */}
+          <div className="mt-5 border-t border-border/60 pt-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground mb-2">Quick Sign-In Credentials:</p>
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("meruguakhilesh.98@gmail.com");
+                  setPassword("Admin@12345");
+                }}
+                className="w-full flex items-center justify-between rounded-lg border border-border/80 bg-surface-2/60 px-3 py-1.5 text-[11px] text-foreground hover:bg-surface-2 hover:border-primary/40 transition-all text-left"
+              >
+                <div>
+                  <span className="font-semibold text-primary">meruguakhilesh.98@gmail.com</span>
+                  <span className="text-muted-foreground block text-[10px]">Primary Admin Tenant (170+ Findings)</span>
+                </div>
+                <span className="text-[10px] font-mono bg-surface-3 px-1.5 py-0.5 rounded border border-border/60">Admin@12345</span>
+              </button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("admin@securityplatform.com");
+                  setPassword("Admin@12345");
+                }}
+                className="w-full flex items-center justify-between rounded-lg border border-border/80 bg-surface-2/60 px-3 py-1.5 text-[11px] text-foreground hover:bg-surface-2 hover:border-primary/40 transition-all text-left"
+              >
+                <div>
+                  <span className="font-semibold text-foreground">admin@securityplatform.com</span>
+                  <span className="text-muted-foreground block text-[10px]">Global SecOps Administrator</span>
+                </div>
+                <span className="text-[10px] font-mono bg-surface-3 px-1.5 py-0.5 rounded border border-border/60">Admin@12345</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Sign Up Link */}
