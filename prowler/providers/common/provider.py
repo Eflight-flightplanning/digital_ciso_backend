@@ -12,6 +12,10 @@ class Provider:
         return cls._global_provider
 
     @staticmethod
+    def is_tool_wrapper_provider(provider_type):
+        return str(provider_type).lower() in ["iac", "image"]
+
+    @staticmethod
     def get_available_providers():
         return [
             "aws",
