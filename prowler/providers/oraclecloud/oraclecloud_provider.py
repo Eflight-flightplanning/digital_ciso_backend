@@ -330,16 +330,23 @@ class OraclecloudProvider(Provider):
 
                 # Handle private key
                 if key_content:
-                    # Decode base64 key content
-                    try:
-                        key_data = base64.b64decode(key_content)
-                        decoded_key = key_data.decode("utf-8")
-                    except Exception as decode_error:
-                        logger.error(f"Failed to decode key_content: {decode_error}")
-                        raise OCIInvalidConfigError(
-                            file=pathlib.Path(__file__).name,
-                            message="Failed to decode key_content. Ensure it is base64 encoded.",
-                        )
+                    # Support both raw PEM format and base64 encoded PEM format
+                    decoded_key = None
+                    if isinstance(key_content, str) and ("BEGIN" in key_content and "PRIVATE KEY" in key_content):
+                        decoded_key = key_content
+                    else:
+                        try:
+                            key_data = base64.b64decode(key_content)
+                            decoded_key = key_data.decode("utf-8")
+                        except Exception as decode_error:
+                            if isinstance(key_content, str) and "PRIVATE KEY" in key_content:
+                                decoded_key = key_content
+                            else:
+                                logger.error(f"Failed to decode key_content: {decode_error}")
+                                raise OCIInvalidConfigError(
+                                    file=pathlib.Path(__file__).name,
+                                    message="Failed to decode key_content. Ensure it is a valid PEM key or base64 encoded.",
+                                )
 
                     # Use OCI SDK's native key_content support
                     config["key_content"] = decoded_key
