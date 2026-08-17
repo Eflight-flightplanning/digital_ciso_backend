@@ -662,28 +662,74 @@ function ProvidersPage() {
                   </div>
 
                   <div>
-                    <label className="section-label mb-1 block">Home Region</label>
-                    <select
-                      value={ociRegion}
-                      onChange={(e) => setOciRegion(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
-                    >
-                      <option value="uk-london-1">uk-london-1 (UK South - London) ★</option>
-                      <option value="ap-mumbai-1">ap-mumbai-1 (India West - Mumbai)</option>
-                      <option value="ap-hyderabad-1">ap-hyderabad-1 (India South - Hyderabad)</option>
-                      <option value="us-ashburn-1">us-ashburn-1 (US East - Ashburn)</option>
-                      <option value="us-phoenix-1">us-phoenix-1 (US West - Phoenix)</option>
-                      <option value="us-sanjose-1">us-sanjose-1 (US West - San Jose)</option>
-                      <option value="us-chicago-1">us-chicago-1 (US Central - Chicago)</option>
-                      <option value="eu-frankfurt-1">eu-frankfurt-1 (Germany Central - Frankfurt)</option>
-                      <option value="eu-amsterdam-1">eu-amsterdam-1 (Netherlands - Amsterdam)</option>
-                      <option value="ap-singapore-1">ap-singapore-1 (Singapore)</option>
-                      <option value="ap-tokyo-1">ap-tokyo-1 (Japan East - Tokyo)</option>
-                      <option value="me-dubai-1">me-dubai-1 (UAE East - Dubai)</option>
-                      <option value="me-jeddah-1">me-jeddah-1 (Saudi Arabia - Jeddah)</option>
-                      <option value="ca-toronto-1">ca-toronto-1 (Canada - Toronto)</option>
-                      <option value="ap-sydney-1">ap-sydney-1 (Australia - Sydney)</option>
-                    </select>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="section-label">Home Region Identifier *</label>
+                      <span className="text-[10px] text-muted-foreground">Select from list or type custom</span>
+                    </div>
+                    <div className="space-y-2">
+                      <select
+                        value={ociRegion}
+                        onChange={(e) => setOciRegion(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
+                      >
+                        <optgroup label="Europe">
+                          <option value="uk-london-1">uk-london-1 (UK South - London)</option>
+                          <option value="uk-cardiff-1">uk-cardiff-1 (UK West - Newport)</option>
+                          <option value="eu-frankfurt-1">eu-frankfurt-1 (Germany Central - Frankfurt)</option>
+                          <option value="eu-amsterdam-1">eu-amsterdam-1 (Netherlands - Amsterdam)</option>
+                          <option value="eu-paris-1">eu-paris-1 (France - Paris)</option>
+                          <option value="eu-marseille-1">eu-marseille-1 (France - Marseille)</option>
+                          <option value="eu-zurich-1">eu-zurich-1 (Switzerland - Zurich)</option>
+                          <option value="eu-milan-1">eu-milan-1 (Italy - Milan)</option>
+                          <option value="eu-madrid-1">eu-madrid-1 (Spain - Madrid)</option>
+                          <option value="eu-stockholm-1">eu-stockholm-1 (Sweden - Stockholm)</option>
+                        </optgroup>
+                        <optgroup label="Asia Pacific">
+                          <option value="ap-mumbai-1">ap-mumbai-1 (India West - Mumbai)</option>
+                          <option value="ap-hyderabad-1">ap-hyderabad-1 (India South - Hyderabad)</option>
+                          <option value="ap-singapore-1">ap-singapore-1 (Singapore)</option>
+                          <option value="ap-tokyo-1">ap-tokyo-1 (Japan East - Tokyo)</option>
+                          <option value="ap-osaka-1">ap-osaka-1 (Japan Central - Osaka)</option>
+                          <option value="ap-seoul-1">ap-seoul-1 (South Korea - Seoul)</option>
+                          <option value="ap-chuncheon-1">ap-chuncheon-1 (South Korea - Chuncheon)</option>
+                          <option value="ap-sydney-1">ap-sydney-1 (Australia East - Sydney)</option>
+                          <option value="ap-melbourne-1">ap-melbourne-1 (Australia - Melbourne)</option>
+                        </optgroup>
+                        <optgroup label="North America">
+                          <option value="us-ashburn-1">us-ashburn-1 (US East - Ashburn)</option>
+                          <option value="us-phoenix-1">us-phoenix-1 (US West - Phoenix)</option>
+                          <option value="us-sanjose-1">us-sanjose-1 (US West - San Jose)</option>
+                          <option value="us-chicago-1">us-chicago-1 (US Central - Chicago)</option>
+                          <option value="ca-toronto-1">ca-toronto-1 (Canada - Toronto)</option>
+                          <option value="ca-montreal-1">ca-montreal-1 (Canada - Montreal)</option>
+                          <option value="mx-queretaro-1">mx-queretaro-1 (Mexico - Queretaro)</option>
+                          <option value="mx-monterrey-1">mx-monterrey-1 (Mexico - Monterrey)</option>
+                        </optgroup>
+                        <optgroup label="Middle East & Africa">
+                          <option value="me-dubai-1">me-dubai-1 (UAE East - Dubai)</option>
+                          <option value="me-abudhabi-1">me-abudhabi-1 (UAE - Abu Dhabi)</option>
+                          <option value="me-jeddah-1">me-jeddah-1 (Saudi Arabia - Jeddah)</option>
+                          <option value="me-riyadh-1">me-riyadh-1 (Saudi Arabia - Riyadh)</option>
+                          <option value="il-jerusalem-1">il-jerusalem-1 (Israel - Jerusalem)</option>
+                          <option value="af-johannesburg-1">af-johannesburg-1 (South Africa - Johannesburg)</option>
+                        </optgroup>
+                        <optgroup label="Latin America">
+                          <option value="sa-saopaulo-1">sa-saopaulo-1 (Brazil - Sao Paulo)</option>
+                          <option value="sa-vinhedo-1">sa-vinhedo-1 (Brazil - Vinhedo)</option>
+                          <option value="sa-santiago-1">sa-santiago-1 (Chile - Santiago)</option>
+                          <option value="sa-bogota-1">sa-bogota-1 (Colombia - Bogota)</option>
+                          <option value="sa-valparaiso-1">sa-valparaiso-1 (Chile - Valparaiso)</option>
+                        </optgroup>
+                      </select>
+
+                      <input
+                        type="text"
+                        placeholder="Or type custom OCI region key (e.g. uk-london-1, ap-mumbai-1)"
+                        value={ociRegion}
+                        onChange={(e) => setOciRegion(e.target.value.trim().toLowerCase())}
+                        className="h-9 w-full rounded-lg border border-border bg-surface-2/40 px-3 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

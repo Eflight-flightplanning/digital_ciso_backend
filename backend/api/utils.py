@@ -255,12 +255,10 @@ def get_prowler_provider_kwargs(
             prowler_provider_kwargs["user"] = user
         if key_content:
             prowler_provider_kwargs["key_content"] = key_content
-        if isinstance(region, str) and region:
-            prowler_provider_kwargs["region"] = region
+        if isinstance(region, str) and region.strip():
+            prowler_provider_kwargs["region"] = region.strip()
         elif isinstance(region, (list, set, tuple)) and len(region) > 0:
             prowler_provider_kwargs["region"] = next(iter(region))
-        else:
-            prowler_provider_kwargs["region"] = "uk-london-1"
     elif provider.provider == Provider.ProviderChoices.OPENSTACK.value:
         # clouds_yaml_content, clouds_yaml_cloud and provider_id are validated
         # in the provider itself, so it's not needed here.
@@ -417,12 +415,10 @@ def prowler_provider_connection_test(provider: Provider) -> Connection:
             oci_kwargs["user"] = user
         if key_content:
             oci_kwargs["key_content"] = key_content
-        if isinstance(region, str) and region:
-            oci_kwargs["region"] = region
+        if isinstance(region, str) and region.strip():
+            oci_kwargs["region"] = region.strip()
         elif isinstance(region, (list, set, tuple)) and len(region) > 0:
             oci_kwargs["region"] = next(iter(region))
-        else:
-            oci_kwargs["region"] = "uk-london-1"
         oci_kwargs["raise_on_exception"] = False
         return prowler_provider.test_connection(**oci_kwargs)
     else:
