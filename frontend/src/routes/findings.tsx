@@ -103,15 +103,8 @@ function FindingsPage() {
     return [];
   }, [apiFindings]);
 
-  const [data, setData] = useState<Finding[]>([]);
-
-  // Sync with API updates if received
-  useEffect(() => {
-    if (apiFindings?.items) {
-      setData(rawData);
-    }
-  }, [rawData, apiFindings]);
-
+  const [mutedIds, setMutedIds] = useState<string[]>([]);
+  const [remediatedIds, setRemediatedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string>("All");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("All");
@@ -119,8 +112,20 @@ function FindingsPage() {
   const [expandedId, setExpandedId] = useState<string | null>("FND-40281");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [remediatingId, setRemediatingId] = useState<string | null>(null);
-  const [remediatedIds, setRemediatedIds] = useState<string[]>([]);
   const [analysisStatus, setAnalysisStatus] = useState<Record<string, string>>({});
+
+  const data: Finding[] = useMemo(() => {
+    const base = rawData.length > 0 ? rawData : (initialFindings as Finding[]);
+    return base.map((f) => {
+      if (remediatedIds.includes(f.id)) {
+        return { ...f, status: "PASS" };
+      }
+      if (mutedIds.includes(f.id)) {
+        return { ...f, status: f.status === "MUTED" ? "FAIL" : "MUTED" };
+      }
+      return f;
+    });
+  }, [rawData, mutedIds, remediatedIds]);
 
   const filtered = useMemo(() => {
     return data.filter((item) => {
@@ -171,15 +176,8 @@ function FindingsPage() {
 
   const handleToggleMute = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setData((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: item.status === "MUTED" ? "FAIL" : "MUTED",
-            }
-          : item
-      )
+    setMutedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
@@ -189,11 +187,6 @@ function FindingsPage() {
     setTimeout(() => {
       setRemediatingId(null);
       setRemediatedIds((prev) => [...prev, id]);
-      setData((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, status: "PASS" } : item
-        )
-      );
     }, 1500);
   };
 

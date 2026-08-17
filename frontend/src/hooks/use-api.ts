@@ -84,10 +84,13 @@ export function useFindings(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.findings(params),
     queryFn: async () => {
-      const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
+      const now = new Date();
+      const gteDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const lteDate = now.toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "500",
-        "filter[inserted_at.gte]": defaultDate,
+        "filter[inserted_at.gte]": gteDate,
+        "filter[inserted_at.lte]": lteDate,
         ...(params || {}),
       };
       const res = await api.get(`/findings${buildQuery(finalParams)}`);
@@ -333,10 +336,13 @@ export function useResources(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.resources(params),
     queryFn: async () => {
-      const defaultDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString();
+      const now = new Date();
+      const gteDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const lteDate = now.toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "500",
-        "filter[updated_at.gte]": defaultDate,
+        "filter[updated_at.gte]": gteDate,
+        "filter[updated_at.lte]": lteDate,
         ...(params || {}),
       };
       const res = await api.get(`/resources${buildQuery(finalParams)}`);
