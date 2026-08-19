@@ -1,0 +1,73 @@
+{
+  "Framework": "SOC1-TYPE2",
+  "Name": "SOC 1 Type II (Financial Reporting & ICFR) for Oracle SaaS",
+  "Version": "SSAE-18-ISAE-3402",
+  "Provider": "oracle_saas",
+  "Description": "Service Organization Control (SOC 1 Type II) framework evaluating controls relevant to Internal Control over Financial Reporting (ICFR) across Oracle Fusion Cloud ERP and HCM.",
+  "Requirements": [
+    {
+      "Id": "SOC1-CC-1.1",
+      "Name": "Control Environment - Logical Access & Privileged Identity",
+      "Description": "Logical access to financial systems is restricted to authorized individuals based on job responsibility and least privilege principles.",
+      "Attributes": [
+        {
+          "Section": "Control Environment",
+          "SubSection": "Logical Access",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_superuser_role_assigned",
+        "erp_iam_implementation_role_active",
+        "erp_iam_mfa_not_enforced_admin",
+        "erp_iam_dormant_privileged_account"
+      ]
+    },
+    {
+      "Id": "SOC1-CC-2.1",
+      "Name": "Control Activities - Separation of Incompatible Duties",
+      "Description": "Duties within the financial ERP system are segregated such that no individual can control all phases of a financial transaction.",
+      "Attributes": [
+        {
+          "Section": "Control Activities",
+          "SubSection": "Segregation of Duties",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOC1-CC-3.1",
+      "Name": "Information & Communication - Audit Logging and Change Tracking",
+      "Description": "Transactions and administrative modifications in Oracle Fusion ERP are logged and retained in an audit trail.",
+      "Attributes": [
+        {
+          "Section": "Information & Communication",
+          "SubSection": "Audit Trail & Integrity",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "erp_audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOC1-CC-4.1",
+      "Name": "Monitoring Activities - API Security and Network Perimeters",
+      "Description": "Access to ERP APIs and management interfaces is restricted via network controls and scoped OAuth credentials.",
+      "Attributes": [
+        {
+          "Section": "Monitoring Activities",
+          "SubSection": "Integration Security",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "erp_network_ip_allowlist_not_configured",
+        "erp_oauth_app_excessive_scopes"
+      ]
+    }
+  ]
+}

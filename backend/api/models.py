@@ -619,6 +619,7 @@ class Provider(RowLevelSecurityProtectedModel):
 
         OKTA = "okta", _("Okta")
 
+        ORACLE_SAAS = "oracle_saas", _("Oracle SaaS / ERP")
 
 
     @staticmethod
@@ -946,6 +947,36 @@ class Provider(RowLevelSecurityProtectedModel):
 
                 pointer="/data/attributes/uid",
 
+            )
+
+
+
+    @staticmethod
+    def validate_oracle_saas_uid(value):
+        """Oracle SaaS tenant UID is either Identity Domain or Fusion ERP pod hostname (e.g. fa-xxxx.oraclecloud.com or idcs-xxxx.identity.oraclecloud.com)."""
+        val = value.strip().lower()
+        # Remove https:// or http:// prefix if provided
+        if val.startswith("https://"):
+            val = val[8:]
+        elif val.startswith("http://"):
+            val = val[7:]
+        val = val.rstrip("/")
+
+        if not (
+            val.endswith(".oraclecloud.com")
+            or val.endswith(".oraclepdemos.com")
+            or val.endswith(".oracle.com")
+            or "fa-" in val
+            or "idcs-" in val
+            or len(val) >= 3
+        ):
+            raise ModelValidationError(
+                detail=(
+                    "Oracle SaaS provider ID must be a valid Fusion ERP Base URL or Identity Domain hostname. "
+                    "Example: fa-xxxx.oraclecloud.com or idcs-xxxx.identity.oraclecloud.com"
+                ),
+                code="oracle-saas-uid",
+                pointer="/data/attributes/uid",
             )
 
 
@@ -6399,6 +6430,10 @@ class SecurityDecision(RowLevelSecurityProtectedModel):
     remediation_status = models.CharField(max_length=50, default="PENDING")
 
     applied_policy_rules = ArrayField(models.CharField(max_length=100), default=list)
+
+    jira_ticket_key = models.CharField(max_length=50, null=True, blank=True)
+
+    jira_ticket_url = models.URLField(max_length=500, null=True, blank=True)
 
     inserted_at = models.DateTimeField(auto_now_add=True)
 

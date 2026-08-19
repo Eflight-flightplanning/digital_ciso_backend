@@ -1,0 +1,228 @@
+{
+  "Framework": "NCA-ECC",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
+  "Version": "1:2018",
+  "Provider": "AWS",
+  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) to set minimum cybersecurity requirements for national organizations to protect information assets and technology infrastructure against cyber threats.",
+  "Requirements": [
+    {
+      "Id": "ECC-1.1.1",
+      "Name": "1-1-1 Cybersecurity Strategy & Governance",
+      "Description": "A cybersecurity strategy must be defined, approved by management, and aligned with organizational objectives and regulatory requirements.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-1 Cybersecurity Strategy",
+          "Service": "account"
+        }
+      ],
+      "Checks": [
+        "account_security_contact_information_is_registered",
+        "organizations_account_part_of_organizations"
+      ]
+    },
+    {
+      "Id": "ECC-1.4.1",
+      "Name": "1-4-1 Cybersecurity Roles and Responsibilities",
+      "Description": "Cybersecurity roles and responsibilities must be clearly defined, assigned to authorized personnel, and segregated to avoid conflict of interest.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_root_mfa_enabled",
+        "iam_root_access_key_check",
+        "iam_root_hardware_mfa_enabled",
+        "iam_user_mfa_enabled_console_access",
+        "iam_policy_attached_only_to_group_or_roles",
+        "iam_aws_attached_policy_no_administrative_privileges"
+      ]
+    },
+    {
+      "Id": "ECC-1.5.1",
+      "Name": "1-5-1 Cybersecurity Risk Management",
+      "Description": "Cybersecurity risks must be continuously identified, analyzed, evaluated, and treated using automated threat intelligence and vulnerability management.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "guardduty"
+        }
+      ],
+      "Checks": [
+        "guardduty_is_enabled",
+        "securityhub_enabled",
+        "macie_is_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.1.1",
+      "Name": "2-1-1 Asset Management & Inventory",
+      "Description": "An accurate and up-to-date inventory of all technology assets and cloud resources must be maintained and protected.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "config"
+        }
+      ],
+      "Checks": [
+        "config_recorder_all_regions_enabled",
+        "ec2_instance_managed_by_ssm"
+      ]
+    },
+    {
+      "Id": "ECC-2.2.1",
+      "Name": "2-2-1 Identity and Access Management (IAM)",
+      "Description": "Access to systems and data must be controlled through unique identification, Multi-Factor Authentication (MFA), and least-privilege role assignment.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_user_mfa_enabled_console_access",
+        "iam_password_policy_strong",
+        "iam_user_accesskey_unused",
+        "iam_rotate_access_key_90_days",
+        "iam_no_custom_policy_permissive_role_assumption"
+      ]
+    },
+    {
+      "Id": "ECC-2.3.1",
+      "Name": "2-3-1 Information System Protection & Hardening",
+      "Description": "Workloads and virtual infrastructure must be hardened with endpoint protection, vulnerability scanning, and secure baseline configurations.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Information System Protection",
+          "Service": "ec2"
+        }
+      ],
+      "Checks": [
+        "ec2_ebs_default_encryption",
+        "ec2_ebs_volume_encryption",
+        "ec2_instance_detailed_monitoring_enabled",
+        "ec2_ebs_public_snapshot"
+      ]
+    },
+    {
+      "Id": "ECC-2.5.1",
+      "Name": "2-5-1 Network Security Management",
+      "Description": "Network perimeters, VPCs, and subnets must be segmented and protected using Security Groups, Network ACLs, and VPC Flow Logs.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Network Security Management",
+          "Service": "vpc"
+        }
+      ],
+      "Checks": [
+        "ec2_securitygroup_allow_ingress_from_internet_to_any_port",
+        "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22",
+        "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_3389",
+        "vpc_flow_logs_enabled",
+        "vpc_default_security_group_closed",
+        "elb_ssl_listeners",
+        "elbv2_insecure_ssl_ciphers"
+      ]
+    },
+    {
+      "Id": "ECC-2.7.1",
+      "Name": "2-7-1 Data and Information Protection",
+      "Description": "Data at rest and in transit must be protected against unauthorized disclosure, modification, and deletion.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "s3"
+        }
+      ],
+      "Checks": [
+        "s3_bucket_default_encryption",
+        "s3_bucket_public_access",
+        "s3_bucket_secure_transport_policy",
+        "s3_bucket_object_versioning",
+        "rds_instance_storage_encrypted",
+        "dynamodb_tables_kms_cmk_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.8.1",
+      "Name": "2-8-1 Cryptography and Key Management",
+      "Description": "Cryptographic keys, certificates, and secrets must be managed securely through AWS KMS with automatic rotation and deletion protection.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_cmk_rotation_enabled",
+        "kms_key_not_publicly_accessible",
+        "secretsmanager_automatic_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.9.1",
+      "Name": "2-9-1 Backup and Recovery Management",
+      "Description": "Automated backups of critical workloads and databases must be configured, encrypted, tested periodically, and protected.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Backup and Recovery",
+          "Service": "backup"
+        }
+      ],
+      "Checks": [
+        "backup_plans_exist",
+        "backup_vault_encrypted",
+        "rds_instance_backup_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.12.1",
+      "Name": "2-12-1 Event Logs and Monitoring Management",
+      "Description": "Security event logs, CloudTrail audit trails, and VPC flow logs must be centralized, encrypted, and retained for security investigations.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring",
+          "Service": "cloudtrail"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_multi_region_enabled",
+        "cloudtrail_s3_dataevents_read_enabled",
+        "cloudtrail_s3_dataevents_write_enabled",
+        "cloudtrail_kms_encryption_enabled",
+        "cloudtrail_log_file_validation_enabled",
+        "cloudwatch_log_group_kms_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.15.1",
+      "Name": "2-15-1 Web Application Security",
+      "Description": "Web applications and APIs must enforce HTTPS with strong TLS ciphers, WAF rate-limiting, and client certificate verification.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Web Application Security",
+          "Service": "waf"
+        }
+      ],
+      "Checks": [
+        "wafv2_webacl_exists",
+        "cloudfront_distributions_https_enabled",
+        "apigateway_restapi_client_certificate_enabled",
+        "awslambda_function_not_publicly_accessible"
+      ]
+    }
+  ]
+}

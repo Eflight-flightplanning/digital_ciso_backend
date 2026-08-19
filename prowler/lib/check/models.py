@@ -1470,6 +1470,51 @@ class CheckReportScaleway(Check_Report):
         return self._region
 
 
+@dataclass
+class CheckReportOracleSaas(Check_Report):
+    """Contains the Oracle SaaS / ERP Check's finding information.
+
+    Oracle SaaS is a global SaaS platform — there are no regions.
+    The scoping context is the Oracle Identity Domain (tenant_id) and
+    the specific ERP product (FUSION_ERP, FUSION_HCM, NETSUITE, etc.).
+    """
+
+    resource_name: str
+    resource_id: str
+    tenant_id: str
+    erp_type: str
+
+    def __init__(
+        self,
+        metadata: Dict,
+        resource: Any,
+        resource_name: str = None,
+        resource_id: str = None,
+        tenant_id: str = None,
+        erp_type: str = "FUSION_ERP",
+    ) -> None:
+        """Initialize the Oracle SaaS Check's finding information.
+
+        Args:
+            metadata: Check metadata dictionary.
+            resource: The Oracle SaaS / ERP resource being checked.
+            resource_name: Human-readable name of the resource (user, app, policy).
+            resource_id: Unique ID of the resource (IDCS ID, role code, app ID).
+            tenant_id: Oracle Identity Domain tenant identifier.
+            erp_type: ERP product type (FUSION_ERP, FUSION_HCM, NETSUITE, ORACLE_SCM).
+        """
+        super().__init__(metadata, resource)
+        self.resource_name = resource_name or getattr(resource, "display_name", "") or getattr(resource, "username", "") or getattr(resource, "name", "")
+        self.resource_id = resource_id or getattr(resource, "id", "") or getattr(resource, "username", "")
+        self.tenant_id = tenant_id or getattr(resource, "tenant_id", "")
+        self.erp_type = erp_type
+
+    @property
+    def region(self) -> str:
+        """Oracle SaaS is global — return 'global'."""
+        return "global"
+
+
 # Testing Pending
 def load_check_metadata(metadata_file: str) -> CheckMetadata:
     """

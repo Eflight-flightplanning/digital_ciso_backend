@@ -42,20 +42,20 @@ export interface Finding {
 }
 
 export function formatFindingId(rawId: string): string {
-  if (!rawId) return "FND-0000";
-  if (rawId.startsWith("prowler-")) {
+  if (!rawId) return "CISO-SEC-0000";
+  if (rawId.startsWith("prowler-") || rawId.startsWith("fnd-") || rawId.startsWith("ciso-")) {
     const parts = rawId.split("-");
-    const prov = parts[1]?.toUpperCase() || "AZ";
-    const shortProv = prov === "AZURE" ? "AZ" : prov === "ORACLECLOUD" ? "OCI" : prov;
+    const prov = parts[1]?.toUpperCase() || "CLOUD";
+    const shortProv = prov === "AZURE" ? "AZ" : prov === "ORACLECLOUD" ? "OCI" : (prov === "ORACLE_SAAS" || prov === "ORACLE-SAAS") ? "ERP" : prov;
     const checkWord = parts[2] ? parts[2].split("_").slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") : "SEC";
     const uuidPart = parts.find((p) => p.length === 36 || (p.length === 8 && /^[0-9a-fA-F]+$/.test(p)));
     const hash = uuidPart ? uuidPart.slice(-4).toUpperCase() : parts[parts.length - 1].slice(-4).toUpperCase();
-    return `${shortProv}-${checkWord}-${hash}`;
+    return `CISO-${shortProv}-${checkWord}-${hash}`;
   }
   if (rawId.length > 18) {
-    return `FND-${rawId.slice(-6).toUpperCase()}`;
+    return `CISO-FND-${rawId.slice(-6).toUpperCase()}`;
   }
-  return rawId;
+  return rawId.replace(/^prowler-/i, "CISO-");
 }
 
 export const Route = createFileRoute("/findings")({
@@ -77,12 +77,14 @@ function FindingsPage() {
         let prov = String(meta.provider || f.provider || f.provider_type || "").toUpperCase();
         if (!prov) {
           if (uid.includes("prowler-azure-") || uid.includes("/subscriptions/")) prov = "AZURE";
+          else if (uid.includes("prowler-oracle_saas-") || uid.includes("oracle-saas") || checkId.startsWith("erp_")) prov = "ORACLE_SAAS";
           else if (uid.includes("prowler-oci-") || uid.includes("ocid1.")) prov = "OCI";
           else if (uid.includes("prowler-gcp-") || uid.includes("projects/")) prov = "GCP";
           else if (uid.includes("prowler-aws-") || uid.includes("arn:aws:")) prov = "AWS";
           else prov = "AZURE";
         }
         if (prov === "ORACLECLOUD") prov = "OCI";
+        if (prov === "ORACLE-SAAS" || prov === "ORACLE_SAAS" || checkId.startsWith("erp_")) prov = "ORACLE_SAAS";
         if (prov === "KUBERNETES") prov = "K8S";
 
         // 2. Real Human-Readable Security Title
@@ -95,7 +97,13 @@ function FindingsPage() {
         // 3. Real Service Name
         const rawService = String(meta.servicename || meta.service_name || meta.service || f.service || "").toLowerCase();
         let service = "Compute";
-        if (rawService === "vm" || checkId.startsWith("vm_") || checkId.includes("virtualmachine")) {
+        if (checkId.startsWith("erp_iam_") || (prov === "ORACLE_SAAS" && (rawService === "iam" || rawService === "roles" || rawService === "users"))) {
+          service = "ERP IAM & SoD";
+        } else if (checkId.startsWith("erp_audit_") || (prov === "ORACLE_SAAS" && rawService === "audit")) {
+          service = "ERP Audit Trail";
+        } else if (checkId.startsWith("erp_network_") || checkId.startsWith("erp_oauth_") || (prov === "ORACLE_SAAS" && rawService === "network")) {
+          service = "ERP Access & OAuth";
+        } else if (rawService === "vm" || checkId.startsWith("vm_") || checkId.includes("virtualmachine")) {
           service = "Virtual Machines";
         } else if (rawService === "network" || checkId.startsWith("network_") || checkId.includes("nsg") || checkId.includes("vnet")) {
           service = "Network & NSG";
@@ -265,18 +273,18 @@ function FindingsPage() {
         <button
           onClick={() => {
             const csv =
-              "id,title,severity,status,provider,service,resource\n" +
+              "Finding_ID,Title,Severity,Status,Provider,Region,Service,Resource,Remediation_Plan\n" +
               filtered
                 .map(
                   (f) =>
-                    `"${f.id}","${f.title}","${f.severity}","${f.status}","${f.provider}","${f.service}","${f.resource}"`
+                    `"${formatFindingId(f.id)}","${f.title.replace(/"/g, '""')}","${f.severity.toUpperCase()}","${f.status}","${f.provider}","${f.region}","${f.service}","${f.resource.replace(/"/g, '""')}","${(f.remediation || '').replace(/"/g, '""')}"`
                 )
                 .join("\n");
-            const blob = new Blob([csv], { type: "text/csv" });
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `findings-export.csv`;
+            a.download = `ciso-security-findings-${new Date().toISOString().slice(0, 10)}.csv`;
             a.click();
           }}
           className="inline-flex h-10 min-w-[140px] items-center justify-center gap-2 rounded-lg border border-border bg-surface-2/50 px-5 text-xs font-semibold text-foreground transition-all hover:border-primary/40 active:scale-95"
@@ -376,6 +384,7 @@ function FindingsPage() {
               <option value="All">All Providers</option>
               <option value="AWS">AWS</option>
               <option value="OCI">Oracle Cloud (OCI)</option>
+              <option value="ORACLE_SAAS">Oracle SaaS / ERP</option>
               <option value="Azure">Azure</option>
               <option value="GCP">GCP</option>
               <option value="K8s">Kubernetes</option>
@@ -436,7 +445,7 @@ function FindingsPage() {
               const isRemediating = remediatingId === f.id;
 
               return (
-                <div key={f.id} className="contents">
+                <div key={`${f.id}-${i}`} className="contents">
                   <Row
                     index={i}
                     onClick={() => setExpandedId(isExpanded ? null : f.id)}

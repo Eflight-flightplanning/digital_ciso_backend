@@ -53,7 +53,7 @@ class NIS2ReportGenerator(BaseComplianceReportGenerator):
     PDF report generator for NIS2 Directive (EU) 2022/2555.
 
     This generator creates comprehensive PDF reports containing:
-    - Cover page with both Prowler and NIS2 logos
+    - Cover page with both Digital CISO and NIS2 logos
     - Executive summary with overall compliance score
     - Section analysis with horizontal bar chart
     - SubSection breakdown table
@@ -75,18 +75,30 @@ class NIS2ReportGenerator(BaseComplianceReportGenerator):
         elements = []
 
         # Create logos side by side
-        prowler_logo_path = os.path.join(
-            os.path.dirname(__file__), "../../assets/img/prowler_logo.png"
+        platform_logo_path = os.path.join(
+            os.path.dirname(__file__), "../../assets/img/platform_logo.png"
         )
+        if not os.path.exists(platform_logo_path):
+            platform_logo_path = os.path.join(
+                os.path.dirname(__file__), "../../assets/img/logo.png"
+            )
         nis2_logo_path = os.path.join(
             os.path.dirname(__file__), "../../assets/img/nis2_logo.png"
         )
 
-        prowler_logo = Image(prowler_logo_path, width=3.5 * inch, height=0.7 * inch)
-        nis2_logo = Image(nis2_logo_path, width=2.3 * inch, height=1.5 * inch)
+        platform_logo = (
+            Image(platform_logo_path, width=3.5 * inch, height=0.7 * inch)
+            if os.path.exists(platform_logo_path)
+            else Spacer(3.5 * inch, 0.7 * inch)
+        )
+        nis2_logo = (
+            Image(nis2_logo_path, width=2.3 * inch, height=1.5 * inch)
+            if os.path.exists(nis2_logo_path)
+            else Spacer(2.3 * inch, 1.5 * inch)
+        )
 
         logos_table = Table(
-            [[prowler_logo, nis2_logo]], colWidths=[4 * inch, 2.5 * inch]
+            [[platform_logo, nis2_logo]], colWidths=[4 * inch, 2.5 * inch]
         )
         logos_table.setStyle(
             TableStyle(

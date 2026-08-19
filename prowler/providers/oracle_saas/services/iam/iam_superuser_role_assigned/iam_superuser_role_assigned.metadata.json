@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "iam_superuser_role_assigned",
+  "CheckTitle": "Oracle Fusion ERP Superuser or Implementation Consultant role assigned",
+  "CheckType": [],
+  "ServiceName": "iam",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "oracle-saas://{tenant_id}/iam/{resource_id}",
+  "Severity": "critical",
+  "ResourceType": "User",
+  "ResourceGroup": "IAM",
+  "Description": "Audits Oracle Fusion Cloud ERP & HCM configuration for Oracle Fusion ERP Superuser or Implementation Consultant role assigned.",
+  "Risk": "Violation of Oracle Fusion ERP Superuser or Implementation Consultant role assigned leads to potential ITGC SOX 404 or ICFR non-compliance.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [],
+  "Remediation": {
+    "Code": {
+      "CLI": "",
+      "NativeIaC": "",
+      "Other": "Navigate to Oracle Fusion ERP Security Console and review access configurations.",
+      "Terraform": ""
+    },
+    "Recommendation": {
+      "Text": "Remediate Oracle Fusion ERP Superuser or Implementation Consultant role assigned according to Oracle Security best practices.",
+      "Url": "https://hub.prowler.com/check/iam_superuser_role_assigned"
+    }
+  },
+  "Categories": [
+    "identity-access"
+  ],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": "SOX 404 / SOC 1 Type 2 ICFR Control"
+}

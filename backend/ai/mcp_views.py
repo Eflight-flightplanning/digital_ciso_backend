@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from django.http import JsonResponse
-from rest_framework import status
+from rest_framework import permissions, status
 from rest_framework.parsers import JSONParser
 from rest_framework.renderers import JSONRenderer
 from rest_framework.request import Request
@@ -54,6 +54,7 @@ class MCPGatewayView(APIView):
     """
     parser_classes = [JSONParser, JSONAPIParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
+    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         summary="Model Context Protocol (MCP) Discovery & Capabilities",
@@ -87,9 +88,13 @@ class MCPGatewayView(APIView):
         if not method:
             return self._jsonrpc_error(req_id, -32600, "Invalid Request: 'method' field is required.")
 
-        user = request.user if request.user and request.user.is_authenticated else None
+        user = request.user
         tenant_id = getattr(request, "tenant_id", None)
-        tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else Tenant.objects.first()
+        tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else None
+        if tenant is None:
+            return self._jsonrpc_error(
+                req_id, -32001, "No tenant could be resolved for this request."
+            )
 
         try:
             # 1. Initialize

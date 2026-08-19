@@ -18,7 +18,7 @@ from .config import COLOR_HIGH_RISK, COLOR_WHITE
 
 class ThreatScoreReportGenerator(BaseComplianceReportGenerator):
     """
-    PDF report generator for Prowler ThreatScore framework.
+    PDF report generator for ThreatScore framework.
 
     This generator creates comprehensive PDF reports containing:
     - Compliance overview and metadata

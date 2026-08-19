@@ -1,0 +1,156 @@
+{
+  "Framework": "NCA-CSCC",
+  "Name": "NCA Cloud Cybersecurity Controls (CSCC-1:2019)",
+  "Version": "1:2019",
+  "Provider": "AWS",
+  "Description": "The Cloud Cybersecurity Controls (CSCC-1:2019) framework was issued by the National Cybersecurity Authority (NCA) of Saudi Arabia to establish mandatory cybersecurity controls for Cloud Service Providers (CSPs) and Cloud Service Tenants (CSTs) to securely adopt and manage cloud computing services.",
+  "Requirements": [
+    {
+      "Id": "CSCC-1.1",
+      "Name": "CCG-1 Cloud Cybersecurity Governance",
+      "Description": "Cloud computing cybersecurity policies, governance architecture, and compliance oversight must be established and enforced across all AWS accounts.",
+      "Attributes": [
+        {
+          "Section": "1. Cloud Cybersecurity Governance",
+          "SubSection": "1.1 Governance and Compliance",
+          "Service": "organizations"
+        }
+      ],
+      "Checks": [
+        "organizations_account_part_of_organizations",
+        "account_security_contact_information_is_registered"
+      ]
+    },
+    {
+      "Id": "CSCC-2.1",
+      "Name": "CCD-1 Cloud Identity and Access Management",
+      "Description": "Enforce strong Multi-Factor Authentication (MFA), role-based access control (RBAC), password policies, and privileged access boundaries across AWS IAM.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.1 Identity and Access Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_root_mfa_enabled",
+        "iam_user_mfa_enabled_console_access",
+        "iam_password_policy_strong",
+        "iam_policy_attached_only_to_group_or_roles",
+        "iam_aws_attached_policy_no_administrative_privileges",
+        "iam_rotate_access_key_90_days"
+      ]
+    },
+    {
+      "Id": "CSCC-2.2",
+      "Name": "CCD-2 Cloud Data & Storage Protection",
+      "Description": "Protect S3 buckets, RDS databases, DynamoDB tables, and EBS volumes using KMS encryption, secure transport enforcement, and block public access settings.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.2 Data Protection & Encryption",
+          "Service": "s3"
+        }
+      ],
+      "Checks": [
+        "s3_bucket_default_encryption",
+        "s3_bucket_public_access",
+        "s3_bucket_secure_transport_policy",
+        "s3_bucket_object_versioning",
+        "rds_instance_storage_encrypted",
+        "ec2_ebs_default_encryption",
+        "dynamodb_tables_kms_cmk_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.3",
+      "Name": "CCD-3 Cloud Network & Perimeter Defense",
+      "Description": "VPCs, subnets, and security groups must be strictly configured with zero open internet ingress for administrative ports and VPC Flow Logs active.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.3 Network & Perimeter Security",
+          "Service": "vpc"
+        }
+      ],
+      "Checks": [
+        "ec2_securitygroup_allow_ingress_from_internet_to_any_port",
+        "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22",
+        "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_3389",
+        "vpc_flow_logs_enabled",
+        "vpc_default_security_group_closed",
+        "elbv2_insecure_ssl_ciphers"
+      ]
+    },
+    {
+      "Id": "CSCC-2.4",
+      "Name": "CCD-4 Cloud Cryptographic Key Management",
+      "Description": "Centralize and protect all cryptographic keys and secrets in AWS KMS and Secrets Manager with automatic key rotation and IAM policy restrictions.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.4 Key & Secret Management",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_cmk_rotation_enabled",
+        "kms_key_not_publicly_accessible",
+        "secretsmanager_automatic_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.5",
+      "Name": "CCD-5 Cloud Threat Detection & Vulnerability Management",
+      "Description": "Enable intelligent threat detection with GuardDuty, posture assessment with Security Hub, and sensitive data discovery with Macie.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.5 Threat Detection & Vulnerability Mgmt",
+          "Service": "guardduty"
+        }
+      ],
+      "Checks": [
+        "guardduty_is_enabled",
+        "securityhub_enabled",
+        "macie_is_enabled",
+        "inspector2_is_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.6",
+      "Name": "CCD-6 Cloud Logging, Auditing & SIEM Ingestion",
+      "Description": "Comprehensive CloudTrail multi-region logs and CloudWatch alarms must be configured, encrypted, and archived for security monitoring.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.6 Logging & Auditing",
+          "Service": "cloudtrail"
+        }
+      ],
+      "Checks": [
+        "cloudtrail_multi_region_enabled",
+        "cloudtrail_kms_encryption_enabled",
+        "cloudtrail_log_file_validation_enabled",
+        "cloudwatch_log_group_kms_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-3.1",
+      "Name": "CCR-1 Cloud Backup, Recovery & Resilience",
+      "Description": "Implement automated AWS Backup plans and database point-in-time recovery across production workloads.",
+      "Attributes": [
+        {
+          "Section": "3. Cloud Cybersecurity Resilience",
+          "SubSection": "3.1 Backup and Recovery",
+          "Service": "backup"
+        }
+      ],
+      "Checks": [
+        "backup_plans_exist",
+        "backup_vault_encrypted",
+        "rds_instance_backup_enabled"
+      ]
+    }
+  ]
+}

@@ -24,23 +24,25 @@ function ResourcesPage() {
   const { data: apiResources, isLoading } = useResources();
 
   const resourceList = (apiResources?.items && apiResources.items.length > 0)
-    ? (apiResources.items as Array<Record<string, unknown>>).map((r) => {
-        const uid = (r.uid as string) || (r.name as string) || (r.id as string) || "res-0000";
+    ? (apiResources.items as Array<Record<string, any>>).map((r) => {
+        const uid = String(r.uid || r.name || r.id || "res-0000");
         let prov = String(r.provider || r.provider_type || "").toUpperCase();
         if (!prov) {
           if (uid.includes("/subscriptions/") || uid.includes("prowler-azure-")) prov = "AZURE";
           else if (uid.includes("arn:aws:")) prov = "AWS";
+          else if (uid.includes("ocid1.")) prov = "OCI";
+          else if (uid.includes("projects/")) prov = "GCP";
           else prov = "AZURE";
         }
 
         return {
           uid,
-          name: (r.name as string) || uid.split("/").pop() || "azure-resource",
-          type: (r.type as string) || (r.resource_type as string) || (r.service_name as string) || "Cloud Service",
+          name: String(r.name || uid.split("/").pop() || "cloud-resource"),
+          type: String(r.type || r.resource_type || r.service_name || "Cloud Service"),
           provider: prov,
-          region: (r.region as string) || "centralindia",
-          tags: typeof r.tags === "object" && r.tags !== null ? Object.keys(r.tags).length : ((r.tag_count as number) || 0),
-          failedFindings: (r.failed_findings_count as number) || 0,
+          region: String(r.region || "centralindia"),
+          tags: typeof r.tags === "object" && r.tags !== null ? Object.keys(r.tags).length : (Number(r.tag_count) || 0),
+          failedFindings: Number(r.failed_findings_count || 0),
         };
       })
     : [];
@@ -123,7 +125,7 @@ function ResourcesPage() {
             </tr>
           ) : (
             filtered.map((r, i) => (
-              <Row key={r.uid} index={i}>
+              <Row key={`${r.uid || r.id}-${i}`} index={i}>
                 <td className="mono px-4 py-3 text-xs font-semibold text-foreground max-w-[280px] truncate" title={r.uid}>
                   {r.name}
                   <span className="block text-[10px] text-muted-foreground font-mono truncate">{r.uid}</span>

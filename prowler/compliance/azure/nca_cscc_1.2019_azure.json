@@ -1,0 +1,196 @@
+{
+  "Framework": "NCA-CSCC",
+  "Name": "NCA Cloud Cybersecurity Controls (CSCC-1:2019)",
+  "Version": "1:2019",
+  "Provider": "Azure",
+  "Description": "The Cloud Cybersecurity Controls (CSCC-1:2019) framework was issued by the National Cybersecurity Authority (NCA) of Saudi Arabia to establish mandatory cybersecurity controls for Cloud Service Providers (CSPs) and Cloud Service Tenants (CSTs) to securely adopt and manage cloud computing services.",
+  "Requirements": [
+    {
+      "Id": "CSCC-1.1",
+      "Name": "CCG-1 Cloud Cybersecurity Governance",
+      "Description": "Cloud computing cybersecurity policies, governance architecture, and compliance oversight must be established and enforced across all subscriptions.",
+      "Attributes": [
+        {
+          "Section": "1. Cloud Cybersecurity Governance",
+          "SubSection": "1.1 Governance and Compliance",
+          "Service": "policy"
+        }
+      ],
+      "Checks": [
+        "policy_ensure_asc_enforcement_enabled",
+        "entra_security_defaults_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.1",
+      "Name": "CCD-1 Cloud Identity and Access Management",
+      "Description": "Enforce strong Multi-Factor Authentication (MFA), role-based access control (RBAC), conditional access, and privileged access boundaries across cloud tenants.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.1 Identity and Access Management",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_privileged_user_has_mfa",
+        "entra_non_privileged_user_has_mfa",
+        "entra_conditional_access_policy_require_mfa_for_management_api",
+        "entra_user_with_vm_access_has_mfa",
+        "entra_global_admin_in_less_than_five_users",
+        "iam_custom_roles_least_privileges",
+        "sqlserver_azuread_administrator_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.2",
+      "Name": "CCD-2 Cloud Data & Storage Protection",
+      "Description": "Protect cloud storage, relational databases, NoSQL stores, and data lakes using customer-managed key encryption (CMK), private endpoints, and HTTPS transit enforcement.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.2 Data Protection & Encryption",
+          "Service": "storage"
+        }
+      ],
+      "Checks": [
+        "storage_ensure_https_traffic_only_is_enabled",
+        "storage_ensure_minimum_tls_version_12",
+        "storage_blob_public_access_level_is_disabled",
+        "storage_customer_managed_key_encryption_enabled",
+        "storage_infrastructure_encryption_is_enabled",
+        "storage_ensure_private_endpoints_in_storage_accounts",
+        "sqlserver_tde_encryption_enabled",
+        "cosmosdb_account_encryption_at_rest_with_cmk"
+      ]
+    },
+    {
+      "Id": "CSCC-2.3",
+      "Name": "CCD-3 Cloud Network & Perimeter Defense",
+      "Description": "Cloud virtual networks, subnets, and Kubernetes clusters must be segmented with Network Security Groups (NSGs), firewall rules, and strict ingress/egress filtering.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.3 Network & Perimeter Security",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_http_internet_access_restricted",
+        "network_rdp_internet_access_restricted",
+        "network_ssh_internet_access_restricted",
+        "network_all_inbound_traffic_restricted",
+        "network_flow_log_more_than_90_days",
+        "aks_network_policy_enabled",
+        "aks_clusters_public_access_disabled",
+        "aks_clusters_created_with_private_nodes",
+        "sqlserver_firewall_rule_allows_internet_access"
+      ]
+    },
+    {
+      "Id": "CSCC-2.4",
+      "Name": "CCD-4 Cloud Cryptographic Key Management",
+      "Description": "Centralize and protect all cryptographic keys, secrets, and certificates in dedicated Key Vaults with purge protection, access logging, and expiration policies.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.4 Key & Secret Management",
+          "Service": "keyvault"
+        }
+      ],
+      "Checks": [
+        "keyvault_key_expiration_set_in_non_rbac",
+        "keyvault_rbac_key_expiration_set",
+        "keyvault_secret_expiration_set_in_non_rbac",
+        "keyvault_rbac_secret_expiration_set",
+        "keyvault_soft_delete_and_purge_protection_enabled",
+        "keyvault_private_endpoints_enabled",
+        "keyvault_logging_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-2.5",
+      "Name": "CCD-5 Cloud Threat Detection & Vulnerability Management",
+      "Description": "Continuous threat detection, behavioral anomaly analysis, and workload vulnerability scanning must be enabled across all compute and database layers.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.5 Threat Detection & Vulnerability Mgmt",
+          "Service": "defender"
+        }
+      ],
+      "Checks": [
+        "defender_ensure_defender_for_server_is_on",
+        "defender_ensure_defender_for_arm_is_on",
+        "defender_ensure_defender_for_storage_is_on",
+        "defender_ensure_defender_for_azure_sql_databases_is_on",
+        "defender_ensure_defender_for_containers_is_on",
+        "defender_ensure_defender_for_keyvault_is_on",
+        "defender_ensure_notify_alerts_severity_is_high",
+        "sqlserver_vulnerability_assessments_enabled",
+        "vm_ensure_system_updates_applied",
+        "containerregistry_not_publicly_accessible"
+      ]
+    },
+    {
+      "Id": "CSCC-2.6",
+      "Name": "CCD-6 Cloud Logging, Auditing & SIEM Ingestion",
+      "Description": "Comprehensive control plane activity logs and diagnostic telemetry must be captured, monitored for anomalous modifications, and archived.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.6 Logging & Auditing",
+          "Service": "monitor"
+        }
+      ],
+      "Checks": [
+        "monitor_diagnostic_settings_exists",
+        "monitor_activity_log_retention_days_greater_than_365",
+        "monitor_alert_create_update_nsg",
+        "monitor_alert_delete_nsg",
+        "monitor_alert_create_policy_assignment",
+        "monitor_alert_delete_policy_assignment",
+        "sqlserver_auditing_enabled"
+      ]
+    },
+    {
+      "Id": "CSCC-3.1",
+      "Name": "CCR-1 Cloud Backup, Recovery & Resilience",
+      "Description": "Implement automated backups, disaster recovery vaults, and soft-delete protections to guarantee business continuity during adverse cyber events.",
+      "Attributes": [
+        {
+          "Section": "3. Cloud Cybersecurity Resilience",
+          "SubSection": "3.1 Backup and Recovery",
+          "Service": "recovery"
+        }
+      ],
+      "Checks": [
+        "recovery_vault_soft_delete_enabled",
+        "recovery_vault_backup_storage_redundancy",
+        "storage_ensure_soft_delete_is_enabled",
+        "vm_ensure_auto_backup_configured"
+      ]
+    },
+    {
+      "Id": "CSCC-4.1",
+      "Name": "CCT-1 Multi-Tenant Isolation & Third-Party Integrations",
+      "Description": "Enforce strict tenant isolation, guest collaboration restrictions, application registration controls, and third-party risk mitigation.",
+      "Attributes": [
+        {
+          "Section": "4. Third-Party & Multi-Tenant Security",
+          "SubSection": "4.1 Multi-Tenant Isolation",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_policy_guest_invite_only_for_admin_roles",
+        "entra_policy_guest_users_access_restrictions",
+        "entra_policy_restricts_user_consent_for_apps",
+        "entra_policy_user_consent_for_verified_apps",
+        "entra_policy_ensure_default_user_cannot_create_apps",
+        "entra_policy_ensure_default_user_cannot_create_tenants",
+        "entra_users_cannot_create_microsoft_365_groups"
+      ]
+    }
+  ]
+}

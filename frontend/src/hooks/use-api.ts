@@ -24,7 +24,8 @@ export const qk = {
   roles: () => ["roles"] as const,
   overviews: () => ["overviews"] as const,
   tenants: () => ["tenants"] as const,
-  decisionLogs: () => ["decision-logs"] as const,
+  decisionLogs: (params?: Record<string, string>) => ["decision-logs", params ?? {}] as const,
+  securityDecisions: (params?: Record<string, string>) => ["ai-security-decisions", params ?? {}] as const,
   hitlReviews: () => ["hitl-reviews"] as const,
   llmConfigs: () => ["tenant-llm-configs"] as const,
   integrations: () => ["integrations"] as const,
@@ -85,8 +86,8 @@ export function useFindings(params?: Record<string, string>) {
     queryKey: qk.findings(params),
     queryFn: async () => {
       const now = new Date();
-      const gteDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const lteDate = now.toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "500",
         "filter[inserted_at.gte]": gteDate,
@@ -105,6 +106,28 @@ export function useFinding(id: string) {
     queryKey: qk.finding(id),
     queryFn: () => api.get(`/findings/${id}`).then(unwrapSingle),
     enabled: !!id,
+  });
+}
+
+// ─── Resources ────────────────────────────────────────────────────────────
+
+export function useResources(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.resources(params),
+    queryFn: async () => {
+      const now = new Date();
+      const lteDate = now.toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const finalParams = {
+        "page[size]": "500",
+        "filter[updated_at.gte]": gteDate,
+        "filter[updated_at.lte]": lteDate,
+        ...(params || {}),
+      };
+      const res = await api.get(`/resources${buildQuery(finalParams)}`);
+      return { items: unwrapList(res), meta: unwrapMeta(res) };
+    },
+    staleTime: 30 * 1000,
   });
 }
 
@@ -153,6 +176,45 @@ export function useDecisionLogs(params?: Record<string, string>) {
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 30 * 1000,
+  });
+}
+
+export function useSecurityDecisions(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.securityDecisions(params),
+    queryFn: async () => {
+      const finalParams = {
+        "page[size]": "50",
+        ...(params || {}),
+      };
+      const res = await api.get(`/ai/decisions${buildQuery(finalParams)}`, { jsonApi: false });
+      return res as { data: Array<{ type: string; id: string; attributes: Record<string, unknown> }>; meta?: Record<string, unknown> };
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useCreateJiraTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      decisionId,
+      projectKey,
+      issueType,
+    }: {
+      decisionId: string;
+      projectKey?: string;
+      issueType?: string;
+    }) => {
+      return await api.post(
+        `/ai/decisions/${decisionId}/jira-ticket`,
+        { project_key: projectKey, issue_type: issueType },
+        { jsonApi: false }
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.securityDecisions() });
+    },
   });
 }
 
@@ -327,28 +389,6 @@ export function useLaunchScan() {
         },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.scans() }),
-  });
-}
-
-// ─── Resources ────────────────────────────────────────────────────────────
-
-export function useResources(params?: Record<string, string>) {
-  return useQuery({
-    queryKey: qk.resources(params),
-    queryFn: async () => {
-      const now = new Date();
-      const gteDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      const lteDate = now.toISOString().split("T")[0];
-      const finalParams = {
-        "page[size]": "500",
-        "filter[updated_at.gte]": gteDate,
-        "filter[updated_at.lte]": lteDate,
-        ...(params || {}),
-      };
-      const res = await api.get(`/resources${buildQuery(finalParams)}`);
-      return { items: unwrapList(res), meta: unwrapMeta(res) };
-    },
-    staleTime: 2 * 60 * 1000,
   });
 }
 

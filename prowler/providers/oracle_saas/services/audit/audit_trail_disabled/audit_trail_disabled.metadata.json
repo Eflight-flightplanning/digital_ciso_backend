@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "audit_trail_disabled",
+  "CheckTitle": "Oracle Fusion ERP Audit Trail is disabled",
+  "CheckType": [],
+  "ServiceName": "audit",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "oracle-saas://{tenant_id}/audit/{resource_id}",
+  "Severity": "high",
+  "ResourceType": "Policy",
+  "ResourceGroup": "governance",
+  "Description": "Audits Oracle Fusion Cloud ERP & HCM configuration for Oracle Fusion ERP Audit Trail is disabled.",
+  "Risk": "Violation of Oracle Fusion ERP Audit Trail is disabled leads to potential ITGC SOX 404 or ICFR non-compliance.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [],
+  "Remediation": {
+    "Code": {
+      "CLI": "",
+      "NativeIaC": "",
+      "Other": "Navigate to Oracle Fusion ERP Security Console and review access configurations.",
+      "Terraform": ""
+    },
+    "Recommendation": {
+      "Text": "Remediate Oracle Fusion ERP Audit Trail is disabled according to Oracle Security best practices.",
+      "Url": "https://hub.prowler.com/check/audit_trail_disabled"
+    }
+  },
+  "Categories": [
+    "logging"
+  ],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": "SOX 404 / SOC 1 Type 2 ICFR Control"
+}

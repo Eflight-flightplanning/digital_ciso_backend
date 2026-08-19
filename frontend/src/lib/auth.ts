@@ -19,7 +19,10 @@ export interface AuthState {
   isLoading: boolean;
 }
 
-const API_BASE = (typeof window !== "undefined" && (window as any).__API_BASE__) || "http://localhost:8000/api/v1";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== "undefined" && (window as any).__API_BASE__) ||
+  "/api/v1";
 
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;

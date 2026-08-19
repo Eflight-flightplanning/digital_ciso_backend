@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "network_oauth_app_excessive_scopes",
+  "CheckTitle": "Oracle IDCS OAuth application has excessive permission scopes",
+  "CheckType": [],
+  "ServiceName": "network",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "oracle-saas://{tenant_id}/network/{resource_id}",
+  "Severity": "high",
+  "ResourceType": "Policy",
+  "ResourceGroup": "network",
+  "Description": "Audits Oracle Fusion Cloud ERP & HCM configuration for Oracle IDCS OAuth application has excessive permission scopes.",
+  "Risk": "Violation of Oracle IDCS OAuth application has excessive permission scopes leads to potential ITGC SOX 404 or ICFR non-compliance.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [],
+  "Remediation": {
+    "Code": {
+      "CLI": "",
+      "NativeIaC": "",
+      "Other": "Navigate to Oracle Fusion ERP Security Console and review access configurations.",
+      "Terraform": ""
+    },
+    "Recommendation": {
+      "Text": "Remediate Oracle IDCS OAuth application has excessive permission scopes according to Oracle Security best practices.",
+      "Url": "https://hub.prowler.com/check/network_oauth_app_excessive_scopes"
+    }
+  },
+  "Categories": [
+    "identity-access"
+  ],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": "SOX 404 / SOC 1 Type 2 ICFR Control"
+}

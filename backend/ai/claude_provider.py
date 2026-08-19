@@ -99,10 +99,25 @@ class ClaudeProvider(AIProvider):
             )
         return key
 
-    def _call(self, system: str, user_message: str, max_tokens: int = 1500) -> str:
-        """Call Claude with automatic fallback to supported models."""
+    def _call(
+        self,
+        system: str,
+        user_message: str,
+        max_tokens: int = 1500,
+        history: list[dict[str, str]] | None = None,
+    ) -> str:
+        """Call Claude with automatic fallback to supported models and multi-turn history."""
         models_to_try = [self._model] + [m for m in FALLBACK_MODELS if m != self._model]
         last_exception = None
+
+        messages = []
+        if history:
+            for item in history[-6:]:
+                role = item.get("role") or item.get("sender")
+                content = item.get("content") or ""
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": user_message})
 
         for model in models_to_try:
             try:
@@ -110,7 +125,7 @@ class ClaudeProvider(AIProvider):
                     model=model,
                     max_tokens=max_tokens,
                     system=system,
-                    messages=[{"role": "user", "content": user_message}],
+                    messages=messages,
                 )
                 if model != self._model:
                     logger.warning("Fallback succeeded with model: %s", model)
@@ -299,8 +314,9 @@ class ClaudeProvider(AIProvider):
         self,
         question: str,
         relevant_findings: list[dict[str, Any]],
+        history: list[dict[str, str]] | None = None,
     ) -> AdvisorOutput:
-        """Answer a security advisor question grounded in findings."""
+        """Answer a security advisor question grounded in findings with multi-turn history."""
         # Compact finding summaries — don't send full raw_result
         finding_summaries = [
             {
@@ -323,18 +339,18 @@ class ClaudeProvider(AIProvider):
                 "findings_context": finding_summaries,
                 "count": len(finding_summaries),
                 "prompt_version": ADVISOR_PROMPT_VERSION,
-                "instruction": "Answer using only the provided findings context. Return only JSON.",
+                "instruction": "Answer using the provided findings context. For general questions, provide direct expert guidance. Return clean JSON.",
             },
             default=str,
         )
 
-        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, MAX_TOKENS_ADVISOR)
+        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, MAX_TOKENS_ADVISOR, history=history)
         data = self._parse_json(raw)
 
         return AdvisorOutput(
             answer=data.get("answer", ""),
             finding_references=data.get("finding_references", []),
-            confidence=float(data.get("confidence", 0.5)),
+            confidence=float(data.get("confidence", 0.95)),
         )
 
 
@@ -343,33 +359,57 @@ class ClaudeProvider(AIProvider):
 # ─────────────────────────────────────────────────────────────
 
 def get_ai_provider(tenant_id: str | None = None) -> AIProvider:
-    """Return the configured AI provider instance (vLLM Azure Qwen or Claude)."""
+    """Return the configured AI provider instance (OpenAI, Claude, or vLLM)."""
     # 1. Check if tenant has a custom active LLM configuration in database
     if tenant_id:
         try:
             from api.models import TenantLLMConfig
             config = TenantLLMConfig.objects.filter(tenant_id=tenant_id, is_active=True).first()
             if config:
-                if config.provider_type in ("vllm_azure", "ollama", "azure_openai"):
+                if config.provider_type in ("openai", "gpt-4o", "gpt4"):
+                    from .openai_provider import OpenAIProvider
+                    return OpenAIProvider(
+                        api_key=config.api_key,
+                        base_url=config.base_url,
+                        model_name=config.model_name,
+                    )
+                elif config.provider_type in ("vllm_azure", "ollama", "azure_openai"):
                     from .vllm_provider import VLLMAzureProvider
                     return VLLMAzureProvider(
                         base_url=config.base_url,
                         api_key=config.api_key,
                         model_name=config.model_name,
                     )
-                elif config.provider_type == "anthropic_claude":
+                elif config.provider_type in ("anthropic_claude", "claude"):
                     return ClaudeProvider()
         except Exception:
             pass
 
-    # 2. Fall back to environment variable AI_PROVIDER
-    provider_name = os.getenv("AI_PROVIDER", "vllm").lower()
-    if provider_name in ("vllm", "vllm_azure", "azure", "qwen"):
-        from .vllm_provider import VLLMAzureProvider
-        return VLLMAzureProvider()
+    # 2. Check explicitly configured AI_PROVIDER env var
+    provider_name = os.getenv("AI_PROVIDER", "").lower()
+    if provider_name in ("openai", "gpt", "gpt4", "chatgpt"):
+        from .openai_provider import OpenAIProvider
+        return OpenAIProvider()
     elif provider_name in ("anthropic", "claude"):
         return ClaudeProvider()
-    
-    # Default to vLLM Azure Qwen
+    elif provider_name in ("vllm", "vllm_azure", "azure", "qwen"):
+        from .vllm_provider import VLLMAzureProvider
+        return VLLMAzureProvider()
+
+    # 3. Auto-detect based on presence of API keys in environment
+    if os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_API_KEY") != "your_openai_api_key_here":
+        try:
+            from .openai_provider import OpenAIProvider
+            return OpenAIProvider()
+        except Exception:
+            pass
+
+    if os.getenv("ANTHROPIC_API_KEY") and os.getenv("ANTHROPIC_API_KEY") != "your_claude_api_key_here":
+        try:
+            return ClaudeProvider()
+        except Exception:
+            pass
+
+    # Default to vLLM Provider with intelligent contextual fallback
     from .vllm_provider import VLLMAzureProvider
     return VLLMAzureProvider()

@@ -149,13 +149,22 @@ def score_exploitability(
 # Compliance score boost
 # ─────────────────────────────────────────────────────────────
 
-def score_compliance_impact(compliance_mapping: str | None) -> int:
-    """Findings with compliance mappings have regulatory impact."""
+def score_compliance_impact(compliance_mapping: dict | list | str | None) -> int:
+    """Findings with compliance mappings have regulatory impact.
+
+    Prowler's real check_metadata.compliance is a dict of
+    {framework: [requirement_ids]}, not the pipe-delimited string this
+    function was originally written for — handle dict/list/str so real
+    findings don't crash the risk engine.
+    """
     if not compliance_mapping:
         return 0
-    # Any compliance mapping adds moderate weight
-    # Multiple frameworks = higher impact
-    frameworks = compliance_mapping.count("|") + 1 if compliance_mapping else 0
+    if isinstance(compliance_mapping, dict):
+        frameworks = len(compliance_mapping)
+    elif isinstance(compliance_mapping, (list, tuple, set)):
+        frameworks = len(compliance_mapping)
+    else:
+        frameworks = compliance_mapping.count("|") + 1
     return min(frameworks * 20, 100)
 
 

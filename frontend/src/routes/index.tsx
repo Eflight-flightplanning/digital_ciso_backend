@@ -94,13 +94,13 @@ function MarketingLandingPage() {
   };
 
   const frameworks = [
+    { name: "NCA ECC-1:2018 (Saudi KSA)", score: 93, passed: 106, total: 114 },
     { name: "CIS AWS Foundations 3.0", score: 91, passed: 156, total: 171 },
     { name: "SOC 2 Type II (Security)", score: 94, passed: 98, total: 104 },
     { name: "ISO/IEC 27001:2022", score: 90, passed: 118, total: 131 },
     { name: "PCI-DSS v4.0", score: 95, passed: 145, total: 152 },
     { name: "NIST CSF 2.0", score: 89, passed: 108, total: 122 },
     { name: "CIS OCI Benchmark 2.0", score: 92, passed: 84, total: 91 },
-    { name: "HIPAA Security Rule", score: 94, passed: 72, total: 76 },
     { name: "MITRE ATT&CK Cloud", score: 92, passed: 68, total: 74 },
   ];
 
@@ -831,7 +831,7 @@ function MarketingLandingPage() {
               </p>
               <div className="mt-6 space-y-2.5 text-xs font-mono">
                 {[
-                  "prowler_get_findings — Query findings by severity, provider, status",
+                  "ciso_get_findings — Query findings by severity, provider, status",
                   "ciso_analyze_finding — AI root-cause analysis with risk scoring",
                   "ciso_get_compliance_overview — 28 framework readiness scores",
                   "remediation_generate_playbook — AI-generated Terraform/CLI scripts",
@@ -855,7 +855,7 @@ function MarketingLandingPage() {
   "jsonrpc": "2.0",
   "method": "tools/call",
   "params": {
-    "name": "prowler_get_findings",
+    "name": "ciso_get_findings",
     "arguments": {
       "severity": "critical",
       "status": "FAIL",
@@ -922,7 +922,7 @@ function MarketingLandingPage() {
             <Link to="/sign-up" className="hover:text-[#8EC63F] transition-colors">Register</Link>
             <a href="#compliance" className="hover:text-[#8EC63F] transition-colors">28 Standards</a>
             <a href="#mcp" className="hover:text-[#8EC63F] transition-colors">MCP Protocol</a>
-            <a href="http://localhost:8000/api/v1/reports/executive-summary" target="_blank" className="hover:text-[#8EC63F] transition-colors">Executive PDF</a>
+            <a href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/reports/executive-summary`} target="_blank" className="hover:text-[#8EC63F] transition-colors">Executive PDF</a>
           </div>
         </div>
       </footer>

@@ -69,7 +69,8 @@ MAX_FINDINGS_PER_CHECK = int(os.environ.get("DJANGO_PDF_MAX_FINDINGS_PER_CHECK",
 # =============================================================================
 # Base colors
 # =============================================================================
-COLOR_PROWLER_DARK_GREEN = colors.Color(0.1, 0.5, 0.2)
+COLOR_BRAND_DARK_GREEN = colors.Color(0.1, 0.5, 0.2)
+COLOR_PROWLER_DARK_GREEN = COLOR_BRAND_DARK_GREEN
 COLOR_BLUE = colors.Color(0.2, 0.4, 0.6)
 COLOR_LIGHT_BLUE = colors.Color(0.3, 0.5, 0.7)
 COLOR_LIGHTER_BLUE = colors.Color(0.4, 0.6, 0.8)
@@ -215,6 +216,23 @@ CSA_CCM_SECTION_SHORT_NAMES = {
     "Infrastructure & Virtualization Security": "Infrastructure & Virtualization",
 }
 
+# Saudi NCA ECC-1:2018 sections (Domains)
+NCA_ECC_SECTIONS = [
+    "1. Cybersecurity Governance",
+    "2. Cybersecurity Defense",
+    "3. Cybersecurity Resilience",
+    "4. Third-Party and Cloud Computing",
+    "5. Industrial Control Systems",
+]
+
+# Saudi NCA CSCC-1:2019 sections (Cloud Domains)
+NCA_CSCC_SECTIONS = [
+    "1. Cloud Cybersecurity Governance",
+    "2. Cloud Cybersecurity Defense",
+    "3. Cloud Cybersecurity Resilience",
+    "4. Third-Party & Multi-Tenant Security",
+]
+
 # Table column widths
 COL_WIDTH_SMALL = 0.4 * inch
 COL_WIDTH_MEDIUM = 0.9 * inch
@@ -271,7 +289,7 @@ class FrameworkConfig:
 FRAMEWORK_REGISTRY: dict[str, FrameworkConfig] = {
     "prowler_threatscore": FrameworkConfig(
         name="prowler_threatscore",
-        display_name="Prowler ThreatScore",
+        display_name="ThreatScore",
         logo_filename=None,
         primary_color=COLOR_BLUE,
         secondary_color=COLOR_LIGHT_BLUE,
@@ -381,6 +399,44 @@ FRAMEWORK_REGISTRY: dict[str, FrameworkConfig] = {
         has_niveles=False,
         has_weight=False,
     ),
+    "nca_ecc": FrameworkConfig(
+        name="nca_ecc",
+        display_name="NCA Essential Cybersecurity Controls (ECC-1:2018)",
+        logo_filename=None,
+        primary_color=COLOR_BLUE,
+        secondary_color=COLOR_LIGHT_BLUE,
+        bg_color=COLOR_BG_BLUE,
+        attribute_fields=[
+            "Section",
+            "SubSection",
+            "Service",
+        ],
+        sections=NCA_ECC_SECTIONS,
+        language="en",
+        has_risk_levels=False,
+        has_dimensions=False,
+        has_niveles=False,
+        has_weight=False,
+    ),
+    "nca_cscc": FrameworkConfig(
+        name="nca_cscc",
+        display_name="NCA Cloud Cybersecurity Controls (CSCC-1:2019)",
+        logo_filename=None,
+        primary_color=COLOR_BLUE,
+        secondary_color=COLOR_LIGHT_BLUE,
+        bg_color=COLOR_BG_BLUE,
+        attribute_fields=[
+            "Section",
+            "SubSection",
+            "Service",
+        ],
+        sections=NCA_CSCC_SECTIONS,
+        language="en",
+        has_risk_levels=False,
+        has_dimensions=False,
+        has_niveles=False,
+        has_weight=False,
+    ),
 }
 
 
@@ -389,7 +445,7 @@ def get_framework_config(compliance_id: str) -> FrameworkConfig | None:
     Get framework configuration based on compliance ID.
 
     Args:
-        compliance_id (str): The compliance framework identifier (e.g., "prowler_threatscore_aws").
+        compliance_id (str): The compliance framework identifier (e.g., "nca_ecc_1.2018_azure").
 
     Returns:
         FrameworkConfig | None: The framework configuration if found, None otherwise.
@@ -404,6 +460,10 @@ def get_framework_config(compliance_id: str) -> FrameworkConfig | None:
         return FRAMEWORK_REGISTRY["nis2"]
     if "csa" in compliance_lower or "ccm" in compliance_lower:
         return FRAMEWORK_REGISTRY["csa_ccm"]
+    if "nca_ecc" in compliance_lower or "ecc" in compliance_lower:
+        return FRAMEWORK_REGISTRY["nca_ecc"]
+    if "nca_cscc" in compliance_lower or "cscc" in compliance_lower or "nca" in compliance_lower:
+        return FRAMEWORK_REGISTRY["nca_cscc"]
     if compliance_lower.startswith("cis_") or "cis" in compliance_lower:
         return FRAMEWORK_REGISTRY["cis"]
 

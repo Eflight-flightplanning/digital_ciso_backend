@@ -54,6 +54,7 @@ from .config import (
     COLOR_GRAY,
     COLOR_LIGHT_BLUE,
     COLOR_LIGHTER_BLUE,
+    COLOR_BRAND_DARK_GREEN,
     COLOR_PROWLER_DARK_GREEN,
     FINDINGS_TABLE_CHUNK_SIZE,
     PADDING_LARGE,
@@ -308,7 +309,7 @@ def create_pdf_styles() -> dict[str, ParagraphStyle]:
         "CustomTitle",
         parent=styles["Title"],
         fontSize=24,
-        textColor=COLOR_PROWLER_DARK_GREEN,
+        textColor=COLOR_BRAND_DARK_GREEN,
         spaceAfter=20,
         fontName="PlusJakartaSans",
         alignment=TA_CENTER,
@@ -628,12 +629,16 @@ class BaseComplianceReportGenerator(ABC):
         """
         elements = []
 
-        # Prowler logo
+        # Platform logo
         logo_path = os.path.join(
-            os.path.dirname(__file__), "../../assets/img/prowler_logo.png"
+            os.path.dirname(__file__), "../../assets/img/platform_logo.png"
         )
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(
+                os.path.dirname(__file__), "../../assets/img/logo.png"
+            )
         if os.path.exists(logo_path):
-            logo = Image(logo_path, width=5 * inch, height=1 * inch)
+            logo = Image(logo_path, width=4.5 * inch, height=0.9 * inch)
             elements.append(logo)
 
         elements.append(Spacer(1, 0.5 * inch))
@@ -861,7 +866,7 @@ class BaseComplianceReportGenerator(ABC):
         else:
             page_text = f"Page {page_num}"
 
-        return page_text, "Powered by Prowler"
+        return page_text, "Powered by Digital CISO Platform"
 
     def _render_requirement_detail_extras(
         self, req: RequirementData, data: ComplianceData

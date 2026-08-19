@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   X,
+  Database,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/providers")({
   component: ProvidersPage,
 });
 
-type ProviderType = "AWS" | "AZURE" | "GCP" | "OCI" | "KUBERNETES" | "GITHUB";
+type ProviderType = "AWS" | "AZURE" | "GCP" | "OCI" | "KUBERNETES" | "GITHUB" | "ORACLE_SAAS";
 
 interface ProviderItem {
   id: string;
@@ -131,6 +132,16 @@ function ProvidersPage() {
   const [githubOrg, setGithubOrg] = useState("");
   const [githubToken, setGithubToken] = useState("");
 
+  // Oracle SaaS / ERP Fields
+  const [ociSaasAuthMode, setOciSaasAuthMode] = useState<"BASIC_AUTH" | "OAUTH2">("BASIC_AUTH");
+  const [ociSaasUsername, setOciSaasUsername] = useState("");
+  const [ociSaasPassword, setOciSaasPassword] = useState("");
+  const [ociSaasErpType, setOciSaasErpType] = useState<"FUSION_ERP" | "FUSION_HCM" | "NETSUITE" | "ORACLE_SCM">("FUSION_ERP");
+  const [ociSaasDomainUrl, setOciSaasDomainUrl] = useState("");
+  const [ociSaasClientId, setOciSaasClientId] = useState("");
+  const [ociSaasClientSecret, setOciSaasClientSecret] = useState("");
+  const [ociSaasErpBaseUrl, setOciSaasErpBaseUrl] = useState("");
+
   const resetForm = () => {
     setAlias("");
     setErrorMsg(null);
@@ -154,6 +165,11 @@ function ProvidersPage() {
     setK8sKubeconfig("");
     setGithubOrg("");
     setGithubToken("");
+    setOciSaasErpType("FUSION_ERP");
+    setOciSaasDomainUrl("");
+    setOciSaasClientId("");
+    setOciSaasClientSecret("");
+    setOciSaasErpBaseUrl("");
   };
 
   const handleOpenModal = (type: ProviderType) => {
@@ -232,10 +248,36 @@ function ProvidersPage() {
           secretType = "static";
           secretPayload = { token: githubToken };
         }
+      } else if (activeTab === "ORACLE_SAAS") {
+        uid = ociSaasErpBaseUrl || ociSaasDomainUrl || alias;
+        secretType = "static";
+        if (ociSaasAuthMode === "BASIC_AUTH") {
+          secretPayload = {
+            auth_mode: "BASIC_AUTH",
+            erp_base_url: ociSaasErpBaseUrl,
+            username: ociSaasUsername,
+            password: ociSaasPassword,
+            erp_type: ociSaasErpType,
+          };
+        } else {
+          secretPayload = {
+            auth_mode: "OAUTH2",
+            erp_base_url: ociSaasErpBaseUrl,
+            domain_url: ociSaasDomainUrl,
+            client_id: ociSaasClientId,
+            client_secret: ociSaasClientSecret,
+            erp_type: ociSaasErpType,
+          };
+        }
       }
 
       await createProviderMutation.mutateAsync({
-        provider: activeTab === "OCI" ? "oraclecloud" : activeTab.toLowerCase(),
+        provider:
+          activeTab === "OCI"
+            ? "oraclecloud"
+            : activeTab === "ORACLE_SAAS"
+            ? "oracle_saas"
+            : activeTab.toLowerCase(),
         uid: uid || alias,
         alias: alias.trim(),
         secret: secretPayload || undefined,
@@ -259,7 +301,7 @@ function ProvidersPage() {
   return (
     <AppShell
       title="Cloud Provider Connections"
-      subtitle="Prowler-compatible multi-cloud connectors for AWS, Azure, GCP, Oracle Cloud (OCI), Kubernetes & SaaS"
+      subtitle="Multi-cloud connectors for AWS, Azure, GCP, Oracle Cloud (OCI), Kubernetes & SaaS"
       actions={
         <button
           onClick={() => handleOpenModal("AWS")}
@@ -329,6 +371,13 @@ function ProvidersPage() {
                 icon: "GH",
                 color: "text-slate-300",
               },
+              {
+                type: "ORACLE_SAAS" as ProviderType,
+                title: "Oracle SaaS / ERP",
+                desc: "Audit Oracle Fusion ERP, HCM & NetSuite for SoD conflicts, privileged roles & audit trail integrity.",
+                icon: "ERP",
+                color: "text-[#F80000]",
+              },
             ].map((card) => (
               <button
                 key={card.type}
@@ -360,66 +409,107 @@ function ProvidersPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {providerList.map((p, i) => (
-            <Panel
-              key={`${p.name}-${p.alias}`}
-              index={i}
-              className="flex flex-col justify-between p-5 transition-all hover:border-primary/50"
-            >
-              <div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-foreground font-display text-sm font-bold">
-                      {(p.name || 'AWS').slice(0, 3).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="font-display text-sm font-bold text-foreground">
-                        {p.alias}
-                      </h3>
-                      <span className="text-xs text-muted-foreground">
-                        {p.name} Environment
-                      </span>
-                    </div>
-                  </div>
-                  <Chip tone={p.status === "connected" ? "success" : "critical"}>
-                    <Dot tone={p.status === "connected" ? "success" : "critical"} />
-                    {p.status}
-                  </Chip>
-                </div>
+        <div className="space-y-6">
+          {/* ── Connected Provider Cards Grid ── */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {providerList.map((p, i) => {
+              const nameLower = (p.name || "").toLowerCase();
+              const aliasLower = (p.alias || "").toLowerCase();
+              const isSaas =
+                nameLower === "oracle_saas" ||
+                nameLower.includes("saas") ||
+                aliasLower.includes("fusion");
+              const isOci =
+                (nameLower === "oraclecloud" || nameLower === "oci" || aliasLower.includes("oci")) &&
+                !isSaas;
+              const isAzure = nameLower.includes("azure");
 
-                <div className="mt-4 space-y-2 rounded-lg border border-border/80 bg-surface-2/40 p-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Last Scanned:</span>
-                    <span className="font-semibold text-foreground">{p.lastScan}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Discovered Assets:</span>
-                    <span className="mono font-semibold text-foreground">
-                      {(p.resources ?? 0).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              return (
+                <Panel
+                  key={`${p.name}-${p.alias}`}
+                  index={i}
+                  className="flex flex-col justify-between p-5 transition-all hover:border-primary/50"
+                >
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-xl font-display text-xs font-bold ${
+                            isSaas
+                              ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                              : isOci
+                              ? "bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                              : isAzure
+                              ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                              : "bg-surface-2 text-foreground"
+                          }`}
+                        >
+                          {isSaas ? "SaaS" : isOci ? "OCI" : (p.name || "AWS").slice(0, 3).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-display text-sm font-bold text-foreground">
+                            {p.alias}
+                          </h3>
+                          <span className="text-xs text-muted-foreground">
+                            {isSaas
+                              ? "ORACLE_SAAS Environment"
+                              : isOci
+                              ? "ORACLECLOUD Environment"
+                              : `${p.name} Environment`}
+                          </span>
+                        </div>
+                      </div>
+                      <Chip tone={p.status === "connected" ? "success" : "critical"}>
+                        <Dot tone={p.status === "connected" ? "success" : "critical"} />
+                        {p.status}
+                      </Chip>
+                    </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedConfigProvider(p)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2/70 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors"
-                    title="View Provider Configuration"
-                  >
-                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>Config</span>
-                  </button>
-                  <Link
-                    to="/scans"
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                    <span>Scan</span>
-                  </Link>
-                </div>
+                    <div className="mt-4 space-y-2 rounded-lg border border-border/80 bg-surface-2/40 p-3 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Last Scanned:</span>
+                        <span className="font-semibold text-foreground">{p.lastScan}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {isSaas ? "Monitored Users / Policies:" : "Discovered Assets:"}
+                        </span>
+                        <span className="mono font-semibold text-foreground">
+                          {(p.resources ?? 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedConfigProvider(p)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2/70 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors"
+                        title="View Provider Configuration"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Config</span>
+                      </button>
+                      <Link
+                        to="/scans"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        <Zap className="h-3.5 w-3.5" />
+                        <span>Scan</span>
+                      </Link>
+
+                      {isSaas && (
+                        <Link
+                          to="/oracle-saas"
+                          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                          title="Open Oracle Fusion SaaS Governance Dashboard"
+                        >
+                          <Database className="h-3.5 w-3.5" />
+                          <span>SaaS Portal →</span>
+                        </Link>
+                      )}
+                    </div>
 
                 <div className="flex items-center gap-3">
                   <Link
@@ -438,11 +528,13 @@ function ProvidersPage() {
                 </div>
               </div>
             </Panel>
-          ))}
+          );
+        })}
         </div>
-      )}
+      </div>
+    )}
 
-      {/* ── Prowler Multi-Cloud Connection Modal (Full Real-Time Setup with OCI) ── */}
+      {/* ── Multi-Cloud Connection Modal (Full Real-Time Setup with OCI) ── */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto">
           <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 sm:p-8 shadow-2xl my-8">
@@ -478,6 +570,7 @@ function ProvidersPage() {
                 { type: "GCP" as ProviderType, label: "Google Cloud (GCP)" },
                 { type: "KUBERNETES" as ProviderType, label: "Kubernetes" },
                 { type: "GITHUB" as ProviderType, label: "GitHub" },
+                { type: "ORACLE_SAAS" as ProviderType, label: "Oracle SaaS / ERP" },
               ].map((tab) => (
                 <button
                   key={tab.type}
@@ -837,6 +930,156 @@ function ProvidersPage() {
                 </div>
               )}
 
+              {/* ── Oracle SaaS / ERP Form ── */}
+              {activeTab === "ORACLE_SAAS" && (
+                <div className="space-y-3.5 pt-1">
+                  {/* Auth Mode Toggle */}
+                  <div className="flex gap-2 p-1 rounded-lg border border-border bg-surface-2/40">
+                    <button
+                      type="button"
+                      onClick={() => setOciSaasAuthMode("BASIC_AUTH")}
+                      className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all ${
+                        ociSaasAuthMode === "BASIC_AUTH"
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Basic Auth (Direct Pod)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOciSaasAuthMode("OAUTH2")}
+                      className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all ${
+                        ociSaasAuthMode === "OAUTH2"
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      OAuth 2.0 (IDCS Domain)
+                    </button>
+                  </div>
+
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2 text-[11px] text-emerald-400 flex items-start gap-2">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      {ociSaasAuthMode === "BASIC_AUTH"
+                        ? "Connects directly using your Fusion ERP Pod URL and read-only audit user. No IDCS application setup required."
+                        : "Connects using OAuth 2.0 Confidential Application registered in your Oracle Identity Domain."}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="section-label mb-1 block">Oracle ERP Product *</label>
+                    <select
+                      value={ociSaasErpType}
+                      onChange={(e) => setOciSaasErpType(e.target.value as any)}
+                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
+                    >
+                      <option value="FUSION_ERP">Oracle Fusion Cloud ERP (Financials & SoD)</option>
+                      <option value="FUSION_HCM">Oracle Fusion Cloud HCM (HR & Payroll)</option>
+                      <option value="NETSUITE">Oracle NetSuite ERP</option>
+                      <option value="ORACLE_SCM">Oracle Fusion Cloud SCM (Supply Chain)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="section-label mb-1 block">Fusion ERP Base URL *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="https://fa-xxxx-saasfaprod1.fa.ocs.oraclecloud.com"
+                      value={ociSaasErpBaseUrl}
+                      onChange={(e) => setOciSaasErpBaseUrl(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {ociSaasAuthMode === "BASIC_AUTH" ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="section-label mb-1 block">Auditor Username *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ciso_auditor"
+                          value={ociSaasUsername}
+                          onChange={(e) => setOciSaasUsername(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="section-label mb-1 block">Auditor Password *</label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="••••••••••••"
+                          value={ociSaasPassword}
+                          onChange={(e) => setOciSaasPassword(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="section-label mb-1 block">Oracle Identity Domain URL *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="https://idcs-xxxxxxxx.identity.oraclecloud.com"
+                          value={ociSaasDomainUrl}
+                          onChange={(e) => setOciSaasDomainUrl(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="section-label mb-1 block">OAuth Client ID *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="c9284fa019284091..."
+                            value={ociSaasClientId}
+                            onChange={(e) => setOciSaasClientId(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="section-label mb-1 block">OAuth Client Secret *</label>
+                          <input
+                            type="password"
+                            required
+                            value={ociSaasClientSecret}
+                            onChange={(e) => setOciSaasClientSecret(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-1.5 text-[11px]">
+                    <p className="font-bold text-foreground">Security Checks Performed (Read-Only):</p>
+                    {[
+                      "Separation of Duties (SoD) Role Conflict Detection",
+                      "Superuser & Implementation Role Audit",
+                      "MFA Enforcement for Finance & HR Admins",
+                      "ERP Audit Trail & Tamper-Proofing Status",
+                      "OAuth API Integration Scope Validation",
+                      "IP Allowlist & Network Access Restrictions",
+                      "Dormant Privileged Account Review",
+                      "SOC 1 / ITGC Control Validation",
+                    ].map((check, i) => (
+                      <div key={i} className="flex items-center gap-2 text-muted-foreground">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                        <span>{check}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ── GitHub Form ── */}
               {activeTab === "GITHUB" && (
                 <div className="space-y-3.5 pt-1">
@@ -1010,7 +1253,7 @@ function ProvidersPage() {
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <div className="flex items-center gap-2 text-primary font-bold text-xs mb-1.5">
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Prowler Continuous Audit Active</span>
+                  <span>Continuous Audit Active</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   This connector supports continuous CIS benchmark scanning, asset graph ingestion, and Spectra AI automated remediation procedures.

@@ -56,6 +56,7 @@ class AIAnalysisService:
         finding_id: str,
         finding_data: dict[str, Any],
         force_reanalysis: bool = False,
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Run the full AI pipeline for a Prowler finding.
@@ -66,7 +67,7 @@ class AIAnalysisService:
         remain accessible even when AI is unavailable.
         """
         try:
-            return self._analyze_inner(finding_id, finding_data, force_reanalysis)
+            return self._analyze_inner(finding_id, finding_data, force_reanalysis, tenant_id)
         except Exception as e:
             logger.error(
                 "AI analysis failed for finding %s: %s: %s",
@@ -86,6 +87,7 @@ class AIAnalysisService:
         finding_id: str,
         finding_data: dict[str, Any],
         force_reanalysis: bool,
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
         # ── Step 1-2: Normalize ──
         normalized = normalize_finding(finding_data)
@@ -115,14 +117,14 @@ class AIAnalysisService:
             prompt_version=REASONING_PROMPT_VERSION,
         )
 
-        cached_assessment = self._get_cached_assessment(finding_id, fingerprint)
+        cached_assessment = self._get_cached_assessment(finding_id, fingerprint, tenant_id)
         if cached_assessment and not force_reanalysis:
             logger.info(
                 "Using cached AI assessment for finding %s (fingerprint match)", finding_id
             )
             return {
                 "assessment": cached_assessment,
-                "decision": self._get_cached_decision(finding_id),
+                "decision": self._get_cached_decision(finding_id, tenant_id),
                 "from_cache": True,
             }
 
@@ -169,6 +171,7 @@ class AIAnalysisService:
             reasoning=reasoning,
             risk_result=risk_result,
             final_decision=final_decision,
+            tenant_id=tenant_id,
         )
 
         return {
@@ -197,7 +200,6 @@ class AIAnalysisService:
             "requires_rescan": True,
         }
 
-    @transaction.atomic
     def _store(
         self,
         finding_id: str,
@@ -210,49 +212,54 @@ class AIAnalysisService:
         """
         Store AI assessment and security decision to database using Django ORM.
         """
+        if not tenant_id:
+            raise ValueError("_store requires a tenant_id — AIAssessment/SecurityDecision are RLS-protected.")
+
+        from api.db_utils import rls_transaction
         from api.models import AIAssessment, SecurityDecision
 
-        current_tenant = tenant_id  # tenant_id is passed in or None
+        with rls_transaction(tenant_id), transaction.atomic():
+            # Create or update assessment
+            assessment, _created = AIAssessment.objects.update_or_create(
+                tenant_id=tenant_id,
+                finding_id=finding_id,
+                defaults={
+                    "summary": reasoning.summary,
+                    "domain": reasoning.domain,
+                    "exposure": reasoning.exposure,
+                    "root_cause": reasoning.root_cause,
+                    "technical_impact": reasoning.technical_impact,
+                    "business_impact": reasoning.business_impact,
+                    "attack_scenario": reasoning.attack_scenario,
+                    "remediation": reasoning.remediation,
+                    "verification": reasoning.verification,
+                    "unknowns": reasoning.unknowns,
+                    "rationale_summary": reasoning.rationale_summary,
+                    "confidence": reasoning.confidence,
+                    "model": "claude",
+                    "prompt_version": reasoning.to_dict().get("prompt_version", "1.0.0"),
+                    "fingerprint": fingerprint,
+                },
+            )
 
-        # Create or update assessment
-        assessment, _created = AIAssessment.objects.update_or_create(
-            finding_id=finding_id,
-            defaults={
-                "summary": reasoning.summary,
-                "domain": reasoning.domain,
-                "exposure": reasoning.exposure,
-                "root_cause": reasoning.root_cause,
-                "technical_impact": reasoning.technical_impact,
-                "business_impact": reasoning.business_impact,
-                "attack_scenario": reasoning.attack_scenario,
-                "remediation": reasoning.remediation,
-                "verification": reasoning.verification,
-                "unknowns": reasoning.unknowns,
-                "rationale_summary": reasoning.rationale_summary,
-                "confidence": reasoning.confidence,
-                "model": "claude",
-                "prompt_version": reasoning.to_dict().get("prompt_version", "1.0.0"),
-                "fingerprint": fingerprint,
-            },
-        )
-
-        # Create or update decision
-        decision, _created = SecurityDecision.objects.update_or_create(
-            finding_id=finding_id,
-            defaults={
-                "assessment": assessment,
-                "risk_score": risk_result["risk_score"],
-                "risk_level": risk_result["risk_level"],
-                "decision": final_decision["decision"],
-                "priority": final_decision["priority"],
-                "reason": final_decision["reason"],
-                "recommended_owner": final_decision["recommended_owner"],
-                "sla_hours": final_decision["sla_hours"],
-                "human_review_status": "PENDING",
-                "remediation_status": "PENDING",
-                "applied_policy_rules": final_decision.get("applied_policy_rules", []),
-            },
-        )
+            # Create or update decision
+            decision, _created = SecurityDecision.objects.update_or_create(
+                tenant_id=tenant_id,
+                finding_id=finding_id,
+                defaults={
+                    "assessment": assessment,
+                    "risk_score": risk_result["risk_score"],
+                    "risk_level": risk_result["risk_level"],
+                    "decision": final_decision["decision"],
+                    "priority": final_decision["priority"],
+                    "reason": final_decision["reason"],
+                    "recommended_owner": final_decision["recommended_owner"],
+                    "sla_hours": final_decision["sla_hours"],
+                    "human_review_status": "PENDING",
+                    "remediation_status": "PENDING",
+                    "applied_policy_rules": final_decision.get("applied_policy_rules", []),
+                },
+            )
 
         logger.info(
             "AI analysis stored for finding %s: score=%s level=%s decision=%s",
@@ -265,14 +272,18 @@ class AIAnalysisService:
         return self._assessment_to_dict(assessment), self._decision_to_dict(decision)
 
     def _get_cached_assessment(
-        self, finding_id: str, fingerprint: str
+        self, finding_id: str, fingerprint: str, tenant_id: str | None = None
     ) -> dict[str, Any] | None:
         """Retrieve cached assessment from DB if fingerprint matches."""
+        if not tenant_id:
+            return None
         try:
+            from api.db_utils import rls_transaction
             from api.models import AIAssessment
-            assessment = AIAssessment.objects.filter(
-                finding_id=finding_id, fingerprint=fingerprint
-            ).first()
+            with rls_transaction(tenant_id):
+                assessment = AIAssessment.objects.filter(
+                    tenant_id=tenant_id, finding_id=finding_id, fingerprint=fingerprint
+                ).first()
             if assessment:
                 return self._assessment_to_dict(assessment)
         except Exception as e:
@@ -280,12 +291,18 @@ class AIAnalysisService:
         return None
 
     def _get_cached_decision(
-        self, finding_id: str
+        self, finding_id: str, tenant_id: str | None = None
     ) -> dict[str, Any] | None:
         """Retrieve cached decision from DB."""
+        if not tenant_id:
+            return None
         try:
+            from api.db_utils import rls_transaction
             from api.models import SecurityDecision
-            decision = SecurityDecision.objects.filter(finding_id=finding_id).first()
+            with rls_transaction(tenant_id):
+                decision = SecurityDecision.objects.filter(
+                    tenant_id=tenant_id, finding_id=finding_id
+                ).first()
             if decision:
                 return self._decision_to_dict(decision)
         except Exception as e:
@@ -333,6 +350,8 @@ class AIAnalysisService:
             "reviewed_at": decision.reviewed_at.isoformat() if decision.reviewed_at else None,
             "remediation_status": decision.remediation_status,
             "applied_policy_rules": decision.applied_policy_rules,
+            "jira_ticket_key": decision.jira_ticket_key,
+            "jira_ticket_url": decision.jira_ticket_url,
             "created_at": decision.inserted_at.isoformat() if decision.inserted_at else "",
         }
 

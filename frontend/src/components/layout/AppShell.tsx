@@ -24,6 +24,7 @@ import {
   ChevronRight,
   LogOut,
   KeyRound,
+  Database,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,12 @@ type NavSection = { label?: string; items: NavItem[] };
 
 export const navSections: NavSection[] = [
   { items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    label: "SaaS & ERP",
+    items: [
+      { to: "/oracle-saas", label: "Oracle Fusion SaaS", icon: Database },
+    ],
+  },
   {
     label: "Security",
     items: [
@@ -217,7 +224,7 @@ function Sidebar({
       <div className={cn("border-t border-sidebar-border p-3", collapsed && "flex justify-center")}>
         <Link to="/profile" className="flex items-center gap-2.5">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
-            {authStore.getState().user?.name ? authStore.getState().user!.name.slice(0, 2).toUpperCase() : "SA"}
+            {(authStore.getState().user?.name || "SA").slice(0, 2).toUpperCase()}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
@@ -241,11 +248,11 @@ function Breadcrumbs() {
   }, [pathname]);
 
   return (
-    <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       {crumbs.map((c, i) => (
         <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight className="h-3 w-3 opacity-50" />}
-          <span className={cn(i === crumbs.length - 1 && "font-medium text-foreground")}>{c}</span>
+          {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/50" />}
+          <span className={cn(i === crumbs.length - 1 && "font-semibold text-foreground")}>{c}</span>
         </span>
       ))}
     </div>
@@ -288,7 +295,7 @@ export function AppShell({
   actions,
 }: {
   children: ReactNode;
-  title: string;
+  title?: string;
   subtitle?: string;
   actions?: ReactNode;
 }) {
@@ -387,13 +394,15 @@ export function AppShell({
         </header>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">
-          <div className="enter-stagger mb-5 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="font-display text-2xl font-bold text-foreground">{title}</h1>
-              {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          {title && (
+            <div className="enter-stagger mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h1 className="font-display text-2xl font-bold text-foreground">{title}</h1>
+                {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+              </div>
+              {actions}
             </div>
-            {actions}
-          </div>
+          )}
           {children}
         </main>
       </div>

@@ -1,0 +1,125 @@
+{
+  "Framework": "NCA-ECC",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
+  "Version": "1:2018",
+  "Provider": "OracleCloud",
+  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of Saudi Arabia to set minimum cybersecurity requirements for organizations operating on Oracle Cloud Infrastructure (OCI).",
+  "Requirements": [
+    {
+      "Id": "ECC-1.4.1",
+      "Name": "1-4-1 Cybersecurity Roles and Responsibilities",
+      "Description": "Cybersecurity roles and responsibilities must be clearly defined, assigned to authorized personnel, and segregated to avoid conflict of interest.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_tenancy_admin_permissions_limited",
+        "identity_service_level_admins_exist"
+      ]
+    },
+    {
+      "Id": "ECC-1.5.1",
+      "Name": "1-5-1 Cybersecurity Risk Management",
+      "Description": "Enable continuous threat detection and Cloud Guard security zones across OCI compartments.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_is_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.2.1",
+      "Name": "2-2-1 Identity and Access Management (IAM)",
+      "Description": "Access to OCI resources must require MFA, strong password policies, and API key rotation.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_password_policy_strong",
+        "identity_user_api_key_rotate_90_days"
+      ]
+    },
+    {
+      "Id": "ECC-2.5.1",
+      "Name": "2-5-1 Network Security Management",
+      "Description": "OCI Virtual Cloud Networks (VCNs), Security Lists, and Network Security Groups must restrict internet exposure.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Network Security Management",
+          "Service": "core"
+        }
+      ],
+      "Checks": [
+        "core_security_list_allow_ingress_from_internet_to_any_port",
+        "core_security_list_allow_ingress_from_internet_to_tcp_port_22",
+        "core_security_list_allow_ingress_from_internet_to_tcp_port_3389",
+        "core_default_security_list_closed",
+        "core_subnet_flow_logs_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.7.1",
+      "Name": "2-7-1 Data and Information Protection",
+      "Description": "Object Storage buckets and Block Volumes must be encrypted with Vault keys and prohibited from public access.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_public_access_type_disabled",
+        "objectstorage_bucket_cmk_encryption_enabled",
+        "core_boot_volume_kms_cmk_encryption_enabled",
+        "core_block_volume_kms_cmk_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.8.1",
+      "Name": "2-8-1 Cryptography and Key Management",
+      "Description": "Cryptographic keys and secrets must be protected within OCI Vault with auto-rotation.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.12.1",
+      "Name": "2-12-1 Event Logs and Monitoring Management",
+      "Description": "OCI Audit logs and event rules must be enabled and retained for compliance auditing.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_retention_period_365_days",
+        "events_rule_create_update_security_list_exists"
+      ]
+    }
+  ]
+}

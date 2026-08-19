@@ -96,7 +96,7 @@ class CISReportGenerator(BaseComplianceReportGenerator):
         charts.
 
     This generator produces:
-      - Cover page with Prowler logo and dynamic CIS version/provider metadata
+      - Cover page with Digital CISO logo and dynamic CIS version/provider metadata
       - Executive summary with overall compliance score, counts, and breakdowns
         by Profile and AssessmentStatus
       - Charts: overall status pie, pass rate by section (horizontal bar),
@@ -126,22 +126,30 @@ class CISReportGenerator(BaseComplianceReportGenerator):
     # -------------------------------------------------------------------------
 
     def create_cover_page(self, data: ComplianceData) -> list:
-        """Create the CIS report cover page with Prowler + CIS logos side by side."""
+        """Create the CIS report cover page with Digital CISO + CIS logos side by side."""
         elements = []
 
         # Create logos side by side (same pattern as NIS2 / ENS)
-        prowler_logo_path = os.path.join(
-            os.path.dirname(__file__), "../../assets/img/prowler_logo.png"
+        platform_logo_path = os.path.join(
+            os.path.dirname(__file__), "../../assets/img/platform_logo.png"
         )
+        if not os.path.exists(platform_logo_path):
+            platform_logo_path = os.path.join(
+                os.path.dirname(__file__), "../../assets/img/logo.png"
+            )
         cis_logo_path = os.path.join(
             os.path.dirname(__file__), "../../assets/img/cis_logo.png"
         )
 
         if os.path.exists(cis_logo_path):
-            prowler_logo = Image(prowler_logo_path, width=3.5 * inch, height=0.7 * inch)
+            platform_logo = (
+                Image(platform_logo_path, width=3.5 * inch, height=0.7 * inch)
+                if os.path.exists(platform_logo_path)
+                else Spacer(3.5 * inch, 0.7 * inch)
+            )
             cis_logo = Image(cis_logo_path, width=2.3 * inch, height=1.1 * inch)
             logos_table = Table(
-                [[prowler_logo, cis_logo]], colWidths=[4 * inch, 2.5 * inch]
+                [[platform_logo, cis_logo]], colWidths=[4 * inch, 2.5 * inch]
             )
             logos_table.setStyle(
                 TableStyle(
@@ -154,9 +162,9 @@ class CISReportGenerator(BaseComplianceReportGenerator):
                 )
             )
             elements.append(logos_table)
-        elif os.path.exists(prowler_logo_path):
-            # Fallback: only the Prowler logo if the CIS asset is missing
-            elements.append(Image(prowler_logo_path, width=5 * inch, height=1 * inch))
+        elif os.path.exists(platform_logo_path):
+            # Fallback: only the platform logo if the CIS asset is missing
+            elements.append(Image(platform_logo_path, width=4.5 * inch, height=0.9 * inch))
 
         elements.append(Spacer(1, 0.5 * inch))
 

@@ -457,10 +457,10 @@ class SchemaView(SpectacularAPIView):
     serializer_class = None
 
     def get(self, request, *args, **kwargs):
-        spectacular_settings.TITLE = "Prowler API"
+        spectacular_settings.TITLE = "Digital CISO API"
         spectacular_settings.VERSION = RELEASE_ID
         spectacular_settings.DESCRIPTION = (
-            "Prowler API specification.\n\nThis file is auto-generated."
+            "Digital CISO API specification.\n\nThis file is auto-generated."
         )
         spectacular_settings.TAGS = [
             {"name": "User", "description": "Endpoints for managing user accounts."},
@@ -521,7 +521,7 @@ class SchemaView(SpectacularAPIView):
             },
             {
                 "name": "Processor",
-                "description": "Endpoints for managing post-processors used to process Prowler findings, including "
+                "description": "Endpoints for managing post-processors used to process security findings, including "
                 "registration, configuration, and deletion of post-processing actions.",
             },
             {
@@ -2872,7 +2872,7 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
         tags=["Resource"],
         summary="List all resources",
         description="Retrieve a list of all resources with options for filtering by various criteria. Resources are "
-        "objects that are discovered by Prowler. They can be anything from a single host to a whole VPC.",
+        "objects that are discovered by security scans. They can be anything from a single host to a whole VPC.",
         parameters=[
             OpenApiParameter(
                 name="filter[updated_at]",
@@ -2886,7 +2886,7 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
         tags=["Resource"],
         summary="Retrieve data for a resource",
         description="Fetch detailed information about a specific resource by their ID. A Resource is an object that "
-        "is discovered by Prowler. It can be anything from a single host to a whole VPC.",
+        "is discovered by security scans. It can be anything from a single host to a whole VPC.",
     ),
     metadata=extend_schema(
         tags=["Resource"],

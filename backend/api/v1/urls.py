@@ -1,3 +1,11 @@
+from .oracle_saas_views import (
+    OracleSaasOverviewView,
+    OracleSaasInactiveSyncView,
+    OracleSaasSyncHcmUsersView,
+    OracleSaasInactiveUsersView,
+    OracleSaasRemediateView,
+    OracleSaasSyncLiveView,
+)
 from .report_views import ExecutiveReportView
 from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
@@ -201,6 +209,13 @@ urlpatterns = [
     path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
     path("mcp/", MCPGatewayView.as_view(), name="mcp-gateway-v1-slash"),
     path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
+    # Oracle Fusion SaaS Governance & Dormant User Endpoints
+    path("oracle-saas/overview", OracleSaasOverviewView.as_view(), name="oracle-saas-overview"),
+    path("oracle-saas/sync-live", OracleSaasSyncLiveView.as_view(), name="oracle-saas-sync-live"),
+    path("oracle-saas/sync-inactive", OracleSaasInactiveSyncView.as_view(), name="oracle-saas-sync-inactive"),
+    path("oracle-saas/sync-hcm-users", OracleSaasSyncHcmUsersView.as_view(), name="oracle-saas-sync-hcm-users"),
+    path("oracle-saas/inactive-users", OracleSaasInactiveUsersView.as_view(), name="oracle-saas-inactive-users"),
+    path("oracle-saas/remediate", OracleSaasRemediateView.as_view(), name="oracle-saas-remediate"),
     path("", include(router.urls)),
     path("", include(tenants_router.urls)),
     path("", include(users_router.urls)),

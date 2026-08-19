@@ -27,6 +27,7 @@ from tasks.jobs.reports import (
     CISReportGenerator,
     CSAReportGenerator,
     ENSReportGenerator,
+    NCAReportGenerator,
     NIS2ReportGenerator,
     ThreatScoreReportGenerator,
     build_provider_metadata,
@@ -636,6 +637,52 @@ def generate_cis_report(
         findings_cache: Cache of already loaded findings to avoid duplicate queries.
     """
     generator = CISReportGenerator(FRAMEWORK_REGISTRY["cis"])
+
+    generator.generate(
+        tenant_id=tenant_id,
+        scan_id=scan_id,
+        compliance_id=compliance_id,
+        output_path=output_path,
+        provider_id=provider_id,
+        provider_obj=provider_obj,
+        requirement_statistics=requirement_statistics,
+        findings_cache=findings_cache,
+        prowler_provider=prowler_provider,
+        only_failed=only_failed,
+        include_manual=include_manual,
+    )
+
+
+def generate_nca_report(
+    tenant_id: str,
+    scan_id: str,
+    compliance_id: str,
+    output_path: str,
+    provider_id: str,
+    only_failed: bool = True,
+    include_manual: bool = False,
+    provider_obj: Provider | None = None,
+    requirement_statistics: dict[str, dict[str, int]] | None = None,
+    findings_cache: dict[str, list[FindingOutput]] | None = None,
+    prowler_provider=None,
+) -> None:
+    """
+    Generate a PDF compliance report for Saudi NCA ECC or CSCC framework.
+
+    Args:
+        tenant_id: The tenant ID for Row-Level Security context.
+        scan_id: ID of the scan executed by the scanner.
+        compliance_id: ID of the specific NCA framework (e.g., "nca_ecc_1.2018_azure", "nca_cscc_1.2019_aws").
+        output_path: Output PDF file path.
+        provider_id: Provider ID for the scan.
+        only_failed: If True, only include failed requirements in detailed section.
+        include_manual: If True, include manual requirements in detailed section.
+        provider_obj: Pre-fetched Provider object to avoid duplicate queries.
+        requirement_statistics: Pre-aggregated requirement statistics.
+        findings_cache: Cache of already loaded findings to avoid duplicate queries.
+    """
+    config_key = "nca_ecc" if "ecc" in compliance_id.lower() else "nca_cscc"
+    generator = NCAReportGenerator(FRAMEWORK_REGISTRY[config_key])
 
     generator.generate(
         tenant_id=tenant_id,

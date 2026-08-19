@@ -4,10 +4,19 @@ Remediation Execution Agent (HITL Gated)
 Executes approved remediation playbooks (Terraform HCL, AWS CLI, Azure CLI, Python Boto3)
 against target cloud providers.
 
+*** _apply_cloud_remediation() IS CURRENTLY SIMULATED. ***
+It does not call Terraform, any cloud CLI, or any cloud SDK — it only produces
+log text describing what a real run would do. Until real provider-scoped
+execution is implemented, this agent must NOT report success as if
+infrastructure changed, must NOT flip a Finding's Prowler-derived status,
+and must NOT write a DecisionLog entry claiming a verified fix — all of
+that would be a false compliance/audit record. Only Prowler itself is the
+source of truth for whether a finding is resolved (see ai/service.py: "AI
+never changes Prowler PASS/FAIL").
+
 Security Architecture:
 - Human-In-The-Loop Enforcement: Rejects any execution unless human admin approved.
 - Automatic Audit Logging: Records all actions, outputs, and timestamps in PostgreSQL DecisionLog.
-- Finding Resolution: Automatically resolves findings upon successful cloud execution.
 """
 from __future__ import annotations
 
@@ -65,18 +74,26 @@ class RemediationExecutionAgent:
         output_log.append(f"[{now.isoformat()}] [TARGET] Finding ID: {playbook.finding_id} | Script Type: {playbook.script_type.upper()}")
 
         try:
-            # Step 3: Run Cloud Execution Engine
+            # Step 3: Run Cloud Execution Engine (SIMULATED — see module docstring)
             cloud_result = self._apply_cloud_remediation(playbook)
             output_log.extend(cloud_result.get("logs", []))
 
-            # Step 4: Update Playbook to EXECUTED_SUCCESS
+            # Step 4: Update Playbook status. Real execution isn't implemented yet,
+            # so this is recorded as a simulation, not a verified success — the
+            # playbook stays in EXECUTED_FAILED semantics from the platform's
+            # point of view until real cloud execution exists, but we keep the
+            # existing EXECUTED_SUCCESS value (so the UI/status choices don't
+            # break) while being explicit in the log/audit text that nothing
+            # in the cloud actually changed.
             playbook.approval_status = RemediationPlaybook.ApprovalStatus.EXECUTED_SUCCESS
             playbook.executed_at = now
             playbook.executed_by = executed_by
             playbook.execution_output = "\n".join(output_log)
             playbook.save()
 
-            # Step 5: Automatically record immutable audit entry in DecisionLog
+            # Step 5: Record an honest audit entry — a human did approve and
+            # trigger this, which is worth logging, but do NOT claim the
+            # remediation was verified against real infrastructure.
             finding = Finding.objects.filter(id=playbook.finding_id).first()
             check_id = finding.check_id if finding else "remediation_executed"
             provider_type = "aws"
@@ -89,28 +106,30 @@ class RemediationExecutionAgent:
                 analyst_email=user_email,
                 decision="FIX_NOW",
                 previous_status="FAIL",
-                new_status="RESOLVED",
+                new_status="FAIL",
                 rationale_summary=(
-                    f"Remediation playbook '{playbook.title}' executed successfully by Agent "
-                    f"following human approval by {playbook.approved_by.email if playbook.approved_by else 'Admin'}."
+                    f"[SIMULATED] Remediation playbook '{playbook.title}' was approved by "
+                    f"{playbook.approved_by.email if playbook.approved_by else 'Admin'} and run by the "
+                    f"Execution Agent, but real cloud execution is not yet implemented — no "
+                    f"infrastructure was actually changed. Re-run a Prowler scan to verify and "
+                    f"resolve this finding once a real fix has been applied."
                 ),
                 provider_type=provider_type,
                 severity=severity,
             )
             output_log.append(f"[{now.isoformat()}] [AUDIT] Logged to DecisionLog (ID: {decision_entry.id})")
-
-            # Step 6: Mark finding resolved / PASS
-            if finding:
-                finding.status = "PASS"
-                finding.status_extended = f"Remediated via Playbook {playbook.id} on {now.strftime('%Y-%m-%d %H:%M:%S UTC')}."
-                finding.save(update_fields=["status", "status_extended", "updated_at"])
-                output_log.append(f"[{now.isoformat()}] [STATE] Finding {finding.id} status updated to PASS (RESOLVED)")
+            output_log.append(
+                f"[{now.isoformat()}] [NOTICE] This was a SIMULATED execution. No cloud "
+                f"resources were modified. Finding {playbook.finding_id} status was left "
+                f"unchanged — only a real Prowler rescan can confirm remediation."
+            )
 
             playbook.execution_output = "\n".join(output_log)
             playbook.save(update_fields=["execution_output"])
 
             return {
                 "success": True,
+                "simulated": True,
                 "playbook_id": str(playbook.id),
                 "approval_status": playbook.approval_status,
                 "executed_at": now.isoformat(),
@@ -139,24 +158,27 @@ class RemediationExecutionAgent:
 
     def _apply_cloud_remediation(self, playbook: RemediationPlaybook) -> dict[str, Any]:
         """
-        Executes cloud configuration changes.
+        SIMULATED cloud execution. Does not call Terraform, any cloud CLI, or
+        any cloud SDK — real provider-scoped execution is not implemented yet.
+        Produces a dry-run-style description of what a real run would attempt,
+        clearly labeled, so nobody mistakes this log for a real applied change.
         """
         logs = []
         script_type = playbook.script_type.lower()
         now_str = django_tz.now().isoformat()
 
         if script_type == RemediationPlaybook.ScriptType.TERRAFORM:
-            logs.append(f"[{now_str}] [TERRAFORM RUNNER] Initializing Terraform Workspace...")
-            logs.append(f"[{now_str}] [TERRAFORM RUNNER] Validating HCL syntax: 0 syntax errors detected.")
-            logs.append(f"[{now_str}] [TERRAFORM RUNNER] terraform plan: 1 to add, 0 to change, 0 to destroy.")
-            logs.append(f"[{now_str}] [TERRAFORM RUNNER] terraform apply -auto-approve: Execution complete. 1 resource updated.")
+            logs.append(f"[{now_str}] [SIMULATED][TERRAFORM RUNNER] Would initialize Terraform workspace.")
+            logs.append(f"[{now_str}] [SIMULATED][TERRAFORM RUNNER] Would validate HCL syntax.")
+            logs.append(f"[{now_str}] [SIMULATED][TERRAFORM RUNNER] Would run: terraform plan / terraform apply.")
+            logs.append(f"[{now_str}] [SIMULATED] No real Terraform run occurred — real execution is not implemented yet.")
         elif script_type in (RemediationPlaybook.ScriptType.AWS_CLI, RemediationPlaybook.ScriptType.AZURE_CLI):
-            logs.append(f"[{now_str}] [CLI EXECUTOR] Authenticating with provider credentials...")
-            logs.append(f"[{now_str}] [CLI EXECUTOR] Executing: {playbook.code_snippet.strip().splitlines()[0] if playbook.code_snippet else 'CLI Command'}")
-            logs.append(f"[{now_str}] [CLI EXECUTOR] Cloud Provider API returned HTTP 200 OK. Setting applied successfully.")
+            logs.append(f"[{now_str}] [SIMULATED][CLI EXECUTOR] Would authenticate with provider credentials.")
+            logs.append(f"[{now_str}] [SIMULATED][CLI EXECUTOR] Would execute: {playbook.code_snippet.strip().splitlines()[0] if playbook.code_snippet else 'CLI Command'}")
+            logs.append(f"[{now_str}] [SIMULATED] No real cloud API call was made — real execution is not implemented yet.")
         else:
-            logs.append(f"[{now_str}] [AUTOMATION ENGINE] Executing Python SDK driver...")
-            logs.append(f"[{now_str}] [AUTOMATION ENGINE] Cloud API call completed with status 200.")
+            logs.append(f"[{now_str}] [SIMULATED][AUTOMATION ENGINE] Would execute the generated script via the cloud SDK.")
+            logs.append(f"[{now_str}] [SIMULATED] No real cloud API call was made — real execution is not implemented yet.")
 
         return {"logs": logs}
 

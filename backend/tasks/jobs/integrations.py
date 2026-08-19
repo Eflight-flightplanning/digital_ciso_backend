@@ -485,8 +485,11 @@ def send_findings_to_jira(
         integration = Integration.objects.get(id=integration_id)
         jira_integration = initialize_prowler_integration(integration)
 
+    jira_domain = getattr(jira_integration, "_domain", "") or ""
+
     num_tickets_created = 0
     error_messages = []
+    tickets: dict[str, dict[str, str]] = {}
     for finding_id in finding_ids:
         with rls_transaction(tenant_id):
             finding_instance = (
@@ -554,6 +557,11 @@ def send_findings_to_jira(
 
             if result:
                 num_tickets_created += 1
+                if isinstance(result, str):
+                    ticket_url = (
+                        f"https://{jira_domain}/browse/{result}" if jira_domain else ""
+                    )
+                    tickets[str(finding_id)] = {"key": result, "url": ticket_url}
             else:
                 error_message = JIRA_GENERIC_SEND_ERROR
                 logger.error(error_message)
@@ -562,6 +570,7 @@ def send_findings_to_jira(
     result = {
         "created_count": num_tickets_created,
         "failed_count": len(finding_ids) - num_tickets_created,
+        "tickets": tickets,
     }
     if error_messages:
         result["error"] = "; ".join(dict.fromkeys(error_messages))

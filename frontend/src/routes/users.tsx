@@ -21,13 +21,20 @@ function UsersPage() {
   const { data: apiUsers, isLoading } = useUsers();
   const { data: apiRoles } = useRoles();
 
-  const userList = (apiUsers?.items && apiUsers.items.length > 0)
-    ? (apiUsers.items as Array<Record<string, unknown>>).map((u) => ({
-        email: (u.email as string) || "user@acme.io",
-        name: (u.name as string) || (u.email as string)?.split("@")[0] || "Team Member",
-        role: (u.role as string) || ((u.is_superuser || u.is_staff) ? "Security Admin" : "Auditor"),
-        lastLogin: u.last_login ? new Date(u.last_login as string).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active",
-        status: u.is_active !== false ? "Active" : "Suspended",
+  const [suspendedEmails, setSuspendedEmails] = useState<string[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState("Member");
+  const [inviting, setInviting] = useState(false);
+
+  const rawUserList = (apiUsers?.items && apiUsers.items.length > 0)
+    ? (apiUsers.items as Array<Record<string, any>>).map((u) => ({
+        email: String(u.email || "user@acme.io"),
+        name: String(u.name || (u.email ? String(u.email).split("@")[0] : "Team Member")),
+        role: String(u.role || ((u.is_superuser || u.is_staff) ? "Security Admin" : "Auditor")),
+        lastLogin: u.last_login ? new Date(String(u.last_login)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active",
+        status: (u.is_active !== false ? "Active" : "Suspended") as "Active" | "Suspended",
       }))
     : [
         {
@@ -35,15 +42,16 @@ function UsersPage() {
           name: "Alex CISO",
           role: "Security Admin",
           lastLogin: "Active Now",
-          status: "Active",
+          status: "Active" as const,
         },
       ];
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState("Member");
-  const [inviting, setInviting] = useState(false);
+  const userList = rawUserList.map((u) => ({
+    ...u,
+    status: suspendedEmails.includes(u.email)
+      ? (u.status === "Active" ? "Suspended" : "Active")
+      : u.status,
+  }));
 
   const handleInvite = () => {
     if (!newEmail || !newName) return;
@@ -57,15 +65,8 @@ function UsersPage() {
   };
 
   const handleToggleStatus = (email: string) => {
-    setUserList((prev) =>
-      prev.map((u) =>
-        u.email === email
-          ? {
-              ...u,
-              status: u.status === "Active" ? "Suspended" : "Active",
-            }
-          : u
-      )
+    setSuspendedEmails((prev) =>
+      prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]
     );
   };
 

@@ -57,15 +57,18 @@ export function Panel({
   index = 0,
   glow,
   holo = false,
+  onClick,
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   index?: number;
   glow?: "primary" | "critical" | "high" | "success" | "info";
   holo?: boolean;
-}) {
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      onClick={onClick}
       className={cn(
         "glass-card hover-lift enter-stagger p-4",
         holo && "holo-border",
@@ -77,6 +80,7 @@ export function Panel({
           ...(glow ? { ["--glow-primary" as string]: `0 0 26px color-mix(in oklab, var(--color-${glow}) 28%, transparent)` } : {}),
         } as React.CSSProperties
       }
+      {...rest}
     >
       {children}
     </div>

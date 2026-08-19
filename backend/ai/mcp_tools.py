@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------
 MCP_TOOLS_SPEC = [
     {
-        "name": "prowler_get_findings",
-        "description": "Query cloud security findings discovered by Prowler scans. Filter by severity, provider, status, or check ID.",
+        "name": "ciso_get_findings",
+        "description": "Query cloud security findings discovered by security scans. Filter by severity, provider, status, or check ID.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -61,7 +61,7 @@ MCP_TOOLS_SPEC = [
         },
     },
     {
-        "name": "prowler_get_resources",
+        "name": "ciso_get_resources",
         "description": "List multi-cloud inventory resources (AWS, Azure, GCP, Kubernetes) scanned by the platform.",
         "inputSchema": {
             "type": "object",
@@ -209,11 +209,13 @@ class MCPToolExecutor:
 
     @staticmethod
     def execute_tool(tool_name: str, arguments: dict[str, Any], user: User | None = None, tenant: Tenant | None = None) -> dict[str, Any]:
-        tenant_id = tenant.id if tenant else (Tenant.objects.first().id if Tenant.objects.exists() else None)
+        if tenant is None:
+            raise ValueError("No tenant resolved for this request; refusing to guess one.")
+        tenant_id = tenant.id
 
-        if tool_name == "prowler_get_findings":
+        if tool_name in ("ciso_get_findings", "prowler_get_findings"):
             return MCPToolExecutor._get_findings(arguments, tenant_id)
-        elif tool_name == "prowler_get_resources":
+        elif tool_name in ("ciso_get_resources", "prowler_get_resources"):
             return MCPToolExecutor._get_resources(arguments, tenant_id)
         elif tool_name == "ciso_analyze_finding":
             return MCPToolExecutor._analyze_finding(arguments, tenant_id)
@@ -285,35 +287,41 @@ class MCPToolExecutor:
 
     @staticmethod
     def _analyze_finding(args: dict[str, Any], tenant_id) -> dict[str, Any]:
+        from ai.service import ai_analysis_service
+        from ai.views import _finding_to_dict
+
         finding_id = args.get("finding_id")
-        finding = Finding.objects.filter(id=finding_id).first()
+        finding = Finding.objects.filter(id=finding_id, tenant_id=tenant_id).first()
         if not finding:
             return {"error": f"Finding {finding_id} not found."}
 
-        provider = get_ai_provider(tenant_id=str(tenant_id) if tenant_id else None)
-        prompt = (
-            f"Analyze finding: {finding.check_id}\n"
-            f"Severity: {finding.severity}\n"
-            f"Evidence: {finding.status_extended}\n"
-            f"Raw Result: {json.dumps(finding.raw_result)}\n"
+        finding_data = _finding_to_dict(finding)
+        result = ai_analysis_service.analyze(
+            finding_id=str(finding.id),
+            finding_data=finding_data,
+            force_reanalysis=bool(args.get("force_reanalysis", False)),
+            tenant_id=str(finding.tenant_id),
         )
+        if result.get("error"):
+            return {"finding_id": finding_id, "error": result["error"]}
 
-        if hasattr(provider, "_call_vllm_chat"):
-            data = provider._call_vllm_chat(
-                system_prompt="You are an enterprise Digital CISO reasoning engine. Return structured JSON with 'root_cause', 'attack_scenario', 'business_impact', 'risk_score' (0-100), and 'decision' (FIX_NOW/ACCEPT_RISK).",
-                user_prompt=prompt,
-                temperature=0.1,
-                max_tokens=600,
-            )
-        else:
-            data = {
-                "root_cause": f"Misconfiguration in {finding.check_id}",
-                "attack_scenario": "Threat actor exploits open access.",
-                "business_impact": "Compliance violation.",
-                "risk_score": 85,
-                "decision": "FIX_NOW",
-            }
-        return {"finding_id": finding_id, "analysis": data, "model_used": getattr(provider, "model", "qwen-3.5-9b")}
+        assessment = result.get("assessment") or {}
+        decision = result.get("decision") or {}
+        return {
+            "finding_id": finding_id,
+            "from_cache": result.get("from_cache", False),
+            "analysis": {
+                "root_cause": assessment.get("root_cause"),
+                "attack_scenario": assessment.get("attack_scenario"),
+                "business_impact": assessment.get("business_impact"),
+                "technical_impact": assessment.get("technical_impact"),
+                "remediation": assessment.get("remediation"),
+                "risk_score": decision.get("risk_score"),
+                "risk_level": decision.get("risk_level"),
+                "decision": decision.get("decision"),
+            },
+            "model_used": assessment.get("model"),
+        }
 
     @staticmethod
     def _get_compliance(args: dict[str, Any], tenant_id) -> dict[str, Any]:
@@ -333,19 +341,15 @@ class MCPToolExecutor:
                     "total": c.total_requirements,
                     "status": "COMPLIANT" if pct >= 80 else "AT_RISK"
                 })
-        else:
-            frameworks_list = [
-                {"id": "cis_3.0_aws", "name": "CIS AWS Foundations Benchmark", "version": "3.0.0", "readiness_score": 91.2, "passed": 156, "failed": 15, "total": 171, "status": "COMPLIANT"},
-                {"id": "soc2_aws", "name": "SOC 2 Type II (Trust Services)", "version": "2023", "readiness_score": 94.0, "passed": 98, "failed": 6, "total": 104, "status": "COMPLIANT"},
-                {"id": "iso27001_2022_aws", "name": "ISO/IEC 27001:2022 (ISMS)", "version": "2022", "readiness_score": 90.2, "passed": 118, "failed": 13, "total": 131, "status": "COMPLIANT"},
-                {"id": "pci_4.0_aws", "name": "PCI-DSS v4.0", "version": "4.0.0", "readiness_score": 95.0, "passed": 145, "failed": 7, "total": 152, "status": "COMPLIANT"},
-                {"id": "nist_csf_2.0_aws", "name": "NIST Cybersecurity Framework (CSF)", "version": "2.0", "readiness_score": 88.6, "passed": 108, "failed": 14, "total": 122, "status": "COMPLIANT"},
-                {"id": "hipaa_aws", "name": "HIPAA Security Rule & HITECH", "version": "2023", "readiness_score": 94.5, "passed": 72, "failed": 4, "total": 76, "status": "COMPLIANT"},
-            ]
         return {
             "status": "success",
             "total_frameworks": len(frameworks_list),
             "frameworks": frameworks_list,
+            "message": (
+                None
+                if frameworks_list
+                else "No compliance overview has been computed for this tenant yet. Run a scan first."
+            ),
         }
 
     @staticmethod
@@ -361,28 +365,86 @@ class MCPToolExecutor:
                 "connected": integ.connected,
                 "configuration": integ.configuration,
             })
-        if not items:
-            items = [
-                {"type": "amazon_s3", "enabled": True, "connected": True, "configuration": {"bucket": "digital-ciso-audit-exports-2026"}},
-                {"type": "jira", "enabled": True, "connected": True, "configuration": {"domain": "eflight.atlassian.net", "project": "SECOPS"}},
-                {"type": "aws_security_hub", "enabled": True, "connected": True, "configuration": {"auto_stream_asff": True}},
-                {"type": "slack", "enabled": True, "connected": True, "configuration": {"channel": "#secops-critical-alerts"}},
-            ]
         return {
             "status": "success",
             "connected_channels": len([i for i in items if i.get("enabled")]),
             "integrations": items,
+            "message": None if items else "No integrations are configured for this tenant yet.",
         }
 
     @staticmethod
     def _trigger_sync(args: dict[str, Any], tenant_id) -> dict[str, Any]:
-        itype = args.get("integration_type", "slack")
+        from api.models import Integration
+
+        itype = args.get("integration_type", "jira")
+
+        if itype != Integration.IntegrationChoices.JIRA.value:
+            return {
+                "status": "error",
+                "error": (
+                    f"Immediate sync is not supported for integration type '{itype}' yet. "
+                    "Only 'jira' is currently wired to real dispatch via this tool."
+                ),
+            }
+
+        integration = Integration.objects.filter(
+            tenant_id=tenant_id,
+            integration_type=Integration.IntegrationChoices.JIRA,
+            enabled=True,
+            connected=True,
+        ).first()
+        if integration is None:
+            return {
+                "status": "error",
+                "error": "No connected Jira integration is configured for this tenant.",
+            }
+
+        project_key = integration.configuration.get("default_project_key")
+        issue_type = integration.configuration.get("default_issue_type")
+        if not project_key or not issue_type:
+            return {
+                "status": "error",
+                "error": (
+                    "The Jira integration has no default project/issue type configured. "
+                    "Set 'default_project_key' and 'default_issue_type' on the integration first."
+                ),
+            }
+
+        finding_ids = list(
+            Finding.objects.filter(
+                tenant_id=tenant_id,
+                status="FAIL",
+                muted=False,
+                severity__in=["critical", "high"],
+            )
+            .order_by("-inserted_at")
+            .values_list("id", flat=True)[:10]
+        )
+        if not finding_ids:
+            return {
+                "status": "success",
+                "dispatched_to": "jira",
+                "events_synced": 0,
+                "dispatched_at": django_tz.now().isoformat(),
+                "message": "No unresolved critical/high findings to sync.",
+            }
+
+        from tasks.jobs.integrations import send_findings_to_jira
+
+        result = send_findings_to_jira(
+            tenant_id=str(tenant_id),
+            integration_id=str(integration.id),
+            project_key=project_key,
+            issue_type=issue_type,
+            finding_ids=[str(fid) for fid in finding_ids],
+        )
         return {
-            "status": "success",
-            "dispatched_to": itype,
-            "events_synced": 3,
+            "status": "success" if result.get("created_count") else "error",
+            "dispatched_to": "jira",
+            "events_synced": result.get("created_count", 0),
+            "failed_count": result.get("failed_count", 0),
             "dispatched_at": django_tz.now().isoformat(),
-            "message": f"Successfully dispatched latest findings to {itype} integration channel.",
+            "error": result.get("error"),
         }
 
     @staticmethod

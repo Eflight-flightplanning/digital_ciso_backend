@@ -1,0 +1,71 @@
+{
+  "Framework": "SOD-MATRIX",
+  "Name": "Oracle Fusion ERP Separation of Duties (SoD) Matrix",
+  "Version": "2024.1",
+  "Provider": "oracle_saas",
+  "Description": "Automated Separation of Duties (SoD) matrix for detecting conflicting business role combinations across Oracle Fusion Cloud ERP (Financials, Payables, Receivables, Procurement, General Ledger).",
+  "Requirements": [
+    {
+      "Id": "SOD-AP-01",
+      "Name": "Accounts Payable Creation vs Payment Processing Segregation",
+      "Description": "Prevents users from holding both AP Invoice creation/management and Payment disbursement roles to mitigate fraud risk.",
+      "Attributes": [
+        {
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Accounts Payable & Disbursements",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-GL-02",
+      "Name": "General Ledger Entry vs Journal Approval Segregation",
+      "Description": "Ensures manual journal entries cannot be created and approved by the same accountant without independent review.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "General Ledger & Journals",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-PO-03",
+      "Name": "Purchase Order Creation vs AP Specialist Segregation",
+      "Description": "Ensures purchase orders and vendor invoices cannot be raised and matched by the same employee.",
+      "Attributes": [
+        {
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Purchasing & Invoicing",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-SEC-04",
+      "Name": "Security Configuration vs User Administration Segregation",
+      "Description": "Ensures application implementation roles are not combined with IT security management privileges in live operations.",
+      "Attributes": [
+        {
+          "Section": "Security Administration",
+          "SubSection": "Security Console Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected",
+        "erp_iam_implementation_role_active",
+        "erp_iam_superuser_role_assigned"
+      ]
+    }
+  ]
+}

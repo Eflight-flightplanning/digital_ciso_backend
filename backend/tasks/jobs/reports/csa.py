@@ -32,7 +32,7 @@ class CSAReportGenerator(BaseComplianceReportGenerator):
     PDF report generator for CSA Cloud Controls Matrix (CCM) v4.0.
 
     This generator creates comprehensive PDF reports containing:
-    - Cover page with Prowler logo
+    - Cover page with Digital CISO logo
     - Executive summary with overall compliance score
     - Section analysis with horizontal bar chart
     - Section breakdown table

@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "iam_sod_conflict_detected",
+  "CheckTitle": "Separation of Duties (SoD) toxic role conflict detected in Oracle Fusion ERP",
+  "CheckType": [],
+  "ServiceName": "iam",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "oracle-saas://{tenant_id}/iam/{resource_id}",
+  "Severity": "critical",
+  "ResourceType": "User",
+  "ResourceGroup": "IAM",
+  "Description": "Audits Oracle Fusion Cloud ERP & HCM configuration for Separation of Duties (SoD) toxic role conflict detected in Oracle Fusion ERP.",
+  "Risk": "Violation of Separation of Duties (SoD) toxic role conflict detected in Oracle Fusion ERP leads to potential ITGC SOX 404 or ICFR non-compliance.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [],
+  "Remediation": {
+    "Code": {
+      "CLI": "",
+      "NativeIaC": "",
+      "Other": "Navigate to Oracle Fusion ERP Security Console and review access configurations.",
+      "Terraform": ""
+    },
+    "Recommendation": {
+      "Text": "Remediate Separation of Duties (SoD) toxic role conflict detected in Oracle Fusion ERP according to Oracle Security best practices.",
+      "Url": "https://hub.prowler.com/check/iam_sod_conflict_detected"
+    }
+  },
+  "Categories": [
+    "identity-access"
+  ],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": "SOX 404 / SOC 1 Type 2 ICFR Control"
+}

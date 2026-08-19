@@ -1,0 +1,86 @@
+{
+  "Framework": "ITGC-SOX",
+  "Name": "IT General Controls (ITGC) for Oracle ERP Systems",
+  "Version": "SOX-404-COSO",
+  "Provider": "oracle_saas",
+  "Description": "IT General Controls (ITGC) framework aligned with Sarbanes-Oxley Act (SOX) Section 404 and COSO Internal Control Framework for Oracle Fusion Cloud ERP, HCM, and NetSuite.",
+  "Requirements": [
+    {
+      "Id": "ITGC-AC-1.1",
+      "Name": "Privileged User Access Governance & Implementation Roles",
+      "Description": "Implementation consultant and superuser roles must not remain active in production Oracle ERP environments post-go-live.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Privileged Access Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_implementation_role_active",
+        "erp_iam_superuser_role_assigned"
+      ]
+    },
+    {
+      "Id": "ITGC-AC-1.2",
+      "Name": "Multi-Factor Authentication on Administrator and Finance Accounts",
+      "Description": "Multi-factor authentication (MFA) must be enforced for all users holding elevated, administrative, or financial transaction privileges.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Identification & Authentication",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_mfa_not_enforced_admin"
+      ]
+    },
+    {
+      "Id": "ITGC-AC-1.3",
+      "Name": "User Access Reviews and Dormant Account Cleanup",
+      "Description": "Privileged accounts with no login activity for over 90 days must be reviewed, deactivated, or revoked to minimize attack surface.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Account Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_dormant_privileged_account"
+      ]
+    },
+    {
+      "Id": "ITGC-AL-2.1",
+      "Name": "Audit Trail Configuration and Sensitive Transaction Logging",
+      "Description": "Oracle Fusion ERP audit policies must be enabled and actively recording changes to financial objects, user permissions, and security configurations.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging (AL)",
+          "SubSection": "Audit Policies & Forensics",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "erp_audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "ITGC-NS-3.1",
+      "Name": "Network Perimeters and OAuth Integration Governance",
+      "Description": "ERP access must be restricted through corporate IP allowlists and OAuth Confidential Application scopes must adhere to least privilege.",
+      "Attributes": [
+        {
+          "Section": "Network Security (NS)",
+          "SubSection": "Perimeter & Integration Controls",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "erp_network_ip_allowlist_not_configured",
+        "erp_oauth_app_excessive_scopes"
+      ]
+    }
+  ]
+}

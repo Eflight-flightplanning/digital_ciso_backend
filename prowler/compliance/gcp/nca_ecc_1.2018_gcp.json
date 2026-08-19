@@ -1,0 +1,114 @@
+{
+  "Framework": "NCA-ECC",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
+  "Version": "1:2018",
+  "Provider": "GCP",
+  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of Saudi Arabia to set minimum cybersecurity requirements for Google Cloud Platform (GCP) workloads.",
+  "Requirements": [
+    {
+      "Id": "ECC-1.4.1",
+      "Name": "1-4-1 Cybersecurity Roles and Responsibilities",
+      "Description": "Cybersecurity roles and service accounts must enforce least privilege and separation of duties.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sa_no_administrative_privileges",
+        "iam_role_sa_enforce_separation_of_duties",
+        "iam_role_kms_enforce_separation_of_duties",
+        "iam_sa_no_user_managed_keys"
+      ]
+    },
+    {
+      "Id": "ECC-2.1.1",
+      "Name": "2-1-1 Asset Management & Inventory",
+      "Description": "Maintain automated inventory of all GCP assets using Cloud Asset Inventory.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_cloud_asset_inventory_enabled",
+        "compute_instance_shielded_vm_enabled"
+      ]
+    },
+    {
+      "Id": "ECC-2.5.1",
+      "Name": "2-5-1 Network Security Management",
+      "Description": "VPC firewall rules must prohibit unrestricted ingress from 0.0.0.0/0 on sensitive ports.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Network Security Management",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_firewall_rule_allow_ingress_from_internet_to_all_ports",
+        "compute_firewall_rule_allow_ingress_from_internet_to_port_22",
+        "compute_firewall_rule_allow_ingress_from_internet_to_port_3389",
+        "compute_instance_no_public_ip"
+      ]
+    },
+    {
+      "Id": "ECC-2.7.1",
+      "Name": "2-7-1 Data and Information Protection",
+      "Description": "Cloud Storage buckets and Cloud SQL instances must enforce encryption with Customer-Managed Keys (CMEK) and uniform bucket-level access.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "storage"
+        }
+      ],
+      "Checks": [
+        "storage_bucket_public_access_prevention",
+        "storage_bucket_uniform_bucket_level_access_enabled",
+        "storage_bucket_kms_encryption_enabled",
+        "cloudsql_instance_ssl_required"
+      ]
+    },
+    {
+      "Id": "ECC-2.8.1",
+      "Name": "2-8-1 Cryptography and Key Management",
+      "Description": "Cloud KMS keys must have automatic rotation configured and access separated.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_key_rotation_prevent_destroy",
+        "kms_key_rotation_90_days"
+      ]
+    },
+    {
+      "Id": "ECC-2.12.1",
+      "Name": "2-12-1 Event Logs and Monitoring Management",
+      "Description": "Cloud Audit logging and metric alerts must be enabled for security-critical configuration changes.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring",
+          "Service": "logging"
+        }
+      ],
+      "Checks": [
+        "logging_log_metric_filter_and_alert_for_audit_configuration_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_bucket_permission_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_custom_role_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_project_ownership_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_vpc_firewall_rule_changes_enabled"
+      ]
+    }
+  ]
+}

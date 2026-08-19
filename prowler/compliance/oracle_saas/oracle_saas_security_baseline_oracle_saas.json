@@ -1,0 +1,85 @@
+{
+  "Framework": "ORACLE-SAAS-BASELINE",
+  "Name": "Oracle Cloud SaaS Security Baseline",
+  "Version": "1.0",
+  "Provider": "oracle_saas",
+  "Description": "Security Baseline controls for Oracle Cloud Applications (Oracle Fusion ERP, HCM, SCM, and IDCS Identity Domains).",
+  "Requirements": [
+    {
+      "Id": "SAAS-IAM-01",
+      "Name": "Enforce MFA for Privileged and Finance Identities",
+      "Description": "Configure sign-on policies in Oracle Identity Cloud Service (IDCS) requiring MFA for administrative and finance user accounts.",
+      "Attributes": [
+        {
+          "Section": "Identity and Access Management",
+          "SubSection": "MFA Enforcement",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_mfa_not_enforced_admin"
+      ]
+    },
+    {
+      "Id": "SAAS-IAM-02",
+      "Name": "Decommission Implementation Roles Post-Go-Live",
+      "Description": "Revoke the Application Implementation Consultant role from production users immediately following go-live.",
+      "Attributes": [
+        {
+          "Section": "Identity and Access Management",
+          "SubSection": "Role Lifecycle Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_implementation_role_active"
+      ]
+    },
+    {
+      "Id": "SAAS-IAM-03",
+      "Name": "Eliminate Separation of Duties (SoD) Conflicts",
+      "Description": "Ensure no user possesses conflicting roles across payables, receivables, general ledger, and procurement.",
+      "Attributes": [
+        {
+          "Section": "Identity and Access Management",
+          "SubSection": "Separation of Duties",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "erp_iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SAAS-LOG-04",
+      "Name": "Enable Oracle Fusion ERP Audit Trail",
+      "Description": "Audit policies must be active for all sensitive business objects with tamper-proofing enabled.",
+      "Attributes": [
+        {
+          "Section": "Logging and Auditing",
+          "SubSection": "Audit Policy Configuration",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "erp_audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SAAS-NET-05",
+      "Name": "IDCS Network Perimeters and API Scope Hardening",
+      "Description": "Configure IP allowlisting on IDCS sign-on policies and limit OAuth application scopes to least privilege.",
+      "Attributes": [
+        {
+          "Section": "Network and Integration Security",
+          "SubSection": "Network Perimeters",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "erp_network_ip_allowlist_not_configured",
+        "erp_oauth_app_excessive_scopes"
+      ]
+    }
+  ]
+}

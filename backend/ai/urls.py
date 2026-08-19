@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     AIAdvisorQueryView,
+    AIDecisionCreateJiraTicketView,
     AIDecisionDetailView,
     AIDecisionLogView,
     AIFindingAnalysisView,
@@ -45,6 +46,11 @@ ai_urlpatterns = [
         "decisions/<uuid:decision_id>",
         AIDecisionDetailView.as_view(),
         name="ai-decisions-detail",
+    ),
+    path(
+        "decisions/<uuid:decision_id>/jira-ticket",
+        AIDecisionCreateJiraTicketView.as_view(),
+        name="ai-decisions-jira-ticket",
     ),
     # Spectra: AI Advisor & Developer Reasoning Proxy
     path(

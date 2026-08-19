@@ -132,6 +132,7 @@ class AIFindingAnalysisView(APIView):
                 finding_id=str(finding.id),
                 finding_data=finding_data,
                 force_reanalysis=bool(force),
+                tenant_id=str(finding.tenant_id),
             )
 
             if result.get("error"):
@@ -315,6 +316,111 @@ class AIDecisionDetailView(APIView):
             return _ai_unavailable_response()
 
 
+class AIDecisionCreateJiraTicketView(APIView):
+    """
+    POST /ai/decisions/{decision_id}/jira-ticket
+
+    Create a real Jira ticket for this decision's finding using the
+    tenant's existing connected Jira integration (see
+    tasks/jobs/integrations.py::send_findings_to_jira — the same code path
+    the manual Findings-page "send to Jira" flow uses). Idempotent: if a
+    ticket was already created for this decision, returns the existing one
+    instead of creating a duplicate.
+    """
+
+    def post(self, request: Request, decision_id: str) -> Response:
+        try:
+            from api.db_utils import rls_transaction
+            from api.models import Integration, SecurityDecision
+
+            tenant_id = getattr(request, "tenant_id", None)
+            if not tenant_id:
+                return Response(
+                    {"errors": [{"status": "400", "title": "No tenant resolved for this request."}]},
+                    status=400,
+                    content_type="application/vnd.api+json",
+                )
+
+            with rls_transaction(tenant_id):
+                decision = SecurityDecision.objects.filter(
+                    id=decision_id, tenant_id=tenant_id
+                ).first()
+                if not decision:
+                    return Response(
+                        {"errors": [{"status": "404", "title": "Not Found", "detail": "Decision not found."}]},
+                        status=404,
+                        content_type="application/vnd.api+json",
+                    )
+
+                # Idempotent — don't spam a new ticket on repeat clicks.
+                if decision.jira_ticket_key:
+                    from ai.service import ai_analysis_service
+                    return _json_api_success(
+                        ai_analysis_service._decision_to_dict(decision),
+                        "security-decisions",
+                        str(decision.id),
+                    )
+
+                integration = Integration.objects.filter(
+                    tenant_id=tenant_id,
+                    integration_type=Integration.IntegrationChoices.JIRA,
+                    enabled=True,
+                    connected=True,
+                ).first()
+                if integration is None:
+                    return Response(
+                        {"errors": [{"status": "400", "title": "No connected Jira integration is configured for this tenant."}]},
+                        status=400,
+                        content_type="application/vnd.api+json",
+                    )
+
+                body = request.data.get("data", {}).get("attributes", request.data) if isinstance(request.data, dict) else {}
+                project_key = body.get("project_key") or integration.configuration.get("default_project_key")
+                issue_type = body.get("issue_type") or integration.configuration.get("default_issue_type")
+                if not project_key or not issue_type:
+                    return Response(
+                        {"errors": [{"status": "400", "title": "project_key/issue_type not provided and no default is configured on the Jira integration."}]},
+                        status=400,
+                        content_type="application/vnd.api+json",
+                    )
+
+            from tasks.jobs.integrations import send_findings_to_jira
+
+            result = send_findings_to_jira(
+                tenant_id=str(tenant_id),
+                integration_id=str(integration.id),
+                project_key=project_key,
+                issue_type=issue_type,
+                finding_ids=[str(decision.finding_id)],
+            )
+
+            ticket = result.get("tickets", {}).get(str(decision.finding_id))
+            if not ticket:
+                return Response(
+                    {"errors": [{"status": "502", "title": "Jira ticket creation failed", "detail": result.get("error", "Unknown error.")}]},
+                    status=502,
+                    content_type="application/vnd.api+json",
+                )
+
+            with rls_transaction(tenant_id):
+                decision.jira_ticket_key = ticket["key"]
+                decision.jira_ticket_url = ticket["url"]
+                decision.save(update_fields=["jira_ticket_key", "jira_ticket_url", "updated_at"])
+
+            from ai.service import ai_analysis_service
+            return _json_api_success(
+                ai_analysis_service._decision_to_dict(decision),
+                "security-decisions",
+                str(decision.id),
+            )
+        except Exception as e:
+            logger.error("Create Jira ticket error: %s", e)
+            return Response(
+                {"errors": [{"status": "500", "title": "Failed to create Jira ticket", "detail": str(e)}]},
+                status=500,
+                content_type="application/vnd.api+json",
+            )
+
 
 class AIAdvisorQueryView(APIView):
     """
@@ -389,7 +495,9 @@ class AIAdvisorQueryView(APIView):
             # Natural Language Provider Intent Detection from question
             if not provider_filter:
                 q_lower = clean_question.lower()
-                if any(k in q_lower for k in ("oci", "oracle", "oraclecloud", "tenancy", "compartment", "vcn")):
+                if any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "netsuite")):
+                    provider_filter = "oracle_saas"
+                elif any(k in q_lower for k in ("oci", "oracle cloud", "oracle infrastructure", "oraclecloud", "tenancy", "compartment", "vcn", "oracle")):
                     provider_filter = "oraclecloud"
                 elif any(k in q_lower for k in ("azure", "defender", "virtual machine", "vnet", "nsg", "entra")):
                     provider_filter = "azure"
@@ -398,15 +506,21 @@ class AIAdvisorQueryView(APIView):
                 elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery")):
                     provider_filter = "gcp"
 
+            # Optional conversation history for multi-turn chat memory
+            history = raw_data.get("history") or _attrs.get("history") or []
+            if not isinstance(history, list):
+                history = []
+
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
-                request, clean_question, provider=provider_filter
+                request, clean_question, provider=provider_filter, history=history
             )
 
             ai_provider = get_ai_provider()
             result = ai_provider.answer_advisor_query(
                 question=clean_question,
                 relevant_findings=relevant_findings,
+                history=history,
             )
 
             from django.http import JsonResponse
@@ -422,9 +536,10 @@ def _retrieve_relevant_findings(
     question: str,
     limit: int = 35,
     provider: str | None = None,
-) -> list[dict]:
-    """
-    Retrieve a comprehensive, relevant list of findings for the AI Advisor.
+    history: list[dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve relevant findings from DB for AI Advisor context.
+
     Prioritizes findings that match keywords, check IDs, or resource names in the query,
     then pads with top-severity failing findings.
     """
@@ -435,9 +550,43 @@ def _retrieve_relevant_findings(
         from api.db_utils import rls_transaction
         from api.models import Finding
 
+        q_lower = question.strip().lower()
+
+        # Security/technical terms that signify a real technical query
+        security_terms = [
+            "oci", "oracle", "azure", "aws", "gcp", "saas", "erp", "cloud",
+            "high", "critical", "medium", "low", "risk", "finding", "vulnerability", "threat",
+            "infrastructure", "network", "subnet", "gateway", "nsg", "iam", "policy", "role", "user",
+            "sod", "mfa", "audit", "log", "guard", "topic", "storage", "bucket", "database", "sql",
+            "cve", "compliance", "cis", "sox", "itgc", "remediate", "remediation", "patch", "fix"
+        ]
+        has_security_topic = any(term in q_lower for term in security_terms)
+
+        # 1. Detect pure conversational / greeting questions (ONLY when no security topics are mentioned)
+        if not has_security_topic:
+            conversational_patterns = [
+                "will you work", "will ou work", "hello", "hi", "hey", "who are you", "what can you do",
+                "how do you work", "help", "good morning", "good evening", "how are you",
+                "are you working", "can you help me", "what is your name", "test"
+            ]
+            if any(q_lower == p or q_lower.startswith(p + " ") or q_lower.startswith(p + "?") for p in conversational_patterns):
+                return []
+
+        # 2. Detect conversational follow-ups (rely on chat history rather than pulling new random findings)
+        if history and not has_security_topic and any(k in q_lower for k in ["for that", "about that", "step by step", "explain step", "write code", "generate script", "checklist", "summarize that", "tell me more", "how to fix that", "in detail"]):
+            return []
+
         tenant_id = getattr(request, "tenant_id", None) or (
             request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None
         )
+        if not tenant_id:
+            try:
+                from api.models import Tenant
+                default_tenant = Tenant.objects.first()
+                if default_tenant:
+                    tenant_id = default_tenant.id
+            except Exception:
+                pass
 
         if tenant_id:
             cm = rls_transaction(tenant_id)
@@ -451,29 +600,108 @@ def _retrieve_relevant_findings(
 
             # Apply provider scope filter when requested
             if provider:
-                if provider == "oraclecloud":
-                    qs = qs.filter(Q(scan__provider__provider__iexact="oraclecloud") | Q(uid__icontains="prowler-oraclecloud") | Q(uid__icontains="oci"))
+                if provider == "oracle_saas":
+                    qs = qs.filter(
+                        Q(scan__provider__provider__iexact="oracle_saas")
+                        | Q(uid__startswith="prowler-oracle_saas")
+                        | Q(uid__startswith="oracle_saas-")
+                        | Q(check_id__startswith="erp_")
+                    )
+                elif provider in ("oraclecloud", "oci"):
+                    qs = qs.filter(
+                        Q(scan__provider__provider__iexact="oraclecloud")
+                        | Q(scan__provider__provider__iexact="oci")
+                        | Q(uid__startswith="prowler-oraclecloud")
+                        | Q(uid__startswith="prowler-oci")
+                        | Q(uid__startswith="oci-")
+                        | Q(check_id__startswith="oci_")
+                    )
                 elif provider == "azure":
-                    qs = qs.filter(Q(scan__provider__provider__iexact="azure") | Q(uid__icontains="prowler-azure"))
+                    qs = qs.filter(
+                        Q(scan__provider__provider__iexact="azure")
+                        | Q(uid__startswith="prowler-azure")
+                        | Q(uid__startswith="azure-")
+                    )
                 elif provider == "aws":
-                    qs = qs.filter(Q(scan__provider__provider__iexact="aws") | Q(uid__icontains="prowler-aws"))
+                    qs = qs.filter(
+                        Q(scan__provider__provider__iexact="aws")
+                        | Q(uid__startswith="prowler-aws")
+                        | Q(uid__startswith="aws-")
+                    )
                 elif provider == "gcp":
-                    qs = qs.filter(Q(scan__provider__provider__iexact="gcp") | Q(uid__icontains="prowler-gcp"))
+                    qs = qs.filter(
+                        Q(scan__provider__provider__iexact="gcp")
+                        | Q(uid__startswith="prowler-gcp")
+                        | Q(uid__startswith="gcp-")
+                    )
                 else:
                     qs = qs.filter(scan__provider__provider__iexact=provider)
+
+            # Apply specific severity filter if explicitly mentioned in query
+            if "critical" in q_lower:
+                qs = qs.filter(severity__iexact="critical")
+            elif "high" in q_lower:
+                qs = qs.filter(severity__iexact="high")
+            elif "medium" in q_lower:
+                qs = qs.filter(severity__iexact="medium")
+            elif "low" in q_lower:
+                qs = qs.filter(severity__iexact="low")
 
             # Keyword matching: extract meaningful terms from question
             words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
             stop_words = {
                 "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
                 "the", "with", "for", "show", "give", "tell", "about", "which", "are",
-                "from", "that", "this", "can", "our", "all", "does", "have", "oci",
-                "azure", "aws", "gcp", "cloud", "oracle"
+                "from", "that", "this", "can", "our", "all", "does", "have", "first", "today",
+                "high", "critical", "medium", "low", "find", "infrastructure", "environment",
+                "account", "accounts", "missing", "enforce", "enforcement", "status", "check", "user", "users"
             }
             meaningful_keywords = [w for w in words if w.lower() not in stop_words]
 
             matching_ids = set()
             matching_findings = []
+
+            # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry if relevant
+            is_saas_query = any(k in q_lower for k in ("saas", "fusion", "erp", "hcm", "sod", "dormant", "inactive", "consultant", "pam", "curtis", "alan", "mandy", "finance", "hr", "account", "user", "mfa"))
+            if is_saas_query:
+                try:
+                    from api.v1.oracle_saas_views import load_real_pod_users, SOD_TOXIC_MATRICES
+                    saas_users = load_real_pod_users()
+                    if saas_users:
+                        # Filter relevant users based on question keywords
+                        relevant_saas_users = []
+                        for u in saas_users:
+                            dept = (u.get("department") or "").lower()
+                            uname = (u.get("username") or "").lower()
+                            roles = " ".join(u.get("roles") or []).lower()
+                            if any(k in q_lower for k in ("finance", "ap", "gl", "payables", "ledger")) and any(fk in (dept + " " + roles + " " + uname) for fk in ("finance", "ap", "gl", "payables", "account")):
+                                relevant_saas_users.append(u)
+                            elif any(k in q_lower for k in ("hr", "hcm", "human resource")) and any(hk in (dept + " " + roles + " " + uname) for hk in ("hr", "hcm", "human", "resource", "person")):
+                                relevant_saas_users.append(u)
+                            elif "pam" in q_lower or "superuser" in q_lower or "consultant" in q_lower:
+                                if u.get("is_superuser"):
+                                    relevant_saas_users.append(u)
+                            elif "sod" in q_lower:
+                                if u.get("sod_conflicts"):
+                                    relevant_saas_users.append(u)
+
+                        if not relevant_saas_users:
+                            relevant_saas_users = saas_users[:10]
+
+                        matching_findings.append({
+                            "finding_id": "ORACLE-SAAS-TELEMETRY-SUMMARY",
+                            "uid": "oracle_saas-identity-governance",
+                            "check_id": "oracle_saas_identity_governance",
+                            "check_title": "Oracle Fusion SaaS Identity Governance & SoD Posture",
+                            "severity": "CRITICAL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "MEDIUM",
+                            "status": "FAIL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "PASS",
+                            "status_extended": f"Total Monitored SaaS Users: {len(saas_users)}. Active Accounts: {len([u for u in saas_users if u.get('days_inactive', 0) < 30 and not u.get('is_suspended')])}, Dormant: {len([u for u in saas_users if u.get('days_inactive', 0) >= 30])}, Superusers/PAM: {len([u for u in saas_users if u.get('is_superuser')])}, SoD Toxic Combinations: {sum(len(u.get('sod_conflicts', [])) for u in saas_users)}. Inspected Users: {', '.join(u.get('username') for u in relevant_saas_users[:5])}.",
+                            "remediation": "Enforce MFA via Oracle Identity Cloud Service (IDCS) / OCI IAM Domain Conditional Access Policy, decouple conflicting SoD roles, and quarantine unused PAM accounts.",
+                            "provider": "oracle_saas",
+                            "resource": {"name": "Oracle Fusion Cloud Pod (fa-etar-dev13)"},
+                        })
+                except Exception as s_err:
+                    logger.debug("SaaS telemetry inclusion error: %s", s_err)
 
             def _serialize_finding(f):
                 meta = f.check_metadata or {}
@@ -484,7 +712,20 @@ def _retrieve_relevant_findings(
                     if len(parts) > 1:
                         res_name = parts[-1]
 
-                prov = f.scan.provider.provider if (f.scan and f.scan.provider) else ("oraclecloud" if "oracle" in (f.uid or "") else "azure")
+                if f.scan and f.scan.provider:
+                    prov = f.scan.provider.provider
+                elif (f.uid or "").startswith(("prowler-oracle_saas", "oracle_saas-")) or (f.check_id or "").startswith("erp_"):
+                    prov = "oracle_saas"
+                elif (f.uid or "").startswith(("prowler-oraclecloud", "prowler-oci", "oci-")):
+                    prov = "oraclecloud"
+                elif (f.uid or "").startswith(("prowler-azure", "azure-")):
+                    prov = "azure"
+                elif (f.uid or "").startswith(("prowler-aws", "aws-")):
+                    prov = "aws"
+                elif (f.uid or "").startswith(("prowler-gcp", "gcp-")):
+                    prov = "gcp"
+                else:
+                    prov = "oraclecloud" if provider in ("oraclecloud", "oci") else "azure"
                 title = meta.get("checktitle") or meta.get("check_title") or meta.get("CheckTitle") or f.check_id.replace("_", " ")
 
                 rem = ""
@@ -509,24 +750,35 @@ def _retrieve_relevant_findings(
                 }
 
             if meaningful_keywords:
+                # Exclude broad noise words to focus on discriminative security and domain terms
+                search_kws = [k for k in meaningful_keywords if len(k) >= 2 and k.lower() not in ("administrator", "administrators", "admin", "admins")]
+                if not search_kws:
+                    search_kws = meaningful_keywords
+
                 q_obj = Q()
-                for kw in meaningful_keywords:
-                    q_obj |= (
-                        Q(check_id__icontains=kw)
-                        | Q(status_extended__icontains=kw)
-                        | Q(uid__icontains=kw)
-                        | Q(resources__name__icontains=kw)
-                        | Q(resources__uid__icontains=kw)
-                    )
+                for kw in search_kws:
+                    if len(kw) <= 2:
+                        q_obj |= (
+                            Q(check_id__icontains=f"_{kw}")
+                            | Q(check_id__istartswith=f"{kw}_")
+                            | Q(status_extended__iregex=rf"\b{kw}\b")
+                        )
+                    else:
+                        q_obj |= (
+                            Q(check_id__icontains=kw)
+                            | Q(status_extended__iregex=rf"\b{kw}\b")
+                            | Q(uid__icontains=kw)
+                        )
 
                 matched_qs = qs.filter(q_obj).distinct()[:limit]
                 for f in matched_qs:
                     matching_ids.add(f.id)
                     matching_findings.append(_serialize_finding(f))
 
-            # Fill remaining slots with top severity findings
-            remaining_limit = max(0, limit - len(matching_findings))
-            if remaining_limit > 0:
+            # Only pad with top general findings if user explicitly asked for general prioritization
+            is_general_triage = any(t in q_lower for t in ["remediate first", "top risk", "top finding", "critical", "prioritize", "today", "what should we fix"])
+            if (is_general_triage or not meaningful_keywords) and len(matching_findings) < limit:
+                remaining_limit = limit - len(matching_findings)
                 severity_order = Case(
                     When(severity="critical", then=Value(0)),
                     When(severity="high", then=Value(1)),

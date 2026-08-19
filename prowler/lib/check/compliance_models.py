@@ -1031,7 +1031,7 @@ def adapt_legacy_to_universal(legacy: Compliance) -> ComplianceFramework:
 def load_compliance_framework_universal(path: str) -> ComplianceFramework:
     """Load a compliance JSON as a ComplianceFramework, handling both new and legacy formats."""
     try:
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         if "attributes_metadata" in data or "requirements" in data:

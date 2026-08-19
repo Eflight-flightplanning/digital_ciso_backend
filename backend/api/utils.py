@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from prowler.providers.openstack.openstack_provider import OpenstackProvider
     from prowler.providers.oraclecloud.oraclecloud_provider import OraclecloudProvider
     from prowler.providers.vercel.vercel_provider import VercelProvider
+    from prowler.providers.oracle_saas.oracle_saas_provider import OracleSaasProvider
 
 
 
@@ -187,6 +188,12 @@ def return_prowler_provider(
             from prowler.providers.okta.okta_provider import OktaProvider
 
             prowler_provider = OktaProvider
+        case Provider.ProviderChoices.ORACLE_SAAS.value:
+            from prowler.providers.oracle_saas.oracle_saas_provider import (
+                OracleSaasProvider,
+            )
+
+            prowler_provider = OracleSaasProvider
         case _:
             raise ValueError(f"Provider type {provider.provider} not supported")
     return prowler_provider
@@ -273,6 +280,32 @@ def get_prowler_provider_kwargs(
             **prowler_provider_kwargs,
             "okta_org_domain": provider.uid,
         }
+    elif provider.provider == Provider.ProviderChoices.ORACLE_SAAS.value:
+        secret = dict(prowler_provider_kwargs)
+        auth_mode = secret.get("auth_mode", "BASIC_AUTH")
+        username = secret.get("username", "") or secret.get("user", "")
+        password = secret.get("password", "")
+        erp_base_url = secret.get("erp_base_url", "")
+        if not erp_base_url and "fa-" in provider.uid:
+            erp_base_url = f"https://{provider.uid}"
+
+        if auth_mode == "BASIC_AUTH" or username or not secret.get("client_id"):
+            prowler_provider_kwargs = {
+                "auth_type": "basic",
+                "username": username,
+                "password": password,
+                "erp_base_url": erp_base_url,
+                "erp_type": secret.get("erp_type", "FUSION_ERP"),
+            }
+        else:
+            prowler_provider_kwargs = {
+                "auth_type": "oauth2",
+                "domain_url": secret.get("domain_url") or f"https://{provider.uid}",
+                "client_id": secret.get("client_id", ""),
+                "client_secret": secret.get("client_secret", ""),
+                "erp_base_url": erp_base_url,
+                "erp_type": secret.get("erp_type", "FUSION_ERP"),
+            }
     elif provider.provider == Provider.ProviderChoices.IMAGE.value:
         # Detect whether uid is a registry URL (e.g. "docker.io/andoniaf") or
         # a concrete image reference (e.g. "docker.io/andoniaf/myimage:latest").
@@ -421,6 +454,9 @@ def prowler_provider_connection_test(provider: Provider) -> Connection:
             oci_kwargs["region"] = next(iter(region))
         oci_kwargs["raise_on_exception"] = False
         return prowler_provider.test_connection(**oci_kwargs)
+    elif provider.provider == Provider.ProviderChoices.ORACLE_SAAS.value:
+        saas_kwargs = get_prowler_provider_kwargs(provider)
+        return prowler_provider.test_connection(**saas_kwargs)
     else:
         return prowler_provider.test_connection(
             **prowler_provider_kwargs,

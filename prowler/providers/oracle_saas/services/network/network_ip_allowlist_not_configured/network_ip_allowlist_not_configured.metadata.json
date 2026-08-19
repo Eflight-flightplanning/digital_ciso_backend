@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "network_ip_allowlist_not_configured",
+  "CheckTitle": "Oracle Identity Domain IP allowlist not configured for ERP access",
+  "CheckType": [],
+  "ServiceName": "network",
+  "SubServiceName": "",
+  "ResourceIdTemplate": "oracle-saas://{tenant_id}/network/{resource_id}",
+  "Severity": "medium",
+  "ResourceType": "Policy",
+  "ResourceGroup": "network",
+  "Description": "Audits Oracle Fusion Cloud ERP & HCM configuration for Oracle Identity Domain IP allowlist not configured for ERP access.",
+  "Risk": "Violation of Oracle Identity Domain IP allowlist not configured for ERP access leads to potential ITGC SOX 404 or ICFR non-compliance.",
+  "RelatedUrl": "",
+  "AdditionalURLs": [],
+  "Remediation": {
+    "Code": {
+      "CLI": "",
+      "NativeIaC": "",
+      "Other": "Navigate to Oracle Fusion ERP Security Console and review access configurations.",
+      "Terraform": ""
+    },
+    "Recommendation": {
+      "Text": "Remediate Oracle Identity Domain IP allowlist not configured for ERP access according to Oracle Security best practices.",
+      "Url": "https://hub.prowler.com/check/network_ip_allowlist_not_configured"
+    }
+  },
+  "Categories": [
+    "internet-exposed"
+  ],
+  "DependsOn": [],
+  "RelatedTo": [],
+  "Notes": "SOX 404 / SOC 1 Type 2 ICFR Control"
+}

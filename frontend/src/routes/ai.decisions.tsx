@@ -324,12 +324,12 @@ function AIDecisionsPage() {
         </Panel>
 
         <Panel index={2} glow="success">
-          <span className="section-label">Executed & Resolved</span>
+          <span className="section-label">Simulated Executions</span>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="kpi-number text-2xl text-success">
               {playbooks.filter((p) => p.approval_status === "EXECUTED").length}
             </span>
-            <span className="text-xs text-success font-semibold">Verified in Cloud</span>
+            <span className="text-xs text-muted-foreground font-semibold">Not yet verified in cloud</span>
           </div>
         </Panel>
 
@@ -571,19 +571,19 @@ function AIDecisionsPage() {
                     >
                       <Play className={`h-4 w-4 ${executingId === selectedPb.id ? "animate-spin" : ""}`} />
                       <span>
-                        {executingId === selectedPb.id ? "Execution Agent Applying..." : "Execute Now (AI Execution Agent)"}
+                        {executingId === selectedPb.id ? "Running Simulation..." : "Run Simulated Execution (AI Execution Agent)"}
                       </span>
                     </button>
                   </div>
                 )}
 
                 {selectedPb.approval_status === "EXECUTED" && (
-                  <div className="rounded-lg border border-success/30 bg-success/10 p-3.5 text-xs text-success flex items-center justify-between">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-600 flex items-center justify-between">
                     <span className="flex items-center gap-2 font-semibold">
                       <CheckCircle2 className="h-4 w-4 shrink-0" />
-                      Remediation Verified & finding resolved in cloud.
+                      Execution simulated — no real cloud changes were made. Re-run a scan to verify.
                     </span>
-                    <span className="mono text-[10px]">PASS</span>
+                    <span className="mono text-[10px]">SIMULATED</span>
                   </div>
                 )}
 

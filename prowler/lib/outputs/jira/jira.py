@@ -2069,7 +2069,7 @@ class Jira:
         issue_labels: list[str] = "",
         finding_url: str = "",
         tenant_info: str = "",
-    ) -> bool:
+    ) -> bool | str:
         """
         Send the finding to Jira
 
@@ -2240,6 +2240,10 @@ class Jira:
                 try:
                     response_json = response.json()
                     logger.info(f"Finding sent successfully: {response_json}")
+                    # Return the created issue key (e.g. "PROJ-123") so callers
+                    # can link back to the ticket. Still truthy like the old
+                    # `return True`, so existing `if result:` checks keep working.
+                    return response_json.get("key") or True
                 except (ValueError, requests.exceptions.JSONDecodeError):
                     logger.info(
                         f"Finding sent successfully: Status {response.status_code}"

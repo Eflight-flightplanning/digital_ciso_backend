@@ -17,7 +17,7 @@ An enterprise-grade, multi-tenant Cloud Security Posture Management (CSPM) and a
   │                                                                        │
   │   • Centralized SimpleJWT Auth & RBAC (Role-Based Access Control)      │
   │   • Multi-Tenant Isolation via PostgreSQL Row-Level Security (RLS)     │
-  │   • Prowler Cloud Security Engine (AWS, Azure, GCP, Kubernetes)        │
+  │   • Automated Cloud Security Engine (AWS, Azure, GCP, Kubernetes)      │
   │   • Deterministic Risk Engine (0-100 Scoring) & Compliance Matrix      │
   │   • Automatic Secret Sanitization & Secret Masking                     │
   │   • Immutable Audit Logging (DecisionLog & Review Queue)               │

@@ -43,7 +43,7 @@ class ENSReportGenerator(BaseComplianceReportGenerator):
     PDF report generator for ENS RD2022 framework.
 
     This generator creates comprehensive PDF reports containing:
-    - Cover page with both Prowler and ENS logos
+    - Cover page with both Digital CISO and ENS logos
     - Executive summary with overall compliance score
     - Marco/Categoría analysis with charts
     - Security dimensions radar chart
@@ -67,18 +67,30 @@ class ENSReportGenerator(BaseComplianceReportGenerator):
         elements = []
 
         # Create logos side by side
-        prowler_logo_path = os.path.join(
-            os.path.dirname(__file__), "../../assets/img/prowler_logo.png"
+        platform_logo_path = os.path.join(
+            os.path.dirname(__file__), "../../assets/img/platform_logo.png"
         )
+        if not os.path.exists(platform_logo_path):
+            platform_logo_path = os.path.join(
+                os.path.dirname(__file__), "../../assets/img/logo.png"
+            )
         ens_logo_path = os.path.join(
             os.path.dirname(__file__), "../../assets/img/ens_logo.png"
         )
 
-        prowler_logo = Image(prowler_logo_path, width=3.5 * inch, height=0.7 * inch)
-        ens_logo = Image(ens_logo_path, width=1.5 * inch, height=2 * inch)
+        platform_logo = (
+            Image(platform_logo_path, width=3.5 * inch, height=0.7 * inch)
+            if os.path.exists(platform_logo_path)
+            else Spacer(3.5 * inch, 0.7 * inch)
+        )
+        ens_logo = (
+            Image(ens_logo_path, width=1.5 * inch, height=2 * inch)
+            if os.path.exists(ens_logo_path)
+            else Spacer(1.5 * inch, 2 * inch)
+        )
 
         logos_table = Table(
-            [[prowler_logo, ens_logo]], colWidths=[4 * inch, 2.5 * inch]
+            [[platform_logo, ens_logo]], colWidths=[4 * inch, 2.5 * inch]
         )
         logos_table.setStyle(
             TableStyle(
@@ -391,7 +403,7 @@ class ENSReportGenerator(BaseComplianceReportGenerator):
         Returns:
             Tuple of (left_text, right_text) for the footer.
         """
-        return f"Página {page_num}", "Powered by Prowler"
+        return f"Página {page_num}", "Powered by Digital CISO Platform"
 
     def _count_manual_requirements(self, data: ComplianceData) -> int:
         """Count requirements with manual execution mode."""

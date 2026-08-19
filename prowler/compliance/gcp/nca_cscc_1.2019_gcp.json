@@ -1,0 +1,95 @@
+{
+  "Framework": "NCA-CSCC",
+  "Name": "NCA Cloud Cybersecurity Controls (CSCC-1:2019)",
+  "Version": "1:2019",
+  "Provider": "GCP",
+  "Description": "The Cloud Cybersecurity Controls (CSCC-1:2019) framework issued by the National Cybersecurity Authority (NCA) of Saudi Arabia for Google Cloud Platform (GCP).",
+  "Requirements": [
+    {
+      "Id": "CSCC-1.1",
+      "Name": "CCG-1 Cloud Cybersecurity Governance",
+      "Description": "Cloud security policies and service account boundaries must be established.",
+      "Attributes": [
+        {
+          "Section": "1. Cloud Cybersecurity Governance",
+          "SubSection": "1.1 Governance and Compliance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_organization_essential_contacts_configured",
+        "iam_no_service_roles_at_project_level"
+      ]
+    },
+    {
+      "Id": "CSCC-2.1",
+      "Name": "CCD-1 Cloud Identity and Access Management",
+      "Description": "Enforce strict separation of duties, no user-managed service account keys, and least privilege.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.1 Identity and Access Management",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sa_no_administrative_privileges",
+        "iam_role_sa_enforce_separation_of_duties",
+        "iam_sa_no_user_managed_keys"
+      ]
+    },
+    {
+      "Id": "CSCC-2.2",
+      "Name": "CCD-2 Cloud Data & Storage Protection",
+      "Description": "Protect Cloud Storage and database instances with CMEK and public access prevention.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.2 Data Protection & Encryption",
+          "Service": "storage"
+        }
+      ],
+      "Checks": [
+        "storage_bucket_public_access_prevention",
+        "storage_bucket_uniform_bucket_level_access_enabled",
+        "storage_bucket_kms_encryption_enabled",
+        "cloudsql_instance_ssl_required"
+      ]
+    },
+    {
+      "Id": "CSCC-2.3",
+      "Name": "CCD-3 Cloud Network & Perimeter Defense",
+      "Description": "VPC firewall rules must restrict open inbound access from the public internet.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.3 Network & Perimeter Security",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_firewall_rule_allow_ingress_from_internet_to_all_ports",
+        "compute_firewall_rule_allow_ingress_from_internet_to_port_22",
+        "compute_firewall_rule_allow_ingress_from_internet_to_port_3389",
+        "compute_instance_no_public_ip"
+      ]
+    },
+    {
+      "Id": "CSCC-2.6",
+      "Name": "CCD-6 Cloud Logging, Auditing & SIEM Ingestion",
+      "Description": "Cloud audit log filters and metric alerts must be active for monitoring security events.",
+      "Attributes": [
+        {
+          "Section": "2. Cloud Cybersecurity Defense",
+          "SubSection": "2.6 Logging & Auditing",
+          "Service": "logging"
+        }
+      ],
+      "Checks": [
+        "logging_log_metric_filter_and_alert_for_audit_configuration_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_bucket_permission_changes_enabled",
+        "logging_log_metric_filter_and_alert_for_vpc_firewall_rule_changes_enabled"
+      ]
+    }
+  ]
+}

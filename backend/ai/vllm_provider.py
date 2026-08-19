@@ -36,9 +36,9 @@ from .provider import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VLLM_ENDPOINT = "http://localhost:8000/v1"
-DEFAULT_MODEL = "qwen-3.5-9b"
-DEFAULT_TIMEOUT = 60.0
+DEFAULT_VLLM_ENDPOINT = "http://20.235.254.33:8000/v1"
+DEFAULT_MODEL = "/home/azureuser/models/qwen3.5-9b"
+DEFAULT_TIMEOUT = 120.0
 
 
 class VLLMAzureProvider(AIProvider):
@@ -68,26 +68,33 @@ class VLLMAzureProvider(AIProvider):
         user_prompt: str,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        history: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
-        """Send chat completion request to vLLM OpenAI-compatible endpoint."""
+        """Send chat completion request to vLLM OpenAI-compatible endpoint with multi-turn history."""
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
+        messages = [{"role": "system", "content": system_prompt}]
+        if history:
+            for item in history[-6:]:
+                role = item.get("role") or item.get("sender")
+                content = item.get("content") or ""
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": user_prompt})
+
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
         }
 
         try:
-            with httpx.Client(timeout=self.timeout) as client:
+            timeout_config = httpx.Timeout(connect=5.0, read=self.timeout or 60.0, write=10.0, pool=5.0)
+            with httpx.Client(timeout=timeout_config) as client:
                 response = client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
                 resp_json = response.json()
@@ -95,39 +102,81 @@ class VLLMAzureProvider(AIProvider):
                 return self._extract_json(raw_content)
         except Exception as e:
             logger.error("vLLM request failed to %s with model %s: %s", url, self.model, e)
-            
-            # Simulated fallback for UI testing when Azure VM is offline
-            if "User Question:" in user_prompt:
-                return {
-                    "answer": "This is a simulated AI response. The Azure vLLM endpoint is currently offline or unreachable. \n\nHowever, in a live environment, Spectra would analyze the findings and give you a detailed breakdown of the toxic path based on the telemetry data.",
-                    "finding_references": [],
-                    "confidence": 0.95
-                }
-                
             return {
                 "summary": f"Analysis failed: {str(e)}",
                 "error": str(e),
+                "_ai_unavailable": True,
             }
 
     @staticmethod
     def _extract_json(text: str) -> dict[str, Any]:
-        """Extract and parse JSON safely from model response."""
-        text = text.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
+        """Extract and parse JSON safely from model response, stripping thinking traces if present."""
+        raw_text = text.strip()
 
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(0))
-                except Exception:
-                    pass
-            return {"raw_text": text}
+        # 1. Strip Qwen/DeepSeek thinking tags </think> if present
+        if "</think>" in raw_text:
+            raw_text = raw_text.split("</think>")[-1].strip()
+
+        # 2. If markdown code block contains json, extract it
+        if "```json" in raw_text:
+            json_block = raw_text.split("```json")[1].split("```")[0].strip()
+            try:
+                parsed = json.loads(json_block, strict=False)
+                if isinstance(parsed, dict):
+                    ans = parsed.get("answer") or parsed.get("recommendation") or parsed.get("response") or parsed.get("summary") or parsed.get("content")
+                    if ans:
+                        return {"answer": str(ans), "finding_references": parsed.get("finding_references", []), "confidence": float(parsed.get("confidence", 0.95))}
+                    return parsed
+            except Exception:
+                pass
+        elif "```" in raw_text:
+            code_block = raw_text.split("```")[1].split("```")[0].strip()
+            try:
+                parsed = json.loads(code_block, strict=False)
+                if isinstance(parsed, dict):
+                    ans = parsed.get("answer") or parsed.get("recommendation") or parsed.get("response") or parsed.get("summary") or parsed.get("content")
+                    if ans:
+                        return {"answer": str(ans), "finding_references": parsed.get("finding_references", []), "confidence": float(parsed.get("confidence", 0.95))}
+                    return parsed
+            except Exception:
+                pass
+
+        # 3. Direct JSON regex search with relaxed strict=False parsing
+        json_match = re.search(r"(\{[\s\S]*\})", raw_text)
+        if json_match:
+            try:
+                parsed = json.loads(json_match.group(1), strict=False)
+                if isinstance(parsed, dict):
+                    ans = parsed.get("answer") or parsed.get("recommendation") or parsed.get("response") or parsed.get("summary") or parsed.get("content")
+                    if ans:
+                        return {"answer": str(ans), "finding_references": parsed.get("finding_references", []), "confidence": float(parsed.get("confidence", 0.95))}
+                    return parsed
+            except Exception:
+                pass
+
+        # 4. Extract "answer" field directly via regex if JSON string had unescaped formatting
+        ans_regex = re.search(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)"', raw_text, re.DOTALL)
+        if ans_regex:
+            try:
+                raw_val = ans_regex.group(1)
+                unescaped = raw_val.encode("utf-8").decode("unicode_escape", errors="ignore")
+                return {"answer": unescaped, "finding_references": [], "confidence": 0.95}
+            except Exception:
+                pass
+
+        # 5. Header-based preamble stripping: if Spectra header exists, cut directly to it
+        cleaned_text = raw_text
+        if any(h in raw_text for h in ["### Spectra", "## Current State", "## Actionable", "## Risk Profile"]):
+            for marker in ["### Spectra", "## Current State", "## Actionable", "## Risk Profile"]:
+                if marker in cleaned_text:
+                    cleaned_text = marker + cleaned_text.split(marker, 1)[1]
+                    break
+        else:
+            lines = [l for l in raw_text.split("\n") if not re.match(r"^\s*(?:\d+\.|\*|-)?\s*(?:Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON)\b", l, re.IGNORECASE)]
+            if lines:
+                cleaned_text = "\n".join(lines).strip()
+
+        return {"answer": cleaned_text, "raw_text": cleaned_text}
 
     def analyze_finding(
         self,
@@ -142,6 +191,12 @@ class VLLMAzureProvider(AIProvider):
             temperature=0.1,
             max_tokens=1500,
         )
+        if data.get("_ai_unavailable"):
+            # Don't fabricate a full "successful" reasoning record when the
+            # model call itself failed — let this propagate so the caller
+            # (AIAnalysisService.analyze) reports a real error instead of
+            # silently persisting a fake analysis as if it completed.
+            raise RuntimeError(f"vLLM reasoning call failed: {data.get('error')}")
 
         return ReasoningOutput(
             summary=data.get("summary", normalized_finding.get("finding_name", "")),
@@ -178,6 +233,8 @@ class VLLMAzureProvider(AIProvider):
             temperature=0.1,
             max_tokens=400,
         )
+        if data.get("_ai_unavailable"):
+            raise RuntimeError(f"vLLM decision call failed: {data.get('error')}")
 
         return DecisionOutput(
             decision=data.get("decision", "ACCEPT_RISK" if risk_score < 30 else "FIX_NOW"),
@@ -212,90 +269,106 @@ class VLLMAzureProvider(AIProvider):
         self,
         question: str,
         relevant_findings: list[dict[str, Any]],
+        history: list[dict[str, str]] | None = None,
     ) -> AdvisorOutput:
-        """Answer CISO security queries grounded in real cloud findings."""
-        context_str = json.dumps(relevant_findings[:35], indent=2)
-        user_prompt = f"Active Findings:\n{context_str}\n\nUser Question: {question}"
+        """Answer CISO security queries using 100% dynamic live LLM generation with multi-turn context."""
+        # 1. Always invoke the live LLM (Qwen / vLLM on Azure or OpenAI/Claude)
+        context_str = json.dumps(relevant_findings[:25], indent=2) if relevant_findings else "[]"
+        user_prompt = f"Active Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
         try:
             data = self._call_vllm_chat(
                 system_prompt=ADVISOR_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
                 temperature=0.2,
-                max_tokens=1000,
+                max_tokens=1500,
+                history=history,
             )
-            if "answer" in data and not data["answer"].startswith("This is a simulated"):
+            ans = data.get("answer", data.get("raw_text", "")).strip()
+            if ans and not ans.startswith("This is a simulated") and len(ans) > 10:
+                refs = data.get("finding_references", [])
+                if not refs and relevant_findings:
+                    # Only include references if the finding relates to the query or answer
+                    refs = [
+                        {
+                            "id": f.get("finding_id", ""),
+                            "name": f.get("check_title", f.get("check_id", "")),
+                            "severity": f.get("severity", "high"),
+                            "resource": f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else str(f.get("resource", "")),
+                        }
+                        for f in relevant_findings[:5]
+                        if any(kw in (f.get("check_title", "") + " " + f.get("check_id", "") + " " + str(f.get("resource", ""))).lower()
+                               for kw in question.lower().split() if len(kw) > 3)
+                           or f.get("finding_id", "---") in ans
+                    ]
                 return AdvisorOutput(
-                    answer=data.get("answer", data.get("raw_text", "No answer generated.")),
-                    finding_references=data.get("finding_references", []),
-                    confidence=float(data.get("confidence", 1.0)),
+                    answer=ans,
+                    finding_references=refs,
+                    confidence=float(data.get("confidence", 0.95)),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Live vLLM call failed: %s, using telemetry fallback", e)
 
-        # Intelligent Grounded Fallback based on real finding telemetry:
-        top_finding = relevant_findings[0] if relevant_findings else None
-        if top_finding:
-            f_title = top_finding.get("check_title") or top_finding.get("check_id", "").replace("_", " ")
-            f_id = top_finding.get("finding_id", "FND-0001")
-            f_res = top_finding.get("resource", {}).get("name") if isinstance(top_finding.get("resource"), dict) else (top_finding.get("resource") or "cloud-resource")
-            f_sev = (top_finding.get("severity") or "HIGH").upper()
-            f_prov = (top_finding.get("provider") or "").lower()
+        # 2. Offline Telemetry Fallback (ONLY if the live LLM server is unreachable)
+        if relevant_findings:
+            top_f = relevant_findings[0]
+            f_title = top_f.get("check_title") or top_f.get("check_id", "").replace("_", " ")
+            f_id = top_f.get("finding_id", "FND-0001")
+            f_res = top_f.get("resource", {}).get("name") if isinstance(top_f.get("resource"), dict) else (top_f.get("resource") or "cloud-resource")
+            f_sev = (top_f.get("severity") or "HIGH").upper()
+            f_prov = (top_f.get("provider") or "").lower()
 
-            if "oracle" in f_prov or "oci" in f_prov:
+            if "oracle_saas" in f_prov or "erp" in f_prov:
+                prov_display = "Oracle SaaS / Fusion Cloud ERP"
+                fw_display = "Oracle Fusion ERP Separation of Duties Matrix & SOX ITGC"
+                tool_display = "Oracle Security Console / Fusion REST API"
+            elif "oracle" in f_prov or "oci" in f_prov:
                 prov_display = "Oracle Cloud Infrastructure (OCI)"
                 fw_display = "CIS Oracle Cloud Infrastructure Foundations Benchmark"
                 tool_display = "OCI CLI / Terraform"
-            elif "aws" in f_prov or "amazon" in f_prov:
+            elif "aws" in f_prov:
                 prov_display = "Amazon Web Services (AWS)"
                 fw_display = "CIS AWS Foundations Benchmark"
                 tool_display = "AWS CLI / Terraform"
-            elif "gcp" in f_prov or "google" in f_prov:
+            elif "gcp" in f_prov:
                 prov_display = "Google Cloud Platform (GCP)"
-                fw_display = "CIS Google Cloud Computing Platform Benchmark"
+                fw_display = "CIS GCP Foundations Benchmark"
                 tool_display = "gcloud / Terraform"
             else:
                 prov_display = "Microsoft Azure"
                 fw_display = "CIS Microsoft Azure Foundations Benchmark"
                 tool_display = "Azure CLI / Terraform"
 
-            f_details = top_finding.get("status_extended") or f"Security control violation on {f_res}"
-            f_rem = top_finding.get("remediation") or f"Apply secure configuration via {tool_display}."
+            f_details = top_f.get("status_extended") or f"Security control violation detected on asset {f_res}."
+            f_rem = top_f.get("remediation") or f"Apply secure configuration policy via {tool_display}."
+
+            multi_summary = ""
+            if len(relevant_findings) > 1:
+                multi_summary = "\n\n**Additional Correlated Findings in Scope:**\n" + "\n".join(
+                    f"- `{f.get('check_title') or f.get('check_id')}` ({f.get('severity', 'MEDIUM').upper()} Risk on `{f.get('resource', {}).get('name', 'resource') if isinstance(f.get('resource'), dict) else f.get('resource', 'resource')}`)"
+                    for f in relevant_findings[1:4]
+                )
 
             answer = (
-                f"### Spectra Threat Analysis & Risk Assessment\n\n"
-                f"**Cloud Environment:** `{prov_display}`\n"
-                f"**Finding Identified:** `{f_title}` ({f_sev} Risk)\n"
-                f"**Target Asset:** `{f_res}`\n\n"
-                f"**Risk Evaluation:**\n"
-                f"{f_details}\n\n"
-                f"**Recommended Remediation Plan:**\n"
-                f"1. **Primary Action**: {f_rem}\n"
-                f"2. **Aegis Action**: Transition finding to **Aegis Decision Core** to review and authorize the automated {tool_display} execution gate.\n"
-                f"3. **Verification**: Run an immediate Prowler scan to verify the control passes {fw_display} requirements."
+                f"### Spectra Threat Analysis & Advisory\n\n"
+                f"**Environment Scope:** `{prov_display}`\n"
+                f"**Primary Finding:** `{f_title}` ({f_sev} Risk)\n"
+                f"**Target Resource / Asset:** `{f_res}`\n\n"
+                f"**Risk Evaluation & Technical Root Cause:**\n"
+                f"{f_details}{multi_summary}\n\n"
+                f"**Actionable Remediation Strategy:**\n"
+                f"1. **Primary Remediation**: {f_rem}\n"
+                f"2. **Aegis Decision Core**: Review and authorize the automated {tool_display} execution playbook.\n"
+                f"3. **Verification**: Re-run the compliance audit to confirm validation against **{fw_display}**."
             )
-            refs = [{"id": f_id, "name": f_title, "severity": top_finding.get("severity", "high")}]
-            return AdvisorOutput(
-                answer=answer,
-                finding_references=refs,
-                confidence=0.96,
-            )
+            refs = [
+                {"id": f.get("finding_id", f_id), "name": f.get("check_title", f_title), "severity": f.get("severity", "high")}
+                for f in relevant_findings[:4]
+            ]
+            return AdvisorOutput(answer=answer, finding_references=refs, confidence=0.90)
 
-        q_low = question.lower()
-        if "oci" in q_low or "oracle" in q_low:
-            prov_text = "Oracle Cloud Infrastructure (OCI)"
-            fw_text = "CIS Oracle Cloud Infrastructure Foundations Benchmark"
-        elif "aws" in q_low or "amazon" in q_low:
-            prov_text = "Amazon Web Services (AWS)"
-            fw_text = "CIS AWS Foundations Benchmark"
-        elif "gcp" in q_low or "google" in q_low:
-            prov_text = "Google Cloud Platform (GCP)"
-            fw_text = "CIS GCP Foundations Benchmark"
-        else:
-            prov_text = "Multi-Cloud"
-            fw_text = "CIS Multi-Cloud Benchmark"
-
+        # General conversational fallback if LLM is offline
         return AdvisorOutput(
-            answer=f"Spectra evaluated telemetry across your connected {prov_text} environment for '{question}'. All verified controls adhere to {fw_text} requirements.",
+            answer=f"I evaluated your inquiry for '{question}'. Connect live LLM inference or launch your vLLM server to generate real-time generative reasoning.",
             finding_references=[],
-            confidence=0.90,
-        )
+            confidence=0.85,
+        )

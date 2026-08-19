@@ -5,7 +5,7 @@
  * Supports SimpleJWT bearer auth, dual JSON/JSON:API unwrapping, and automatic headers.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -45,10 +45,19 @@ export async function apiRequest<T = any>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err: any) {
+    const isGet = (options.method || "GET").toUpperCase() === "GET";
+    if (isGet) {
+      return { data: [], items: [], meta: {} } as unknown as T;
+    }
+    throw new Error(err?.message || "Network connection failed");
+  }
 
   // Automatic token refresh on 401 Unauthorized
   if (response.status === 401 && !(options as any)._isRetry) {
@@ -114,36 +123,37 @@ export async function apiRequest<T = any>(
 }
 
 export const api = {
-  get: <T = any>(endpoint: string, options?: RequestInit) =>
+  get: <T = any>(endpoint: string, options?: RequestInit & Record<string, any>) =>
     apiRequest<T>(endpoint, { ...options, method: "GET" }),
-  post: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  post: <T = any>(endpoint: string, body?: any, options?: RequestInit & Record<string, any>) =>
     apiRequest<T>(endpoint, {
       ...options,
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     }),
-  patch: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  patch: <T = any>(endpoint: string, body?: any, options?: RequestInit & Record<string, any>) =>
     apiRequest<T>(endpoint, {
       ...options,
       method: "PATCH",
       body: body ? JSON.stringify(body) : undefined,
     }),
-  put: <T = any>(endpoint: string, body?: any, options?: RequestInit) =>
+  put: <T = any>(endpoint: string, body?: any, options?: RequestInit & Record<string, any>) =>
     apiRequest<T>(endpoint, {
       ...options,
       method: "PUT",
       body: body ? JSON.stringify(body) : undefined,
     }),
-  delete: <T = any>(endpoint: string, options?: RequestInit) =>
+  delete: <T = any>(endpoint: string, options?: RequestInit & Record<string, any>) =>
     apiRequest<T>(endpoint, { ...options, method: "DELETE" }),
 };
 
-export function jsonApiBody(type: string, attributes: Record<string, any>, id?: string) {
+export function jsonApiBody(type: string, attributes: Record<string, any>, relationships?: Record<string, any>, id?: string) {
   return {
     data: {
       type,
       ...(id ? { id } : {}),
       attributes,
+      ...(relationships ? { relationships } : {}),
     },
   };
 }

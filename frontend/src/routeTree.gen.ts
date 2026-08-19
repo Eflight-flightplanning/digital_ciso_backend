@@ -15,6 +15,7 @@ import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FindingsRouteImport } from './routes/findings'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as OracleSaasRouteImport } from './routes/oracle-saas'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProvidersRouteImport } from './routes/providers'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -55,6 +56,11 @@ const FindingsRoute = FindingsRouteImport.update({
 const IntegrationsRoute = IntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OracleSaasRoute = OracleSaasRouteImport.update({
+  id: '/oracle-saas',
+  path: '/oracle-saas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
+  '/oracle-saas': typeof OracleSaasRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/reports': typeof ReportsRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
+  '/oracle-saas': typeof OracleSaasRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/reports': typeof ReportsRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/findings': typeof FindingsRoute
   '/integrations': typeof IntegrationsRoute
+  '/oracle-saas': typeof OracleSaasRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
   '/reports': typeof ReportsRoute
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/findings'
     | '/integrations'
+    | '/oracle-saas'
     | '/profile'
     | '/providers'
     | '/reports'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/findings'
     | '/integrations'
+    | '/oracle-saas'
     | '/profile'
     | '/providers'
     | '/reports'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/findings'
     | '/integrations'
+    | '/oracle-saas'
     | '/profile'
     | '/providers'
     | '/reports'
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   FindingsRoute: typeof FindingsRoute
   IntegrationsRoute: typeof IntegrationsRoute
+  OracleSaasRoute: typeof OracleSaasRoute
   ProfileRoute: typeof ProfileRoute
   ProvidersRoute: typeof ProvidersRoute
   ReportsRoute: typeof ReportsRoute
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/integrations'
       preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oracle-saas': {
+      id: '/oracle-saas'
+      path: '/oracle-saas'
+      fullPath: '/oracle-saas'
+      preLoaderRoute: typeof OracleSaasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -382,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   FindingsRoute: FindingsRoute,
   IntegrationsRoute: IntegrationsRoute,
+  OracleSaasRoute: OracleSaasRoute,
   ProfileRoute: ProfileRoute,
   ProvidersRoute: ProvidersRoute,
   ReportsRoute: ReportsRoute,

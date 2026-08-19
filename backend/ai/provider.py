@@ -116,6 +116,7 @@ class AIProvider(abc.ABC):
         self,
         question: str,
         relevant_findings: list[dict[str, Any]],
+        history: list[dict[str, str]] | None = None,
     ) -> AdvisorOutput:
-        """Answer a security advisor question grounded in real findings."""
+        """Answer a security advisor question grounded in real findings with multi-turn history."""
         ...

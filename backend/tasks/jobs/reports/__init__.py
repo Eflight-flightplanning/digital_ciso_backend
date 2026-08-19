@@ -73,6 +73,7 @@ from .config import (
     COLOR_MEDIUM_RISK,
     COLOR_NIS2_PRIMARY,
     COLOR_NIS2_SECONDARY,
+    COLOR_BRAND_DARK_GREEN,
     COLOR_PROWLER_DARK_GREEN,
     COLOR_SAFE,
     COLOR_WHITE,
@@ -84,6 +85,8 @@ from .config import (
     ENS_NIVEL_ORDER,
     ENS_TIPO_ORDER,
     FRAMEWORK_REGISTRY,
+    NCA_ECC_SECTIONS,
+    NCA_CSCC_SECTIONS,
     NIS2_SECTION_TITLES,
     NIS2_SECTIONS,
     PADDING_LARGE,
@@ -97,6 +100,7 @@ from .config import (
 )
 from .csa import CSAReportGenerator
 from .ens import ENSReportGenerator
+from .nca import NCAReportGenerator
 from .nis2 import NIS2ReportGenerator
 from .provider_metadata import build_provider_metadata
 from .threatscore import ThreatScoreReportGenerator
@@ -115,10 +119,13 @@ __all__ = [
     "NIS2ReportGenerator",
     "CSAReportGenerator",
     "CISReportGenerator",
+    "NCAReportGenerator",
     # Configuration
     "FrameworkConfig",
     "FRAMEWORK_REGISTRY",
     "get_framework_config",
+    "NCA_ECC_SECTIONS",
+    "NCA_CSCC_SECTIONS",
     # Color constants
     "COLOR_BLUE",
     "COLOR_LIGHT_BLUE",
@@ -133,6 +140,7 @@ __all__ = [
     "COLOR_MEDIUM_RISK",
     "COLOR_LOW_RISK",
     "COLOR_SAFE",
+    "COLOR_BRAND_DARK_GREEN",
     "COLOR_PROWLER_DARK_GREEN",
     "COLOR_ENS_ALTO",
     "COLOR_ENS_MEDIO",

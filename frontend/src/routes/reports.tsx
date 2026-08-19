@@ -226,7 +226,7 @@ function ReportsPage() {
           </table>
 
           <div class="footer">
-            Generated autonomously by Digital CISO Platform · Verified against Prowler Engine telemetry · Confidential & Proprietary
+            Generated autonomously by Digital CISO Platform · Verified against Security Engine telemetry · Confidential & Proprietary
           </div>
 
           <script>
@@ -327,6 +327,8 @@ function ReportsPage() {
                 className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary font-medium"
               >
                 <option value="CIS Microsoft Azure Foundations v2.0">CIS Microsoft Azure Foundations v2.0</option>
+                <option value="NCA Essential Cybersecurity Controls (ECC-1:2018)">NCA Essential Cybersecurity Controls (ECC-1:2018)</option>
+                <option value="NCA Cloud Cybersecurity Controls (CSCC-1:2019)">NCA Cloud Cybersecurity Controls (CSCC-1:2019)</option>
                 <option value="Microsoft Defender for Cloud Assurance">Microsoft Defender for Cloud Assurance</option>
                 <option value="SOC 2 Type II Security Assessment">SOC 2 Type II Security Assessment</option>
                 <option value="ISO/IEC 27001 ISMS Audit">ISO 27001 ISMS Audit</option>

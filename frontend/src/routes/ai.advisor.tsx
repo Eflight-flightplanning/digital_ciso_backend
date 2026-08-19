@@ -100,10 +100,21 @@ function AIAdvisorPage() {
           "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.",
           "Are any worker nodes running with insecure Kubelet ports?",
         ];
+      case "ORACLE_SAAS":
+      case "ORACLE SAAS":
+      case "ORACLE SAAS / ERP":
+        return [
+          "Show all Separation of Duties (SoD) conflicts in Oracle Fusion ERP.",
+          "Which users have superuser or implementation consultant roles assigned?",
+          "Are any finance or HR administrator accounts missing MFA enforcement?",
+          "Is the Oracle Fusion ERP audit trail enabled for payments and journal entries?",
+          "Which Oracle IDCS OAuth applications have excessive permission scopes?",
+        ];
       default:
         return [
           "What should we remediate first across our clouds today?",
           "Show high-risk Azure, AWS, and OCI misconfigurations.",
+          "Show all Separation of Duties (SoD) violations in Oracle SaaS ERP.",
           "Which IAM roles have privilege escalation paths?",
           "Evaluate multi-cloud CIS Foundations failure points.",
           "Which findings are currently breaching SLA deadlines?",
@@ -134,10 +145,19 @@ function AIAdvisorPage() {
     setInput("");
     setLoading(true);
 
+    const chatHistory = messages
+      .filter((m) => m.content && m.content.trim())
+      .slice(-6)
+      .map((m) => ({
+        role: m.sender === "user" ? "user" : "assistant",
+        content: m.content,
+      }));
+
     try {
       const res = await advisorMutation.mutateAsync({
         question: q,
         provider: providerFilter !== "All" ? providerFilter.toLowerCase() : undefined,
+        history: chatHistory,
       }) as Record<string, unknown>;
 
       // Map backend AdvisorOutput → ChatMessage
@@ -228,7 +248,7 @@ function AIAdvisorPage() {
           <Panel index={1} className="p-3">
             <span className="section-label mb-2 block">Environment Scope</span>
             <div className="flex flex-wrap gap-1">
-              {["All", "AWS", "OCI", "Azure", "GCP", "K8s"].map((p) => (
+              {["All", "AWS", "OCI", "Azure", "GCP", "K8s", "Oracle SaaS"].map((p) => (
                 <button
                   key={p}
                   onClick={() => setProviderFilter(p)}
@@ -318,9 +338,9 @@ function AIAdvisorPage() {
                         Referenced Items:
                       </span>
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        {m.findings.map((f) => (
+                        {m.findings.map((f, idx) => (
                           <Link
-                            key={f.id}
+                            key={`${f.id}-${idx}`}
                             to="/findings"
                             className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-[10px] font-medium text-foreground hover:text-primary transition-colors"
                           >
