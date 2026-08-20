@@ -109,7 +109,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.jpg", type: "image/jpeg" },
+      { rel: "shortcut icon", href: "/favicon.jpg" },
+      { rel: "apple-touch-icon", href: "/favicon.jpg" },
     ],
   }),
   shellComponent: RootShell,
@@ -122,6 +124,22 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('dciso-theme');
+                  if (saved === 'light') {
+                    document.documentElement.classList.add('light');
+                  } else {
+                    document.documentElement.classList.remove('light');
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
         <HeadContent />
       </head>
       <body>

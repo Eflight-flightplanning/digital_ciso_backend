@@ -231,15 +231,15 @@ function AIAdvisorPage() {
             <div className="mt-3 space-y-2 border-t border-border/60 pt-3 text-[11px]">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Analyzer:</span>
-                <span className="font-semibold text-foreground">Spectra (Local)</span>
+                <span className="font-semibold text-foreground">Spectra (Qwen 3.5)</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Decisions:</span>
-                <span className="font-semibold text-foreground">Aegis (Local)</span>
+                <span className="font-semibold text-foreground">Aegis (Qwen 3.5)</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Execution:</span>
-                <span className="font-semibold text-foreground">Phantom (Claude)</span>
+                <span className="font-semibold text-foreground">Phantom (Qwen 3.5)</span>
               </div>
             </div>
           </Panel>

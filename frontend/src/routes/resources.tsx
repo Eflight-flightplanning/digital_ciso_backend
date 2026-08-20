@@ -125,7 +125,7 @@ function ResourcesPage() {
             </tr>
           ) : (
             filtered.map((r, i) => (
-              <Row key={`${r.uid || r.id}-${i}`} index={i}>
+              <Row key={`${r.uid}-${i}`} index={i}>
                 <td className="mono px-4 py-3 text-xs font-semibold text-foreground max-w-[280px] truncate" title={r.uid}>
                   {r.name}
                   <span className="block text-[10px] text-muted-foreground font-mono truncate">{r.uid}</span>

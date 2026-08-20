@@ -103,7 +103,7 @@ class MCPGatewayView(APIView):
                     "protocolVersion": MCP_PROTOCOL_VERSION,
                     "serverInfo": SERVER_INFO,
                     "capabilities": SERVER_CAPABILITIES,
-                    "instructions": "Digital CISO Security Platform MCP Gateway. Use tools to query findings, analyze threats with Qwen/Claude, and execute approved remediations.",
+                    "instructions": "Digital CISO Security Platform MCP Gateway. Use tools to query findings, analyze threats with private Qwen 3.5, and execute approved remediations.",
                 })
 
             # 2. Ping

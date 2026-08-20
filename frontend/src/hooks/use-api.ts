@@ -165,8 +165,15 @@ export function useGeneratePlaybook() {
 
 export function useAIAdvisorQuery() {
   return useMutation({
-    mutationFn: ({ question, provider }: { question: string; provider?: string }) =>
-      api.post("/ai/advisor/query", { question, provider }, { jsonApi: false }),
+    mutationFn: ({
+      question,
+      provider,
+      history,
+    }: {
+      question: string;
+      provider?: string;
+      history?: Array<{ role: string; content: string }>;
+    }) => api.post("/ai/advisor/query", { question, provider, history }, { jsonApi: false }),
   });
 }
 

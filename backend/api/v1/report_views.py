@@ -5,7 +5,7 @@ Generates executive-ready security assessment reports (HTML & JSON) with:
 - Custom company logo and tenant branding (100% white-labeled, zero third-party banners).
 - Real-time finding analytics and risk score.
 - Compliance readiness matrix (CIS Benchmarks, SOC 2, ISO 27001, PCI-DSS).
-- Digital CISO AI Executive Summary (Qwen 3.5 9B on Azure VM / Claude).
+- Digital CISO AI Executive Summary (Private Qwen 3.5 9B on Dedicated Azure VM).
 - DecisionLog and Remediation Playbook audit history.
 """
 from __future__ import annotations
@@ -151,7 +151,7 @@ class ExecutiveReportView(APIView):
                 "evidence": f.status_extended,
             })
 
-        # 5. AI Executive Summary (Qwen 3.5 9B / Claude)
+        # 5. AI Executive Summary (Private Qwen 3.5 9B)
         ai_summary_text = (
             f"Overall Cloud Security Posture is evaluated at {posture_score}/100 across {providers_count} cloud accounts "
             f"and {resources_count} inspected resources. {critical_count} critical and {high_count} high-severity findings "

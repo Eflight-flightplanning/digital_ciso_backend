@@ -67,4 +67,9 @@ dependencies = [
     "uuid6>=2025.0.1",
     "reportlab>=5.0.0",
     "matplotlib>=3.11.1",
+    "markdown-it-py>=4.2.0",
+    "alive-progress>=3.3.0",
+    "dulwich>=1.2.12",
+    "markdown>=3.10.3",
+    "py-ocsf-models>=0.10.0",
 ]

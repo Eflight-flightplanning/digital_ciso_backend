@@ -83,7 +83,7 @@ MCP_TOOLS_SPEC = [
     },
     {
         "name": "ciso_analyze_finding",
-        "description": "Perform deep Digital CISO AI analysis on a specific finding using Qwen 3.5 on Azure VM or Claude. Returns root-cause, attack scenario, compliance impact, and risk score.",
+        "description": "Perform deep Digital CISO AI analysis on a specific finding using private Qwen 3.5 on dedicated vLLM instance. Returns root-cause, attack scenario, compliance impact, and risk score.",
         "inputSchema": {
             "type": "object",
             "required": ["finding_id"],

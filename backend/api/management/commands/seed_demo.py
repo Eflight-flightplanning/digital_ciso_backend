@@ -81,12 +81,12 @@ class Command(BaseCommand):
             )
             self.stdout.write("  [OK] Cloud Providers seeded: AWS (acme-prod), Azure (acme-emea), GCP (acme-core)")
 
-            # LLM Config
+            # LLM Config (Private vLLM Qwen 3.5)
             TenantLLMConfig.objects.get_or_create(
                 tenant=tenant,
-                provider_type="claude",
+                provider_type="vllm_azure",
                 defaults={
-                    "model_name": "claude-sonnet-4-6",
+                    "model_name": "/home/azureuser/models/qwen3.5-9b",
                     "is_active": True,
                 }
             )
