@@ -1522,12 +1522,32 @@ class FindingSerializer(RLSSerializer):
     """
 
     resources = serializers.ResourceRelatedField(many=True, read_only=True)
+    provider = serializers.SerializerMethodField()
+    compliance = serializers.JSONField(read_only=True)
+
+    def get_provider(self, obj) -> str:
+        if obj.scan and obj.scan.provider:
+            return obj.scan.provider.provider
+        uid = (obj.uid or "").lower()
+        if "prowler-azure" in uid or "/subscriptions/" in uid or "azure" in uid:
+            return "azure"
+        if "prowler-aws" in uid or "arn:aws:" in uid:
+            return "aws"
+        if "prowler-gcp" in uid or "projects/" in uid:
+            return "gcp"
+        if "prowler-oci" in uid or "prowler-oraclecloud" in uid or "ocid1." in uid:
+            return "oraclecloud"
+        if "oracle_saas" in uid:
+            return "oracle_saas"
+        return "azure"
 
     class Meta:
         model = Finding
         fields = [
             "id",
             "uid",
+            "provider",
+            "compliance",
             "delta",
             "status",
             "status_extended",

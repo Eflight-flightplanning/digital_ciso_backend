@@ -939,6 +939,22 @@ function AIDecisionsPage() {
     }
   ];
 
+function extractFindingProvider(f: any): string {
+  const rawP = f.provider || f.provider_type || f.scan?.provider?.provider || f.raw_result?.Provider || f.check_metadata?.Provider;
+  if (rawP) {
+    const s = String(rawP).toUpperCase();
+    if (s === "ORACLECLOUD") return "OCI";
+    return s;
+  }
+  const uid = String(f.uid || f.id || f.prowler_uid || "").toLowerCase();
+  if (uid.includes("prowler-azure") || uid.includes("/subscriptions/") || uid.includes("azure")) return "AZURE";
+  if (uid.includes("prowler-aws") || uid.includes("arn:aws:")) return "AWS";
+  if (uid.includes("prowler-gcp") || uid.includes("projects/")) return "GCP";
+  if (uid.includes("prowler-oci") || uid.includes("oraclecloud") || uid.includes("ocid1.")) return "OCI";
+  if (uid.includes("saas") || uid.includes("fusion") || uid.includes("oracle")) return "ORACLE_SAAS";
+  return "AZURE";
+}
+
   // Build Unified Remediation Items List from real failed findings + catalog + executions
   const remediationItems: FindingRemediationItem[] = useMemo(() => {
     const list: FindingRemediationItem[] = [];
@@ -946,13 +962,10 @@ function AIDecisionsPage() {
     // 1. First extract all real failed findings from database strictly for connected providers
     const failedFindings = realFindings.filter((f: any) => {
       if (f.status !== "FAIL") return false;
-      const prov = (f.scan?.provider?.provider || f.provider || (f.resources && f.resources[0]?.provider) || "").toUpperCase();
-      if (prov) {
-        if (prov === "ORACLECLOUD" && (connectedProviderSet.has("OCI") || connectedProviderSet.has("ORACLECLOUD"))) return true;
-        if (prov === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS")) return true;
-        if (!connectedProviderSet.has(prov)) return false;
-      }
-      return true;
+      const prov = extractFindingProvider(f);
+      if (prov === "OCI" && (connectedProviderSet.has("OCI") || connectedProviderSet.has("ORACLECLOUD"))) return true;
+      if (prov === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS")) return true;
+      return connectedProviderSet.has(prov);
     });
 
     failedFindings.forEach((f: any, idx: number) => {
@@ -960,16 +973,10 @@ function AIDecisionsPage() {
       const checkMeta = f.check_metadata || {};
       const title = checkMeta.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
       const res = (f.resources && f.resources[0]) || f.resource || {};
-      const resName = res.name || f.resource_name || `resource-${idx + 1}`;
-      const resUid = res.uid || f.resource_uid || `res-uid-${idx + 1}`;
+      const resName = res.name || f.resource_name || f.raw_result?.ResourceName || `resource-${idx + 1}`;
+      const resUid = res.uid || f.resource_uid || f.uid || `res-uid-${idx + 1}`;
       
-      const provRaw = (
-        f.scan?.provider?.provider ||
-        f.provider ||
-        (f.resources && f.resources[0]?.provider) ||
-        (connectedProviders.length > 0 ? connectedProviders[0].providerUpper : "AZURE")
-      );
-      const provider = (provRaw === "oraclecloud" ? "OCI" : provRaw || "AZURE").toUpperCase();
+      const provider = extractFindingProvider(f);
       const region = res.region || f.region || f.raw_result?.Region || (provider === "AZURE" ? "eastus" : provider === "OCI" ? "us-ashburn-1" : "Global");
       const severity = (f.severity || "medium").toLowerCase();
 
