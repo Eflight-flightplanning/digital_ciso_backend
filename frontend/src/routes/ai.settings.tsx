@@ -95,7 +95,7 @@ function AISettingsPage() {
   return (
     <AppShell
       title="AI Engine & API Configuration"
-      subtitle="Model architectures for Spectra (Analysis), Aegis (Decision), and Phantom (Execution)"
+      subtitle="Model architectures for Spectra (Analysis), Aegis (Remediation), and Jira Task Orchestration"
       actions={
         <button
           onClick={handleSave}

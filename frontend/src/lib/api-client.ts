@@ -69,7 +69,7 @@ export async function apiRequest<T = any>(
       });
       if (tokenRes.ok) {
         const tokenJson = await tokenRes.json();
-        const freshToken = tokenJson?.data?.attributes?.access || tokenJson?.access;
+        const freshToken = tokenJson?.attributes?.access || tokenJson?.data?.attributes?.access || tokenJson?.access;
         if (freshToken) {
           setAuthToken(freshToken);
           headers.set("Authorization", `Bearer ${freshToken}`);

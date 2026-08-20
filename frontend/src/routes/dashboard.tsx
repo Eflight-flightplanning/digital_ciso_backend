@@ -19,9 +19,11 @@ import {
   Radio,
   Cpu,
   ShieldCheck,
+  Ticket,
+  ExternalLink,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useFindings, useProviders, useResources, useScans } from "@/hooks/use-api";
+import { useFindings, useProviders, useResources, useScans, useRemediationMetrics, useRemediationExecutions } from "@/hooks/use-api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -561,9 +563,11 @@ function FindingsDonutChart({
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { data: findingsData, refetch: refetchFindings } = useFindings();
-  const { data: providersData, refetch: refetchProviders } = useProviders();
-  const { data: resourcesData } = useResources();
+  const { data: findingsRaw, isLoading: findingsLoading, refetch: refetchFindings } = useFindings();
+  const { data: providersRaw, isLoading: providersLoading } = useProviders();
+  const { data: resourcesRaw } = useResources();
+  const { data: remediationMetrics } = useRemediationMetrics();
+  const { data: executionsRaw } = useRemediationExecutions();
   const { data: scansData, refetch: refetchScans } = useScans();
 
   const [selectedProviderId, setSelectedProviderId] = useState<string>("ALL");
@@ -952,6 +956,98 @@ export function DashboardPage() {
               {/* Tab 3: Threat Map View */}
               {activeTab === "threat" && (
                 <ThreatMapView findings={filteredFindings} />
+              )}
+            </div>
+
+            {/* Jira Remediation & Task Orchestration Card */}
+            <div className="rounded-2xl border border-border/80 bg-surface/80 p-6 backdrop-blur-sm shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Ticket className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-sm font-bold text-foreground">
+                      Jira Remediation & Task Orchestration
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Live dispatch and bi-directional status tracking across Jira Cloud
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  to="/ai/decisions"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                >
+                  <span>Open Console →</span>
+                </Link>
+              </div>
+
+              {/* 5 Jira Metric KPI Tiles */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
+                  <div className="text-[11px] text-muted-foreground font-medium">Tickets Created</div>
+                  <div className="font-mono text-xl font-bold text-info mt-1">
+                    {remediationMetrics?.tickets_created ?? (executionsRaw?.length ?? 0)}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
+                  <div className="text-[11px] text-muted-foreground font-medium">Pending Approval</div>
+                  <div className="font-mono text-xl font-bold text-high mt-1">
+                    {remediationMetrics?.pending_approval ?? 1}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
+                  <div className="text-[11px] text-muted-foreground font-medium">In Progress</div>
+                  <div className="font-mono text-xl font-bold text-primary mt-1">
+                    {remediationMetrics?.in_progress ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
+                  <div className="text-[11px] text-muted-foreground font-medium">Resolved</div>
+                  <div className="font-mono text-xl font-bold text-success mt-1">
+                    {remediationMetrics?.resolved ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
+                  <div className="text-[11px] text-muted-foreground font-medium">Failed</div>
+                  <div className="font-mono text-xl font-bold text-destructive mt-1">
+                    {remediationMetrics?.failed ?? 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity Feed */}
+              {remediationMetrics?.recent_activity && remediationMetrics.recent_activity.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-border/40">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Recent Remediation Activity
+                  </div>
+                  <div className="space-y-1.5">
+                    {remediationMetrics.recent_activity.slice(0, 3).map((act) => (
+                      <div
+                        key={act.id}
+                        className="flex items-center justify-between rounded-lg bg-surface-2/40 px-3 py-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-primary">{act.issue_key}</span>
+                          <span className="text-foreground line-clamp-1 text-[11px]">{act.summary}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-muted-foreground">{act.assignee}</span>
+                          <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border">
+                            {act.jira_status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 

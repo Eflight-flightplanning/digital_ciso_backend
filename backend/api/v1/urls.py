@@ -6,6 +6,16 @@ from .oracle_saas_views import (
     OracleSaasRemediateView,
     OracleSaasSyncLiveView,
 )
+from .jira_views import (
+    JiraConfigView,
+    JiraTestConnectionView,
+    JiraProjectsView,
+    JiraIssueTypesView,
+    JiraAssigneesView,
+    JiraPrioritiesView,
+    RemediationExecutionViewSet,
+    RemediationMetricsView,
+)
 from .report_views import ExecutiveReportView
 from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
@@ -117,6 +127,7 @@ router.register(r"decision-logs", DecisionLogViewSet, basename="decisionlog")
 router.register(r"tenant-llm-configs", TenantLLMConfigViewSet, basename="tenantllmconfig")
 router.register(r"finding-ai-analyses", FindingAIAnalysisViewSet, basename="findingaianalysis")
 router.register(r"remediation-playbooks", RemediationPlaybookViewSet, basename="remediationplaybook")
+router.register(r"remediations/executions", RemediationExecutionViewSet, basename="remediationexecution")
 router.register(r"ciso-conversations", CISOAdvisorConversationViewSet, basename="cisoadvisorconversation")
 
 
@@ -203,6 +214,14 @@ urlpatterns = [
     path("schema", SchemaView.as_view(), name="schema"),
     path("swagger", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger"),
     path("docs", SpectacularRedocView.as_view(url_name="schema"), name="docs"),
+    # Jira Cloud Integration & Remediation Endpoints
+    path("jira/config", JiraConfigView.as_view(), name="jira-config"),
+    path("jira/test-connection", JiraTestConnectionView.as_view(), name="jira-test-connection"),
+    path("jira/projects", JiraProjectsView.as_view(), name="jira-projects"),
+    path("jira/projects/<str:project_key>/issue-types", JiraIssueTypesView.as_view(), name="jira-issue-types"),
+    path("jira/projects/<str:project_key>/assignees", JiraAssigneesView.as_view(), name="jira-assignees"),
+    path("jira/priorities", JiraPrioritiesView.as_view(), name="jira-priorities"),
+    path("remediations/metrics", RemediationMetricsView.as_view(), name="remediation-metrics"),
     # Reports & Digital CISO — AI endpoints
     path("reports/executive-summary", ExecutiveReportView.as_view(), name="executive-report"),
     path("reports/executive-summary/", ExecutiveReportView.as_view(), name="executive-report-slash"),

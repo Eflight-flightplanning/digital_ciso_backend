@@ -1,21 +1,34 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ScrollText,
   BrainCircuit,
   Zap,
-  Eye,
   Check,
   X,
   Sparkles,
   ShieldCheck,
   Terminal,
   AlertTriangle,
-  Play,
   CheckCircle2,
   Clock,
   RotateCcw,
-  UserCheck,
+  ExternalLink,
+  Search,
+  User,
+  Users,
+  Layers,
+  ArrowUpRight,
+  RefreshCw,
+  Sliders,
+  Send,
+  Ticket,
+  ChevronRight,
+  ShieldAlert,
+  Calendar,
+  AlertCircle,
+  FileText,
+  Tag,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -26,583 +39,958 @@ import {
   Row,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useFindings, useDecisionLogs, useRemediationPlaybooks, useApprovePlaybook, useRejectPlaybook, useExecutePlaybook } from "@/hooks/use-api";
+import {
+  useFindings,
+  useDecisionLogs,
+  useRemediationPlaybooks,
+  useJiraConfig,
+  useJiraProjects,
+  useJiraIssueTypes,
+  useJiraAssignees,
+  useJiraPriorities,
+  useRemediationExecutions,
+  useCreateJiraRemediationTicket,
+  useSyncJiraExecutionStatus,
+  useRemediationMetrics,
+  RemediationExecutionRecord,
+} from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/decisions")({
   component: AIDecisionsPage,
 });
 
-interface ExtendedPlaybook {
+interface FindingRemediationItem {
   id: string;
+  finding_id: string;
+  check_id: string;
   title: string;
-  finding_id?: string;
-  finding?: string;
-  script_type: string;
-  code_snippet?: string;
+  finding_title: string;
+  provider: string;
+  region: string;
+  resource_uid: string;
+  resource_name: string;
+  severity: "critical" | "high" | "medium" | "low" | string;
+  risk_score: number;
+  risk_summary: string;
+  compliance_rules: string[];
+  recommended_fix: string;
+  code_snippet: string;
   rollback_snippet?: string;
-  approval_status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED" | string;
-  approved_by?: string;
-  approved_at?: string;
-  executed_at?: string;
-  execution_log?: string;
-  priority?: string;
-  risk?: number;
-  sla?: string;
-  inserted_at?: string;
+  ai_reasoning: string;
+  evidence: string;
+  approval_status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "TICKET_CREATED";
+  execution_record?: RemediationExecutionRecord;
+  inserted_at: string;
 }
 
-const fallbackPlaybooks: ExtendedPlaybook[] = [
-  {
-    id: "pb-azure-01",
-    title: "Remediate Defender for App Services",
-    finding: "Microsoft Defender for App Services Disabled",
-    script_type: "terraform",
-    approval_status: "PENDING_APPROVAL",
-    priority: "P1",
-    risk: 92,
-    sla: "4h remaining",
-    code_snippet: `resource "azurerm_security_center_subscription_pricing" "app_services" {
-  tier          = "Standard"
-  resource_type = "AppServices"
-}`,
-    rollback_snippet: `# Rollback Defender tier to Free\naz security pricing create -n "AppServices" --tier "Free"`,
-    inserted_at: new Date().toISOString(),
-  },
-];
-
 function AIDecisionsPage() {
-  const { data: playbooksRaw } = useRemediationPlaybooks();
-  const { data: decisionLogsRaw } = useDecisionLogs();
   const { data: findingsRaw } = useFindings();
-  const approveMutation = useApprovePlaybook();
-  const rejectMutation = useRejectPlaybook();
-  const executeMutation = useExecutePlaybook();
+  const { data: playbooksRaw } = useRemediationPlaybooks();
+  const { data: executionsRaw, refetch: refetchExecutions } = useRemediationExecutions();
+  const { data: metricsRaw, refetch: refetchMetrics } = useRemediationMetrics();
+  const { data: jiraConfig } = useJiraConfig();
+  const { data: projectsData } = useJiraProjects();
+  const { data: prioritiesData } = useJiraPriorities();
 
-  const [filterStatus, setFilterStatus] = useState<string>("All");
+  const createTicketMutation = useCreateJiraRemediationTicket();
+  const syncStatusMutation = useSyncJiraExecutionStatus();
+
+  // Filters & Selected State
+  const [filterSection, setFilterSection] = useState<"All" | "Pending" | "In Progress" | "Completed" | "Failed">("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  
+  // Modal / Drawer state for Ticket Creation
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedIssueType, setSelectedIssueType] = useState("Task");
+  const [selectedPriority, setSelectedPriority] = useState("Medium");
+  const [selectedAssignee, setSelectedAssignee] = useState<{
+    accountId: string;
+    displayName: string;
+    emailAddress?: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+  const [customSummary, setCustomSummary] = useState("");
+
+  // Feedback State
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [executingId, setExecutingId] = useState<string | null>(null);
-  const [localOverrides, setLocalOverrides] = useState<Record<string, Partial<ExtendedPlaybook>>>({});
+  const [createdTicketResult, setCreatedTicketResult] = useState<{
+    key: string;
+    url: string;
+    assigneeName?: string;
+    status: string;
+  } | null>(null);
+
+  // Load assignees for the selected project
+  const { data: assigneesData, isLoading: assigneesLoading } = useJiraAssignees(
+    selectedProject || jiraConfig?.default_project,
+    assigneeSearchQuery
+  );
+  const { data: issueTypesData } = useJiraIssueTypes(selectedProject || jiraConfig?.default_project);
+
+  // Set default project & settings from Jira Config
+  useEffect(() => {
+    if (jiraConfig) {
+      if (!selectedProject && jiraConfig.default_project) {
+        setSelectedProject(jiraConfig.default_project);
+      }
+      if (jiraConfig.default_issue_type) {
+        setSelectedIssueType(jiraConfig.default_issue_type);
+      }
+      if (jiraConfig.default_priority) {
+        setSelectedPriority(jiraConfig.default_priority);
+      }
+    }
+  }, [jiraConfig, selectedProject]);
 
   const realFindings = findingsRaw?.items ?? [];
+  const executions = executionsRaw ?? [];
 
-  const playbooks: ExtendedPlaybook[] = useMemo(() => {
-    let list: ExtendedPlaybook[] = [];
+  // Build Unified Remediation Items List from real failed findings + executions
+  const remediationItems: FindingRemediationItem[] = useMemo(() => {
+    const list: FindingRemediationItem[] = [];
 
-    // Map all failed realFindings (all 53 Azure security violations)
-    if (realFindings.length > 0) {
-      const failed = realFindings.filter((f: any) => f.status === "FAIL");
-      list = failed.map((f: any, i: number) => {
-        const checkId = f.check_id || `check_${i + 1}`;
-        const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
-        const resName = f.resource_name || f.resource?.name || "azure-subscription-resource";
+    // Map each real failed finding
+    const failedFindings = realFindings.filter((f: any) => f.status === "FAIL");
 
-        let snippet = "";
-        let rollback = "";
-        let scriptType = "terraform";
+    failedFindings.forEach((f: any, idx: number) => {
+      const checkId = f.check_id || `check_${idx + 1}`;
+      const checkMeta = f.check_metadata || {};
+      const title = checkMeta.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
+      const res = (f.resources && f.resources[0]) || f.resource || {};
+      const resName = res.name || f.resource_name || "cloud-infrastructure-resource";
+      const resUid = res.uid || f.resource_uid || `res-${idx + 1}`;
+      const region = res.region || f.region || "Global";
+      const provider = (f.scan?.provider?.provider || f.provider || "cloud").toUpperCase();
+      const severity = (f.severity || "medium").toLowerCase();
 
-        if (checkId.includes("defender_ensure_defender_for_app_services")) {
-          scriptType = "terraform";
-          snippet = `resource "azurerm_security_center_subscription_pricing" "app_services" {\n  tier          = "Standard"\n  resource_type = "AppServices"\n}`;
-          rollback = `# Rollback Defender tier to Free\naz security pricing create -n "AppServices" --tier "Free"`;
-        } else if (checkId.includes("defender_container_images")) {
-          scriptType = "terraform";
-          snippet = `resource "azurerm_security_center_subscription_pricing" "containers" {\n  tier          = "Standard"\n  resource_type = "Containers"\n}`;
-          rollback = `# Rollback Container Defender\naz security pricing create -n "Containers" --tier "Free"`;
-        } else if (checkId.includes("defender_ensure_defender_for_azure_sql")) {
-          scriptType = "azure_cli";
-          snippet = `az security pricing create --name "SqlServers" --tier "Standard"\naz sql server tde set --resource-group "rg-production" --server "sql-primary" --status Enabled`;
-          rollback = `az security pricing create --name "SqlServers" --tier "Free"`;
-        } else if (checkId.includes("defender_auto_provisioning")) {
-          scriptType = "terraform";
-          snippet = `resource "azurerm_security_center_auto_provisioning" "auto_provisioning" {\n  auto_provision = "On"\n}`;
-          rollback = `az security auto-provisioning-setting update --name "default" --auto-provision "Off"`;
-        } else if (checkId.includes("defender_ensure_defender_for_cosmosdb")) {
-          scriptType = "terraform";
-          snippet = `resource "azurerm_security_center_subscription_pricing" "cosmosdb" {\n  tier          = "Standard"\n  resource_type = "CosmosDbs"\n}`;
-          rollback = `az security pricing create -n "CosmosDbs" --tier "Free"`;
-        } else if (checkId.includes("storage")) {
-          scriptType = "terraform";
-          snippet = `resource "azurerm_storage_account" "secure_storage" {\n  name                     = "${resName.slice(0, 20)}"\n  enable_https_traffic_only = true\n  min_tls_version           = "TLS1_2"\n  allow_nested_items_to_be_public = false\n}`;
-          rollback = `# Revert storage account access policies`;
-        } else if (checkId.includes("vm_trusted_launch")) {
-          scriptType = "azure_cli";
-          snippet = `az vm update --resource-group "rg-production" --name "${resName}" --security-type TrustedLaunch --enable-secure-boot true --enable-vtpm true`;
-          rollback = `# Revert Trusted Launch settings for VM`;
-        } else {
-          scriptType = "terraform";
-          snippet = `# Automated Remediation for ${checkId}\n# Enforcing strict CIS Microsoft Azure Benchmark Compliance\nresource "azurerm_security_center_setting" "setting_${i}" {\n  setting_name = "MCAS"\n  enabled      = true\n}`;
-          rollback = `# Rollback automated configuration`;
-        }
+      // Find matching execution if ticket was created
+      const matchedExec = executions.find(
+        (ex) => ex.finding_id === f.id || ex.summary?.toLowerCase().includes(checkId.toLowerCase())
+      );
 
-        const existingDbPlaybook = (playbooksRaw?.items as Array<Record<string, unknown>> | undefined)?.find(
-          (p) => p.finding_id === f.id || p.title?.toString().toLowerCase().includes(checkId.toLowerCase())
-        );
+      // Determine playbook script
+      let snippet = `resource "azurerm_security_center_setting" "setting_${idx}" {\n  setting_name = "MCAS"\n  enabled      = true\n}`;
+      if (checkId.includes("app_services")) {
+        snippet = `resource "azurerm_security_center_subscription_pricing" "app_services" {\n  tier          = "Standard"\n  resource_type = "AppServices"\n}`;
+      } else if (checkId.includes("container")) {
+        snippet = `resource "azurerm_security_center_subscription_pricing" "containers" {\n  tier          = "Standard"\n  resource_type = "Containers"\n}`;
+      } else if (checkId.includes("storage")) {
+        snippet = `resource "azurerm_storage_account" "secure_storage" {\n  name                     = "${resName.slice(0, 20)}"\n  enable_https_traffic_only = true\n  min_tls_version           = "TLS1_2"\n}`;
+      } else if (checkId.includes("sql")) {
+        snippet = `az sql server tde set --resource-group "rg-production" --server "sql-primary" --status Enabled`;
+      }
 
-        let normalizedStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" = "PENDING_APPROVAL";
-        if (existingDbPlaybook) {
-          const rawStatus = String(existingDbPlaybook.approval_status || "pending_approval").toLowerCase();
-          if (rawStatus.includes("approved")) normalizedStatus = "APPROVED";
-          else if (rawStatus.includes("rejected")) normalizedStatus = "REJECTED";
-          else if (rawStatus.includes("exec")) normalizedStatus = "EXECUTED";
-        }
+      let approvalStatus: FindingRemediationItem["approval_status"] = "PENDING_APPROVAL";
+      if (matchedExec) {
+        approvalStatus = "TICKET_CREATED";
+      }
 
-        return {
-          id: f.id || `pb-real-${i}`,
-          title: `Remediate ${checkId.replace(/_/g, " ")}`,
-          finding: title,
-          script_type: existingDbPlaybook?.script_type ? String(existingDbPlaybook.script_type) : scriptType,
-          code_snippet: existingDbPlaybook?.code_snippet ? String(existingDbPlaybook.code_snippet) : snippet,
-          rollback_snippet: existingDbPlaybook?.rollback_snippet ? String(existingDbPlaybook.rollback_snippet) : rollback,
-          approval_status: normalizedStatus,
-          approved_by: normalizedStatus === "APPROVED" || normalizedStatus === "EXECUTED" ? "admin@securityplatform.com" : "",
-          approved_at: existingDbPlaybook?.approved_at ? String(existingDbPlaybook.approved_at) : "",
-          executed_at: existingDbPlaybook?.executed_at ? String(existingDbPlaybook.executed_at) : "",
-          execution_log: existingDbPlaybook?.execution_log ? String(existingDbPlaybook.execution_log) : "",
-          priority: f.severity === "critical" ? "P1" : f.severity === "high" ? "P1" : "P2",
-          risk: f.severity === "critical" ? 96 : f.severity === "high" ? 88 : 65,
-          sla: f.severity === "critical" ? "2h remaining" : "4h remaining",
-          inserted_at: f.inserted_at || new Date().toISOString(),
-        };
+      list.push({
+        id: f.id || `remed-${idx}`,
+        finding_id: f.id || `find-${idx}`,
+        check_id: checkId,
+        title: `Remediate ${checkId.replace(/_/g, " ")}`,
+        finding_title: title,
+        provider,
+        region,
+        resource_uid: resUid,
+        resource_name: resName,
+        severity,
+        risk_score: severity === "critical" ? 95 : severity === "high" ? 85 : severity === "medium" ? 65 : 40,
+        risk_summary: checkMeta.risk || `Exposure detected on ${resName} violating cloud security posture standards.`,
+        compliance_rules: f.compliance ? Object.keys(f.compliance) : ["CIS Microsoft Azure Benchmark v2.0", "NCA ECC"],
+        recommended_fix: checkMeta.remediation?.recommendation?.text || `Apply least privilege and strict encryption configuration to ${resName}.`,
+        code_snippet: snippet,
+        ai_reasoning: `Digital CISO Threat Engine analyzed telemetry for ${resUid}. Misconfiguration allows potential privilege escalation or unauthorized data access.`,
+        evidence: f.status_extended || `Resource ${resName} failed rule verification during continuous assessment.`,
+        approval_status: approvalStatus,
+        execution_record: matchedExec,
+        inserted_at: f.inserted_at || new Date().toISOString(),
       });
-    } else if (playbooksRaw?.items && playbooksRaw.items.length > 0) {
-      list = (playbooksRaw.items as Array<Record<string, unknown>>).map((p) => {
-        const rawStatus = String(p.approval_status || "pending_approval").toLowerCase();
-        let normalizedStatus: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXECUTED" = "PENDING_APPROVAL";
-        if (rawStatus.includes("pending")) normalizedStatus = "PENDING_APPROVAL";
-        else if (rawStatus.includes("approved")) normalizedStatus = "APPROVED";
-        else if (rawStatus.includes("rejected")) normalizedStatus = "REJECTED";
-        else if (rawStatus.includes("exec")) normalizedStatus = "EXECUTED";
-
-        return {
-          id: p.id as string,
-          title: (p.title as string) || "Remediation Playbook",
-          finding: (p.title as string) || "Cloud Misconfiguration Finding",
-          script_type: (p.script_type as string) || "terraform",
-          code_snippet: (p.code_snippet as string) || "",
-          rollback_snippet: (p.rollback_snippet as string) || "",
-          approval_status: normalizedStatus,
-          approved_by: (p.approved_by as string) || (normalizedStatus === "APPROVED" || normalizedStatus === "EXECUTED" ? "admin@securityplatform.com" : ""),
-          approved_at: (p.approved_at as string) || "",
-          executed_at: (p.executed_at as string) || "",
-          execution_log: (p.execution_log as string) || (p.execution_output as string) || "",
-          priority: "P1",
-          risk: 88,
-          sla: "4h remaining",
-        };
-      });
-    } else {
-      list = fallbackPlaybooks;
-    }
-
-    // Apply local state overrides
-    return list.map((item) => {
-      const override = localOverrides[item.id];
-      return override ? { ...item, ...override } : item;
     });
-  }, [playbooksRaw, realFindings, localOverrides]);
 
-  const [selectedId, setSelectedId] = useState<string>(playbooks[0]?.id || "");
-  const selectedPb = playbooks.find((p) => p.id === selectedId) || playbooks[0];
+    return list;
+  }, [realFindings, executions]);
 
-  const filtered = playbooks.filter((p) => {
-    if (filterStatus === "All") return true;
-    if (filterStatus === "Pending") return p.approval_status === "PENDING_APPROVAL";
-    if (filterStatus === "Approved") return p.approval_status === "APPROVED";
-    if (filterStatus === "Executed") return p.approval_status === "EXECUTED";
-    if (filterStatus === "Rejected") return p.approval_status === "REJECTED";
-    return true;
-  });
-
-  const handleApprove = async (id: string) => {
-    setLocalOverrides((prev) => ({
-      ...prev,
-      [id]: {
-        approval_status: "APPROVED",
-        approved_by: "admin@securityplatform.com",
-        approved_at: new Date().toISOString(),
-      },
-    }));
-    try {
-      await approveMutation.mutateAsync({ id, notes: "Approved via HITL Security Console" });
-    } catch {
-      // Handled by local override
+  // Set initial selected item
+  useEffect(() => {
+    if (!selectedItemId && remediationItems.length > 0) {
+      setSelectedItemId(remediationItems[0].id);
     }
-    setActionSuccess("Playbook approved! Safety gate unlocked — authorized for Execution Agent.");
-    setTimeout(() => setActionSuccess(null), 3500);
+  }, [remediationItems, selectedItemId]);
+
+  const selectedItem = useMemo(() => {
+    return remediationItems.find((item) => item.id === selectedItemId) || remediationItems[0];
+  }, [remediationItems, selectedItemId]);
+
+  // Filter items by tab section and search query
+  const filteredItems = useMemo(() => {
+    return remediationItems.filter((item) => {
+      // Search filter
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchTitle = item.title.toLowerCase().includes(q) || item.finding_title.toLowerCase().includes(q);
+        const matchKey = item.execution_record?.issue_key?.toLowerCase().includes(q);
+        const matchAssignee = item.execution_record?.assignee_name?.toLowerCase().includes(q);
+        if (!matchTitle && !matchKey && !matchAssignee) return false;
+      }
+
+      // Section tab filter
+      if (filterSection === "All") return true;
+      if (filterSection === "Pending") {
+        return !item.execution_record || item.execution_record.status === "PENDING";
+      }
+      if (filterSection === "In Progress") {
+        return item.execution_record && (item.execution_record.status === "IN_PROGRESS" || item.execution_record.jira_status_category === "indeterminate");
+      }
+      if (filterSection === "Completed") {
+        return item.execution_record && (item.execution_record.status === "COMPLETED" || item.execution_record.jira_status_category === "done");
+      }
+      if (filterSection === "Failed") {
+        return item.execution_record && item.execution_record.status === "FAILED";
+      }
+      return true;
+    });
+  }, [remediationItems, filterSection, searchQuery]);
+
+  // Handle Opening Ticket Creation Modal
+  const handleOpenCreateTicket = (item: FindingRemediationItem) => {
+    setCustomSummary(`Fix ${item.check_id.replace(/_/g, " ")} on ${item.resource_name}`);
+    setSelectedProject(jiraConfig?.default_project || (projectsData?.items?.[0]?.key || "SEC"));
+    setSelectedIssueType(jiraConfig?.default_issue_type || "Task");
+    setSelectedPriority(item.severity === "critical" ? "Highest" : item.severity === "high" ? "High" : "Medium");
+    setIsCreatingTicket(true);
   };
 
-  const handleReject = async (id: string) => {
-    setLocalOverrides((prev) => ({
-      ...prev,
-      [id]: {
-        approval_status: "REJECTED",
-      },
-    }));
+  // Handle Ticket Creation Submit
+  const handleConfirmCreateTicket = async () => {
+    if (!selectedItem) return;
+
     try {
-      await rejectMutation.mutateAsync({ id, reason: "Rejected by Security Analyst" });
-    } catch {
-      // Handled by local override
+      const payload = {
+        finding_id: selectedItem.finding_id,
+        project_key: selectedProject || "SEC",
+        summary: customSummary || selectedItem.title,
+        issue_type: selectedIssueType || "Task",
+        priority: selectedPriority || "Medium",
+        assignee_account_id: selectedAssignee?.accountId,
+        assignee_name: selectedAssignee?.displayName,
+        assignee_email: selectedAssignee?.emailAddress,
+        labels: ["digital-ciso", "prowler", selectedItem.provider.toLowerCase(), selectedItem.severity],
+        finding_title: selectedItem.finding_title,
+        check_id: selectedItem.check_id,
+        provider: selectedItem.provider,
+        region: selectedItem.region,
+        resource_uid: selectedItem.resource_uid,
+        resource_name: selectedItem.resource_name,
+        severity: selectedItem.severity,
+        risk_score: selectedItem.risk_score,
+        risk_summary: selectedItem.risk_summary,
+        compliance_rules: selectedItem.compliance_rules,
+        recommended_fix: selectedItem.recommended_fix,
+        code_snippet: selectedItem.code_snippet,
+        ai_reasoning: selectedItem.ai_reasoning,
+        evidence: selectedItem.evidence,
+      };
+
+      const result = await createTicketMutation.mutateAsync(payload);
+      setIsCreatingTicket(false);
+      setCreatedTicketResult({
+        key: result.issue_key,
+        url: result.issue_url,
+        assigneeName: result.assignee_name || selectedAssignee?.displayName || "Unassigned",
+        status: result.jira_status || "To Do",
+      });
+      setActionSuccess(`Jira Ticket ${result.issue_key} created and assigned successfully!`);
+      refetchExecutions();
+      refetchMetrics();
+      setTimeout(() => setActionSuccess(null), 5000);
+    } catch (err: any) {
+      setActionSuccess(`Failed to create Jira ticket: ${err?.message || "Check Jira connection."}`);
     }
-    setActionSuccess("Playbook rejected and archived.");
-    setTimeout(() => setActionSuccess(null), 3500);
   };
 
-  const handleExecute = async (id: string) => {
-    setExecutingId(id);
+  // Handle Sync Jira Status
+  const handleSyncStatus = async (executionId: string) => {
     try {
-      await executeMutation.mutateAsync({ id });
+      await syncStatusMutation.mutateAsync(executionId);
+      refetchExecutions();
+      refetchMetrics();
+      setActionSuccess("Synchronized latest status from Jira Cloud!");
+      setTimeout(() => setActionSuccess(null), 3000);
     } catch {
-      // Handled by local override
-    } finally {
-      setLocalOverrides((prev) => ({
-        ...prev,
-        [id]: {
-          approval_status: "EXECUTED",
-          executed_at: new Date().toISOString(),
-          execution_log: "Remediation applied to cloud infrastructure. Verified CIS check PASS.",
-        },
-      }));
-      setExecutingId(null);
-      setActionSuccess("Execution Agent successfully applied remediation to cloud infrastructure! Finding marked PASS.");
-      setTimeout(() => setActionSuccess(null), 4000);
+      // Handled
     }
   };
+
+  // Compute live KPIs
+  const totalTickets = executions.length;
+  const inProgressTickets = executions.filter((e) => e.status === "IN_PROGRESS" || e.jira_status_category === "indeterminate").length;
+  const resolvedTickets = executions.filter((e) => e.status === "COMPLETED" || e.jira_status_category === "done").length;
+  const failedTickets = executions.filter((e) => e.status === "FAILED").length;
+  const pendingTickets = remediationItems.filter((i) => !i.execution_record).length;
 
   return (
     <AppShell
-      title="Aegis — Human-In-The-Loop (HITL) Execution Console"
-      subtitle="AI-generated remediation playbooks with mandatory human authorization and automated execution"
+      title="Aegis — Jira Remediation & Task Orchestration"
+      subtitle="AI-synthesized remediation playbooks dispatched, assigned, and tracked via Jira Cloud"
       actions={
         <div className="flex items-center gap-2">
           <Link
+            to="/integrations"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2/60 px-3.5 text-xs font-semibold text-foreground hover:border-primary/50 transition-all cursor-pointer shadow-sm"
+          >
+            <Sliders className="h-3.5 w-3.5 text-primary" />
+            <span>Jira Settings</span>
+          </Link>
+          <Link
             to="/ai/advisor"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface-2/50 px-4 text-xs font-semibold text-foreground transition-all hover:border-primary/40 active:scale-95"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2/60 px-3.5 text-xs font-semibold text-foreground hover:border-primary/50 transition-all cursor-pointer shadow-sm"
           >
             <BrainCircuit className="h-3.5 w-3.5 text-primary" />
             <span>AI Advisor</span>
           </Link>
-          <Link
-            to="/ai/settings"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface-2/50 px-4 text-xs font-semibold text-foreground transition-all hover:border-primary/40 active:scale-95"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>Settings</span>
-          </Link>
         </div>
       }
     >
+      {/* ── Success Toast Banner ── */}
       {actionSuccess && (
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-success/30 bg-success/10 p-3.5 text-xs font-semibold text-success shadow-sm">
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 p-4 text-xs font-semibold text-success shadow-sm">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             {actionSuccess}
           </span>
-          <button onClick={() => setActionSuccess(null)}>✕</button>
+          <button onClick={() => setActionSuccess(null)} className="cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* ── Summary Stats ── */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <Panel index={0} glow="high">
-          <span className="section-label">Awaiting Human Approval</span>
+      {/* ── Jira Connection Alert Banner if not configured ── */}
+      {!jiraConfig?.connected && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-xs">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="h-4 w-4 text-primary shrink-0" />
+            <div>
+              <span className="font-bold text-foreground">Jira Cloud is not yet connected</span>
+              <p className="text-muted-foreground text-[11px] mt-0.5">
+                Connect your organization's Jira Cloud instance to create and synchronize real remediation tickets.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/integrations"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shrink-0"
+          >
+            <span>Configure Jira Credentials</span>
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      )}
+
+
+      {/* ── Top Summary Stats Row (Jira Metrics) ── */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-5">
+        <Panel index={0} glow="info">
+          <span className="section-label">Tickets Created</span>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="kpi-number text-2xl text-high">
-              {playbooks.filter((p) => p.approval_status === "PENDING_APPROVAL").length}
+            <span className="kpi-number text-2xl font-black text-info">
+              {totalTickets}
             </span>
-            <span className="text-xs text-muted-foreground font-semibold">HITL Gate Active</span>
+            <span className="text-xs text-muted-foreground font-semibold">In Jira Cloud</span>
           </div>
         </Panel>
 
-        <Panel index={1} glow="primary">
-          <span className="section-label">Approved & Authorized</span>
+        <Panel index={1} glow="high">
+          <span className="section-label">Pending Approval</span>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="kpi-number text-2xl text-primary">
-              {playbooks.filter((p) => p.approval_status === "APPROVED").length}
+            <span className="kpi-number text-2xl font-black text-high">
+              {pendingTickets}
             </span>
-            <span className="text-xs text-muted-foreground font-semibold">Ready to Execute</span>
+            <span className="text-xs text-muted-foreground font-semibold">Awaiting Dispatch</span>
           </div>
         </Panel>
 
-        <Panel index={2} glow="success">
-          <span className="section-label">Simulated Executions</span>
+        <Panel index={2} glow="primary">
+          <span className="section-label">In Progress</span>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="kpi-number text-2xl text-success">
-              {playbooks.filter((p) => p.approval_status === "EXECUTED").length}
+            <span className="kpi-number text-2xl font-black text-primary">
+              {inProgressTickets}
             </span>
-            <span className="text-xs text-muted-foreground font-semibold">Not yet verified in cloud</span>
+            <span className="text-xs text-muted-foreground font-semibold">Active in Jira</span>
           </div>
         </Panel>
 
-        <Panel index={3} glow="info">
-          <span className="section-label">Autonomous Safety Gates</span>
-          <div className="mt-2 flex items-center gap-2">
-            <Dot tone="success" pulse />
-            <span className="text-xs font-bold text-foreground">100% Policy Enforced</span>
+        <Panel index={3} glow="success">
+          <span className="section-label">Resolved</span>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="kpi-number text-2xl font-black text-success">
+              {resolvedTickets}
+            </span>
+            <span className="text-xs text-muted-foreground font-semibold">Closed & Verified</span>
+          </div>
+        </Panel>
+
+        <Panel index={4} glow={failedTickets > 0 ? "high" : undefined}>
+          <span className="section-label">Failed</span>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className={`kpi-number text-2xl font-black ${failedTickets > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+              {failedTickets}
+            </span>
+            <span className="text-xs text-muted-foreground font-semibold">API Errors</span>
           </div>
         </Panel>
       </div>
 
-      {/* ── Split Layout: Playbooks List & Inspector Console ── */}
+      {/* ── Main Split View: Execution Table & Decision Inspector ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column (6 Cols): Playbooks Table */}
+        {/* Left Column (6 Cols): Execution Tab & Records Table */}
         <div className="space-y-4 lg:col-span-6">
           <Panel index={0} className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <span className="section-label">Review Queue ({filtered.length})</span>
-              <div className="flex items-center gap-1 text-xs">
-                {["All", "Pending", "Approved", "Executed", "Rejected"].map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setFilterStatus(st)}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition-all ${
-                      filterStatus === st
-                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                        : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
+            {/* Header & Section Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Ticket className="h-4 w-4 text-primary" />
+                <h3 className="font-display text-sm font-bold text-foreground">
+                  Remediation Orchestration
+                </h3>
+              </div>
+
+              {/* Section Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-surface-2/60 p-1 text-xs">
+                {(["All", "Pending", "In Progress", "Completed", "Failed"] as const).map((tab) => {
+                  const count =
+                    tab === "All"
+                      ? remediationItems.length
+                      : tab === "Pending"
+                      ? pendingTickets
+                      : tab === "In Progress"
+                      ? inProgressTickets
+                      : tab === "Completed"
+                      ? resolvedTickets
+                      : failedTickets;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setFilterSection(tab)}
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+                        filterSection === tab
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {tab} ({count})
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="space-y-2">
-              {filtered.map((pb) => {
-                const isSelected = selectedPb?.id === pb.id;
-                const isPending = pb.approval_status === "PENDING_APPROVAL";
-                const isApproved = pb.approval_status === "APPROVED";
-                const isExecuted = pb.approval_status === "EXECUTED";
+            {/* Search Input */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search findings, issue key (e.g. SEC-104), or assignee..."
+                className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+              />
+            </div>
 
-                return (
-                  <div
-                    key={pb.id}
-                    onClick={() => setSelectedId(pb.id)}
-                    className={`cursor-pointer rounded-xl border p-4 transition-all hover:border-primary/50 ${
-                      isSelected
-                        ? "border-primary bg-surface-2/80 shadow-md ring-1 ring-primary/30"
-                        : "border-border/70 bg-surface-2/30"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
+            {/* Records List Table */}
+            <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+              {filteredItems.length === 0 ? (
+                <div className="rounded-xl border border-border/60 bg-surface-2/30 p-8 text-center text-xs text-muted-foreground">
+                  No remediation records found matching the "{filterSection}" filter.
+                </div>
+              ) : (
+                filteredItems.map((item) => {
+                  const isSelected = item.id === selectedItem?.id;
+                  const exec = item.execution_record;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedItemId(item.id)}
+                      className={`group flex flex-col gap-2 rounded-xl border p-3.5 transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-primary/80 bg-primary/5 shadow-sm"
+                          : "border-border/80 bg-surface/80 hover:border-primary/40 hover:bg-surface"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="mono text-[11px] font-bold text-critical">
-                            {pb.priority}
+                          {/* Issue Key / Status Badge */}
+                          {exec?.issue_key && exec.issue_key !== "N/A" ? (
+                            <a
+                              href={exec.issue_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-mono font-bold text-primary hover:underline"
+                            >
+                              <span>{exec.issue_key}</span>
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          ) : (
+                            <span className="rounded-md bg-surface-2 border border-border px-2 py-0.5 text-[10px] font-mono font-bold text-muted-foreground">
+                              PENDING JIRA
+                            </span>
+                          )}
+
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                            item.severity === "critical"
+                              ? "bg-rose-500/10 text-rose-400"
+                              : item.severity === "high"
+                              ? "bg-orange-500/10 text-orange-400"
+                              : "bg-amber-500/10 text-amber-400"
+                          }`}>
+                            {item.severity}
                           </span>
-                          <h4 className="font-display text-xs font-bold text-foreground">
-                            {pb.title}
-                          </h4>
                         </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
-                          {pb.finding}
-                        </p>
+
+                        <div className="flex items-center gap-2">
+                          {/* Current Jira Status Badge */}
+                          {exec ? (
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                              exec.status === "COMPLETED" || exec.jira_status_category === "done"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : exec.status === "FAILED"
+                                ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                            }`}>
+                              <Dot tone={exec.status === "COMPLETED" ? "success" : exec.status === "FAILED" ? "high" : "primary"} pulse={exec.status === "IN_PROGRESS"} />
+                              {exec.jira_status || "In Progress"}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-surface-2 border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              Ready to Dispatch
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <Chip
-                        tone={
-                          isExecuted
-                            ? "success"
-                            : isApproved
-                              ? "primary"
-                              : isPending
-                                ? "high"
-                                : "critical"
-                        }
-                      >
-                        <Dot
-                          tone={
-                            isExecuted
-                              ? "success"
-                              : isApproved
-                                ? "primary"
-                                : isPending
-                                  ? "high"
-                                  : "critical"
-                          }
-                          pulse={isPending}
-                        />
-                        {isPending
-                          ? "Pending Review"
-                          : isApproved
-                            ? "Approved"
-                            : isExecuted
-                              ? "Executed"
-                              : "Rejected"}
-                      </Chip>
-                    </div>
+                      {/* Finding Title */}
+                      <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                        {item.title}
+                      </div>
 
-                    <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
-                      <span className="mono uppercase font-semibold text-foreground">
-                        {pb.script_type}
-                      </span>
-                      <span>SLA: {pb.sla}</span>
+                      {/* Assignee & Resource Meta */}
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium text-foreground">
+                            {exec?.assignee_name || "Unassigned"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-[10px]">{item.provider} · {item.region}</span>
+                          <span className="text-[10px] text-muted-foreground">{new Date(item.inserted_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </Panel>
         </div>
 
-        {/* Right Column (6 Cols): HITL Action Console & Script Viewer */}
-        <div className="lg:col-span-6">
-          {selectedPb ? (
-            <Panel index={1} holo glow="primary" className="p-5 sticky top-4">
-              <div className="flex items-start justify-between border-b border-border/70 pb-3">
+        {/* Right Column (6 Cols): Decision Panel & Jira Ticket Inspector */}
+        <div className="space-y-4 lg:col-span-6">
+          {selectedItem ? (
+            <Panel index={1} className="p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-4 border-b border-border/60 pb-4 mb-4">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-primary" />
-                    <h3 className="font-display text-sm font-bold text-foreground">
-                      {selectedPb.title}
-                    </h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      selectedItem.severity === "critical"
+                        ? "bg-rose-500/10 text-rose-400"
+                        : selectedItem.severity === "high"
+                        ? "bg-orange-500/10 text-orange-400"
+                        : "bg-amber-500/10 text-amber-400"
+                    }`}>
+                      {selectedItem.severity} Severity
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      Risk Score: <strong className="text-foreground">{selectedItem.risk_score}/100</strong>
+                    </span>
                   </div>
-                  <span className="mono text-[11px] text-muted-foreground mt-0.5 block">
-                    Playbook ID: {selectedPb.id} · Type: {selectedPb.script_type.toUpperCase()}
-                  </span>
+                  <h3 className="font-display text-base font-bold text-foreground">
+                    {selectedItem.finding_title}
+                  </h3>
+                  <p className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                    Resource: <span className="text-foreground">{selectedItem.resource_name}</span> ({selectedItem.provider})
+                  </p>
                 </div>
 
-                <Chip
-                  tone={
-                    selectedPb.approval_status === "EXECUTED"
-                      ? "success"
-                      : selectedPb.approval_status === "APPROVED"
-                        ? "primary"
-                        : selectedPb.approval_status === "PENDING_APPROVAL"
-                          ? "high"
-                          : "critical"
-                  }
-                >
-                  {selectedPb.approval_status === "PENDING_APPROVAL"
-                    ? "Awaiting Human Sign-off"
-                    : selectedPb.approval_status === "APPROVED"
-                      ? "Authorized for Execution"
-                      : selectedPb.approval_status === "EXECUTED"
-                        ? "Applied to Infrastructure"
-                        : "Rejected"}
-                </Chip>
-              </div>
-
-              {/* Target Finding & Audit */}
-              <div className="mt-4 rounded-lg border border-border/80 bg-surface-2/40 p-3 text-xs space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Target Finding:</span>
-                  <span className="font-semibold text-foreground">{selectedPb.finding}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Analyst Approval:</span>
-                  <span className="font-semibold text-foreground">
-                    {selectedPb.approved_by || "Pending Sign-off"}
-                  </span>
-                </div>
-                {selectedPb.executed_at && (
-                  <div className="flex justify-between text-success">
-                    <span>Execution Verification:</span>
-                    <span className="font-semibold">Applied & Verified ✓</span>
+                {/* Open in Jira button if already created */}
+                {selectedItem.execution_record?.issue_url && (
+                  <div className="flex flex-col items-end gap-1.5">
+                    <a
+                      href={selectedItem.execution_record.issue_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer"
+                    >
+                      <span>Open in Jira</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                    <button
+                      onClick={() => handleSyncStatus(selectedItem.execution_record!.id)}
+                      disabled={syncStatusMutation.isPending}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncStatusMutation.isPending ? "animate-spin text-primary" : ""}`} />
+                      <span>Sync Live Status</span>
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Remediation Script Code Viewer */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="section-label flex items-center gap-1.5">
-                    <Terminal className="h-3.5 w-3.5 text-primary" />
-                    Generated {selectedPb.script_type.toUpperCase()} Script
-                  </span>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(selectedPb.code_snippet || "")}
-                    className="text-[10px] font-semibold text-primary hover:underline"
-                  >
-                    Copy Code
-                  </button>
-                </div>
-
-                <pre className="max-h-56 overflow-x-auto rounded-lg border border-border bg-surface p-3 text-[11px] font-mono text-foreground leading-relaxed">
-                  {selectedPb.code_snippet || "# No code snippet generated"}
-                </pre>
-              </div>
-
-              {/* Rollback Safety Snippet */}
-              {selectedPb.rollback_snippet && (
-                <div className="mt-3">
-                  <span className="section-label mb-1.5 flex items-center gap-1 text-muted-foreground">
-                    <RotateCcw className="h-3 w-3" />
-                    Automated Rollback Safeguard
-                  </span>
-                  <pre className="max-h-24 overflow-x-auto rounded-lg border border-border/60 bg-surface-2/30 p-2.5 text-[10px] font-mono text-muted-foreground">
-                    {selectedPb.rollback_snippet}
-                  </pre>
+              {/* Success Banner if freshly created */}
+              {createdTicketResult && (
+                <div className="mb-4 rounded-xl border border-success/30 bg-success/10 p-4 text-xs space-y-2">
+                  <div className="flex items-center justify-between font-bold text-success">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Jira Ticket Created Successfully!
+                    </span>
+                    <a
+                      href={createdTicketResult.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 underline"
+                    >
+                      <span>{createdTicketResult.key}</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px]">
+                    <div>Assignee: <strong className="text-foreground">{createdTicketResult.assigneeName}</strong></div>
+                    <div>Initial Status: <strong className="text-foreground">{createdTicketResult.status}</strong></div>
+                  </div>
                 </div>
               )}
 
-              {/* ── HITL Action Buttons ── */}
-              <div className="mt-6 border-t border-border/70 pt-4">
-                {selectedPb.approval_status === "PENDING_APPROVAL" && (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleApprove(selectedPb.id)}
-                      className="flex-1 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
-                    >
-                      <UserCheck className="h-4 w-4" />
-                      <span>Approve & Authorize Execution</span>
-                    </button>
-                    <button
-                      onClick={() => handleReject(selectedPb.id)}
-                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-critical/40 bg-critical/10 px-4 text-xs font-semibold text-critical hover:bg-critical/20 transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                      <span>Reject</span>
-                    </button>
+              {/* Section 1: AI Remediation & Reasoning */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>AI Recommended Fix & Reasoning</span>
+                  </h4>
+                  <div className="rounded-xl border border-border/80 bg-surface-2/50 p-3.5 text-xs text-foreground leading-relaxed">
+                    <p className="font-semibold text-foreground mb-1">{selectedItem.recommended_fix}</p>
+                    <p className="text-muted-foreground text-[11px]">{selectedItem.ai_reasoning}</p>
+                  </div>
+                </div>
+
+                {/* Section 2: IaC / CLI Code Snippet */}
+                {selectedItem.code_snippet && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                      <Terminal className="h-3.5 w-3.5 text-primary" />
+                      <span>Remediation Payload Script</span>
+                    </h4>
+                    <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-3.5 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+                      <code>{selectedItem.code_snippet}</code>
+                    </pre>
                   </div>
                 )}
 
-                {selectedPb.approval_status === "APPROVED" && (
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-foreground flex items-center gap-2.5">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                      <span>
-                        Human approval confirmed by <strong>{selectedPb.approved_by || "Admin"}</strong>. Safety gate unlocked.
-                      </span>
+                {/* Section 3: Execution Timeline */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    <span>Remediation Execution Timeline</span>
+                  </h4>
+
+                  <div className="rounded-xl border border-border/80 bg-surface-2/40 p-4 space-y-3">
+                    {selectedItem.execution_record?.timeline && selectedItem.execution_record.timeline.length > 0 ? (
+                      selectedItem.execution_record.timeline.map((step, sIdx) => (
+                        <div key={sIdx} className="flex items-start gap-3 text-xs">
+                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary shrink-0 font-bold text-[10px]">
+                            {sIdx + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground">{step.title}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(step.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{step.description}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3 text-xs">
+                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0 font-bold text-[10px]">
+                            ✓
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Recommendation Generated</span>
+                            <p className="text-[11px] text-muted-foreground">Root cause synthesized by Digital CISO AI.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 text-xs opacity-60">
+                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface-3 text-muted-foreground shrink-0 font-bold text-[10px]">
+                            2
+                          </div>
+                          <div>
+                            <span className="font-bold text-foreground">Awaiting Jira Ticket Dispatch</span>
+                            <p className="text-[11px] text-muted-foreground">Click "Create Jira Ticket" below to publish & assign.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Action Button */}
+                <div className="pt-2">
+                  {selectedItem.execution_record ? (
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-semibold">
+                      <div className="flex items-center gap-2 text-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        <span>Ticket active in Jira: <strong className="text-primary">{selectedItem.execution_record.issue_key}</strong></span>
+                      </div>
+                      <a
+                        href={selectedItem.execution_record.issue_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline font-bold"
+                      >
+                        <span>View Ticket</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </div>
+                  ) : (
                     <button
-                      onClick={() => handleExecute(selectedPb.id)}
-                      disabled={executingId === selectedPb.id}
-                      className="w-full inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 text-xs font-bold text-white shadow-lg shadow-emerald-900/30 transition-all hover:bg-emerald-500 active:scale-95 disabled:opacity-50 cursor-pointer"
+                      type="button"
+                      onClick={() => handleOpenCreateTicket(selectedItem)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 px-4 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all active:scale-95 cursor-pointer"
                     >
-                      <Play className={`h-4 w-4 ${executingId === selectedPb.id ? "animate-spin" : ""}`} />
-                      <span>
-                        {executingId === selectedPb.id ? "Running Simulation..." : "Run Simulated Execution (AI Execution Agent)"}
-                      </span>
+                      <Ticket className="h-4 w-4" />
+                      <span>Create Jira Ticket & Assign</span>
                     </button>
-                  </div>
-                )}
-
-                {selectedPb.approval_status === "EXECUTED" && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-600 flex items-center justify-between">
-                    <span className="flex items-center gap-2 font-semibold">
-                      <CheckCircle2 className="h-4 w-4 shrink-0" />
-                      Execution simulated — no real cloud changes were made. Re-run a scan to verify.
-                    </span>
-                    <span className="mono text-[10px]">SIMULATED</span>
-                  </div>
-                )}
-
-                {selectedPb.approval_status === "REJECTED" && (
-                  <div className="rounded-lg border border-critical/30 bg-critical/10 p-3 text-xs text-critical flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>Playbook was rejected. Manual review required.</span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </Panel>
           ) : (
-            <Panel index={1} className="p-8 text-center text-muted-foreground">
-              <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-xs">Select a playbook from the review queue to inspect and authorize execution.</p>
+            <Panel index={1} className="p-8 text-center text-muted-foreground text-xs">
+              Select a remediation item from the left queue to inspect details.
             </Panel>
           )}
         </div>
       </div>
+
+      {/* ── Modal / Drawer: Create Jira Ticket Flow ── */}
+      {isCreatingTicket && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="h-5 w-5 text-primary" />
+                <h3 className="font-display text-base font-bold text-foreground">
+                  Create & Assign Jira Remediation Ticket
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsCreatingTicket(false)}
+                className="rounded-lg p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Summary */}
+              <div>
+                <label className="block font-bold text-foreground mb-1">Issue Summary</label>
+                <input
+                  type="text"
+                  value={customSummary}
+                  onChange={(e) => setCustomSummary(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              {/* Project & Issue Type 2-Col */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-foreground mb-1">Target Project</label>
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    {projectsData?.items && projectsData.items.length > 0 ? (
+                      projectsData.items.map((p) => (
+                        <option key={p.key} value={p.key}>
+                          {p.name} ({p.key})
+                        </option>
+                      ))
+                    ) : (
+                      <option value="SEC">Security (SEC)</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-foreground mb-1">Issue Type</label>
+                  <select
+                    value={selectedIssueType}
+                    onChange={(e) => setSelectedIssueType(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="Task">Task</option>
+                    <option value="Bug">Bug</option>
+                    <option value="Security Finding">Security Finding</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Assignee Searchable Dropdown */}
+              <div className="relative">
+                <label className="block font-bold text-foreground mb-1">
+                  Assignee <span className="text-muted-foreground font-normal">(Search Jira users)</span>
+                </label>
+                <div
+                  onClick={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+                  className="flex items-center justify-between w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2 text-xs text-foreground cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-primary" />
+                    <span>{selectedAssignee ? `${selectedAssignee.displayName} (${selectedAssignee.emailAddress || 'User'})` : "Select an assignee..."}</span>
+                  </div>
+                  <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${assigneeDropdownOpen ? "rotate-90" : ""}`} />
+                </div>
+
+                {assigneeDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl border border-border bg-surface p-2 shadow-xl space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2 h-3 w-3 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={assigneeSearchQuery}
+                        onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                        placeholder="Search Jira users by name or email..."
+                        className="w-full rounded-lg border border-border bg-surface-2 pl-8 pr-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {assigneesLoading ? (
+                        <div className="p-2 text-center text-muted-foreground text-[11px]">Loading Jira users...</div>
+                      ) : assigneesData?.items && assigneesData.items.length > 0 ? (
+                        assigneesData.items.map((u) => (
+                          <div
+                            key={u.account_id}
+                            onClick={() => {
+                              setSelectedAssignee({
+                                accountId: u.account_id,
+                                displayName: u.display_name,
+                                emailAddress: u.email_address,
+                                avatarUrl: u.avatar_url,
+                              });
+                              setAssigneeDropdownOpen(false);
+                            }}
+                            className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-2 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              {u.avatar_url ? (
+                                <img src={u.avatar_url} alt="" className="h-5 w-5 rounded-full" />
+                              ) : (
+                                <User className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <div>
+                                <div className="font-bold text-foreground text-xs">{u.display_name}</div>
+                                <div className="text-[10px] text-muted-foreground">{u.email_address}</div>
+                              </div>
+                            </div>
+                            {selectedAssignee?.accountId === u.account_id && <Check className="h-3.5 w-3.5 text-primary" />}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-center text-muted-foreground text-[11px]">
+                          No Jira users found. Type to search or select unassigned.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Priority & Auto Labels */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-foreground mb-1">Priority</label>
+                  <select
+                    value={selectedPriority}
+                    onChange={(e) => setSelectedPriority(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="Highest">Highest (P1)</option>
+                    <option value="High">High (P2)</option>
+                    <option value="Medium">Medium (P3)</option>
+                    <option value="Low">Low (P4)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-foreground mb-1">Attached Labels</label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {["digital-ciso", "prowler", selectedItem.provider.toLowerCase(), selectedItem.severity].map((lbl) => (
+                      <span key={lbl} className="rounded bg-surface-2 border border-border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                        {lbl}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Structured Template Note */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-[11px] text-muted-foreground space-y-1">
+                <span className="font-bold text-foreground flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  Full Security Context Included
+                </span>
+                <p>Includes Executive Summary, Affected Resource, Compliance Findings, Risk Analysis, Remediation Playbook, and Verification Steps.</p>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setIsCreatingTicket(false)}
+                className="rounded-xl border border-border bg-surface-2 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmCreateTicket}
+                disabled={createTicketMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
+              >
+                <Send className={`h-3.5 w-3.5 ${createTicketMutation.isPending ? "animate-spin" : ""}`} />
+                <span>{createTicketMutation.isPending ? "Publishing to Jira..." : "Authorize & Create Ticket"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

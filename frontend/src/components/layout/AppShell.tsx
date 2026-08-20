@@ -69,8 +69,8 @@ export const navSections: NavSection[] = [
     label: "AI Engines",
     items: [
       { to: "/ai/advisor", label: "Spectra (Analysis)", icon: Sparkles },
-      { to: "/ai/decisions", label: "Aegis (Decisions)", icon: ScrollText },
-      { to: "/ai/settings", label: "Phantom (Execution)", icon: Settings2 },
+      { to: "/ai/decisions", label: "Aegis (Remediation)", icon: ScrollText },
+      { to: "/ai/settings", label: "Model Settings", icon: Settings2 },
     ],
   },
   {
@@ -320,7 +320,7 @@ export function AppShell({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+      if (e.key?.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setPaletteOpen((v) => !v);
       }

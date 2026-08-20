@@ -10,6 +10,9 @@ from api.models import (
     FindingAIAnalysis,
     RemediationPlaybook,
     CISOAdvisorConversation,
+    RemediationExecution,
+    JiraProjectMapping,
+    JiraAssigneeCache,
 
     AttackPathsScan,
     Finding,
@@ -4609,3 +4612,123 @@ class CISOAdvisorConversationSerializer(serializers.ModelSerializer):
 
     class JSONAPIMeta:
         resource_name = "ciso-advisor-conversations"
+
+
+class RemediationExecutionSerializer(serializers.ModelSerializer):
+    """Serializer for tracking Jira-based remediation tasks and timeline."""
+    class Meta:
+        model = RemediationExecution
+        fields = [
+            "id",
+            "finding_id",
+            "decision",
+            "playbook",
+            "issue_key",
+            "issue_url",
+            "issue_id",
+            "project_key",
+            "summary",
+            "description",
+            "status",
+            "jira_status",
+            "jira_status_category",
+            "priority",
+            "assignee_name",
+            "assignee_email",
+            "assignee_account_id",
+            "labels",
+            "ai_payload",
+            "timeline",
+            "error_message",
+            "last_synced_at",
+            "inserted_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "issue_key",
+            "issue_url",
+            "issue_id",
+            "jira_status",
+            "jira_status_category",
+            "timeline",
+            "last_synced_at",
+            "inserted_at",
+            "updated_at",
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "remediation-executions"
+
+
+class JiraProjectMappingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JiraProjectMapping
+        fields = [
+            "id",
+            "project_key",
+            "project_name",
+            "default_issue_type",
+            "default_priority",
+            "default_assignee_account_id",
+            "default_assignee_name",
+            "default_labels",
+            "inserted_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "inserted_at", "updated_at"]
+
+    class JSONAPIMeta:
+        resource_name = "jira-project-mappings"
+
+
+class JiraAssigneeCacheSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JiraAssigneeCache
+        fields = [
+            "id",
+            "project_key",
+            "account_id",
+            "display_name",
+            "email_address",
+            "avatar_url",
+            "active",
+            "last_synced_at",
+        ]
+        read_only_fields = ["id", "last_synced_at"]
+
+    class JSONAPIMeta:
+        resource_name = "jira-assignees-cache"
+
+
+class CreateJiraTicketRequestSerializer(serializers.Serializer):
+    """Payload for creating and assigning a Jira ticket from AI recommendation."""
+    finding_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    decision_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    playbook_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    project_key = serializers.CharField(max_length=50, required=True)
+    summary = serializers.CharField(max_length=255, required=True)
+    issue_type = serializers.CharField(max_length=100, default="Task")
+    priority = serializers.CharField(max_length=50, default="Medium")
+    assignee_account_id = serializers.CharField(max_length=200, required=False, allow_null=True, allow_blank=True)
+    assignee_name = serializers.CharField(max_length=200, required=False, allow_null=True, allow_blank=True)
+    assignee_email = serializers.CharField(max_length=200, required=False, allow_null=True, allow_blank=True)
+    labels = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    
+    # Structured remediation payload
+    finding_title = serializers.CharField(required=False, allow_blank=True)
+    check_id = serializers.CharField(required=False, allow_blank=True)
+    provider = serializers.CharField(required=False, default="cloud")
+    region = serializers.CharField(required=False, allow_blank=True)
+    resource_uid = serializers.CharField(required=False, allow_blank=True)
+    resource_name = serializers.CharField(required=False, allow_blank=True)
+    severity = serializers.CharField(required=False, default="medium")
+    risk_score = serializers.IntegerField(required=False, default=75)
+    risk_summary = serializers.CharField(required=False, allow_blank=True)
+    compliance_rules = serializers.ListField(required=False, default=list)
+    recommended_fix = serializers.CharField(required=False, allow_blank=True)
+    code_snippet = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    ai_reasoning = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    evidence = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    validation_steps = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+

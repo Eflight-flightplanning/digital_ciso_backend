@@ -3998,24 +3998,27 @@ class Integration(RowLevelSecurityProtectedModel):
 
 
     @property
-
     def credentials(self):
+        if not self._credentials:
+            return {}
 
         if isinstance(self._credentials, memoryview):
-
             encrypted_bytes = self._credentials.tobytes()
-
         elif isinstance(self._credentials, str):
-
             encrypted_bytes = self._credentials.encode()
-
         else:
-
             encrypted_bytes = self._credentials
 
-        decrypted_data = fernet.decrypt(encrypted_bytes)
+        if not encrypted_bytes:
+            return {}
 
-        return json.loads(decrypted_data.decode())
+        try:
+            decrypted_data = fernet.decrypt(encrypted_bytes)
+            return json.loads(decrypted_data.decode())
+        except (InvalidToken, Exception) as e:
+            logger.warning(f"Failed to decrypt credentials for integration {self.id}: {e}")
+            return {}
+
 
 
 
@@ -6895,3 +6898,154 @@ class CISOAdvisorConversation(RowLevelSecurityProtectedModel):
 
     def __str__(self):
         return f"CISOConversation tenant={self.tenant_id} q={self.question[:30]}..."
+
+
+# =============================================================================
+# JIRA REMEDIATION ORCHESTRATION MODELS
+# =============================================================================
+
+class RemediationExecution(RowLevelSecurityProtectedModel):
+    """
+    Execution and task tracking record for AI-generated remediations dispatched to Jira Cloud.
+    Maintains full lifecycle timeline from approval to resolution.
+    """
+    class ExecutionStatus(models.TextChoices):
+        PENDING = "PENDING", _("Pending Ticket Creation")
+        IN_PROGRESS = "IN_PROGRESS", _("In Progress (Jira Active)")
+        COMPLETED = "COMPLETED", _("Completed (Jira Resolved)")
+        FAILED = "FAILED", _("Failed")
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE, related_name="remediation_executions")
+    finding_id = models.UUIDField(db_index=True, null=True, blank=True)
+    decision = models.ForeignKey(
+        "SecurityDecision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="remediation_executions",
+    )
+    playbook = models.ForeignKey(
+        "RemediationPlaybook",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="remediation_executions",
+    )
+    
+    # Jira Details
+    issue_key = models.CharField(max_length=50, db_index=True)
+    issue_url = models.URLField(max_length=500, blank=True, null=True)
+    issue_id = models.CharField(max_length=50, blank=True, null=True)
+    project_key = models.CharField(max_length=50)
+    summary = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    
+    # Status & Progress
+    status = models.CharField(
+        max_length=50,
+        choices=ExecutionStatus.choices,
+        default=ExecutionStatus.PENDING,
+        db_index=True,
+    )
+    jira_status = models.CharField(max_length=100, default="To Do")
+    jira_status_category = models.CharField(max_length=50, default="new")
+    priority = models.CharField(max_length=50, default="Medium")
+    
+    # Assignee
+    assignee_name = models.CharField(max_length=200, blank=True, null=True)
+    assignee_email = models.CharField(max_length=200, blank=True, null=True)
+    assignee_account_id = models.CharField(max_length=200, blank=True, null=True)
+    
+    # Payload & Audit
+    labels = models.JSONField(default=list, blank=True)
+    ai_payload = models.JSONField(default=dict, blank=True)
+    timeline = models.JSONField(default=list, blank=True)
+    error_message = models.TextField(blank=True, null=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    
+    inserted_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "remediation_executions"
+        indexes = [
+            models.Index(fields=["tenant_id", "status"], name="remed_exec_tenant_status_idx"),
+            models.Index(fields=["tenant_id", "issue_key"], name="remed_exec_tenant_key_idx"),
+            models.Index(fields=["tenant_id", "finding_id"], name="remed_exec_tenant_find_idx"),
+        ]
+        constraints = [
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+        ordering = ["-inserted_at"]
+
+    class JSONAPIMeta:
+        resource_name = "remediation-executions"
+
+    def __str__(self):
+        return f"RemediationExecution[{self.issue_key}]: {self.summary[:40]} ({self.status})"
+
+
+class JiraProjectMapping(RowLevelSecurityProtectedModel):
+    """
+    Per-tenant Jira project defaults and pre-configured mapping for rapid ticket creation.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE, related_name="jira_project_mappings")
+    project_key = models.CharField(max_length=50)
+    project_name = models.CharField(max_length=200)
+    default_issue_type = models.CharField(max_length=100, default="Task")
+    default_priority = models.CharField(max_length=50, default="Medium")
+    default_assignee_account_id = models.CharField(max_length=200, blank=True, null=True)
+    default_assignee_name = models.CharField(max_length=200, blank=True, null=True)
+    default_labels = models.JSONField(default=list, blank=True)
+    
+    inserted_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "jira_project_mappings"
+        unique_together = ("tenant", "project_key")
+        constraints = [
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "jira-project-mappings"
+
+
+class JiraAssigneeCache(RowLevelSecurityProtectedModel):
+    """
+    Cached Jira assignable users for fast responsive search in the remediation UI.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    tenant = models.ForeignKey("Tenant", on_delete=models.CASCADE, related_name="jira_assignees_cache")
+    project_key = models.CharField(max_length=50, db_index=True)
+    account_id = models.CharField(max_length=200, db_index=True)
+    display_name = models.CharField(max_length=200)
+    email_address = models.CharField(max_length=200, blank=True, null=True)
+    avatar_url = models.URLField(max_length=500, blank=True, null=True)
+    active = models.BooleanField(default=True)
+    last_synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "jira_assignees_cache"
+        unique_together = ("tenant", "project_key", "account_id")
+        constraints = [
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "jira-assignees-cache"

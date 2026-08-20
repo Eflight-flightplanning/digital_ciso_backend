@@ -32,6 +32,14 @@ export const qk = {
   apiKeys: () => ["api-keys"] as const,
   attackPaths: () => ["attack-paths-scans"] as const,
   currentUser: () => ["users", "me"] as const,
+  jiraConfig: () => ["jira-config"] as const,
+  jiraProjects: () => ["jira-projects"] as const,
+  jiraIssueTypes: (projectKey: string) => ["jira-issue-types", projectKey] as const,
+  jiraAssignees: (projectKey: string, query?: string) => ["jira-assignees", projectKey, query ?? ""] as const,
+  jiraPriorities: () => ["jira-priorities"] as const,
+  remediationExecutions: (status?: string) => ["remediation-executions", status ?? "ALL"] as const,
+  remediationExecution: (id: string) => ["remediation-executions", id] as const,
+  remediationMetrics: () => ["remediation-metrics"] as const,
 };
 
 // ─── Query param builder ───────────────────────────────────────────────────
@@ -512,4 +520,264 @@ export function useExecutePlaybook() {
     },
   });
 }
+
+// ─── Jira Cloud Integration & Remediation Orchestration ────────────────────
+
+export interface JiraConfig {
+  id?: string;
+  connected: boolean;
+  base_url: string;
+  email: string;
+  has_api_token: boolean;
+  default_project: string;
+  default_issue_type: string;
+  default_priority: string;
+  default_labels: string[];
+  last_sync: string | null;
+  connection_health: string;
+}
+
+export function useJiraConfig() {
+  return useQuery({
+    queryKey: qk.jiraConfig(),
+    queryFn: async () => {
+      const res = await api.get("/jira/config", { jsonApi: false });
+      return res as JiraConfig;
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useSaveJiraConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      base_url: string;
+      email: string;
+      api_token?: string;
+      default_project?: string;
+      default_issue_type?: string;
+      default_priority?: string;
+      default_labels?: string[];
+    }) => {
+      return await api.post("/jira/config", payload, { jsonApi: false });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.jiraConfig() });
+      queryClient.invalidateQueries({ queryKey: qk.integrations() });
+    },
+  });
+}
+
+export function useTestJiraConnection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload?: {
+      base_url?: string;
+      email?: string;
+      api_token?: string;
+    }) => {
+      return await api.post("/jira/test-connection", payload ?? {}, { jsonApi: false });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.jiraConfig() });
+    },
+  });
+}
+
+export function useJiraProjects() {
+  return useQuery({
+    queryKey: qk.jiraProjects(),
+    queryFn: async () => {
+      const res = await api.get("/jira/projects", { jsonApi: false });
+      return res as { items: Array<{ id: string; key: string; name: string; avatar_url?: string; lead?: string }>; count: number };
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useJiraIssueTypes(projectKey?: string) {
+  return useQuery({
+    queryKey: qk.jiraIssueTypes(projectKey ?? ""),
+    queryFn: async () => {
+      if (!projectKey) return { items: [], count: 0 };
+      const res = await api.get(`/jira/projects/${encodeURIComponent(projectKey)}/issue-types`, { jsonApi: false });
+      return res as { items: Array<{ id: string; name: string; description: string; subtask: boolean; icon_url?: string }>; count: number };
+    },
+    enabled: Boolean(projectKey),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useJiraAssignees(projectKey?: string, query: string = "") {
+  return useQuery({
+    queryKey: qk.jiraAssignees(projectKey ?? "", query),
+    queryFn: async () => {
+      if (!projectKey) return { items: [], count: 0 };
+      const q = query ? `?query=${encodeURIComponent(query)}` : "";
+      const res = await api.get(`/jira/projects/${encodeURIComponent(projectKey)}/assignees${q}`, { jsonApi: false });
+      return res as { items: Array<{ account_id: string; display_name: string; email_address?: string; avatar_url?: string; active?: boolean }>; count: number };
+    },
+    enabled: Boolean(projectKey),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useJiraPriorities() {
+  return useQuery({
+    queryKey: qk.jiraPriorities(),
+    queryFn: async () => {
+      const res = await api.get("/jira/priorities", { jsonApi: false });
+      return res as { items: Array<{ id: string; name: string; description?: string; icon_url?: string }>; count: number };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export interface RemediationExecutionRecord {
+  id: string;
+  finding_id?: string;
+  decision?: string;
+  playbook?: string;
+  issue_key: string;
+  issue_url: string;
+  issue_id?: string;
+  project_key: string;
+  summary: string;
+  description?: string;
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | string;
+  jira_status: string;
+  jira_status_category: string;
+  priority: string;
+  assignee_name?: string;
+  assignee_email?: string;
+  assignee_account_id?: string;
+  labels: string[];
+  ai_payload?: Record<string, unknown>;
+  timeline: Array<{
+    stage: string;
+    timestamp: string;
+    title: string;
+    description: string;
+    actor: string;
+    status: string;
+  }>;
+  error_message?: string;
+  last_synced_at?: string;
+  inserted_at: string;
+  updated_at: string;
+}
+
+export function useRemediationExecutions(statusFilter?: string) {
+  return useQuery({
+    queryKey: qk.remediationExecutions(statusFilter),
+    queryFn: async () => {
+      const param = statusFilter && statusFilter !== "All" ? `?status=${encodeURIComponent(statusFilter.toUpperCase())}` : "";
+      const res = await api.get(`/remediations/executions${param}`, { jsonApi: false });
+      // Handles both JSON:API unwrapping and raw DRF response
+      const list = Array.isArray(res) ? res : ((res as any)?.results || (res as any)?.items || (res as any)?.data || []);
+      return list as RemediationExecutionRecord[];
+    },
+    staleTime: 15 * 1000,
+  });
+}
+
+export function useRemediationExecution(id: string) {
+  return useQuery({
+    queryKey: qk.remediationExecution(id),
+    queryFn: async () => {
+      const res = await api.get(`/remediations/executions/${id}`, { jsonApi: false });
+      return res as RemediationExecutionRecord;
+    },
+    enabled: Boolean(id),
+    staleTime: 15 * 1000,
+  });
+}
+
+export function useCreateJiraRemediationTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      finding_id?: string;
+      decision_id?: string;
+      playbook_id?: string;
+      project_key: string;
+      summary: string;
+      issue_type?: string;
+      priority?: string;
+      assignee_account_id?: string;
+      assignee_name?: string;
+      assignee_email?: string;
+      labels?: string[];
+      finding_title?: string;
+      check_id?: string;
+      provider?: string;
+      region?: string;
+      resource_uid?: string;
+      resource_name?: string;
+      severity?: string;
+      risk_score?: number;
+      risk_summary?: string;
+      compliance_rules?: any[];
+      recommended_fix?: string;
+      code_snippet?: string;
+      ai_reasoning?: string;
+      evidence?: string;
+      validation_steps?: string[];
+    }) => {
+      return await api.post("/remediations/executions/create-ticket", payload, { jsonApi: false });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.remediationExecutions() });
+      queryClient.invalidateQueries({ queryKey: qk.remediationMetrics() });
+      queryClient.invalidateQueries({ queryKey: ["remediation-playbooks"] });
+      queryClient.invalidateQueries({ queryKey: qk.securityDecisions() });
+    },
+  });
+}
+
+export function useSyncJiraExecutionStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await api.post(`/remediations/executions/${id}/sync`, {}, { jsonApi: false });
+    },
+    onSuccess: (data: any, id: string) => {
+      queryClient.invalidateQueries({ queryKey: qk.remediationExecutions() });
+      queryClient.invalidateQueries({ queryKey: qk.remediationExecution(id) });
+      queryClient.invalidateQueries({ queryKey: qk.remediationMetrics() });
+    },
+  });
+}
+
+export interface RemediationMetrics {
+  tickets_created: number;
+  pending_approval: number;
+  in_progress: number;
+  resolved: number;
+  failed: number;
+  recent_activity: Array<{
+    id: string;
+    issue_key: string;
+    summary: string;
+    status: string;
+    jira_status: string;
+    assignee: string;
+    priority: string;
+    timestamp: string;
+    issue_url?: string;
+  }>;
+}
+
+export function useRemediationMetrics() {
+  return useQuery({
+    queryKey: qk.remediationMetrics(),
+    queryFn: async () => {
+      const res = await api.get("/remediations/metrics", { jsonApi: false });
+      return res as RemediationMetrics;
+    },
+    staleTime: 15 * 1000,
+  });
+}
+
 
