@@ -51,7 +51,7 @@ function IntegrationsPage() {
   const [defaultProject, setDefaultProject] = useState("");
   const [defaultIssueType, setDefaultIssueType] = useState("Task");
   const [defaultPriority, setDefaultPriority] = useState("Medium");
-  const [defaultLabels, setDefaultLabels] = useState("digital-ciso, prowler, security");
+  const [defaultLabels, setDefaultLabels] = useState("digital-ciso, security");
 
   const [testResult, setTestResult] = useState<{
     success: boolean;

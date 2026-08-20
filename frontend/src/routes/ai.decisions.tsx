@@ -1959,7 +1959,7 @@ function extractFindingProvider(f: any): string {
                 <div>
                   <label className="block font-bold text-foreground mb-1">Attached Labels</label>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {["digital-ciso", "prowler", selectedItem.provider.toLowerCase(), selectedItem.severity].map((lbl) => (
+                    {["digital-ciso", "security", selectedItem.provider.toLowerCase(), selectedItem.severity].map((lbl) => (
                       <span key={lbl} className="rounded bg-surface-2 border border-border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
                         {lbl}
                       </span>

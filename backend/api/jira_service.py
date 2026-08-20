@@ -289,12 +289,12 @@ class JiraService:
         Creates an issue in Jira Cloud using API v3 with ADF description.
         Assigns the issue immediately to the selected user.
         """
-        # Ensure sanitized labels
+        # Ensure sanitized labels (strictly exclude 'prowler')
         clean_labels = []
         if labels:
             for l in labels:
                 sanitized = str(l).strip().replace(" ", "-").lower()
-                if sanitized and sanitized not in clean_labels:
+                if sanitized and sanitized != "prowler" and sanitized not in clean_labels:
                     clean_labels.append(sanitized)
 
         fields: Dict[str, Any] = {
