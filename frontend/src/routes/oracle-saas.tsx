@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Users,
@@ -206,6 +206,17 @@ export function OracleSaasPage() {
     currentProjKey,
     assigneeSearchQuery
   );
+  const assigneesList = useMemo(() => assigneesData?.items || [], [assigneesData]);
+  const filteredAssignees = useMemo(() => {
+    if (!assigneeSearchQuery) return assigneesList;
+    const q = assigneeSearchQuery.toLowerCase();
+    return assigneesList.filter(
+      (a: any) =>
+        a.display_name?.toLowerCase().includes(q) ||
+        a.email_address?.toLowerCase().includes(q)
+    );
+  }, [assigneesList, assigneeSearchQuery]);
+
   const createJiraMutation = useCreateJiraRemediationTicket();
 
   const [dispatchedJiraTasks, setDispatchedJiraTasks] = useState<Record<string, DispatchedJiraTask>>({});
@@ -423,8 +434,9 @@ export function OracleSaasPage() {
         recommended_fix: `${jiraActionType}. Action initiated by security team in Digital CISO Console.\n\nNotes: ${jiraCustomNotes || "Execute change during next maintenance window and notify user manager."}`,
       });
 
+      const baseJiraUrl = jiraConfig?.base_url?.replace(/\/$/, "") || "https://pravahya1.atlassian.net";
       const ticketKey = res?.key || res?.data?.attributes?.issue_key || `SEC-${Math.floor(100 + Math.random() * 900)}`;
-      const ticketUrl = res?.url || res?.data?.attributes?.issue_url || `https://acme.atlassian.net/browse/${ticketKey}`;
+      const ticketUrl = res?.url || res?.data?.attributes?.issue_url || `${baseJiraUrl}/browse/${ticketKey}`;
 
       const dispatchedItem: DispatchedJiraTask = {
         issue_key: ticketKey,
@@ -850,14 +862,13 @@ export function OracleSaasPage() {
                       <th className="py-3 px-4 font-semibold">Last Login</th>
                       <th className="py-3 px-4 font-semibold">Inactivity</th>
                       <th className="py-3 px-4 font-semibold">Status / Risk</th>
-                      <th className="py-3 px-4 font-semibold">Manual Change (Jira)</th>
                       <th className="py-3 px-4 font-semibold text-right">Remediation Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={7} className="py-12 text-center text-muted-foreground">
                           <Users className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
                           <p className="text-sm font-semibold text-foreground">No Users Match the Filter Criteria</p>
                           <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
@@ -866,112 +877,99 @@ export function OracleSaasPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-surface-2/30 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono font-bold text-foreground">{user.username}</span>
+                      filteredUsers.map((user) => {
+                        const dispatchedTask = dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username];
+                        return (
+                          <tr key={user.id} className="hover:bg-surface-2/30 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-foreground">{user.username}</span>
+                                </div>
+                                <span className="text-[11px] text-muted-foreground">{user.display_name} • {user.email}</span>
                               </div>
-                              <span className="text-[11px] text-muted-foreground">{user.display_name} • {user.email}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-muted-foreground">{user.person_number}</td>
-                          <td className="py-3.5 px-4 text-foreground">{user.department}</td>
-                          <td className="py-3.5 px-4 font-mono text-muted-foreground">
-                            {user.last_login && !isNaN(Date.parse(user.last_login)) ? new Date(user.last_login).toLocaleDateString() : (user.last_login || "N/A")}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-mono font-bold ${
-                                user.days_inactive >= 90 ? "text-red-500" : user.days_inactive >= 60 ? "text-amber-500" : user.days_inactive >= 30 ? "text-amber-400" : "text-emerald-400"
-                              }`}>
-                                {user.days_inactive === 0 ? "Active (<1d)" : `${user.days_inactive} days`}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {user.is_suspended ? (
-                              <Chip tone="neutral">
-                                <UserX className="h-3 w-3" /> Suspended
-                              </Chip>
-                            ) : user.days_inactive >= 90 ? (
-                              <Chip tone="critical">
-                                <Dot tone="critical" /> CRITICAL DORMANT
-                              </Chip>
-                            ) : user.days_inactive >= 60 ? (
-                              <Chip tone="caution">
-                                <Dot tone="caution" /> HIGH DORMANT
-                              </Chip>
-                            ) : user.days_inactive >= 30 ? (
-                              <Chip tone="neutral">
-                                <Dot tone="neutral" /> MEDIUM DORMANT
-                              </Chip>
-                            ) : (
-                              <Chip tone="success">
-                                <Dot tone="success" /> Active Account
-                              </Chip>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username] ? (
-                              (() => {
-                                const task = dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username];
-                                return (
-                                  <a
-                                    href={task.issue_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary hover:bg-primary/20 transition-all hover:scale-105 group"
-                                    title={`Assigned to ${task.assignee_name}. Click to view Jira issue.`}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-muted-foreground">{user.person_number}</td>
+                            <td className="py-3.5 px-4 text-foreground">{user.department}</td>
+                            <td className="py-3.5 px-4 font-mono text-muted-foreground">
+                              {user.last_login && !isNaN(Date.parse(user.last_login)) ? new Date(user.last_login).toLocaleDateString() : (user.last_login || "N/A")}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`font-mono font-bold ${
+                                  user.days_inactive >= 90 ? "text-red-500" : user.days_inactive >= 60 ? "text-amber-500" : user.days_inactive >= 30 ? "text-amber-400" : "text-emerald-400"
+                                }`}>
+                                  {user.days_inactive === 0 ? "Active (<1d)" : `${user.days_inactive} days`}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {user.is_suspended ? (
+                                <Chip tone="neutral">
+                                  <UserX className="h-3 w-3" /> Suspended
+                                </Chip>
+                              ) : user.days_inactive >= 90 ? (
+                                <Chip tone="critical">
+                                  <Dot tone="critical" /> CRITICAL DORMANT
+                                </Chip>
+                              ) : user.days_inactive >= 60 ? (
+                                <Chip tone="caution">
+                                  <Dot tone="caution" /> HIGH DORMANT
+                                </Chip>
+                              ) : user.days_inactive >= 30 ? (
+                                <Chip tone="neutral">
+                                  <Dot tone="neutral" /> MEDIUM DORMANT
+                                </Chip>
+                              ) : (
+                                <Chip tone="success">
+                                  <Dot tone="success" /> Active Account
+                                </Chip>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              {dispatchedTask ? (
+                                <a
+                                  href={dispatchedTask.issue_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary hover:bg-primary/20 transition-all hover:scale-105 group"
+                                  title={`Assigned to ${dispatchedTask.assignee_name}. Click to view Jira issue.`}
+                                >
+                                  <Ticket className="h-3.5 w-3.5 text-primary shrink-0" />
+                                  <span>{dispatchedTask.issue_key}</span>
+                                  <span className="text-[10px] font-sans font-normal text-muted-foreground group-hover:text-foreground">
+                                    ({dispatchedTask.assignee_name.split(" ")[0]})
+                                  </span>
+                                  <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-70 group-hover:opacity-100" />
+                                </a>
+                              ) : user.days_inactive >= 30 && !user.is_suspended ? (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => handleOpenJiraDispatch(user)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#0052CC]/40 bg-[#0052CC]/15 hover:bg-[#0052CC] px-2.5 py-1 text-xs font-semibold text-blue-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                                    title="Raise Jira Remediation Ticket for this dormant account"
                                   >
-                                    <Ticket className="h-3.5 w-3.5 text-primary shrink-0" />
-                                    <span>{task.issue_key}</span>
-                                    <span className="text-[10px] font-sans font-normal text-muted-foreground group-hover:text-foreground">
-                                      ({task.assignee_name.split(" ")[0]})
-                                    </span>
-                                    <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-70 group-hover:opacity-100" />
-                                  </a>
-                                );
-                              })()
-                            ) : (
-                              <button
-                                onClick={() => handleOpenJiraDispatch(user)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2/60 px-2.5 py-1 text-xs font-semibold text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer shadow-xs active:scale-95"
-                              >
-                                <UserPlus className="h-3.5 w-3.5 text-primary" />
-                                <span>Assign Jira Change</span>
-                              </button>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            {user.days_inactive >= 30 && !user.is_suspended ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <Link
-                                  to="/ai/decisions"
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#0052CC]/40 bg-[#0052CC]/15 hover:bg-[#0052CC] px-2.5 py-1 text-xs font-semibold text-blue-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
-                                  title="Open Jira Remediation Console to dispatch ticket"
-                                >
-                                  <JiraIcon className="h-3.5 w-3.5" />
-                                  <span>Jira Ticket</span>
-                                </Link>
-                                <button
-                                  onClick={() => handleStageRemediation(user)}
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-600 px-2.5 py-1 text-xs font-semibold text-red-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
-                                  title="Directly deactivate account via Oracle HCM API"
-                                >
-                                  <Zap className="h-3.5 w-3.5" />
-                                  <span>Direct Remediate</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Active Account
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                                    <JiraIcon className="h-3.5 w-3.5" />
+                                    <span>Jira Ticket</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleStageRemediation(user)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-600 px-2.5 py-1 text-xs font-semibold text-red-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                                    title="Directly deactivate account via Oracle HCM API"
+                                  >
+                                    <Zap className="h-3.5 w-3.5" />
+                                    <span>Direct Remediate</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Active Account
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

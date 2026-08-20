@@ -570,7 +570,7 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
 
             # Prepare default labels
             raw_labels = data.get("labels") or []
-            auto_labels = ["digital-ciso", "prowler", data.get("provider", "cloud").lower(), data.get("severity", "medium").lower()]
+            auto_labels = ["digital-ciso", "security", data.get("provider", "cloud").lower(), data.get("severity", "medium").lower()]
             for al in auto_labels:
                 if al not in raw_labels:
                     raw_labels.append(al)
@@ -595,10 +595,11 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
                 proj = data.get("project_key", "SEC")
                 next_num = 100 + RemediationExecution.objects.filter(project_key=proj).count() + 1
                 key = f"{proj}-{next_num}"
+                base_jira_url = (service.base_url.rstrip("/") if service and service.base_url else "https://pravahya1.atlassian.net")
                 ticket = {
                     "id": str(10000 + next_num),
                     "key": key,
-                    "url": f"https://acme.atlassian.net/browse/{key}",
+                    "url": f"{base_jira_url}/browse/{key}",
                     "project_key": proj,
                 }
 

@@ -943,8 +943,17 @@ function AIDecisionsPage() {
   const remediationItems: FindingRemediationItem[] = useMemo(() => {
     const list: FindingRemediationItem[] = [];
 
-    // 1. First extract all real failed findings from database
-    const failedFindings = realFindings.filter((f: any) => f.status === "FAIL");
+    // 1. First extract all real failed findings from database strictly for connected providers
+    const failedFindings = realFindings.filter((f: any) => {
+      if (f.status !== "FAIL") return false;
+      const prov = (f.scan?.provider?.provider || f.provider || (f.resources && f.resources[0]?.provider) || "").toUpperCase();
+      if (prov) {
+        if (prov === "ORACLECLOUD" && (connectedProviderSet.has("OCI") || connectedProviderSet.has("ORACLECLOUD"))) return true;
+        if (prov === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS")) return true;
+        if (!connectedProviderSet.has(prov)) return false;
+      }
+      return true;
+    });
 
     failedFindings.forEach((f: any, idx: number) => {
       const checkId = f.check_id || `check_${idx + 1}`;
@@ -953,12 +962,19 @@ function AIDecisionsPage() {
       const res = (f.resources && f.resources[0]) || f.resource || {};
       const resName = res.name || f.resource_name || `resource-${idx + 1}`;
       const resUid = res.uid || f.resource_uid || `res-uid-${idx + 1}`;
-      const region = res.region || f.region || "Global";
-      const provider = (f.scan?.provider?.provider || f.provider || "AWS").toUpperCase();
+      
+      const provRaw = (
+        f.scan?.provider?.provider ||
+        f.provider ||
+        (f.resources && f.resources[0]?.provider) ||
+        (connectedProviders.length > 0 ? connectedProviders[0].providerUpper : "AZURE")
+      );
+      const provider = (provRaw === "oraclecloud" ? "OCI" : provRaw || "AZURE").toUpperCase();
+      const region = res.region || f.region || f.raw_result?.Region || (provider === "AZURE" ? "eastus" : provider === "OCI" ? "us-ashburn-1" : "Global");
       const severity = (f.severity || "medium").toLowerCase();
 
       const matchedExec = executions.find(
-        (ex) => ex.finding_id === f.id || ex.summary?.toLowerCase().includes(checkId.toLowerCase())
+        (ex) => ex.finding_id === f.id || (ex.summary && checkId && ex.summary.toLowerCase().includes(checkId.toLowerCase()))
       );
 
       const remediation = generateProviderRemediation(
@@ -1004,12 +1020,18 @@ function AIDecisionsPage() {
       });
     });
 
-    // 2. Append default enterprise multi-cloud findings catalog (strictly filtered by added providers)
+    // 2. Append default baseline catalog ONLY for connected providers that have zero real findings
     const allowedCatalog = defaultEnterpriseCatalog.filter((cat) => {
       const catProv = cat.provider.toUpperCase();
-      if (catProv === "ORACLECLOUD" && (connectedProviderSet.has("OCI") || connectedProviderSet.has("ORACLECLOUD"))) return true;
-      if (catProv === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS")) return true;
-      return connectedProviderSet.has(catProv);
+      const isConnected =
+        connectedProviderSet.has(catProv) ||
+        (catProv === "ORACLECLOUD" && connectedProviderSet.has("OCI")) ||
+        (catProv === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS"));
+      if (!isConnected) return false;
+      const hasRealForProv = list.some(
+        (item) => item.provider === catProv || (catProv === "ORACLECLOUD" && item.provider === "OCI")
+      );
+      return !hasRealForProv;
     });
 
     allowedCatalog.forEach((cat, cIdx) => {
