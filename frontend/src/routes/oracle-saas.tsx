@@ -412,7 +412,17 @@ export function OracleSaasPage() {
   const handleConfirmJiraDispatch = async () => {
     if (!selectedUserForJira || !selectedAssignee) return;
     const projectKey = selectedProjectKey || jiraConfig?.default_project || "SEC";
-    const summary = `[Oracle SaaS IAM] Manual Change: ${jiraActionType} for ${selectedUserForJira.username}`;
+    const summary = `[Oracle SaaS IAM] ${jiraActionType}: ${selectedUserForJira.username} (${selectedUserForJira.days_inactive}d dormant)`;
+
+    const actionDescriptions: Record<string, string> = {
+      "Suspend Inactive Account": "Disables Oracle Fusion login credentials completely. Best for accounts inactive >90 days or offboarded employees to prevent unauthorized interactive access while retaining audit trails under SOX ITGC.",
+      "Revoke Privileged Roles": "Leaves the account active, but strips elevated PAM and administrative implementation consultant roles (e.g. IT Security Manager, Application Implementation Consultant).",
+      "Trigger Manager Recertification": "Dispatches a formal review request to the line manager for business justification and active employment re-validation under SOX 404.",
+      "Audit SoD Conflict Violation": "Reviews toxic role combinations and segregation of duties conflicts under SOX 404 ITGC.",
+    };
+
+    const actionDetail = actionDescriptions[jiraActionType] || jiraActionType;
+    const fixText = `${jiraActionType}\n${actionDetail}\n\nTechnical Remediation:\n• Target Endpoint: Oracle HCM REST API (PATCH /hcmRestApi/resources/11.13.18.05/userAccounts/${selectedUserForJira.guid})\n• Direct Action: Set { "Suspended": true }\n• Alternate Manual: Navigate to Oracle Security Console -> Users -> Lock/Deactivate User Account.\n\nSecurity Notes: ${jiraCustomNotes || "Execute change during next scheduled maintenance window and notify department manager."}`;
 
     try {
       const res: any = await createJiraMutation.mutateAsync({
@@ -430,8 +440,8 @@ export function OracleSaasPage() {
         resource_uid: selectedUserForJira.guid,
         resource_name: selectedUserForJira.username,
         severity: selectedUserForJira.days_inactive >= 90 ? "critical" : "high",
-        risk_summary: `User '${selectedUserForJira.username}' (${selectedUserForJira.display_name}) in department '${selectedUserForJira.department}' has been inactive for ${selectedUserForJira.days_inactive} days with assigned roles: ${selectedUserForJira.roles.join(", ")}.`,
-        recommended_fix: `${jiraActionType}. Action initiated by security team in Digital CISO Console.\n\nNotes: ${jiraCustomNotes || "Execute change during next maintenance window and notify user manager."}`,
+        risk_summary: `User '${selectedUserForJira.username}' (${selectedUserForJira.display_name}) in department '${selectedUserForJira.department}' has been inactive for ${selectedUserForJira.days_inactive} days with assigned roles: ${selectedUserForJira.roles.join(", ")}.\n\nRequired Action: ${actionDetail}`,
+        recommended_fix: fixText,
       });
 
       const baseJiraUrl = jiraConfig?.base_url?.replace(/\/$/, "") || "https://pravahya1.atlassian.net";
@@ -946,18 +956,18 @@ export function OracleSaasPage() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={() => handleOpenJiraDispatch(user)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#0052CC] to-[#0065FF] hover:from-[#0747A6] hover:to-[#0052CC] px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 transition-all duration-200 cursor-pointer active:scale-95 border border-blue-400/30"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-surface-2/80 hover:bg-surface-2 hover:border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-all duration-150 cursor-pointer active:scale-95 shadow-sm"
                                     title="Raise Jira Remediation Ticket for this dormant account"
                                   >
-                                    <JiraIcon className="h-3.5 w-3.5 fill-white text-white" />
+                                    <JiraIcon className="h-3.5 w-3.5 text-[#0052CC] shrink-0" />
                                     <span>Jira Ticket</span>
                                   </button>
                                   <button
                                     onClick={() => handleStageRemediation(user)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-rose-500/20 hover:shadow-rose-500/35 transition-all duration-200 cursor-pointer active:scale-95 border border-rose-400/30"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-surface-2/80 hover:bg-surface-2 hover:border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-all duration-150 cursor-pointer active:scale-95 shadow-sm"
                                     title="Directly deactivate account via Oracle HCM REST API"
                                   >
-                                    <Zap className="h-3.5 w-3.5 text-amber-200 fill-amber-200" />
+                                    <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                     <span>Direct Remediate</span>
                                   </button>
                                 </div>
