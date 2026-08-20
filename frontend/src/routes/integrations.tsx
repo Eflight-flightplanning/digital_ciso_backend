@@ -380,6 +380,40 @@ function IntegrationsPage() {
                   </p>
                 </div>
 
+                {/* Default Target Project */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Default Target Project
+                  </label>
+                  {projects.length > 0 ? (
+                    <select
+                      value={defaultProject || projects[0]?.key || "SEC"}
+                      onChange={(e) => setDefaultProject(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-xs text-foreground font-mono font-medium focus:border-primary focus:outline-none transition-colors cursor-pointer"
+                    >
+                      {projects.map((p) => (
+                        <option key={p.key} value={p.key}>
+                          {p.key} — {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="relative">
+                      <FileText className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={defaultProject}
+                        onChange={(e) => setDefaultProject(e.target.value.toUpperCase())}
+                        placeholder="e.g. SEC or IT"
+                        className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3.5 py-2.5 text-xs text-foreground font-mono uppercase placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+                      />
+                    </div>
+                  )}
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Remediation tickets will be automatically created under this Jira project by default.
+                  </p>
+                </div>
+
                 {/* Actions */}
                 <div className="flex items-center gap-3 pt-4 border-t border-border/60">
                   <button
