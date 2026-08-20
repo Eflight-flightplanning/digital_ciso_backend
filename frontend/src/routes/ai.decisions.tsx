@@ -1045,12 +1045,13 @@ function extractFindingProvider(f: any): string {
       // Don't duplicate if already present
       if (list.some((item) => item.check_id === cat.check_id)) return;
 
+      const catProvider = (cat.provider === "ORACLECLOUD" ? "OCI" : cat.provider).toUpperCase();
       const matchedExec = executions.find(
-        (ex) => ex.finding_id === cat.finding_id || ex.summary?.toLowerCase().includes(cat.check_id.toLowerCase())
+        (ex) => ex.finding_id === cat.finding_id || (ex.summary && cat.check_id && ex.summary.toLowerCase().includes(cat.check_id.toLowerCase()))
       );
 
       const remediation = generateProviderRemediation(
-        cat.provider,
+        catProvider,
         cat.check_id,
         cat.resource_name,
         cat.resource_uid,
@@ -1070,7 +1071,7 @@ function extractFindingProvider(f: any): string {
         check_id: cat.check_id,
         title: `Remediate ${cat.check_id.replace(/_/g, " ")}`,
         finding_title: cat.finding_title,
-        provider: cat.provider,
+        provider: catProvider,
         region: cat.region,
         resource_uid: cat.resource_uid,
         resource_name: cat.resource_name,
@@ -1084,7 +1085,7 @@ function extractFindingProvider(f: any): string {
         console_steps: remediation.console_steps,
         validation_steps: remediation.validation_steps,
         remediation_url: remediation.remediation_url,
-        ai_reasoning: `Digital CISO Threat Engine analyzed telemetry for ${cat.resource_uid}. Root cause analysis indicates non-compliance with ${cat.provider} baseline security architecture.`,
+        ai_reasoning: `Digital CISO Threat Engine analyzed telemetry for ${cat.resource_uid}. Root cause analysis indicates non-compliance with ${catProvider} baseline security architecture.`,
         evidence: cat.status_extended,
         approval_status: approvalStatus,
         execution_record: matchedExec,
@@ -1115,7 +1116,7 @@ function extractFindingProvider(f: any): string {
         if (selectedProviderFilter === "ORACLE_SAAS") {
           if (!itemProv.includes("SAAS") && !itemProv.includes("ORACLE_SAAS")) return false;
         } else if (selectedProviderFilter === "OCI" || selectedProviderFilter === "ORACLECLOUD") {
-          if (!itemProv.includes("ORACLE") && !itemProv.includes("OCI")) return false;
+          if (itemProv !== "OCI" && itemProv !== "ORACLECLOUD" && !itemProv.includes("ORACLE")) return false;
         } else if (selectedProviderFilter === "KUBERNETES") {
           if (!itemProv.includes("KUBE") && !itemProv.includes("K8S")) return false;
         } else if (itemProv !== selectedProviderFilter) {

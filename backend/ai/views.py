@@ -448,8 +448,13 @@ class AIAdvisorQueryView(APIView):
                 or _attrs.get("question")
                 or ""
             ).strip()
+            history = raw_data.get("history") or _attrs.get("history") or []
         else:
             question = ""
+            history = []
+
+        if not isinstance(history, list):
+            history = []
 
         if not question:
             return Response(
