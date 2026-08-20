@@ -472,13 +472,15 @@ function FleetCircularGauge({ score }: { score: number }) {
   );
 }
 
-function getProviderOfFinding(f: any): "AZURE" | "OCI" | "AWS" | "GCP" | "OTHER" {
-  const p = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
-  const uid = String(f.uid || f.id || f.prowler_uid || "");
+function getProviderOfFinding(f: any): "AZURE" | "OCI" | "AWS" | "GCP" | "KUBERNETES" | "ORACLE_SAAS" | "OTHER" {
+  const p = String(f.provider || f.provider_type || f.scan?.provider?.provider || f.check_metadata?.provider || f.raw_result?.Provider || "").toUpperCase();
+  const uid = String(f.uid || f.id || f.prowler_uid || f.resources?.[0]?.uid || f.resource_uid || "").toLowerCase();
   if (p === "AZURE" || uid.includes("/subscriptions/") || uid.includes("azure")) return "AZURE";
-  if (p === "OCI" || p === "ORACLECLOUD" || uid.includes("ocid1.") || uid.includes("oraclecloud")) return "OCI";
   if (p === "AWS" || uid.includes("arn:aws:")) return "AWS";
   if (p === "GCP" || uid.includes("projects/")) return "GCP";
+  if (p === "OCI" || p === "ORACLECLOUD" || uid.includes("ocid1.") || uid.includes("oraclecloud")) return "OCI";
+  if (p === "KUBERNETES" || p === "K8S" || uid.includes("k8s") || uid.includes("kube")) return "KUBERNETES";
+  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || uid.includes(".oraclecloud.com") || uid.includes("fusion")) return "ORACLE_SAAS";
   return "OTHER";
 }
 
@@ -498,12 +500,35 @@ export function CompliancePage() {
   const rawFindings = findingsData?.items ?? [];
   const realResources = resourcesData?.items ?? [];
 
+  // Connected providers from database
+  const connectedProviders = useMemo(() => {
+    const list = (providersData?.items as Array<Record<string, unknown>>) || [];
+    return list.map((p) => {
+      const provStr = String(p.provider || "").toUpperCase();
+      const provType = provStr === "ORACLECLOUD" ? "OCI" : provStr;
+      return {
+        id: String(p.id),
+        alias: String(p.alias || p.name || provType),
+        providerUpper: provType,
+      };
+    });
+  }, [providersData]);
+
+  // Set of upper-case connected provider names
+  const connectedProviderSet = useMemo(() => {
+    const set = new Set(connectedProviders.map((p) => p.providerUpper));
+    if (set.size === 0) set.add("AZURE"); // Default fallback
+    return set;
+  }, [connectedProviders]);
+
   // Categorize real findings by provider
   const findingsByProvider = useMemo(() => {
     const azure: any[] = [];
     const oci: any[] = [];
     const aws: any[] = [];
     const gcp: any[] = [];
+    const kubernetes: any[] = [];
+    const oracle_saas: any[] = [];
     const all: any[] = rawFindings;
 
     rawFindings.forEach((f: any) => {
@@ -512,14 +537,11 @@ export function CompliancePage() {
       else if (p === "OCI") oci.push(f);
       else if (p === "AWS") aws.push(f);
       else if (p === "GCP") gcp.push(f);
+      else if (p === "KUBERNETES") kubernetes.push(f);
+      else if (p === "ORACLE_SAAS") oracle_saas.push(f);
     });
 
-    const oracle_saas = rawFindings.filter((f: any) => {
-      const prov = (f.provider || f.provider_type || "").toLowerCase();
-      return prov === "oracle_saas" || prov === "oracle-saas";
-    });
-
-    return { azure, oci, aws, gcp, oracle_saas, all };
+    return { azure, oci, aws, gcp, kubernetes, oracle_saas, all };
   }, [rawFindings]);
 
   const realFindings = useMemo(() => {
@@ -527,6 +549,7 @@ export function CompliancePage() {
     if (selectedProvider === "OCI") return findingsByProvider.oci;
     if (selectedProvider === "AWS") return findingsByProvider.aws;
     if (selectedProvider === "GCP") return findingsByProvider.gcp;
+    if (selectedProvider === "KUBERNETES") return findingsByProvider.kubernetes;
     if (selectedProvider === "ORACLE_SAAS") return findingsByProvider.oracle_saas;
     return findingsByProvider.all;
   }, [findingsByProvider, selectedProvider]);
@@ -543,43 +566,48 @@ export function CompliancePage() {
 
   // Dynamically compute framework metrics strictly based on their target provider's live findings
   const dynamicFrameworks = useMemo(() => {
-    return ALL_COMPLIANCE_FRAMEWORKS.map((fw) => {
-      let targetList = findingsByProvider.all;
-      if (fw.providerTarget === "AZURE") targetList = findingsByProvider.azure;
-      else if (fw.providerTarget === "OCI") targetList = findingsByProvider.oci;
-      else if (fw.providerTarget === "AWS") targetList = findingsByProvider.aws;
-      else if (fw.providerTarget === "GCP") targetList = findingsByProvider.gcp;
-      else if (fw.providerTarget === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
+    return ALL_COMPLIANCE_FRAMEWORKS
+      // Filter out frameworks for un-added cloud providers (keep ALL/universal + connected)
+      .filter((fw) => {
+        if (!fw.providerTarget || fw.providerTarget === "ALL") return true;
+        return connectedProviderSet.has(fw.providerTarget);
+      })
+      .map((fw) => {
+        let targetList = findingsByProvider.all;
+        if (fw.providerTarget === "AZURE") targetList = findingsByProvider.azure;
+        else if (fw.providerTarget === "OCI") targetList = findingsByProvider.oci;
+        else if (fw.providerTarget === "AWS") targetList = findingsByProvider.aws;
+        else if (fw.providerTarget === "GCP") targetList = findingsByProvider.gcp;
+        else if (fw.providerTarget === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
 
-      const fwPass = targetList.filter((f: any) => f.status === "PASS").length;
-      const fwFail = targetList.filter((f: any) => f.status === "FAIL").length;
-      const fwTotal = targetList.length;
+        const fwPass = targetList.filter((f: any) => f.status === "PASS").length;
+        const fwFail = targetList.filter((f: any) => f.status === "FAIL").length;
+        const fwTotal = targetList.length;
 
-      let passed = fw.passed;
-      let failed = fw.failed;
-      let score = fw.score;
+        let passed = fw.passed;
+        let failed = fw.failed;
+        let score = fw.score;
 
-      if (fwTotal > 0) {
-        passed = fwPass;
-        failed = fwFail;
-        const total = Math.max(1, passed + failed + fw.manual);
-        score = Math.round((passed / total) * 100);
-      } else {
-        // When no direct scans exist for that provider yet, keep calibrated baseline
-        score = fw.score;
-      }
+        if (fwTotal > 0) {
+          passed = fwPass;
+          failed = fwFail;
+          const total = Math.max(1, passed + failed);
+          score = Math.round((passed / total) * 100);
+        } else {
+          score = fw.score;
+        }
 
-      return {
-        ...fw,
-        passed,
-        failed,
-        totalControls: Math.max(fw.totalControls, passed + failed + fw.manual),
-        score,
-        strokeColor: score >= 75 ? "#34d399" : score >= 60 ? "#fbbf24" : "#fb7185",
-        textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : "text-rose-400",
-      };
-    });
-  }, [findingsByProvider]);
+        return {
+          ...fw,
+          passed,
+          failed,
+          totalControls: Math.max(fw.totalControls, passed + failed + fw.manual),
+          score,
+          strokeColor: score >= 75 ? "#34d399" : score >= 60 ? "#fbbf24" : "#fb7185",
+          textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : "text-rose-400",
+        };
+      });
+  }, [findingsByProvider, connectedProviderSet]);
 
   const filteredFrameworks = useMemo(() => {
     return dynamicFrameworks.filter((f) => {
@@ -618,17 +646,12 @@ export function CompliancePage() {
         tenant: "Enterprise Managed Security Tenant",
         generated_at: new Date().toISOString(),
         fleet_compliance_score: `${fleetScore}%`,
-        total_cloud_assets: totalAssetsCount,
-        frameworks_evaluated: dynamicFrameworks.length,
-        frameworks: dynamicFrameworks,
-        live_telemetry_findings: realFindings.map((f: any) => ({
-          check_id: f.check_id,
-          title: f.check_metadata?.checktitle || f.check_id,
-          status: f.status,
-          severity: f.severity,
-          provider: f.provider || f.provider_type || "Cloud",
-          resource: f.resource_name || f.resource?.name || f.resource_id,
-          region: f.region || "global",
+        frameworks: dynamicFrameworks.map((f) => ({
+          framework: f.name,
+          version: f.version,
+          score: `${f.score}%`,
+          passed: f.passed,
+          failed: f.failed,
         })),
       },
       null,
@@ -638,15 +661,15 @@ export function CompliancePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `compliance-audit-evidence-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `digital-ciso-compliance-evidence-${Date.now()}.json`;
     a.click();
     setTimeout(() => setExportSuccess(false), 3000);
   };
 
   return (
     <AppShell
-      title="Compliance & Regulatory Assurance"
-      subtitle="Automated audit evidence collection, continuous control monitoring, and 20+ multi-cloud framework mappings"
+      title="Compliance & Governance"
+      subtitle="Multi-framework regulatory alignment and automated audit evidence mapping"
       actions={
         <button
           onClick={handleExportEvidence}
@@ -678,18 +701,18 @@ export function CompliancePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Provider Filter Dropdown */}
+            {/* Dynamic Provider Filter Dropdown (Only configured providers) */}
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="h-9 rounded-xl border border-border bg-surface-2/60 px-3 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
             >
-              <option value="ALL">All Providers ({providersData?.items?.length || 5})</option>
-              <option value="OCI">Oracle Cloud (OCI) ({findingsByProvider.oci.length} checks)</option>
-              <option value="AZURE">Microsoft Azure ({findingsByProvider.azure.length} checks)</option>
-              <option value="AWS">Amazon Web Services ({findingsByProvider.aws.length} checks)</option>
-              <option value="GCP">Google Cloud Platform ({findingsByProvider.gcp.length} checks)</option>
-              <option value="ORACLE_SAAS">Oracle SaaS / ERP ({findingsByProvider.oracle_saas.length} checks)</option>
+              <option value="ALL">All Connected Environments ({connectedProviders.length || 1})</option>
+              {connectedProviders.map((p) => (
+                <option key={p.id} value={p.providerUpper}>
+                  {p.alias} ({p.providerUpper})
+                </option>
+              ))}
             </select>
 
             {/* Search Input */}

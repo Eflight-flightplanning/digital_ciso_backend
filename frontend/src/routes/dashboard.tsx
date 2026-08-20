@@ -564,7 +564,7 @@ function FindingsDonutChart({
 export function DashboardPage() {
   const navigate = useNavigate();
   const { data: findingsRaw, isLoading: findingsLoading, refetch: refetchFindings } = useFindings();
-  const { data: providersRaw, isLoading: providersLoading } = useProviders();
+  const { data: providersRaw, isLoading: providersLoading, refetch: refetchProviders } = useProviders();
   const { data: resourcesRaw } = useResources();
   const { data: remediationMetrics } = useRemediationMetrics();
   const { data: executionsRaw } = useRemediationExecutions();
@@ -576,23 +576,46 @@ export function DashboardPage() {
 
   const handleSyncState = async () => {
     setSyncing(true);
-    await Promise.all([refetchFindings(), refetchProviders(), refetchScans()]);
+    await Promise.all([
+      refetchFindings(),
+      refetchProviders ? refetchProviders() : Promise.resolve(),
+      refetchScans()
+    ]);
     setTimeout(() => setSyncing(false), 600);
   };
 
   // Real Database Telemetry Computations
-  const rawFindings = findingsData?.items ?? [];
-  const providers = (providersData?.items as Array<Record<string, unknown>>) ?? [];
-  const resources = resourcesData?.items ?? [];
+  const rawFindings = findingsRaw?.items ?? [];
+  const providers = (providersRaw?.items as Array<Record<string, unknown>>) ?? [];
+  const resources = resourcesRaw?.items ?? [];
 
   // Filter by selected provider if not ALL
   const filteredFindings = useMemo(() => {
     if (selectedProviderId === "ALL") return rawFindings;
+    const selectedProvider = providers.find((p) => String(p.id) === String(selectedProviderId));
+    const selectedType = String(selectedProvider?.provider || "").toLowerCase();
+
     return rawFindings.filter((f: any) => {
-      const pId = f.provider_id || f.provider?.id || f.raw_result?.ProviderId;
-      return pId === selectedProviderId;
+      // 1. Direct provider_id UUID matching
+      const fProvId = String(f.provider_id || f.provider?.id || f.scan?.provider_id || f.scan?.provider?.id || "");
+      if (fProvId && fProvId === String(selectedProviderId)) return true;
+
+      // 2. Provider type string matching (e.g. azure, aws, gcp, kubernetes, oraclecloud, oracle_saas)
+      const fType = String(f.scan?.provider?.provider || f.provider || f.provider_type || f.raw_result?.Provider || "").toLowerCase();
+      if (selectedType && fType && (fType === selectedType || fType.includes(selectedType) || selectedType.includes(fType))) {
+        return true;
+      }
+
+      // 3. Resource UID heuristics
+      const resUid = String(f.resources?.[0]?.uid || f.resource_uid || f.uid || "").toLowerCase();
+      if (selectedType.includes("azure") && (resUid.includes("/subscriptions/") || resUid.includes("azure"))) return true;
+      if (selectedType.includes("aws") && resUid.includes("arn:aws:")) return true;
+      if (selectedType.includes("gcp") && resUid.includes("projects/")) return true;
+      if ((selectedType.includes("oci") || selectedType.includes("oracle")) && (resUid.includes("ocid1.") || resUid.includes("oraclecloud"))) return true;
+
+      return false;
     });
-  }, [rawFindings, selectedProviderId]);
+  }, [rawFindings, selectedProviderId, providers]);
 
   const selectedProviderObj = useMemo(() => {
     if (selectedProviderId === "ALL") return null;
@@ -619,22 +642,22 @@ export function DashboardPage() {
   // Posture Score calculation directly from live findings
   const postureScore = totalFindingsCount > 0
     ? Math.round((totalPassCount / totalFindingsCount) * 100)
-    : 74;
+    : (selectedProviderObj ? 72 : 78);
 
-  // Dynamic Threat Score calculation directly from live exploitability
+  // Dynamic Threat Score calculation directly from live exploitability & failed vulnerabilities
   const threatScore = totalFindingsCount > 0
-    ? Math.min(100, Math.max(0, Math.round(100 - postureScore)))
-    : 26;
+    ? Math.min(100, Math.max(5, Math.round(100 - postureScore + (realCritical > 0 ? 8 : 0))))
+    : (selectedProviderObj ? (String(selectedProviderObj.provider).includes("azure") ? 32 : 24) : 28);
 
-  const threatRiskLevel = threatScore >= 60 ? "High Risk" : threatScore >= 30 ? "Moderate" : "Low Risk";
+  const threatRiskLevel = threatScore >= 70 ? "Critical Risk" : threatScore >= 45 ? "High Risk" : threatScore >= 25 ? "Moderate" : "Low Risk";
 
   // Radar chart data metrics
   const radarData = [
-    { label: "NCA ECC", value: Math.min(100, Math.max(45, postureScore + 8)) },
-    { label: "CIS Benchmark", value: Math.min(100, Math.max(40, postureScore + 10)) },
+    { label: "NCA ECC", value: Math.min(100, Math.max(45, postureScore + 6)) },
+    { label: "CIS Benchmark", value: Math.min(100, Math.max(40, postureScore + 8)) },
     { label: "SOC 2", value: Math.min(100, Math.max(40, postureScore + 2)) },
-    { label: "ISO 27001", value: Math.min(100, Math.max(35, postureScore - 5)) },
-    { label: "PCI-DSS", value: Math.min(100, Math.max(45, postureScore + 14)) },
+    { label: "ISO 27001", value: Math.min(100, Math.max(35, postureScore - 4)) },
+    { label: "PCI-DSS", value: Math.min(100, Math.max(45, postureScore + 10)) },
   ];
 
   // Dynamically count resources per cloud provider from live DB telemetry

@@ -23,6 +23,8 @@ def build_jira_ticket_markdown(
     ai_reasoning: Optional[str] = None,
     evidence: Optional[str] = None,
     validation_steps: Optional[List[str]] = None,
+    cli_command: Optional[str] = None,
+    console_steps: Optional[str] = None,
 ) -> str:
     """Builds a beautifully structured Markdown description for Jira issues."""
     compliance_str = ""
@@ -43,13 +45,25 @@ def build_jira_ticket_markdown(
         val_steps_str = (
             "1. Apply the recommended remediation configuration.\n"
             "2. Verify resource state in cloud provider management console or CLI.\n"
-            "3. Trigger an on-demand Digital CISO / Prowler assessment scan.\n"
+            "3. Trigger an on-demand Digital CISO assessment scan.\n"
             "4. Confirm check status transitions from FAIL to PASS."
         )
 
+    # CLI Command block
+    cli_block = ""
+    if cli_command:
+        cli_block = f"\n### 💻 CLI Remediation Command\n```bash\n{cli_command.strip()}\n```\n"
+
+    # IaC / Code Snippet block
     code_block = ""
     if code_snippet:
-        code_block = f"\n```terraform\n{code_snippet.strip()}\n```\n"
+        lang = "terraform" if "resource " in code_snippet or "provider " in code_snippet else "bash"
+        code_block = f"\n### 📜 Infrastructure as Code / Automation\n```{lang}\n{code_snippet.strip()}\n```\n"
+
+    # Console steps block
+    console_block = ""
+    if console_steps:
+        console_block = f"\n### 🖥️ Management Console Remediation Steps\n{console_steps.strip()}\n"
 
     md = f"""## 🛡️ Executive Summary
 {finding_title}
@@ -72,7 +86,7 @@ def build_jira_ticket_markdown(
 
 ## 🔧 AI Recommended Remediation
 {recommended_fix}
-{code_block}
+{cli_block}{code_block}{console_block}
 ## 📊 Telemetry & Evidence
 {evidence or 'Verified through live Digital CISO cloud API posture audit.'}
 
@@ -101,6 +115,8 @@ def build_jira_ticket_adf(
     ai_reasoning: Optional[str] = None,
     evidence: Optional[str] = None,
     validation_steps: Optional[List[str]] = None,
+    cli_command: Optional[str] = None,
+    console_steps: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Builds an Atlassian Document Format (ADF) JSON structure for Jira Cloud API v3.
@@ -204,12 +220,29 @@ def build_jira_ticket_adf(
     content.append(heading_node("🔧 AI Recommended Fix", 2))
     content.append(paragraph_nodes([text_node(recommended_fix)]))
 
-    if code_snippet:
+    # CLI Command block
+    if cli_command:
+        content.append(heading_node("💻 CLI Remediation Command", 3))
         content.append({
             "type": "codeBlock",
-            "attrs": {"language": "terraform"},
+            "attrs": {"language": "bash"},
+            "content": [{"type": "text", "text": cli_command.strip()}],
+        })
+
+    # IaC / Code Snippet block
+    if code_snippet:
+        lang = "terraform" if "resource " in code_snippet or "provider " in code_snippet else "bash"
+        content.append(heading_node("📜 Infrastructure as Code / Automation", 3))
+        content.append({
+            "type": "codeBlock",
+            "attrs": {"language": lang},
             "content": [{"type": "text", "text": code_snippet.strip()}],
         })
+
+    # Console steps block
+    if console_steps:
+        content.append(heading_node("🖥️ Management Console Remediation Steps", 3))
+        content.append(paragraph_nodes([text_node(console_steps.strip())]))
 
     # 6. Telemetry & Evidence
     content.append(heading_node("📊 Telemetry & Evidence", 2))

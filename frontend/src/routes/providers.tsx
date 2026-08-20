@@ -1236,7 +1236,7 @@ function ProvidersPage() {
                   <div>
                     <span className="text-muted-foreground block text-[11px] font-medium mb-1">Discovered Assets</span>
                     <div className="mono font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
-                      {selectedConfigProvider.resources.toLocaleString()}
+                      {(selectedConfigProvider.resources ?? 0).toLocaleString()}
                     </div>
                   </div>
                 </div>

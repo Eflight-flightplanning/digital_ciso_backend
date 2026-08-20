@@ -506,10 +506,25 @@ class AIAdvisorQueryView(APIView):
                 elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery")):
                     provider_filter = "gcp"
 
-            # Optional conversation history for multi-turn chat memory
-            history = raw_data.get("history") or _attrs.get("history") or []
-            if not isinstance(history, list):
-                history = []
+            # Query tenant connected cloud providers
+            tenant_id = getattr(request, "tenant_id", None) or (
+                request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None
+            )
+            connected_providers = []
+            try:
+                from api.models import Provider
+                prov_qs = Provider.objects.all()
+                if tenant_id:
+                    prov_qs = prov_qs.filter(tenant_id=tenant_id)
+                for p in prov_qs:
+                    connected_providers.append({
+                        "id": str(p.id),
+                        "provider": str(p.provider).lower(),
+                        "alias": str(p.alias or p.provider),
+                        "uid": str(p.uid or ""),
+                    })
+            except Exception as pe:
+                logger.warning("Could not fetch connected providers for advisor: %s", pe)
 
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
@@ -521,6 +536,7 @@ class AIAdvisorQueryView(APIView):
                 question=clean_question,
                 relevant_findings=relevant_findings,
                 history=history,
+                connected_providers=connected_providers,
             )
 
             from django.http import JsonResponse

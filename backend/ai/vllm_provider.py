@@ -270,6 +270,7 @@ class VLLMAzureProvider(AIProvider):
         question: str,
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
+        connected_providers: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
         """Answer CISO security queries using 100% dynamic live LLM generation with multi-turn context."""
         # 1. Always invoke the live LLM (Qwen / vLLM on Azure or OpenAI/Claude)

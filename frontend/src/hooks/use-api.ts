@@ -165,8 +165,15 @@ export function useGeneratePlaybook() {
 
 export function useAIAdvisorQuery() {
   return useMutation({
-    mutationFn: ({ question, provider }: { question: string; provider?: string }) =>
-      api.post("/ai/advisor/query", { question, provider }, { jsonApi: false }),
+    mutationFn: ({
+      question,
+      provider,
+      history,
+    }: {
+      question: string;
+      provider?: string;
+      history?: Array<{ role: string; content: string }>;
+    }) => api.post("/ai/advisor/query", { question, provider, history }, { jsonApi: false }),
   });
 }
 
@@ -721,6 +728,8 @@ export function useCreateJiraRemediationTicket() {
       compliance_rules?: any[];
       recommended_fix?: string;
       code_snippet?: string;
+      cli_command?: string;
+      console_steps?: string;
       ai_reasoning?: string;
       evidence?: string;
       validation_steps?: string[];

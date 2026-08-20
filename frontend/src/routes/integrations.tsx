@@ -74,6 +74,8 @@ function IntegrationsPage() {
     }
   }, [jiraConfig]);
 
+  const [showReconfigure, setShowReconfigure] = useState(false);
+
   const handleTestConnection = async () => {
     setTestResult(null);
     try {
@@ -116,6 +118,7 @@ function IntegrationsPage() {
       });
       setSaveSuccess(true);
       setApiToken("");
+      setShowReconfigure(false);
       refetchConfig();
       refetchProjects();
       setTimeout(() => setSaveSuccess(false), 4000);
@@ -165,7 +168,7 @@ function IntegrationsPage() {
       )}
 
       {/* ── Status Row ── */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Panel index={0} glow={isConnected ? "success" : "high"}>
           <span className="section-label">Jira Cloud Status</span>
           <div className="mt-2 flex items-center gap-2.5">
@@ -179,26 +182,14 @@ function IntegrationsPage() {
           </p>
         </Panel>
 
-        <Panel index={1} glow="primary">
-          <span className="section-label">Connection Health</span>
-          <div className="mt-2">
-            <span className="font-display text-lg font-bold text-foreground">
-              {jiraConfig?.connection_health || (isConnected ? "Healthy" : "Not Configured")}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Last checked: {jiraConfig?.last_sync ? new Date(jiraConfig.last_sync).toLocaleString() : "Never"}
-          </p>
-        </Panel>
-
-        <Panel index={2} glow="info">
+        <Panel index={1} glow="info">
           <span className="section-label">Jira Projects Loaded</span>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="kpi-number text-2xl text-info font-black">{projects.length}</span>
-            <span className="text-xs text-muted-foreground font-semibold">Available</span>
+            <span className="text-xs text-muted-foreground font-semibold">Available Projects</span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Default: <span className="font-mono font-bold text-foreground">{defaultProject || "Not set"}</span>
+            Default Target: <span className="font-mono font-bold text-foreground">{defaultProject || "SEC"}</span>
           </p>
         </Panel>
       </div>
@@ -206,295 +197,220 @@ function IntegrationsPage() {
       {/* ── Main Config Grid ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
 
-        {/* LEFT: Credentials Form (7 cols) */}
+        {/* LEFT: Active Account Card OR Credentials Form (7 cols) */}
         <div className="space-y-6 lg:col-span-7">
 
-          {/* Step Guide Header */}
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <h4 className="text-xs font-bold text-foreground mb-3 flex items-center gap-1.5">
-              <Key className="h-3.5 w-3.5 text-primary" />
-              Setup Guide — 3 Steps to Connect
-            </h4>
-            <div className="flex flex-col sm:flex-row gap-3 text-[11px]">
-              <div className="flex items-start gap-2 flex-1">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">1</span>
-                <div>
-                  <div className="font-bold text-foreground">Log into Atlassian</div>
-                  <div className="text-muted-foreground">Go to id.atlassian.com → Security → API Tokens</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 flex-1">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">2</span>
-                <div>
-                  <div className="font-bold text-foreground">Create API Token</div>
-                  <div className="text-muted-foreground">Label it "Digital CISO Remediation" and copy the token</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 flex-1">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">3</span>
-                <div>
-                  <div className="font-bold text-foreground">Paste & Save Below</div>
-                  <div className="text-muted-foreground">Enter URL, email, token → Test Connection → Save</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Credentials Panel */}
-          <Panel index={0} className="p-6">
-            <div className="flex items-center justify-between border-b border-border/60 pb-4 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Link2 className="h-4.5 w-4.5" />
-                </div>
-                <div>
-                  <h3 className="font-display text-sm font-bold text-foreground">Jira Cloud Connection</h3>
-                  <p className="text-[11px] text-muted-foreground">Atlassian REST API v3 · Basic Auth · AES-256 encrypted credentials</p>
-                </div>
-              </div>
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold border ${isConnected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"}`}>
-                {isConnected ? "CONNECTED" : "SETUP REQUIRED"}
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              {/* Base URL */}
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">
-                  Jira Cloud Base URL <span className="text-destructive">*</span>
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="https://your-domain.atlassian.net"
-                    className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">Your Atlassian Cloud workspace URL (e.g. <code className="font-mono">acme.atlassian.net</code>)</p>
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">
-                  Atlassian Account Email <span className="text-destructive">*</span>
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="secops@yourcompany.com"
-                    className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">Use a dedicated service account with <code className="font-mono">BROWSE_PROJECTS</code>, <code className="font-mono">CREATE_ISSUES</code>, and <code className="font-mono">ASSIGN_ISSUES</code> permissions</p>
-              </div>
-
-              {/* API Token */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-foreground">
-                    Jira API Token <span className="text-destructive">*</span>
-                  </label>
-                  <a
-                    href="https://id.atlassian.com/manage-profile/security/api-tokens"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
-                  >
-                    <span>Generate API Token ↗</span>
-                    <ExternalLink className="h-2.5 w-2.5" />
-                  </a>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                  <input
-                    type={showToken ? "text" : "password"}
-                    value={apiToken}
-                    onChange={(e) => setApiToken(e.target.value)}
-                    placeholder={
-                      jiraConfig?.has_api_token
-                        ? "•••••••••••••••• (AES-256 Encrypted — leave blank to keep)"
-                        : "Paste token from Atlassian API Tokens page"
-                    }
-                    className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-10 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowToken(!showToken)}
-                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Lock className="h-2.5 w-2.5 text-primary" />
-                  Encrypted with AES-256 Fernet at rest · never sent back to clients in plaintext
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3 pt-4 border-t border-border/60">
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={testMutation.isPending || !baseUrl || !email}
-                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-surface-3 transition-colors active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 text-primary ${testMutation.isPending ? "animate-spin" : ""}`} />
-                  <span>{testMutation.isPending ? "Testing..." : "Test Connection"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending || !baseUrl || !email}
-                  className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  <span>{saveMutation.isPending ? "Saving..." : "Save Configuration"}</span>
-                </button>
-              </div>
-            </div>
-          </Panel>
-
-          {/* API Token Permission Guidance */}
-          <Panel index={1} className="p-5">
-            <h4 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              API Token Permissions — How It Works
-            </h4>
-
-            {/* Key callout: no scopes */}
-            <div className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-[11px]">
-              <p className="font-bold text-amber-400 mb-0.5">⚠️ Atlassian API Tokens do not have selectable scopes</p>
-              <p className="text-muted-foreground leading-relaxed">
-                Classic API Tokens (from <span className="font-mono">id.atlassian.com</span>) automatically inherit
-                <span className="font-semibold text-foreground"> all permissions of the Atlassian user account</span> they belong to.
-                There is no scope selection screen for API tokens.
-              </p>
-            </div>
-
-            {/* What actually needs to be configured */}
-            <p className="text-[11px] font-bold text-foreground mb-2">
-              What your Jira Admin needs to configure:
-            </p>
-            <div className="space-y-2 mb-3">
-              {[
-                { step: "1", label: "Add the service account to the Jira project", path: "Project Settings → People → Add member" },
-                { step: "2", label: "Assign it the Developer or Member role", path: "Grants: Browse + Create + Assign Issues" },
-              ].map((item) => (
-                <div key={item.step} className="flex items-start gap-2.5 rounded-lg border border-border/50 bg-surface-2/30 px-3 py-2 text-[11px]">
-                  <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground mt-0.5">{item.step}</span>
+          {/* Condition 1: Active Jira Account Summary Card (when connected and not editing) */}
+          {isConnected && !showReconfigure ? (
+            <Panel index={0} className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
                   <div>
-                    <div className="font-semibold text-foreground">{item.label}</div>
-                    <div className="text-muted-foreground font-mono">{item.path}</div>
+                    <h3 className="font-display text-base font-bold text-foreground flex items-center gap-2">
+                      <span>Active Jira Cloud Account</span>
+                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                        ONLINE
+                      </span>
+                    </h3>
+                    <p className="text-xs text-muted-foreground">Authenticated via Atlassian REST API v3</p>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="pt-2.5 border-t border-border/40">
-              <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                NOT required — safe for enterprise InfoSec review:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {NOT_NEEDED.map((item) => (
-                  <span key={item} className="rounded-lg border border-destructive/20 bg-destructive/5 px-2 py-0.5 text-[10px] font-semibold text-destructive/70 line-through">
-                    {item}
-                  </span>
-                ))}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={testMutation.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3.5 py-2 text-xs font-bold text-foreground hover:bg-surface-3 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-primary ${testMutation.isPending ? "animate-spin" : ""}`} />
+                    <span>Test Connection</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowReconfigure(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-md"
+                  >
+                    <Sliders className="h-3.5 w-3.5" />
+                    <span>Reconfigure Jira</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </Panel>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 space-y-1.5">
+                  <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">Workspace URL</span>
+                  <div className="font-mono font-bold text-foreground flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{jiraConfig?.base_url || baseUrl}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 space-y-1.5">
+                  <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">Connected User</span>
+                  <div className="font-bold text-foreground flex items-center gap-2">
+                    <User className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{jiraConfig?.email || email}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 space-y-1.5">
+                  <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">Default Target Project</span>
+                  <div className="font-bold text-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-mono text-primary font-bold">{defaultProject || "SEC"}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 space-y-1.5">
+                  <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider">Credential Security</span>
+                  <div className="font-bold text-foreground flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-400">AES-256 Fernet Encrypted</span>
+                  </div>
+                </div>
+              </div>
+            </Panel>
+          ) : (
+            /* Condition 2: Credentials Form (when not connected or reconfiguring) */
+            <Panel index={0} className="p-6">
+              <div className="flex items-center justify-between border-b border-border/60 pb-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Link2 className="h-4.5 w-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-sm font-bold text-foreground">
+                      {isConnected ? "Reconfigure Jira Credentials" : "Connect Jira Cloud"}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">Atlassian REST API v3 · Basic Auth · AES-256 encrypted</p>
+                  </div>
+                </div>
+
+                {isConnected && (
+                  <button
+                    type="button"
+                    onClick={() => setShowReconfigure(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Base URL */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Jira Cloud Base URL <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder="https://your-domain.atlassian.net"
+                      className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Your Atlassian Cloud workspace URL (e.g. <code className="font-mono">acme.atlassian.net</code>)</p>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1">
+                    Atlassian Account Email <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="secops@yourcompany.com"
+                      className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* API Token */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-foreground">
+                      Jira API Token <span className="text-destructive">*</span>
+                    </label>
+                    <a
+                      href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      <span>Generate API Token ↗</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type={showToken ? "text" : "password"}
+                      value={apiToken}
+                      onChange={(e) => setApiToken(e.target.value)}
+                      placeholder={
+                        jiraConfig?.has_api_token
+                          ? "•••••••••••••••• (AES-256 Encrypted — leave blank to keep)"
+                          : "Paste token from Atlassian API Tokens page"
+                      }
+                      className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-10 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Lock className="h-2.5 w-2.5 text-primary" />
+                    Encrypted with AES-256 Fernet at rest
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 pt-4 border-t border-border/60">
+                  <button
+                    type="button"
+                    onClick={handleTestConnection}
+                    disabled={testMutation.isPending || !baseUrl || !email}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-xs font-bold text-foreground hover:bg-surface-3 transition-colors active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 text-primary ${testMutation.isPending ? "animate-spin" : ""}`} />
+                    <span>{testMutation.isPending ? "Testing..." : "Test Connection"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending || !baseUrl || !email}
+                    className="ml-auto inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>{saveMutation.isPending ? "Saving..." : "Save Configuration"}</span>
+                  </button>
+                </div>
+              </div>
+            </Panel>
+          )}
         </div>
 
-        {/* RIGHT: Default Settings + What Gets Created (5 cols) */}
+        {/* RIGHT: What Gets Created (5 cols) */}
         <div className="space-y-6 lg:col-span-5">
-          {/* Default Ticket Settings */}
-          <Panel index={0} className="p-6">
-            <div className="flex items-center gap-3 border-b border-border/60 pb-4 mb-5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-info/10 text-info">
-                <Sliders className="h-4.5 w-4.5" />
-              </div>
-              <div>
-                <h3 className="font-display text-sm font-bold text-foreground">Default Ticket Settings</h3>
-                <p className="text-[11px] text-muted-foreground">Pre-populated when generating remediation tickets</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">Default Target Project</label>
-                {projects.length > 0 ? (
-                  <select
-                    value={defaultProject}
-                    onChange={(e) => setDefaultProject(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none transition-colors"
-                  >
-                    <option value="">Select a project...</option>
-                    {projects.map((p) => (
-                      <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={defaultProject}
-                    onChange={(e) => setDefaultProject(e.target.value)}
-                    placeholder="e.g. SEC or DEVOPS"
-                    className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
-                  />
-                )}
-                {!isConnected && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">Connect Jira to load projects automatically</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1">Issue Type</label>
-                  <select value={defaultIssueType} onChange={(e) => setDefaultIssueType(e.target.value)} className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none transition-colors">
-                    <option value="Task">Task</option>
-                    <option value="Bug">Bug</option>
-                    <option value="Story">Story</option>
-                    <option value="Security Finding">Security Finding</option>
-                    <option value="Vulnerability">Vulnerability</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-foreground mb-1">Default Priority</label>
-                  <select value={defaultPriority} onChange={(e) => setDefaultPriority(e.target.value)} className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none transition-colors">
-                    <option value="Highest">Highest (P1)</option>
-                    <option value="High">High (P2)</option>
-                    <option value="Medium">Medium (P3)</option>
-                    <option value="Low">Low (P4)</option>
-                    <option value="Lowest">Lowest (P5)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">Default Labels</label>
-                <input
-                  type="text"
-                  value={defaultLabels}
-                  onChange={(e) => setDefaultLabels(e.target.value)}
-                  placeholder="digital-ciso, prowler, security"
-                  className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">Comma-separated. Automatically combined with provider and severity labels.</p>
-              </div>
-            </div>
-          </Panel>
-
           {/* What's in each Jira Ticket */}
-          <Panel index={1} className="p-5">
+          <Panel index={0} className="p-6">
             <h4 className="text-xs font-bold text-foreground mb-3 flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5 text-primary" />
               What's Inside Each Auto-Generated Ticket

@@ -11,7 +11,7 @@ import {
   DataTable,
   Row,
 } from "@/components/ui-kit/primitives";
-import { useUsers, useRoles } from "@/hooks/use-api";
+import { useUsers, useRoles, useCurrentUser, useJiraConfig } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/users")({
   component: UsersPage,
@@ -20,6 +20,16 @@ export const Route = createFileRoute("/users")({
 function UsersPage() {
   const { data: apiUsers, isLoading } = useUsers();
   const { data: apiRoles } = useRoles();
+  const { data: currentUserRaw } = useCurrentUser();
+  const { data: jiraConfig } = useJiraConfig();
+
+  const currentUser = (currentUserRaw as Record<string, any>) || {};
+  const defaultAdminEmail = currentUser.email || jiraConfig?.email || "akhilesh.merugu@pravahya.com";
+  const defaultAdminName =
+    currentUser.name ||
+    (jiraConfig?.email
+      ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : "Akhilesh Merugu");
 
   const [suspendedEmails, setSuspendedEmails] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,16 +40,16 @@ function UsersPage() {
 
   const rawUserList = (apiUsers?.items && apiUsers.items.length > 0)
     ? (apiUsers.items as Array<Record<string, any>>).map((u) => ({
-        email: String(u.email || "user@acme.io"),
-        name: String(u.name || (u.email ? String(u.email).split("@")[0] : "Team Member")),
+        email: String(u.email || defaultAdminEmail),
+        name: String(u.name || (u.email ? String(u.email).split("@")[0] : defaultAdminName)),
         role: String(u.role || ((u.is_superuser || u.is_staff) ? "Security Admin" : "Auditor")),
-        lastLogin: u.last_login ? new Date(String(u.last_login)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active",
+        lastLogin: u.last_login ? new Date(String(u.last_login)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active Now",
         status: (u.is_active !== false ? "Active" : "Suspended") as "Active" | "Suspended",
       }))
     : [
         {
-          email: "admin@securityplatform.com",
-          name: "Alex CISO",
+          email: defaultAdminEmail,
+          name: defaultAdminName,
           role: "Security Admin",
           lastLogin: "Active Now",
           status: "Active" as const,
@@ -103,7 +113,7 @@ function UsersPage() {
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
                     {u.name
                       .split(" ")
-                      .map((n) => n[0])
+                      .map((n: string) => n[0])
                       .join("")}
                   </div>
                   <span className="text-xs font-semibold text-foreground">

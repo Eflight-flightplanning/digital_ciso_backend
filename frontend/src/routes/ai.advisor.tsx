@@ -14,7 +14,12 @@ import {
   Chip,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useAIAdvisorQuery } from "@/hooks/use-api";
+import {
+  useAIAdvisorQuery,
+  useProviders,
+  useCurrentUser,
+  useJiraConfig,
+} from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/advisor")({
   validateSearch: (search: Record<string, unknown>): { prompt?: string; provider?: string } => {
@@ -42,7 +47,7 @@ const initialMessages: ChatMessage[] = [
     id: "msg-1",
     sender: "assistant",
     content:
-      "Spectra Threat Analysis & Security Advisor Engine initialized. Ingesting live telemetry from your connected Microsoft Azure subscription (eflight-azure). Ask any question regarding cloud security posture, Defender for Cloud gaps, CIS benchmark failures, or toxic attack paths.",
+      "Spectra Threat Analysis & Security Advisor Engine initialized. Ingesting live telemetry from your connected cloud infrastructure. Ask any question regarding cloud security posture, Defender for Cloud gaps, CIS benchmark failures, or toxic attack paths.",
     timestamp: "Live",
     confidence: 1.0,
   },
@@ -52,75 +57,132 @@ function AIAdvisorPage() {
   const searchParams = Route.useSearch();
   const autoTriggeredRef = useRef(false);
 
+  const { data: providersRaw } = useProviders();
+  const { data: currentUserRaw } = useCurrentUser();
+  const { data: jiraConfig } = useJiraConfig();
+
+  const currentUser = (currentUserRaw as Record<string, any>) || {};
+  const userDisplayName =
+    currentUser.name ||
+    (jiraConfig?.email
+      ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : "Akhilesh Merugu");
+
+  const userInitials = useMemo(() => {
+    if (!userDisplayName) return "AM";
+    const parts = userDisplayName.trim().split(" ");
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return userDisplayName.slice(0, 2).toUpperCase();
+  }, [userDisplayName]);
+
+  const connectedProviders = useMemo(() => {
+    const list = (providersRaw?.items as Array<Record<string, unknown>>) || [];
+    return list.map((p) => {
+      const provStr = String(p.provider || "").toUpperCase();
+      const label = provStr === "ORACLECLOUD" ? "OCI" : provStr === "ORACLE_SAAS" ? "Oracle SaaS" : provStr === "KUBERNETES" ? "K8s" : provStr === "AZURE" ? "Azure" : provStr === "AWS" ? "AWS" : provStr === "GCP" ? "GCP" : provStr;
+      return {
+        id: String(p.id),
+        label,
+        providerUpper: provStr === "ORACLECLOUD" ? "OCI" : provStr,
+        alias: String(p.alias || p.name || label),
+      };
+    });
+  }, [providersRaw]);
+
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [providerFilter, setProviderFilter] = useState(searchParams.provider ? searchParams.provider.toUpperCase() === "AZURE" ? "Azure" : searchParams.provider : "All");
+  const [providerFilter, setProviderFilter] = useState(
+    searchParams.provider
+      ? searchParams.provider.toUpperCase() === "AZURE"
+        ? "Azure"
+        : searchParams.provider
+      : "All"
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const advisorMutation = useAIAdvisorQuery();
 
   const suggestedQueries = useMemo(() => {
-    switch (providerFilter.toUpperCase()) {
-      case "AZURE":
-        return [
-          "What should we remediate first on Azure today?",
-          "Show high-risk Microsoft Defender for Cloud failures.",
-          "Audit Entra ID IAM accounts and privilege escalation.",
-          "Evaluate CIS Microsoft Azure Foundations Benchmark failures.",
-          "Which Azure Storage accounts allow anonymous blob access?",
-        ];
-      case "OCI":
-        return [
-          "What should we remediate first on Oracle Cloud today?",
-          "Show open Object Storage buckets and VCN ingress rules.",
-          "Audit OCI Tenancy Compartment policies and IAM groups.",
-          "Evaluate CIS OCI Benchmark failure points.",
-          "Which OCI Compute instances have public IPs directly exposed?",
-        ];
-      case "GCP":
-        return [
-          "What should we remediate first on Google Cloud today?",
-          "Audit GCP Service Account keys with excessive permissions.",
-          "Show public Cloud Storage buckets and open VPC firewalls.",
-          "Evaluate CIS Google Cloud Platform Benchmark failures.",
-          "Which GCP IAM service accounts have Admin privileges?",
-        ];
-      case "AWS":
-        return [
-          "What should we remediate first on AWS today?",
-          "Show high-risk production S3 buckets and open Security Groups.",
-          "Which IAM roles have privilege escalation paths?",
-          "Evaluate CIS AWS Foundations Benchmark failure points.",
-          "Which findings are currently breaching SLA deadlines?",
-        ];
-      case "K8S":
-        return [
-          "Audit Kubernetes API Server and RBAC cluster roles.",
-          "Which pods run with privileged securityContext enabled?",
-          "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.",
-          "Are any worker nodes running with insecure Kubelet ports?",
-        ];
-      case "ORACLE_SAAS":
-      case "ORACLE SAAS":
-      case "ORACLE SAAS / ERP":
-        return [
-          "Show all Separation of Duties (SoD) conflicts in Oracle Fusion ERP.",
-          "Which users have superuser or implementation consultant roles assigned?",
-          "Are any finance or HR administrator accounts missing MFA enforcement?",
-          "Is the Oracle Fusion ERP audit trail enabled for payments and journal entries?",
-          "Which Oracle IDCS OAuth applications have excessive permission scopes?",
-        ];
-      default:
-        return [
-          "What should we remediate first across our clouds today?",
-          "Show high-risk Azure, AWS, and OCI misconfigurations.",
-          "Show all Separation of Duties (SoD) violations in Oracle SaaS ERP.",
-          "Which IAM roles have privilege escalation paths?",
-          "Evaluate multi-cloud CIS Foundations failure points.",
-          "Which findings are currently breaching SLA deadlines?",
-        ];
+    const hasAzure = connectedProviders.some((p) => p.providerUpper === "AZURE") || connectedProviders.length === 0;
+    const hasOCI = connectedProviders.some((p) => p.providerUpper === "OCI");
+    const hasAWS = connectedProviders.some((p) => p.providerUpper === "AWS");
+    const hasGCP = connectedProviders.some((p) => p.providerUpper === "GCP");
+    const hasK8s = connectedProviders.some((p) => p.providerUpper === "K8S" || p.providerUpper === "KUBERNETES");
+    const hasSaas = connectedProviders.some((p) => p.providerUpper === "ORACLE_SAAS");
+
+    const activeFilter = providerFilter.toUpperCase();
+
+    if (activeFilter === "AZURE" || (activeFilter === "ALL" && hasAzure && !hasAWS && !hasOCI && !hasGCP && !hasSaas)) {
+      return [
+        "What should we remediate first on Azure today?",
+        "Show high-risk Microsoft Defender for Cloud failures.",
+        "Audit Entra ID IAM accounts and privilege escalation.",
+        "Evaluate CIS Microsoft Azure Foundations Benchmark failures.",
+        "Which Azure Storage accounts allow anonymous blob access?",
+      ];
     }
-  }, [providerFilter]);
+    if (activeFilter === "OCI") {
+      return [
+        "What should we remediate first on Oracle Cloud today?",
+        "Show open Object Storage buckets and VCN ingress rules.",
+        "Audit OCI Tenancy Compartment policies and IAM groups.",
+        "Evaluate CIS OCI Benchmark failure points.",
+        "Which OCI Compute instances have public IPs directly exposed?",
+      ];
+    }
+    if (activeFilter === "ORACLE_SAAS" || activeFilter === "ORACLE SAAS") {
+      return [
+        "Show all Separation of Duties (SoD) conflicts in Oracle Fusion ERP.",
+        "Which users have superuser or implementation consultant roles assigned?",
+        "Are any finance or HR administrator accounts missing MFA enforcement?",
+        "Is the Oracle Fusion ERP audit trail enabled for payments and journal entries?",
+        "Which Oracle IDCS OAuth applications have excessive permission scopes?",
+      ];
+    }
+    if (activeFilter === "AWS" && hasAWS) {
+      return [
+        "What should we remediate first on AWS today?",
+        "Show high-risk production S3 buckets and open Security Groups.",
+        "Which IAM roles have privilege escalation paths?",
+        "Evaluate CIS AWS Foundations Benchmark failure points.",
+        "Which findings are currently breaching SLA deadlines?",
+      ];
+    }
+    if (activeFilter === "GCP" && hasGCP) {
+      return [
+        "What should we remediate first on Google Cloud today?",
+        "Audit GCP Service Account keys with excessive permissions.",
+        "Show public Cloud Storage buckets and open VPC firewalls.",
+        "Evaluate CIS Google Cloud Platform Benchmark failures.",
+      ];
+    }
+    if (activeFilter === "K8S" && hasK8s) {
+      return [
+        "Audit Kubernetes API Server and RBAC cluster roles.",
+        "Which pods run with privileged securityContext enabled?",
+        "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.",
+      ];
+    }
+
+    // Default multi-cloud for connected providers
+    const queries: string[] = [];
+    if (hasAzure) {
+      queries.push("What should we remediate first on Azure today?");
+      queries.push("Show high-risk Microsoft Defender for Cloud failures.");
+    }
+    if (hasOCI) {
+      queries.push("Show open OCI Object Storage buckets and VCN rules.");
+    }
+    if (hasSaas) {
+      queries.push("Show all Separation of Duties (SoD) violations in Oracle SaaS ERP.");
+    }
+    if (queries.length < 5) {
+      queries.push("Which IAM accounts have privilege escalation paths?");
+      queries.push("Which findings are currently breaching SLA deadlines?");
+      queries.push("Evaluate multi-cloud CIS Foundations failure points.");
+    }
+    return queries.slice(0, 5);
+  }, [providerFilter, connectedProviders]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -244,18 +306,18 @@ function AIAdvisorPage() {
             </div>
           </Panel>
 
-          {/* Provider Filter */}
+          {/* Dynamic Provider Filter based strictly on added providers */}
           <Panel index={1} className="p-3">
             <span className="section-label mb-2 block">Environment Scope</span>
             <div className="flex flex-wrap gap-1">
-              {["All", "AWS", "OCI", "Azure", "GCP", "K8s", "Oracle SaaS"].map((p) => (
+              {["All", ...connectedProviders.map((p) => p.label)].map((p) => (
                 <button
                   key={p}
                   onClick={() => setProviderFilter(p)}
-                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-all ${
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                     providerFilter === p
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-surface-2/60 text-muted-foreground hover:text-foreground"
+                      : "bg-surface-2/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
                   }`}
                 >
                   {p}
@@ -364,8 +426,8 @@ function AIAdvisorPage() {
                 </div>
 
                 {m.sender === "user" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
-                    NH
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30 shadow-sm">
+                    {userInitials}
                   </div>
                 )}
               </div>

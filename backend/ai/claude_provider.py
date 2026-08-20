@@ -39,15 +39,13 @@ from .provider import (
 logger = logging.getLogger(__name__)
 
 # Model configuration
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-3-5-sonnet-20241022"
 FALLBACK_MODELS = [
-    "claude-sonnet-4-6",
-    "claude-sonnet-5",
-    "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-5-20250929",
-    "claude-3-5-sonnet-latest",
     "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-5-sonnet-latest",
     "claude-3-haiku-20240307",
+    "claude-sonnet-4-6",
 ]
 MAX_TOKENS_REASONING = 1500
 MAX_TOKENS_DECISION = 400
@@ -315,31 +313,40 @@ class ClaudeProvider(AIProvider):
         question: str,
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
+        connected_providers: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
         """Answer a security advisor question grounded in findings with multi-turn history."""
-        # Compact finding summaries — don't send full raw_result
         finding_summaries = [
             {
                 "id": f.get("finding_id"),
                 "uid": f.get("uid"),
                 "check_id": f.get("check_id"),
                 "severity": f.get("severity"),
-                "status": f.get("status"),  # PASS/FAIL — from Prowler, immutable
+                "status": f.get("status"),
                 "summary": f.get("check_title"),
                 "details": f.get("status_extended"),
                 "remediation": f.get("remediation"),
                 "resource": f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else f.get("resource"),
             }
-            for f in relevant_findings[:35]  # Generous context
+            for f in relevant_findings[:35]
+        ]
+
+        active_envs = [
+            {"provider": p.get("provider"), "alias": p.get("alias", p.get("provider"))}
+            for p in (connected_providers or [])
         ]
 
         user_message = json.dumps(
             {
                 "question": question,
+                "connected_environments": active_envs if active_envs else [{"provider": "azure", "alias": "eflight-azure"}],
                 "findings_context": finding_summaries,
-                "count": len(finding_summaries),
+                "findings_count": len(finding_summaries),
                 "prompt_version": ADVISOR_PROMPT_VERSION,
-                "instruction": "Answer using the provided findings context. For general questions, provide direct expert guidance. Return clean JSON.",
+                "instruction": (
+                    "Deliver an intelligent, concise, executive, and technically grounded response in GitHub Markdown. "
+                    "If the asked cloud provider is not in connected_environments, clearly state it is not connected and reference their active environment."
+                ),
             },
             default=str,
         )

@@ -77,7 +77,6 @@ export const navSections: NavSection[] = [
     label: "Infrastructure",
     items: [
       { to: "/scans", label: "Scans", icon: Radar },
-      { to: "/resources", label: "Resources", icon: Boxes },
       { to: "/providers", label: "Cloud Providers", icon: Cloud },
     ],
   },

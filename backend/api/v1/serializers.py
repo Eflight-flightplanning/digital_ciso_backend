@@ -4728,6 +4728,8 @@ class CreateJiraTicketRequestSerializer(serializers.Serializer):
     compliance_rules = serializers.ListField(required=False, default=list)
     recommended_fix = serializers.CharField(required=False, allow_blank=True)
     code_snippet = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cli_command = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    console_steps = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     ai_reasoning = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     evidence = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     validation_steps = serializers.ListField(child=serializers.CharField(), required=False, default=list)

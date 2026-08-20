@@ -193,6 +193,7 @@ class OpenAIProvider(AIProvider):
         question: str,
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
+        connected_providers: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
         context_str = json.dumps(relevant_findings[:35], indent=2) if relevant_findings else "[]"
         user_message = f"Active Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"

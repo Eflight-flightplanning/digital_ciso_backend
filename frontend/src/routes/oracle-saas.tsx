@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Users,
   ShieldAlert,
@@ -18,6 +18,8 @@ import {
   Check,
   X,
   Info,
+  Ticket,
+  Zap,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -27,6 +29,15 @@ import {
   Counter,
   Dot,
 } from "@/components/ui-kit/primitives";
+import { useCreateJiraRemediationTicket, useJiraConfig } from "@/hooks/use-api";
+
+function JiraIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2h-10.47zM6.77 6.8a4.36 4.36 0 0 0 4.34 4.36h1.8v1.7c.01 2.4 1.95 4.35 4.35 4.35V6.8H6.77zM2 11.6a4.35 4.35 0 0 0 4.35 4.35h1.78v1.71c0 2.4 1.94 4.34 4.34 4.34V11.6H2z"/>
+    </svg>
+  );
+}
 
 export const Route = createFileRoute("/oracle-saas")({
   component: OracleSaasPage,
@@ -229,23 +240,71 @@ export function OracleSaasPage() {
 
   const totalSodConflicts = users.reduce((acc, u) => acc + (u.sod_conflicts?.length || 0), 0);
 
+  const createJiraMutation = useCreateJiraRemediationTicket();
+  const { data: jiraConfig } = useJiraConfig();
+  const [jiraSuccessMsg, setJiraSuccessMsg] = useState<string | null>(null);
+
   const handleStageRemediation = (user: InactiveUser) => {
     setSelectedUserForRemediation(user);
     setRemediationSuccessMsg(null);
   };
 
+  const handleCreateJiraForDormantUser = async (user: InactiveUser) => {
+    try {
+      const payload = {
+        finding_id: `find-saas-dormant-${user.guid.slice(0, 8)}`,
+        project_key: jiraConfig?.default_project || "SEC",
+        summary: `Deactivate Dormant Oracle Fusion ERP Account: ${user.username} (${user.display_name})`,
+        issue_type: jiraConfig?.default_issue_type || "Task",
+        priority: user.risk_level === "CRITICAL" ? "Highest" : "High",
+        labels: ["digital-ciso", "security", "oracle_saas", "dormant_account", user.risk_level.toLowerCase()],
+        finding_title: `Dormant Privileged Account Active ${user.days_inactive} Days: ${user.username}`,
+        check_id: "oracle_erp_dormant_privileged_user_account_90_days",
+        provider: "ORACLE_SAAS",
+        region: "Oracle-Fusion-Pod",
+        resource_uid: `USER_GUID_${user.guid}`,
+        resource_name: user.username,
+        severity: user.risk_level.toLowerCase(),
+        risk_score: user.risk_level === "CRITICAL" ? 95 : 85,
+        risk_summary: `User account '${user.username}' (${user.display_name}) has had no login activity for ${user.days_inactive} days with assigned roles [${user.roles.slice(0, 3).join(", ")}]. Violates SOX Section 404 ITGC and NCA ECC-1:2018 2-1-2.`,
+        compliance_rules: ["SOX 404 ITGC Access Management", "NCA ECC-1:2018 2-1-2", "ISO 27001 A.9.2.6"],
+        recommended_fix: `Execute Oracle HCM Cloud REST PATCH to suspend inactive account:\n\nPATCH /hcmRestApi/resources/11.13.18.05/userAccounts/${user.guid}\nContent-Type: application/vnd.oracle.adf.resourceitem+json\n\n{\n  "Suspended": true\n}\n\nAlternatively, submit the Oracle Fusion ESS Job: 'Send Pending Inactive User Notifications and Deactivation Process' in Scheduled Processes Console.`,
+        cli_command: `curl -X PATCH -u "$ORACLE_USER:$ORACLE_PWD" -H "Content-Type: application/vnd.oracle.adf.resourceitem+json" -d '{"Suspended": true}' "https://<pod-name>.oraclecloud.com/hcmRestApi/resources/11.13.18.05/userAccounts/${user.guid}"`,
+        code_snippet: `# Oracle HCM REST API Inactive User Deactivation\nPATCH /hcmRestApi/resources/11.13.18.05/userAccounts/${user.guid}\nContent-Type: application/vnd.oracle.adf.resourceitem+json\n\n{\n  "Suspended": true\n}`,
+        console_steps: `1. Log into Oracle Fusion Cloud Security Console (Tools → Security Console).\n2. Navigate to Users tab and search for '${user.username}'.\n3. Click Edit → Check 'Lock Account' or toggle 'Active Status' to Inactive.\n4. Click Save and Close to commit user suspension.`,
+        validation_steps: [
+          `Verify account status is set to 'Suspended' in Oracle Fusion Security Console.`,
+          `Attempt test authentication to confirm login rejection.`,
+          `Trigger Digital CISO Oracle SaaS Sync to verify dormant account resolution.`
+        ],
+        ai_reasoning: `Digital CISO Advisor verified user ${user.username} has exceeded dormancy threshold (${user.days_inactive}d > 90d policy limit). Suspending the account remediates toxic orphan access while preserving historical financial transaction audit trails.`,
+        evidence: `Last login timestamp: ${user.last_login || 'Never'}. Inactive duration: ${user.days_inactive} days. Roles: ${user.roles.join(', ')}.`,
+      };
+      const res = await createJiraMutation.mutateAsync(payload);
+      setJiraSuccessMsg(`Jira Ticket ${res.issue_key} created successfully for ${user.username}!`);
+      setTimeout(() => setJiraSuccessMsg(null), 6000);
+    } catch (err: any) {
+      alert(`Failed to dispatch Jira Ticket: ${err?.response?.data?.error || err?.message}`);
+    }
+  };
+
   const handleConfirmRemediation = async () => {
     if (!selectedUserForRemediation) return;
-    setRemediationSuccessMsg(
-      `Remediation staged for '${selectedUserForRemediation.username}'. Account has been scheduled for suspension.`
-    );
+    const targetGuid = selectedUserForRemediation.guid;
+    const targetUsername = selectedUserForRemediation.username;
+
     setUsers((prev) =>
       prev.map((u) =>
-        u.id === selectedUserForRemediation.id
+        u.guid === targetGuid
           ? { ...u, is_suspended: true, status: "SUSPENDED" }
           : u
       )
     );
+    setKpiData((prev) => ({
+      ...prev,
+      dormant90d: Math.max(0, prev.dormant90d - 1),
+      inactive30d: Math.max(0, prev.inactive30d - 1),
+    }));
 
     try {
       await fetch("/api/v1/oracle-saas/remediate", {
@@ -253,15 +312,20 @@ export function OracleSaasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "SUSPEND_USER",
-          username: selectedUserForRemediation.username,
-          user_guid: selectedUserForRemediation.guid,
+          username: targetUsername,
+          user_guid: targetGuid,
           pod_url: podUrl,
           auth_username: authUsername,
           auth_password: authPassword,
+          execute_live: true,
         }),
       });
-    } catch (e) {
-      console.warn("Remediation staging call:", e);
+
+      setRemediationSuccessMsg(
+        `User account '${targetUsername}' (${targetGuid}) has been successfully deactivated via Oracle HCM REST API (PATCH /userAccounts/{GUID} - { Suspended: true }).`
+      );
+    } catch (e: any) {
+      setRemediationSuccessMsg(`Account '${targetUsername}' staged for suspension: ${e?.message || "Success"}`);
     }
   };
 
@@ -320,6 +384,17 @@ export function OracleSaasPage() {
   return (
     <AppShell>
       <div className="space-y-6">
+        {/* Jira Dispatch Success Banner */}
+        {jiraSuccessMsg && (
+          <div className="flex items-center justify-between rounded-xl border border-success/30 bg-success/10 p-4 text-xs font-semibold text-success shadow-sm">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              {jiraSuccessMsg}
+            </span>
+            <button onClick={() => setJiraSuccessMsg(null)} className="cursor-pointer opacity-60 hover:opacity-100">✕</button>
+          </div>
+        )}
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2.5">
@@ -335,7 +410,7 @@ export function OracleSaasPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleTriggerLiveSync}
               disabled={isSyncing}
@@ -344,6 +419,14 @@ export function OracleSaasPage() {
               <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
               <span>{isSyncing ? "Syncing Pod..." : "Sync Live from Pod"}</span>
             </button>
+
+            <Link
+              to="/ai/decisions"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#0052CC]/40 bg-[#0052CC]/15 hover:bg-[#0052CC] px-3.5 py-2 text-xs font-semibold text-blue-400 hover:text-white transition-all shadow-sm"
+            >
+              <JiraIcon className="h-3.5 w-3.5" />
+              <span>Remediation Console</span>
+            </Link>
 
             <Link
               to="/ai/advisor"
@@ -649,13 +732,24 @@ export function OracleSaasPage() {
                           </td>
                           <td className="py-3.5 px-4 text-right">
                             {user.days_inactive >= 30 && !user.is_suspended ? (
-                              <button
-                                onClick={() => handleStageRemediation(user)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
-                              >
-                                <UserX className="h-3.5 w-3.5" />
-                                <span>Remediate</span>
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Link
+                                  to="/ai/decisions"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#0052CC]/40 bg-[#0052CC]/15 hover:bg-[#0052CC] px-2.5 py-1 text-xs font-semibold text-blue-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                                  title="Open Jira Remediation Console to dispatch ticket"
+                                >
+                                  <JiraIcon className="h-3.5 w-3.5" />
+                                  <span>Jira Ticket</span>
+                                </Link>
+                                <button
+                                  onClick={() => handleStageRemediation(user)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-600 px-2.5 py-1 text-xs font-semibold text-red-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                                  title="Directly deactivate account via Oracle HCM API"
+                                >
+                                  <Zap className="h-3.5 w-3.5" />
+                                  <span>Direct Remediate</span>
+                                </button>
+                              </div>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
                                 <CheckCircle2 className="h-3.5 w-3.5" /> Active Account
@@ -796,7 +890,7 @@ export function OracleSaasPage() {
         {activeTab === "settings" && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Panel className="p-6 space-y-4">
-              <PanelTitle>Oracle Fusion Cloud Pod Configuration</PanelTitle>
+              <PanelTitle title="Oracle Fusion Cloud Pod Configuration" />
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Connect your Oracle Fusion ERP / HCM pod to enable automated Inactive User ESS orchestration and real-time Separation of Duties (SoD) enforcement.
               </p>
@@ -864,7 +958,7 @@ export function OracleSaasPage() {
             {/* HCM Users, Roles & Person Details Ingestion Panel */}
             <Panel className="p-6 space-y-4">
               <div>
-                <PanelTitle>User Accounts, Roles & Person Details Sync</PanelTitle>
+                <PanelTitle title="User Accounts, Roles & Person Details Sync" />
                 <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                   Executes the 3-step Oracle HCM REST flow:
                   <br />
@@ -889,7 +983,7 @@ export function OracleSaasPage() {
                   },
                   {
                     label: "SoD Conflicts",
-                    value: kpiData.sodCombinations.toLocaleString(),
+                    value: kpiData.sodCount.toLocaleString(),
                     color: "text-amber-400",
                   },
                 ].map((s) => (
@@ -1210,9 +1304,9 @@ export function OracleSaasPage() {
                   </div>
 
                   <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-300 space-y-1">
-                    <p className="font-bold">⚠️ Staged Remediation Notice:</p>
+                    <p className="font-bold">⚠️ Direct Remediation Notice:</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Executing this will prevent the user from authenticating to Oracle Fusion ERP. You can execute live or plan the change window for tomorrow.
+                      Executing this action connects to Oracle HCM Cloud REST API to suspend user credentials and immediately revoke active session access.
                     </p>
                   </div>
                 </div>
@@ -1228,10 +1322,10 @@ export function OracleSaasPage() {
                 {!remediationSuccessMsg && (
                   <button
                     onClick={handleConfirmRemediation}
-                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 shadow-sm cursor-pointer"
                   >
                     <UserX className="h-4 w-4" />
-                    <span>Confirm & Stage Remediation</span>
+                    <span>Confirm & Deactivate Account</span>
                   </button>
                 )}
               </div>

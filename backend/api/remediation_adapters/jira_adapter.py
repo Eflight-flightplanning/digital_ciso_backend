@@ -58,6 +58,8 @@ class JiraRemediationAdapter(BaseRemediationAdapter):
             ai_reasoning=description_data.get("ai_reasoning"),
             evidence=description_data.get("evidence"),
             validation_steps=description_data.get("validation_steps"),
+            cli_command=description_data.get("cli_command"),
+            console_steps=description_data.get("console_steps"),
         )
 
         return self.service.create_issue(
@@ -67,7 +69,7 @@ class JiraRemediationAdapter(BaseRemediationAdapter):
             issue_type=issue_type,
             priority=priority,
             assignee_account_id=assignee_id,
-            labels=labels or ["digital-ciso", "prowler", "remediation"],
+            labels=labels or ["digital-ciso", "security", "remediation"],
         )
 
     def get_ticket_status(self, ticket_key: str) -> Dict[str, Any]:

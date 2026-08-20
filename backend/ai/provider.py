@@ -117,6 +117,7 @@ class AIProvider(abc.ABC):
         question: str,
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
+        connected_providers: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
         """Answer a security advisor question grounded in real findings with multi-turn history."""
         ...
