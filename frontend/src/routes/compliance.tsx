@@ -37,6 +37,68 @@ interface FrameworkCardData {
 }
 
 const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
+  // ── Oracle SaaS / Fusion ERP Compliance Frameworks (Exclusively for ORACLE_SAAS) ──
+  {
+    id: "sod-matrix-oracle-saas",
+    name: "Oracle Fusion ERP Separation of Duties (SoD) Matrix",
+    version: "v2024 · 48 Toxic Rule Pairs",
+    category: "Industry",
+    providerTarget: "ORACLE_SAAS",
+    totalControls: 48,
+    score: 84,
+    passed: 40,
+    failed: 6,
+    manual: 2,
+    color: "text-emerald-400",
+    textColor: "text-emerald-400",
+    strokeColor: "#34d399",
+  },
+  {
+    id: "itgc-sox-oracle-saas",
+    name: "SOX 404 ITGC (Oracle Fusion ERP & Financials)",
+    version: "SOX 404 · 86 Controls",
+    category: "Government",
+    providerTarget: "ORACLE_SAAS",
+    totalControls: 86,
+    score: 79,
+    passed: 68,
+    failed: 14,
+    manual: 4,
+    color: "text-emerald-400",
+    textColor: "text-emerald-400",
+    strokeColor: "#34d399",
+  },
+  {
+    id: "soc1-type2-oracle-saas",
+    name: "SOC 1 Type II (Oracle Fusion Cloud Financials)",
+    version: "SSAE 18 / ISAE 3402 · 124 Controls",
+    category: "Industry",
+    providerTarget: "ORACLE_SAAS",
+    totalControls: 124,
+    score: 81,
+    passed: 100,
+    failed: 18,
+    manual: 6,
+    color: "text-emerald-400",
+    textColor: "text-emerald-400",
+    strokeColor: "#34d399",
+  },
+  {
+    id: "oracle-saas-security-baseline",
+    name: "Oracle Fusion SaaS Security Architecture Baseline",
+    version: "v1.2 · 64 Controls",
+    category: "Cloud",
+    providerTarget: "ORACLE_SAAS",
+    totalControls: 64,
+    score: 85,
+    passed: 54,
+    failed: 8,
+    manual: 2,
+    color: "text-emerald-400",
+    textColor: "text-emerald-400",
+    strokeColor: "#34d399",
+  },
+
   {
     id: "cis-oci-2.0",
     name: "CIS Oracle Cloud Infrastructure (OCI) Benchmark",
@@ -620,6 +682,12 @@ export function CompliancePage() {
   const filteredFrameworks = useMemo(() => {
     return dynamicFrameworks.filter((f) => {
       if (selectedCategory !== "All" && f.category !== selectedCategory) return false;
+
+      // Oracle SaaS ERP frameworks are strictly displayed when ORACLE_SAAS is selected
+      if (f.providerTarget === "ORACLE_SAAS" && selectedProvider !== "ORACLE_SAAS") {
+        return false;
+      }
+
       if (selectedProvider !== "ALL") {
         if (f.providerTarget && f.providerTarget !== "ALL" && f.providerTarget !== selectedProvider) {
           return false;

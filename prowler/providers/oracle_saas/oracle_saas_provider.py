@@ -120,6 +120,14 @@ class OracleSaasProvider(Provider):
         return self._session
 
     @property
+    def domain_url(self) -> str:
+        return getattr(self._session, "domain_url", "") or getattr(self._session, "erp_base_url", "")
+
+    @property
+    def erp_base_url(self) -> str:
+        return getattr(self._session, "erp_base_url", "") or getattr(self._session, "domain_url", "")
+
+    @property
     def identity(self) -> OracleSaasIdentityInfo:
         return self._identity
 
