@@ -464,21 +464,6 @@ function ProvidersPage() {
                         {p.status}
                       </Chip>
                     </div>
-
-                    <div className="mt-4 space-y-2 rounded-lg border border-border/80 bg-surface-2/40 p-3 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Last Scanned:</span>
-                        <span className="font-semibold text-foreground">{p.lastScan}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          {isSaas ? "Monitored Users / Policies:" : "Discovered Assets:"}
-                        </span>
-                        <span className="mono font-semibold text-foreground">
-                          {(p.resources ?? 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
@@ -1226,25 +1211,12 @@ function ProvidersPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="pt-1">
                   <div>
                     <span className="text-muted-foreground block text-[11px] font-medium mb-1">Provider Type</span>
                     <div className="font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
                       {selectedConfigProvider.name}
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px] font-medium mb-1">Discovered Assets</span>
-                    <div className="mono font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
-                      {(selectedConfigProvider.resources ?? 0).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-muted-foreground block text-[11px] font-medium mb-1">Last Assessment Status</span>
-                  <div className="font-semibold text-foreground bg-surface px-3 py-2 rounded-lg border border-border/60">
-                    {selectedConfigProvider.lastScan}
                   </div>
                 </div>
               </div>
