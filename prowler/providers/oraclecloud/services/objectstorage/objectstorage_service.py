@@ -118,9 +118,14 @@ class ObjectStorage(OCIService):
                     continue
 
         except Exception as error:
-            logger.error(
-                f"{region_key} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-            )
+            if getattr(error, "status", None) == 404 or "NamespaceNotFound" in str(error) or "authorization" in str(error).lower():
+                logger.warning(
+                    f"Object Storage in {region_key} - Compartment '{compartment.name}' not accessible or no buckets created: {getattr(error, 'message', str(error))}"
+                )
+            else:
+                logger.error(
+                    f"{region_key} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
 
 
 # Service Models
