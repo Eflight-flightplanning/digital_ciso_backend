@@ -33,6 +33,7 @@ import {
   useJiraProjects,
   useJiraAssignees,
   useCreateJiraRemediationTicket,
+  useRemediationExecutions,
 } from "@/hooks/use-api";
 import {
   Panel,
@@ -218,6 +219,7 @@ export function OracleSaasPage() {
   }, [assigneesList, assigneeSearchQuery]);
 
   const createJiraMutation = useCreateJiraRemediationTicket();
+  const { data: executionsData } = useRemediationExecutions();
 
   const [dispatchedJiraTasks, setDispatchedJiraTasks] = useState<Record<string, DispatchedJiraTask>>({});
   const [selectedUserForJira, setSelectedUserForJira] = useState<InactiveUser | null>(null);
@@ -234,6 +236,33 @@ export function OracleSaasPage() {
     assignee_name: string;
     message: string;
   } | null>(null);
+
+  // Hydrate persistent dispatched Jira tasks from PostgreSQL
+  useEffect(() => {
+    if (executionsData && Array.isArray(executionsData)) {
+      const taskMap: Record<string, DispatchedJiraTask> = {};
+      executionsData.forEach((ex: any) => {
+        if (ex.issue_key) {
+          const userKey = ex.ai_payload?.resource_uid || ex.ai_payload?.resource_name || ex.resource_uid || ex.resource_name;
+          if (userKey) {
+            taskMap[userKey] = {
+              issue_key: ex.issue_key,
+              issue_url: ex.issue_url,
+              project_key: ex.project_key || "SEC",
+              summary: ex.summary,
+              assignee_name: ex.assignee_name || "Assigned",
+              assignee_email: ex.assignee_email || "",
+              assignee_account_id: ex.assignee_account_id || "",
+              priority: ex.priority || "Medium",
+              action_type: ex.ai_payload?.action_type || "Manual Change",
+              created_at: ex.inserted_at || new Date().toISOString(),
+            };
+          }
+        }
+      });
+      setDispatchedJiraTasks((prev) => ({ ...taskMap, ...prev }));
+    }
+  }, [executionsData]);
 
   useEffect(() => {
     fetch("/api/v1/oracle-saas/overview")
@@ -888,7 +917,7 @@ export function OracleSaasPage() {
                       </tr>
                     ) : (
                       filteredUsers.map((user) => {
-                        const dispatchedTask = dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username];
+                        const dispatchedTask = dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username] || (user.guid ? dispatchedJiraTasks[user.guid] : undefined);
                         return (
                           <tr key={user.id} className="hover:bg-surface-2/30 transition-colors">
                             <td className="py-3.5 px-4">

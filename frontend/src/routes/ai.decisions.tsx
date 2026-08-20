@@ -981,7 +981,11 @@ function extractFindingProvider(f: any): string {
       const severity = (f.severity || "medium").toLowerCase();
 
       const matchedExec = executions.find(
-        (ex) => ex.finding_id === f.id || (ex.summary && checkId && ex.summary.toLowerCase().includes(checkId.toLowerCase()))
+        (ex: any) =>
+          (f.id && ex.finding_id === f.id) ||
+          (resUid && (ex.ai_payload?.resource_uid === resUid || ex.resource_uid === resUid)) ||
+          (resName && (ex.ai_payload?.resource_name === resName || ex.resource_name === resName)) ||
+          (ex.summary && checkId && ex.summary.toLowerCase().includes(checkId.toLowerCase()))
       );
 
       const remediation = generateProviderRemediation(
@@ -1047,7 +1051,11 @@ function extractFindingProvider(f: any): string {
 
       const catProvider = (cat.provider === "ORACLECLOUD" ? "OCI" : cat.provider).toUpperCase();
       const matchedExec = executions.find(
-        (ex) => ex.finding_id === cat.finding_id || (ex.summary && cat.check_id && ex.summary.toLowerCase().includes(cat.check_id.toLowerCase()))
+        (ex: any) =>
+          ex.finding_id === cat.finding_id ||
+          (cat.resource_uid && (ex.ai_payload?.resource_uid === cat.resource_uid || ex.resource_uid === cat.resource_uid)) ||
+          (cat.resource_name && (ex.ai_payload?.resource_name === cat.resource_name || ex.resource_name === cat.resource_name)) ||
+          (ex.summary && cat.check_id && ex.summary.toLowerCase().includes(cat.check_id.toLowerCase()))
       );
 
       const remediation = generateProviderRemediation(
@@ -1188,6 +1196,9 @@ function extractFindingProvider(f: any): string {
         compliance_rules: selectedItem.compliance_rules,
         recommended_fix: selectedItem.recommended_fix,
         code_snippet: selectedItem.code_snippet,
+        cli_command: selectedItem.cli_command,
+        console_steps: selectedItem.console_steps,
+        validation_steps: selectedItem.validation_steps,
         ai_reasoning: selectedItem.ai_reasoning,
         evidence: selectedItem.evidence,
       };
@@ -1770,17 +1781,11 @@ function extractFindingProvider(f: any): string {
                     <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-semibold">
                       <div className="flex items-center gap-2 text-foreground">
                         <CheckCircle2 className="h-4 w-4 text-primary" />
-                        <span>Ticket active in Jira: <strong className="text-primary">{selectedItem.execution_record.issue_key}</strong></span>
+                        <span>Ticket active in Jira: <strong className="text-primary font-mono">{selectedItem.execution_record.issue_key}</strong></span>
                       </div>
-                      <a
-                        href={selectedItem.execution_record.issue_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline font-bold"
-                      >
-                        <span>View Ticket</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      <span className="rounded bg-primary/15 border border-primary/30 px-2 py-0.5 text-[11px] font-bold text-primary">
+                        {selectedItem.execution_record.jira_status || "In Progress"}
+                      </span>
                     </div>
                   ) : (
                     <button
