@@ -8,10 +8,8 @@ import {
   Lock,
   FileText,
   Plug,
-  Sparkles,
   Sun,
   Moon,
-  ChevronRight,
   Terminal,
   Award,
   Scan,
@@ -23,72 +21,29 @@ import {
   Code2,
   CheckCircle2,
   Play,
-  ArrowUpRight,
-  Shield,
-  Activity,
-  Layers,
 } from "lucide-react";
+import { ShieldMark } from "@/components/brand/Logo";
 
 export const Route = createFileRoute("/")({
   component: MarketingLandingPage,
 });
-
-/* ── Inline Pravahya-Inspired Brand Shield Logo ── */
-function BrandLogo({ size = 38 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="pravahyaBrand" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#8EC63F" />
-          <stop offset="50%" stopColor="#06B6D4" />
-          <stop offset="100%" stopColor="#0A6EDD" />
-        </linearGradient>
-        <linearGradient id="shieldGlow" x1="12" y1="8" x2="36" y2="40" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#8EC63F" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#0A6EDD" stopOpacity="0.1" />
-        </linearGradient>
-      </defs>
-      {/* Outer Shield */}
-      <path
-        d="M24 4L7 11.5V23C7 33.8 14.3 41.8 24 44.5C33.7 41.8 41 33.8 41 23V11.5L24 4Z"
-        fill="url(#shieldGlow)"
-        stroke="url(#pravahyaBrand)"
-        strokeWidth="2.2"
-        strokeLinejoin="round"
-      />
-      {/* Central Neural Lock Hub */}
-      <rect x="18" y="21" width="12" height="11" rx="2.5" fill="url(#pravahyaBrand)" fillOpacity="0.2" stroke="url(#pravahyaBrand)" strokeWidth="1.5" />
-      <path d="M20.5 21V17.5C20.5 15.6 22.1 14 24 14C25.9 14 27.5 15.6 27.5 17.5V21" stroke="url(#pravahyaBrand)" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="24" cy="26.5" r="1.5" fill="url(#pravahyaBrand)" />
-      <path d="M24 28V30" stroke="url(#pravahyaBrand)" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Orbital Nexus Nodes */}
-      <circle cx="12" cy="19" r="1.5" fill="#8EC63F" />
-      <circle cx="36" cy="19" r="1.5" fill="#0A6EDD" />
-      <circle cx="15" cy="33" r="1.5" fill="#8EC63F" opacity="0.8" />
-      <circle cx="33" cy="33" r="1.5" fill="#0A6EDD" opacity="0.8" />
-      <line x1="13.5" y1="19.5" x2="18" y2="23" stroke="url(#pravahyaBrand)" strokeWidth="0.8" opacity="0.5" />
-      <line x1="34.5" y1="19.5" x2="30" y2="23" stroke="url(#pravahyaBrand)" strokeWidth="0.8" opacity="0.5" />
-    </svg>
-  );
-}
 
 function MarketingLandingPage() {
   const [activeTab, setActiveTab] = useState<"hitl" | "compliance" | "attack-paths">("hitl");
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("dciso-theme-mode");
-    if (saved === "light") {
-      setIsDark(false);
-    } else {
-      setIsDark(true);
-    }
+    const saved = localStorage.getItem("dciso-theme");
+    const isDarkTheme = saved !== "light";
+    setIsDark(isDarkTheme);
+    document.documentElement.classList.toggle("light", !isDarkTheme);
   }, []);
 
   const toggleTheme = () => {
     setIsDark((prev) => {
       const next = !prev;
-      localStorage.setItem("dciso-theme-mode", next ? "dark" : "light");
+      document.documentElement.classList.toggle("light", !next);
+      localStorage.setItem("dciso-theme", next ? "dark" : "light");
       return next;
     });
   };
@@ -149,8 +104,8 @@ function MarketingLandingPage() {
     <div
       className={`min-h-screen font-sans antialiased overflow-x-hidden transition-colors duration-300 ${
         isDark
-          ? "bg-[#07090E] text-[#F1F5F9] selection:bg-[#8EC63F] selection:text-black"
-          : "bg-[#F8FAFC] text-[#0F172A] selection:bg-[#8EC63F] selection:text-black"
+          ? "bg-background text-foreground selection:bg-cyan-500 selection:text-black"
+          : "bg-background text-foreground selection:bg-cyan-500 selection:text-black"
       }`}
     >
       {/* ════════════════════════════════════════════════════════════════════
@@ -159,28 +114,28 @@ function MarketingLandingPage() {
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-all duration-300 ${
           isDark
-            ? "border-white/[0.08] bg-[#07090E]/85 shadow-[0_4px_24px_rgba(0,0,0,0.6)]"
-            : "border-slate-200/80 bg-white/90 shadow-[0_4px_20px_rgba(0,0,0,0.04)]"
+            ? "border-border bg-background/85 shadow-[0_4px_24px_rgba(0,0,0,0.6)]"
+            : "border-border bg-background/90 shadow-[0_4px_20px_rgba(0,0,0,0.04)]"
         }`}
       >
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-8">
+        <div className="mx-auto flex h-20 w-full max-w-[1720px] items-center justify-between px-6 sm:px-10 lg:px-14 xl:px-16">
           {/* Brand Logo & Clean Meaningful Subtitle */}
-          <Link to="/" className="flex items-center gap-3 group cursor-pointer shrink-0">
+          <Link to="/" className="flex items-center gap-3.5 group cursor-pointer shrink-0">
             <div className="transition-transform duration-300 group-hover:scale-105">
-              <BrandLogo size={42} />
+              <ShieldMark size={42} />
             </div>
             <div className="flex flex-col">
               <span className={`text-lg font-black tracking-tight leading-none ${isDark ? "text-white" : "text-slate-950"}`}>
-                DIGITAL <span className="bg-gradient-to-r from-[#8EC63F] to-[#06B6D4] bg-clip-text text-transparent">CISO</span>
+                DIGITAL <span className="text-primary font-black">CISO</span>
               </span>
-              <span className="text-[11px] font-bold tracking-wide text-[#8EC63F] leading-none mt-1">
+              <span className="text-[11px] font-bold tracking-wide text-primary leading-none mt-1">
                 AI Cloud Security
               </span>
             </div>
           </Link>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-2">
+          <nav className="hidden lg:flex items-center gap-2 xl:gap-3">
             {[
               { label: "Overview", href: "#overview" },
               { label: "How It Works", href: "#how-it-works" },
@@ -192,7 +147,7 @@ function MarketingLandingPage() {
               <a
                 key={item.label}
                 href={item.href}
-                className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-200 ${
+                className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition-all duration-200 ${
                   isDark
                     ? "text-slate-300 hover:bg-white/[0.08] hover:text-white"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -231,7 +186,7 @@ function MarketingLandingPage() {
 
             <Link
               to="/sign-up"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#8EC63F] px-6 text-[13px] font-bold text-[#07090E] shadow-[0_1px_2px_rgba(142,198,63,0.3),0_8px_20px_-6px_rgba(142,198,63,0.55)] transition-all duration-200 hover:bg-[#9fe046] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-6 text-[13px] font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all duration-200 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
             >
               <span>Start Free Trial</span>
               <ArrowRight className="h-4 w-4" />
@@ -244,10 +199,10 @@ function MarketingLandingPage() {
           HERO SECTION (2-Column Architecture with Enterprise Marketing Visual)
       ════════════════════════════════════════════════════════════════════ */}
       <section id="overview" className="relative isolate overflow-hidden pt-16 pb-24 sm:pt-20 sm:pb-32 px-6 lg:px-8">
-        {/* Background Gradients & Pravahya Grid Blur */}
+        {/* Background Gradients & Obsidian Cyan/Blue Grid Blur */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
           <div className={`absolute -left-40 top-[-10%] h-[34rem] w-[34rem] rounded-full blur-[140px] ${isDark ? "bg-[#0A6EDD]/20" : "bg-[#0A6EDD]/15"}`} />
-          <div className={`absolute -right-32 top-[15%] h-[30rem] w-[30rem] rounded-full blur-[140px] ${isDark ? "bg-[#8EC63F]/18" : "bg-[#8EC63F]/20"}`} />
+          <div className={`absolute -right-32 top-[15%] h-[30rem] w-[30rem] rounded-full blur-[140px] ${isDark ? "bg-cyan-500/15" : "bg-cyan-500/10"}`} />
           {isDark && (
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff04_1px,transparent_1px),linear-gradient(to_bottom,#ffffff04_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,#000_70%,transparent_100%)]" />
           )}
@@ -258,8 +213,8 @@ function MarketingLandingPage() {
             {/* Left Column: Headline, Subtext & CTAs */}
             <div className="flex flex-col items-start gap-7">
               {/* Badge Pill */}
-              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-xs ${isDark ? 'border-white/15 bg-white/10 text-white/90' : 'border-slate-200 bg-white text-slate-800'}`}>
-                <span className="rounded-full bg-[#8EC63F] px-2.5 py-0.5 text-[0.65rem] font-black uppercase tracking-wider text-[#07090E]">
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-xs ${isDark ? 'border-primary/30 bg-primary/10 text-cyan-300' : 'border-primary/30 bg-primary/10 text-cyan-800'}`}>
+                <span className="rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-2.5 py-0.5 text-[0.65rem] font-black uppercase tracking-wider text-white">
                   Autonomous CISO
                 </span>
                 <span>Continuous Cloud Auditing · 28 Frameworks</span>
@@ -268,7 +223,7 @@ function MarketingLandingPage() {
               {/* High-Impact Executive Headline */}
               <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.08] ${isDark ? "text-white" : "text-slate-950"}`}>
                 Autonomous Cloud Security &{" "}
-                <span className="bg-gradient-to-r from-[#8EC63F] via-[#06B6D4] to-[#0A6EDD] bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 bg-clip-text text-transparent">
                   Continuous Compliance
                 </span>{" "}
                 for Enterprise.
@@ -283,7 +238,7 @@ function MarketingLandingPage() {
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto pt-2">
                 <Link
                   to="/sign-up"
-                  className="inline-flex h-13 items-center justify-center gap-2.5 rounded-full bg-[#8EC63F] px-8 text-base font-bold text-[#07090E] shadow-[0_1px_2px_rgba(142,198,63,0.3),0_8px_24px_-8px_rgba(142,198,63,0.55)] transition-all duration-200 hover:bg-[#9fe046] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+                  className="inline-flex h-13 items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 text-base font-bold text-white shadow-[0_0_24px_rgba(6,182,212,0.45)] transition-all duration-200 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
                 >
                   <span>Deploy Organization Account</span>
                   <ArrowRight className="h-4 w-4" />
@@ -297,7 +252,7 @@ function MarketingLandingPage() {
                       : "border-slate-300 bg-white text-slate-800 shadow-soft hover:bg-slate-100 hover:border-slate-400"
                   }`}
                 >
-                  <Play className="h-4 w-4 text-[#8EC63F] fill-[#8EC63F]" />
+                  <Play className="h-4 w-4 text-cyan-400 fill-cyan-400" />
                   <span>Explore Live Console</span>
                 </Link>
               </div>
@@ -325,13 +280,13 @@ function MarketingLandingPage() {
                 {/* Showcase Header */}
                 <div className={`flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                   <div className="flex items-center gap-2.5">
-                    <ShieldCheck className="h-5 w-5 text-[#8EC63F]" />
+                    <ShieldCheck className="h-5 w-5 text-primary" />
                     <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-950'}`}>
                       Autonomous Security Nervous System
                     </span>
                   </div>
-                  <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-[11px] font-bold text-emerald-400">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="flex items-center gap-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 text-[11px] font-bold text-cyan-400">
+                    <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
                     Continuous Guard
                   </span>
                 </div>
@@ -339,10 +294,10 @@ function MarketingLandingPage() {
                 {/* 3 Core Architecture Cards */}
                 <div className="mt-5 space-y-3.5">
                   {/* Card 1: 28 Frameworks */}
-                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-[#8EC63F]/40' : 'border-slate-200 bg-slate-50/80 hover:border-[#8EC63F] shadow-xs'}`}>
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-primary/40' : 'border-slate-200 bg-slate-50/80 hover:border-primary shadow-xs'}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] ring-1 ring-[#8EC63F]/30">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-400 ring-1 ring-cyan-500/30">
                           <Award className="h-4 w-4" />
                         </div>
                         <div>
@@ -358,10 +313,10 @@ function MarketingLandingPage() {
                   </div>
 
                   {/* Card 2: Spectra AI */}
-                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-[#06B6D4]/40' : 'border-slate-200 bg-slate-50/80 hover:border-[#06B6D4] shadow-xs'}`}>
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-cyan-500/40' : 'border-slate-200 bg-slate-50/80 hover:border-cyan-500 shadow-xs'}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#06B6D4]/20 to-[#0A6EDD]/20 text-[#06B6D4] ring-1 ring-[#06B6D4]/30">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-400 ring-1 ring-cyan-500/30">
                           <BrainCircuit className="h-4 w-4" />
                         </div>
                         <div>
@@ -377,10 +332,10 @@ function MarketingLandingPage() {
                   </div>
 
                   {/* Card 3: HITL Safety Gate */}
-                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-emerald-500/40' : 'border-slate-200 bg-slate-50/80 hover:border-emerald-500 shadow-xs'}`}>
+                  <div className={`group rounded-2xl border p-4 transition-all ${isDark ? 'border-white/10 bg-white/[0.02] hover:border-primary/40' : 'border-slate-200 bg-slate-50/80 hover:border-primary shadow-xs'}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-[#8EC63F]/20 text-emerald-400 ring-1 ring-emerald-500/30">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-600/20 text-cyan-400 ring-1 ring-cyan-500/30">
                           <Lock className="h-4 w-4" />
                         </div>
                         <div>
@@ -399,15 +354,15 @@ function MarketingLandingPage() {
                 {/* Showcase Footer Trust Badge */}
                 <div className={`mt-5 pt-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                   <span className="flex items-center gap-1.5 font-semibold">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                     Zero-Agent Cloud Connect
                   </span>
                   <span className="flex items-center gap-1.5 font-semibold">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                     Continuous Audit Trails
                   </span>
                   <span className="flex items-center gap-1.5 font-semibold">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#8EC63F]" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                     Model Context Protocol
                   </span>
                 </div>
@@ -438,7 +393,7 @@ function MarketingLandingPage() {
                     : "border-slate-200 bg-white text-slate-800"
                 }`}
               >
-                <span className="font-extrabold text-[#8EC63F]">{partner.icon}</span>
+                <span className="font-extrabold text-primary">{partner.icon}</span>
                 <span>{partner.name}</span>
                 <span className="text-[10px] text-slate-400 font-mono">({partner.category})</span>
               </div>
@@ -448,14 +403,14 @@ function MarketingLandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          HOW IT WORKS (Pravahya Step-by-Step Architecture Pipeline)
+          HOW IT WORKS (Step-by-Step Architecture Pipeline)
       ════════════════════════════════════════════════════════════════════ */}
       <section id="how-it-works" className={`py-24 px-6 lg:px-8 border-b ${isDark ? "border-white/[0.06]" : "border-slate-200 bg-white"}`}>
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
             <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F] flex items-center gap-2">
-                <span className="h-px w-6 bg-[#8EC63F]" />
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                <span className="h-px w-6 bg-primary" />
                 Operating Model
               </span>
               <h2 className={`mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
@@ -483,14 +438,14 @@ function MarketingLandingPage() {
                   key={i}
                   className={`group relative overflow-hidden rounded-2xl border p-7 transition-all duration-300 hover:-translate-y-1 ${
                     isDark
-                      ? "border-white/[0.08] bg-white/[0.02] hover:border-[#8EC63F]/50 hover:shadow-[0_12px_30px_-10px_rgba(142,198,63,0.25)]"
-                      : "border-slate-200 bg-white hover:border-[#8EC63F] hover:shadow-[0_12px_30px_-10px_rgba(142,198,63,0.3)] shadow-xs"
+                      ? "border-white/[0.08] bg-white/[0.02] hover:border-primary/50 hover:shadow-[0_12px_30px_-10px_rgba(6,182,212,0.25)]"
+                      : "border-slate-200 bg-white hover:border-primary hover:shadow-[0_12px_30px_-10px_rgba(6,182,212,0.3)] shadow-xs"
                   }`}
                 >
-                  <span className="absolute top-6 right-6 font-mono text-2xl font-black text-slate-500/30 group-hover:text-[#8EC63F] transition-colors">
+                  <span className="absolute top-6 right-6 font-mono text-2xl font-black text-slate-500/30 group-hover:text-primary transition-colors">
                     {item.step}
                   </span>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] mb-6 ring-1 ring-[#8EC63F]/30">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-400 mb-6 ring-1 ring-cyan-500/30">
                     <Icon className="h-6 w-6" />
                   </div>
                   <h3 className={`text-base font-bold leading-snug ${isDark ? "text-white" : "text-slate-950"}`}>
@@ -512,7 +467,7 @@ function MarketingLandingPage() {
       <section className={`py-24 px-6 lg:px-8 border-b ${isDark ? "border-white/[0.06] bg-[#0A0D15]/50" : "border-slate-200 bg-slate-50/70"}`}>
         <div className="mx-auto max-w-7xl">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F]">Command Interface</span>
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Command Interface</span>
             <h2 className={`mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
               Experience the Autonomous CISO Console
             </h2>
@@ -546,7 +501,7 @@ function MarketingLandingPage() {
                       onClick={() => setActiveTab(tab)}
                       className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                         activeTab === tab
-                          ? "bg-[#8EC63F] text-[#07090E] shadow-sm"
+                          ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(6,182,212,0.35)]"
                           : isDark
                             ? "text-slate-400 hover:text-white"
                             : "text-slate-600 hover:text-slate-950"
@@ -571,9 +526,9 @@ function MarketingLandingPage() {
                         AI-Generated Terraform Remediation Playbook
                       </h3>
                       <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600 font-medium"}`}>
-                        Spectra discovered open public ACL exposing confidential financial audits on <code className="font-mono text-[#8EC63F]">s3:::corp-confidential-finance-2026</code>.
+                        Spectra discovered open public ACL exposing confidential financial audits on <code className="font-mono text-cyan-400">s3:::corp-confidential-finance-2026</code>.
                       </p>
-                      <pre className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-emerald-400 leading-relaxed overflow-x-auto shadow-inner">
+                      <pre className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-cyan-300 leading-relaxed overflow-x-auto shadow-inner">
 {`resource "aws_s3_bucket_public_access_block" "enforce_block" {
   bucket                  = "corp-confidential-finance-2026"
   block_public_acls       = true
@@ -584,10 +539,10 @@ function MarketingLandingPage() {
                       </pre>
                     </div>
 
-                    <div className={`lg:col-span-5 rounded-2xl border p-6 flex flex-col justify-between ${isDark ? "border-[#8EC63F]/30 bg-[#8EC63F]/5" : "border-[#8EC63F]/40 bg-emerald-50/50"}`}>
+                    <div className={`lg:col-span-5 rounded-2xl border p-6 flex flex-col justify-between ${isDark ? "border-primary/30 bg-primary/5" : "border-primary/30 bg-cyan-50/50"}`}>
                       <div>
-                        <div className="flex items-center justify-between border-b border-[#8EC63F]/20 pb-3">
-                          <span className="text-xs font-bold uppercase tracking-wider text-[#8EC63F]">
+                        <div className="flex items-center justify-between border-b border-primary/20 pb-3">
+                          <span className="text-xs font-bold uppercase tracking-wider text-primary">
                             Human-In-The-Loop Gate
                           </span>
                           <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/30">
@@ -601,11 +556,11 @@ function MarketingLandingPage() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Blast Radius:</span>
-                            <span className="font-bold text-emerald-400">0 Impact (Isolated)</span>
+                            <span className="font-bold text-cyan-400">0 Impact (Isolated)</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Rollback Safeguard:</span>
-                            <span className="font-bold text-emerald-400">Automated Rollback Ready</span>
+                            <span className="font-bold text-cyan-400">Automated Rollback Ready</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">SLA Deadline:</span>
@@ -617,7 +572,7 @@ function MarketingLandingPage() {
                       <div className="mt-6">
                         <Link
                           to="/ai/decisions"
-                          className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#8EC63F] px-4 text-xs font-bold text-[#07090E] shadow-[0_1px_2px_rgba(142,198,63,0.3),0_6px_16px_rgba(142,198,63,0.4)] transition-all hover:bg-[#9fe046] active:scale-95 cursor-pointer"
+                          className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-4 text-xs font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all active:scale-95 cursor-pointer"
                         >
                           <ShieldCheck className="h-4 w-4" />
                           <span>Authorize Execution in Console</span>
@@ -634,14 +589,14 @@ function MarketingLandingPage() {
                         key={i}
                         className={`rounded-2xl border p-4 transition-all ${
                           isDark
-                            ? "border-white/10 bg-white/5 hover:border-[#8EC63F]/40"
-                            : "border-slate-200 bg-white hover:border-[#8EC63F] shadow-xs"
+                            ? "border-white/10 bg-white/5 hover:border-primary/40"
+                            : "border-slate-200 bg-white hover:border-primary shadow-xs"
                         }`}
                       >
                         <div className={`text-xs font-bold leading-tight ${isDark ? "text-white" : "text-slate-950"}`}>{fw.name}</div>
                         <div className="mt-3 flex items-baseline justify-between">
-                          <span className="text-2xl font-black text-[#8EC63F]">{fw.score}%</span>
-                          <span className="text-[10px] font-bold text-emerald-400">Compliant</span>
+                          <span className="text-2xl font-black text-primary">{fw.score}%</span>
+                          <span className="text-[10px] font-bold text-cyan-400">Compliant</span>
                         </div>
                         <div className="mt-2 text-[10px] text-slate-400">
                           {fw.passed} of {fw.total} controls verified
@@ -680,14 +635,14 @@ function MarketingLandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          CORE CAPABILITIES (Pravahya Spotlight Grid)
+          CORE CAPABILITIES (Spotlight Grid)
       ════════════════════════════════════════════════════════════════════ */}
       <section id="capabilities" className={`py-24 px-6 lg:px-8 border-b ${isDark ? "border-white/[0.06]" : "border-slate-200 bg-white"}`}>
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
             <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F] flex items-center gap-2">
-                <span className="h-px w-6 bg-[#8EC63F]" />
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                <span className="h-px w-6 bg-primary" />
                 Full Capabilities
               </span>
               <h2 className={`mt-3 text-3xl sm:text-4xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
@@ -758,18 +713,18 @@ function MarketingLandingPage() {
                   key={i}
                   className={`group relative overflow-hidden rounded-2xl border p-7 transition-all duration-300 hover:-translate-y-1 ${
                     isDark
-                      ? "border-white/[0.08] bg-white/[0.02] hover:border-[#8EC63F]/50 hover:shadow-[0_12px_30px_-10px_rgba(142,198,63,0.25)]"
-                      : "border-slate-200 bg-white hover:border-[#8EC63F] hover:shadow-[0_12px_30px_-10px_rgba(142,198,63,0.3)] shadow-xs"
+                      ? "border-white/[0.08] bg-white/[0.02] hover:border-primary/50 hover:shadow-[0_12px_30px_-10px_rgba(6,182,212,0.25)]"
+                      : "border-slate-200 bg-white hover:border-primary hover:shadow-[0_12px_30px_-10px_rgba(6,182,212,0.3)] shadow-xs"
                   }`}
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#8EC63F]/20 to-[#0A6EDD]/20 text-[#8EC63F] mb-6 ring-1 ring-[#8EC63F]/30">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-400 mb-6 ring-1 ring-cyan-500/30">
                     <Icon className="h-6 w-6" />
                   </div>
                   <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-950"}`}>{cap.title}</h3>
                   <p className={`mt-3 text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>{cap.desc}</p>
                   <Link
                     to={cap.link}
-                    className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-[#8EC63F] transition-all group-hover:translate-x-1"
+                    className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-primary transition-all group-hover:translate-x-1"
                   >
                     <span>{cap.linkLabel}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -786,7 +741,7 @@ function MarketingLandingPage() {
       ════════════════════════════════════════════════════════════════════ */}
       <section id="compliance" className={`py-20 px-6 lg:px-8 border-b text-center ${isDark ? "border-white/[0.06] bg-white/[0.01]" : "border-slate-200 bg-slate-50/70"}`}>
         <div className="mx-auto max-w-7xl">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F]">Compliance Matrix</span>
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Compliance Matrix</span>
           <h2 className={`mt-3 text-3xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
             Continuous Auditing Across 28+ Global Standards
           </h2>
@@ -804,8 +759,8 @@ function MarketingLandingPage() {
                 key={fw}
                 className={`rounded-full border px-4 py-2 text-xs font-bold transition-all hover:scale-105 ${
                   isDark
-                    ? "border-white/10 bg-white/5 text-slate-300 hover:border-[#8EC63F] hover:text-[#8EC63F]"
-                    : "border-slate-300 bg-white text-slate-800 hover:border-[#8EC63F] hover:text-[#8EC63F] shadow-xs"
+                    ? "border-white/10 bg-white/5 text-slate-300 hover:border-primary hover:text-primary"
+                    : "border-slate-300 bg-white text-slate-800 hover:border-primary hover:text-primary shadow-xs"
                 }`}
               >
                 {fw}
@@ -822,12 +777,12 @@ function MarketingLandingPage() {
         <div className="mx-auto max-w-7xl">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
             <div>
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#8EC63F]">Open Protocol API</span>
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Open Protocol API</span>
               <h2 className={`mt-3 text-3xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
                 Model Context Protocol (MCP) Gateway
               </h2>
               <p className={`mt-4 text-sm leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                Expose 10 live security tools to any AI assistant (Claude Desktop, Cursor, VS Code, LangChain, OpenAI Agents). Compatible with JSON-RPC 2.0 and JWT token authorization.
+                Expose 10 live security tools to private enterprise AI agents, IDE plugins (Cursor, VS Code), and custom SecOps pipelines. Compatible with JSON-RPC 2.0 and JWT token authorization.
               </p>
               <div className="mt-6 space-y-2.5 text-xs font-mono">
                 {[
@@ -838,7 +793,7 @@ function MarketingLandingPage() {
                   "ciso_get_integrations — Connected SIEM & webhook channels",
                 ].map((tool) => (
                   <div key={tool} className="flex items-start gap-2.5">
-                    <Code2 className="h-4 w-4 text-[#8EC63F] mt-0.5 shrink-0" />
+                    <Code2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <span className={isDark ? "text-slate-300" : "text-slate-800 font-semibold"}>{tool}</span>
                   </div>
                 ))}
@@ -850,7 +805,7 @@ function MarketingLandingPage() {
                 <Terminal className="h-4 w-4 text-slate-400" />
                 <span className="font-mono text-xs font-bold text-slate-400">POST /api/v1/mcp</span>
               </div>
-              <pre className="font-mono text-xs text-[#8EC63F] leading-relaxed overflow-x-auto">
+              <pre className="font-mono text-xs text-cyan-300 leading-relaxed overflow-x-auto">
 {`{
   "jsonrpc": "2.0",
   "method": "tools/call",
@@ -870,11 +825,11 @@ function MarketingLandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          FINAL CTA (Pravahya Conversion Section)
+          FINAL CTA (Conversion Section)
       ════════════════════════════════════════════════════════════════════ */}
-      <section className={`py-24 px-6 lg:px-8 text-center relative overflow-hidden ${isDark ? "bg-gradient-to-b from-transparent to-[#8EC63F]/10" : "bg-slate-50"}`}>
+      <section className={`py-24 px-6 lg:px-8 text-center relative overflow-hidden ${isDark ? "bg-gradient-to-b from-transparent to-cyan-500/10" : "bg-slate-50"}`}>
         <div className="mx-auto max-w-4xl flex flex-col items-center">
-          <BrandLogo size={56} />
+          <ShieldMark size={56} />
           <h2 className={`mt-6 text-3xl sm:text-5xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-950"}`}>
             Ready to Automate Your Multi-Cloud Security?
           </h2>
@@ -884,7 +839,7 @@ function MarketingLandingPage() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               to="/sign-up"
-              className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-[#8EC63F] px-8 text-base font-bold text-[#07090E] shadow-[0_1px_2px_rgba(142,198,63,0.3),0_8px_24px_-8px_rgba(142,198,63,0.55)] transition-all hover:bg-[#9fe046] hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+              className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-8 text-base font-bold text-white shadow-[0_0_24px_rgba(6,182,212,0.45)] transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer"
             >
               <span>Deploy Organization Account</span>
               <ArrowRight className="h-4 w-4" />
@@ -905,12 +860,12 @@ function MarketingLandingPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          FOOTER (Pravahya-Style Clean Minimalist Footer)
+          FOOTER (Clean Minimalist Footer)
       ════════════════════════════════════════════════════════════════════ */}
-      <footer className={`border-t py-12 px-6 lg:px-8 ${isDark ? "border-white/[0.08] bg-black/60" : "border-slate-200 bg-white"}`}>
-        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-6 text-xs">
+      <footer className={`border-t py-12 px-6 sm:px-10 lg:px-14 xl:px-16 ${isDark ? "border-border bg-black/60" : "border-border bg-white"}`}>
+        <div className="mx-auto flex w-full max-w-[1720px] flex-col sm:flex-row items-center justify-between gap-6 text-xs">
           <div className="flex items-center gap-3">
-            <BrandLogo size={28} />
+            <ShieldMark size={28} />
             <div className="flex flex-col">
               <span className={`font-black text-sm ${isDark ? "text-white" : "text-slate-900"}`}>DIGITAL CISO</span>
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">© 2026 Digital CISO. All rights reserved.</span>
@@ -918,11 +873,11 @@ function MarketingLandingPage() {
           </div>
 
           <div className="flex items-center gap-6 font-bold text-slate-400">
-            <Link to="/sign-in" className="hover:text-[#8EC63F] transition-colors">Console Sign In</Link>
-            <Link to="/sign-up" className="hover:text-[#8EC63F] transition-colors">Register</Link>
-            <a href="#compliance" className="hover:text-[#8EC63F] transition-colors">28 Standards</a>
-            <a href="#mcp" className="hover:text-[#8EC63F] transition-colors">MCP Protocol</a>
-            <a href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/reports/executive-summary`} target="_blank" className="hover:text-[#8EC63F] transition-colors">Executive PDF</a>
+            <Link to="/sign-in" className="hover:text-primary transition-colors">Console Sign In</Link>
+            <Link to="/sign-up" className="hover:text-primary transition-colors">Register</Link>
+            <a href="#compliance" className="hover:text-primary transition-colors">28 Standards</a>
+            <a href="#mcp" className="hover:text-primary transition-colors">MCP Protocol</a>
+            <a href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/reports/executive-summary`} target="_blank" className="hover:text-primary transition-colors">Executive PDF</a>
           </div>
         </div>
       </footer>

@@ -7,7 +7,7 @@ export function ShieldMark({ size = 32, className = "" }: { size?: number; class
       <img
         src="/logo.png"
         alt="Digital CISO Emblem"
-        className="h-full w-full object-cover transition-transform hover:scale-105"
+        className="h-full w-full object-contain transition-transform hover:scale-105"
         onError={(e) => {
           // Fallback if image not yet loaded
           (e.target as HTMLElement).style.display = "none";

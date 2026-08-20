@@ -100,10 +100,11 @@ function RadarChart({
             key={lvl}
             points={getPolygonPoints(lvl)}
             fill="none"
-            stroke="#334155"
+            stroke="currentColor"
+            className="text-border/70"
             strokeWidth="1"
             strokeDasharray={lvl < 1.0 ? "3 3" : "none"}
-            opacity={0.6}
+            opacity={0.7}
           />
         ))}
 
@@ -117,24 +118,25 @@ function RadarChart({
               y1={cy}
               x2={pt.x}
               y2={pt.y}
-              stroke="#334155"
+              stroke="currentColor"
+              className="text-border/70"
               strokeWidth="1"
-              opacity={0.7}
+              opacity={0.8}
             />
           );
         })}
 
         {/* Scale Numbers */}
-        <text x="153" y="120" fill="#64748b" fontSize="8" fontFamily="monospace">25</text>
-        <text x="153" y="95" fill="#64748b" fontSize="8" fontFamily="monospace">50</text>
-        <text x="153" y="70" fill="#64748b" fontSize="8" fontFamily="monospace">75</text>
-        <text x="153" y="45" fill="#64748b" fontSize="8" fontFamily="monospace">100</text>
+        <text x="153" y="120" fill="currentColor" className="text-muted-foreground" fontSize="8" fontFamily="monospace">25</text>
+        <text x="153" y="95" fill="currentColor" className="text-muted-foreground" fontSize="8" fontFamily="monospace">50</text>
+        <text x="153" y="70" fill="currentColor" className="text-muted-foreground" fontSize="8" fontFamily="monospace">75</text>
+        <text x="153" y="45" fill="currentColor" className="text-muted-foreground" fontSize="8" fontFamily="monospace">100</text>
 
         {/* Data Area Fill */}
         <polygon
           points={dataPolygonStr}
           fill="url(#radarAreaGradient)"
-          stroke="#22d3ee"
+          stroke="#06b6d4"
           strokeWidth="2"
           filter="url(#radarGlow)"
           className="transition-all duration-700 ease-out"
@@ -148,9 +150,9 @@ function RadarChart({
             cy={pt.y}
             r="4.5"
             fill="#06b6d4"
-            stroke="#ffffff"
+            stroke="currentColor"
+            className="text-card transition-all duration-700 ease-out"
             strokeWidth="1.5"
-            className="transition-all duration-700 ease-out"
           />
         ))}
 
@@ -160,11 +162,11 @@ function RadarChart({
             key={i}
             x={lbl.x}
             y={lbl.y}
-            fill="#94a3b8"
+            fill="currentColor"
             fontSize="10"
             fontWeight="600"
             textAnchor={lbl.anchor as any}
-            className="select-none"
+            className="select-none text-foreground/85"
           >
             {lbl.name}
           </text>
@@ -299,12 +301,12 @@ function AssetVolumeView({
           {awsAssets > 0 ? (
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> AWS ({awsAssets} · {awsPct}%)</span>
           ) : (
-            <span className="flex items-center gap-1.5 opacity-50"><span className="h-2 w-2 rounded-full bg-slate-500" /> AWS (0)</span>
+            <span className="flex items-center gap-1.5 text-muted-foreground/60"><span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> AWS (0)</span>
           )}
           {gcpAssets > 0 ? (
             <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Google Cloud ({gcpAssets} · {gcpPct}%)</span>
           ) : (
-            <span className="flex items-center gap-1.5 opacity-50"><span className="h-2 w-2 rounded-full bg-slate-500" /> Google Cloud (0)</span>
+            <span className="flex items-center gap-1.5 text-muted-foreground/60"><span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> Google Cloud (0)</span>
           )}
         </div>
       </div>
@@ -459,7 +461,8 @@ function SpeedometerGauge({ score }: { score: number }) {
         <path
           d="M 20 80 A 70 70 0 0 1 160 80"
           fill="none"
-          stroke="#1e293b"
+          stroke="currentColor"
+          className="text-border/80"
           strokeWidth="14"
           strokeLinecap="round"
         />
@@ -477,12 +480,12 @@ function SpeedometerGauge({ score }: { score: number }) {
           y1={cy}
           x2={nx}
           y2={ny}
-          stroke="#38bdf8"
+          stroke="#06b6d4"
           strokeWidth="3"
           strokeLinecap="round"
           className="transition-all duration-700 ease-out"
         />
-        <circle cx={cx} cy={cy} r="6" fill="#0f172a" stroke="#38bdf8" strokeWidth="2.5" />
+        <circle cx={cx} cy={cy} r="6" fill="currentColor" className="text-surface-2" stroke="#06b6d4" strokeWidth="2.5" />
       </svg>
 
       <div className="text-center -mt-2">
@@ -545,7 +548,8 @@ function FindingsDonutChart({
           cy="50"
           r={radius}
           fill="transparent"
-          stroke="#64748b"
+          stroke="currentColor"
+          className="text-muted-foreground/30"
           strokeWidth="10"
           strokeDasharray={`${mutedDash} ${circ}`}
           strokeDashoffset={-(passDash + failDash)}
@@ -806,9 +810,9 @@ export function DashboardPage() {
                 {providersCount}
               </span>
               <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold">
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-slate-300">AWS</span>
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-sky-300">Azure</span>
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-emerald-300">GCP</span>
+                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-foreground/80">AWS</span>
+                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-sky-500 dark:text-sky-300">Azure</span>
+                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-300">GCP</span>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">

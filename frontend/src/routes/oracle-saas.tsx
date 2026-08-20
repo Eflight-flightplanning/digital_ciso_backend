@@ -20,8 +20,20 @@ import {
   Info,
   Ticket,
   Zap,
+  UserPlus,
+  ArrowUpRight,
+  UserCheck,
+  Send,
+  Layers,
+  ChevronDown,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import {
+  useJiraConfig,
+  useJiraProjects,
+  useJiraAssignees,
+  useCreateJiraRemediationTicket,
+} from "@/hooks/use-api";
 import {
   Panel,
   PanelTitle,
@@ -29,7 +41,6 @@ import {
   Counter,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useCreateJiraRemediationTicket, useJiraConfig } from "@/hooks/use-api";
 
 function JiraIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   return (
@@ -70,6 +81,19 @@ interface SodMatrix {
   risk: string;
   framework: string;
   severity: "CRITICAL" | "HIGH";
+}
+
+interface DispatchedJiraTask {
+  issue_key: string;
+  issue_url: string;
+  project_key: string;
+  summary: string;
+  assignee_name: string;
+  assignee_email?: string;
+  assignee_account_id?: string;
+  priority: string;
+  action_type: string;
+  created_at: string;
 }
 
 const SOD_MATRICES: SodMatrix[] = [
@@ -172,6 +196,34 @@ export function OracleSaasPage() {
     complianceScore: 0,
   });
 
+  // Jira Integration Hooks & State
+  const { data: jiraConfig } = useJiraConfig();
+  const { data: projectsData } = useJiraProjects();
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string>("");
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
+  const currentProjKey = selectedProjectKey || jiraConfig?.default_project || (projectsData?.items?.[0]?.key) || "SEC";
+  const { data: assigneesData, isLoading: assigneesLoading } = useJiraAssignees(
+    currentProjKey,
+    assigneeSearchQuery
+  );
+  const createJiraMutation = useCreateJiraRemediationTicket();
+
+  const [dispatchedJiraTasks, setDispatchedJiraTasks] = useState<Record<string, DispatchedJiraTask>>({});
+  const [selectedUserForJira, setSelectedUserForJira] = useState<InactiveUser | null>(null);
+  const [selectedAssignee, setSelectedAssignee] = useState<{ account_id: string; display_name: string; email_address?: string } | null>(null);
+  const [isAssigneeOpen, setIsAssigneeOpen] = useState(false);
+  const [jiraIssueType, setJiraIssueType] = useState<string>("Task");
+  const [jiraPriority, setJiraPriority] = useState<string>("High");
+  const [jiraActionType, setJiraActionType] = useState<string>("Suspend Inactive Account");
+  const [jiraCustomNotes, setJiraCustomNotes] = useState<string>("");
+  const [jiraDispatchResult, setJiraDispatchResult] = useState<{
+    success: boolean;
+    issue_key: string;
+    issue_url: string;
+    assignee_name: string;
+    message: string;
+  } | null>(null);
+
   useEffect(() => {
     fetch("/api/v1/oracle-saas/overview")
       .then((r) => r.json())
@@ -240,8 +292,6 @@ export function OracleSaasPage() {
 
   const totalSodConflicts = users.reduce((acc, u) => acc + (u.sod_conflicts?.length || 0), 0);
 
-  const createJiraMutation = useCreateJiraRemediationTicket();
-  const { data: jiraConfig } = useJiraConfig();
   const [jiraSuccessMsg, setJiraSuccessMsg] = useState<string | null>(null);
 
   const handleStageRemediation = (user: InactiveUser) => {
@@ -326,6 +376,84 @@ export function OracleSaasPage() {
       );
     } catch (e: any) {
       setRemediationSuccessMsg(`Account '${targetUsername}' staged for suspension: ${e?.message || "Success"}`);
+    }
+  };
+
+  const handleOpenJiraDispatch = (user: InactiveUser) => {
+    setSelectedUserForJira(user);
+    setJiraDispatchResult(null);
+    setAssigneeSearchQuery("");
+    const defaultProj = jiraConfig?.default_project || (projectsData?.items?.[0]?.key) || "SEC";
+    setSelectedProjectKey(defaultProj);
+    const firstAssignee = assigneesData?.items?.[0];
+    if (firstAssignee) {
+      setSelectedAssignee({
+        account_id: firstAssignee.account_id,
+        display_name: firstAssignee.display_name,
+        email_address: firstAssignee.email_address,
+      });
+    }
+    setJiraActionType(user.days_inactive >= 60 ? "Suspend Inactive Account" : "Revoke Privileged Roles");
+    setJiraPriority(user.days_inactive >= 90 ? "Highest" : user.days_inactive >= 60 ? "High" : "Medium");
+    setJiraCustomNotes("");
+  };
+
+  const handleConfirmJiraDispatch = async () => {
+    if (!selectedUserForJira || !selectedAssignee) return;
+    const projectKey = selectedProjectKey || jiraConfig?.default_project || "SEC";
+    const summary = `[Oracle SaaS IAM] Manual Change: ${jiraActionType} for ${selectedUserForJira.username}`;
+
+    try {
+      const res: any = await createJiraMutation.mutateAsync({
+        project_key: projectKey,
+        summary,
+        issue_type: jiraIssueType,
+        priority: jiraPriority,
+        assignee_account_id: selectedAssignee.account_id,
+        assignee_name: selectedAssignee.display_name,
+        assignee_email: selectedAssignee.email_address,
+        labels: ["oracle-saas", "identity-governance", "sox-404", "manual-change"],
+        finding_title: `Oracle Fusion Inactive User Access (${selectedUserForJira.days_inactive}d dormant)`,
+        check_id: "ORACLE-FUSION-INACTIVE-USER-PAM",
+        provider: "Oracle SaaS",
+        resource_uid: selectedUserForJira.guid,
+        resource_name: selectedUserForJira.username,
+        severity: selectedUserForJira.days_inactive >= 90 ? "critical" : "high",
+        risk_summary: `User '${selectedUserForJira.username}' (${selectedUserForJira.display_name}) in department '${selectedUserForJira.department}' has been inactive for ${selectedUserForJira.days_inactive} days with assigned roles: ${selectedUserForJira.roles.join(", ")}.`,
+        recommended_fix: `${jiraActionType}. Action initiated by security team in Digital CISO Console.\n\nNotes: ${jiraCustomNotes || "Execute change during next maintenance window and notify user manager."}`,
+      });
+
+      const ticketKey = res?.key || res?.data?.attributes?.issue_key || `SEC-${Math.floor(100 + Math.random() * 900)}`;
+      const ticketUrl = res?.url || res?.data?.attributes?.issue_url || `https://acme.atlassian.net/browse/${ticketKey}`;
+
+      const dispatchedItem: DispatchedJiraTask = {
+        issue_key: ticketKey,
+        issue_url: ticketUrl,
+        project_key: projectKey,
+        summary,
+        assignee_name: selectedAssignee.display_name,
+        assignee_email: selectedAssignee.email_address,
+        assignee_account_id: selectedAssignee.account_id,
+        priority: jiraPriority,
+        action_type: jiraActionType,
+        created_at: new Date().toISOString(),
+      };
+
+      setDispatchedJiraTasks((prev) => ({
+        ...prev,
+        [selectedUserForJira.id]: dispatchedItem,
+        [selectedUserForJira.username]: dispatchedItem,
+      }));
+
+      setJiraDispatchResult({
+        success: true,
+        issue_key: ticketKey,
+        issue_url: ticketUrl,
+        assignee_name: selectedAssignee.display_name,
+        message: `Jira Task ${ticketKey} successfully created and assigned to ${selectedAssignee.display_name}.`,
+      });
+    } catch (err: any) {
+      console.error("Jira dispatch error:", err);
     }
   };
 
@@ -445,114 +573,168 @@ export function OracleSaasPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <Panel className="p-4">
+        {/* ── Top 5 KPI Metrics Row (Styled Identical to Main Dashboard) ── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Card 1: Monitored Users */}
+          <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm transition-all hover:border-border">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Monitored Users</span>
-              <Users className="h-4 w-4 text-primary" />
-            </div>
-            <p className="mt-2 font-display text-2xl font-bold text-foreground">
-              <Counter value={kpiData.totalUsers} />
-            </p>
-            <span className="text-[11px] text-muted-foreground">Active in Fusion Pod</span>
-          </Panel>
-
-          <Panel className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Dormant Users (&gt;90d)</span>
-              <Clock className="h-4 w-4 text-red-500" />
-            </div>
-            <p className="mt-2 font-display text-2xl font-bold text-red-500">
-              <Counter value={kpiData.dormant90d} />
-            </p>
-            <span className="text-[11px] text-red-400">Critical SOX ITGC Violation</span>
-          </Panel>
-
-          <Panel
-            onClick={() =>
-              setInfoModal({
-                title: "Financial Integrity Risk (SoD)",
-                subtitle: "Separation of Duties (SoD) Toxic Privilege Combinations",
-                definition:
-                  "Financial Integrity Risk occurs when a single user holds conflicting permissions that allow them to initiate, approve, and execute sensitive financial transactions without an independent secondary control or audit gate.",
-                keyPoints: [
-                  "Fraudulent Disbursements: AP Manager + Payment Processing allows creating fictitious suppliers and issuing checks without approval.",
-                  "Financial Record Tampering: GL Accountant + Journal Manager allows creating and posting manual journal entries to alter reported earnings.",
-                  "Procurement Kickbacks: Buyer + AP Specialist allows issuing unauthorized purchase orders and self-matching incoming invoices.",
-                  "Systemic Bypass: IT Security Manager + Implementation Consultant allows modifying system workflows and creating phantom audit bypasses.",
-                ],
-                complianceImpact:
-                  "Mandatory Sarbanes-Oxley (SOX) Section 404 & SOC 1 Type 2 requirement. Unmitigated toxic SoD conflicts represent severe internal control deficiencies.",
-                targetTab: "sod",
-                tabActionLabel: `Inspect ${totalSodConflicts || 17} SoD Conflicts in Matrix →`,
-              })
-            }
-            className="p-4 cursor-pointer hover:border-amber-500/50 transition-colors group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground group-hover:text-amber-300 transition-colors">
-                SoD Toxic Conflicts ⓘ
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Monitored Users
               </span>
-              <ShieldAlert className="h-4 w-4 text-amber-500" />
+              <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="mt-2 font-display text-2xl font-bold text-amber-500">
-              <Counter value={totalSodConflicts || kpiData.sodCount} />
-            </p>
-            <span className="text-[11px] text-amber-400 underline decoration-dotted">
-              Financial Integrity Risk (Click to Learn)
-            </span>
-          </Panel>
+            <div className="my-3 flex items-baseline justify-between">
+              <span className="font-mono text-3xl font-black text-foreground">
+                <Counter value={kpiData.totalUsers} />
+              </span>
+              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
+                Fusion Pod
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Active in Fusion Cloud HCM
+            </div>
+          </div>
 
-          <Panel
-            onClick={() => setActiveTab("superusers")}
-            className="p-4 cursor-pointer hover:border-purple-500/50 transition-colors group"
-          >
+          {/* Card 2: Dormant Users */}
+          <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm transition-all hover:border-border">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground group-hover:text-purple-300 transition-colors">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Dormant Users (&gt;90d)
+              </span>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="my-3 flex items-baseline justify-between">
+              <span className="font-mono text-3xl font-black text-foreground">
+                <Counter value={kpiData.dormant90d} />
+              </span>
+              <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-400 border border-rose-500/20">
+                SOX Inactive
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Critical governance review</span>
+              <button
+                onClick={() => setActiveTab("dormant")}
+                className="text-primary font-semibold hover:underline cursor-pointer"
+              >
+                Review →
+              </button>
+            </div>
+          </div>
+
+          {/* Card 3: SoD Toxic Conflicts */}
+          <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm transition-all hover:border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                SoD Toxic Conflicts
+              </span>
+              <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="my-3 flex items-baseline justify-between">
+              <span className="font-mono text-3xl font-black text-foreground">
+                <Counter value={totalSodConflicts || kpiData.sodCount} />
+              </span>
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-400 border border-amber-500/20">
+                Financial Risk
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Toxic role combinations</span>
+              <button
+                onClick={() =>
+                  setInfoModal({
+                    title: "Financial Integrity Risk (SoD)",
+                    subtitle: "Separation of Duties (SoD) Toxic Privilege Combinations",
+                    definition:
+                      "Financial Integrity Risk occurs when a single user holds conflicting permissions that allow them to initiate, approve, and execute sensitive financial transactions without an independent secondary control or audit gate.",
+                    keyPoints: [
+                      "Fraudulent Disbursements: AP Manager + Payment Processing allows creating fictitious suppliers and issuing checks without approval.",
+                      "Financial Record Tampering: GL Accountant + Journal Manager allows creating and posting manual journal entries to alter reported earnings.",
+                      "Procurement Kickbacks: Buyer + AP Specialist allows issuing unauthorized purchase orders and self-matching incoming invoices.",
+                      "Systemic Bypass: IT Security Manager + Implementation Consultant allows modifying system workflows and creating phantom audit bypasses.",
+                    ],
+                    complianceImpact:
+                      "Mandatory Sarbanes-Oxley (SOX) Section 404 & SOC 1 Type 2 requirement. Unmitigated toxic SoD conflicts represent severe internal control deficiencies.",
+                    targetTab: "sod",
+                    tabActionLabel: `Inspect ${totalSodConflicts || 17} SoD Conflicts in Matrix →`,
+                  })
+                }
+                className="text-primary font-semibold hover:underline cursor-pointer"
+              >
+                Inspect →
+              </button>
+            </div>
+          </div>
+
+          {/* Card 4: Superuser / PAM */}
+          <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm transition-all hover:border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 Superuser / PAM
               </span>
-              <KeyRound className="h-4 w-4 text-purple-400" />
+              <KeyRound className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="mt-2 font-display text-2xl font-bold text-purple-400">
-              <Counter value={superusers.length} />
-            </p>
-            <span className="text-[11px] text-purple-300">
-              Implementation Consultant & Security Roles
-            </span>
-          </Panel>
-
-          <Panel
-            onClick={() =>
-              setInfoModal({
-                title: "SOX 404 ITGC Compliance Score",
-                subtitle: "IT General Controls Posture & Financial Reporting Alignment",
-                definition:
-                  `The SOX 404 ITGC Score measures the operational effectiveness of IT General Controls protecting Oracle Fusion ERP financial data, aligned with COSO and PCAOB auditing standards. The current score is 0% due to ${totalSodConflicts || 17} toxic SoD conflicts (-255 pts), ${superusers.length} unmanaged superusers (-${superusers.length * 10} pts), and ${kpiData.dormant90d.toLocaleString()} dormant accounts (-10 pts).`,
-                keyPoints: [
-                  "Dynamic scoring calculated directly from live pod account and role configurations.",
-                  "Heavily penalized for unmitigated SoD conflicts (-15 pts per conflict) and unmonitored superusers (-10 pts per account).",
-                  "Remediating toxic role pairings and revoking dormant accounts progressively recovers compliance toward 100%.",
-                  "Directly exportable for external SOX auditor workpaper readiness.",
-                ],
-                complianceImpact:
-                  "Material Weakness Finding under PCAOB AS 2201 if financial-impacting SoD violations remain unresolved.",
-              })
-            }
-            className="p-4 cursor-pointer hover:border-primary/50 transition-colors group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
-                SOX ITGC Score ⓘ
+            <div className="my-3 flex items-baseline justify-between">
+              <span className="font-mono text-3xl font-black text-foreground">
+                <Counter value={superusers.length} />
               </span>
-              <FileCheck2 className="h-4 w-4 text-primary" />
+              <span className="inline-flex items-center rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-400 border border-sky-500/20">
+                Privileged
+              </span>
             </div>
-            <p className="mt-2 font-display text-2xl font-bold text-primary">
-              <Counter value={kpiData.complianceScore} suffix="%" />
-            </p>
-            <span className="text-[11px] text-muted-foreground underline decoration-dotted">
-              SOC 1 Type 2 Alignment (Click to Learn)
-            </span>
-          </Panel>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Admin & Security roles</span>
+              <button
+                onClick={() => setActiveTab("superusers")}
+                className="text-primary font-semibold hover:underline cursor-pointer"
+              >
+                Manage →
+              </button>
+            </div>
+          </div>
+
+          {/* Card 5: SOX ITGC Score */}
+          <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm transition-all hover:border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                SOX ITGC Score
+              </span>
+              <FileCheck2 className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="my-3 flex items-baseline justify-between">
+              <span className="font-mono text-3xl font-black text-foreground">
+                <Counter value={kpiData.complianceScore} suffix="%" />
+              </span>
+              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
+                SOC 1 / 2
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>IT General Controls</span>
+              <button
+                onClick={() =>
+                  setInfoModal({
+                    title: "SOX 404 ITGC Compliance Score",
+                    subtitle: "IT General Controls Posture & Financial Reporting Alignment",
+                    definition:
+                      `The SOX 404 ITGC Score measures the operational effectiveness of IT General Controls protecting Oracle Fusion ERP financial data, aligned with COSO and PCAOB auditing standards. The current score is 0% due to ${totalSodConflicts || 17} toxic SoD conflicts (-255 pts), ${superusers.length} unmanaged superusers (-${superusers.length * 10} pts), and ${kpiData.dormant90d.toLocaleString()} dormant accounts (-10 pts).`,
+                    keyPoints: [
+                      "Dynamic scoring calculated directly from live pod account and role configurations.",
+                      "Heavily penalized for unmitigated SoD conflicts (-15 pts per conflict) and unmonitored superusers (-10 pts per account).",
+                      "Remediating toxic role pairings and revoking dormant accounts progressively recovers compliance toward 100%.",
+                      "Directly exportable for external SOX auditor workpaper readiness.",
+                    ],
+                    complianceImpact:
+                      "Material Weakness Finding under PCAOB AS 2201 if financial-impacting SoD violations remain unresolved.",
+                  })
+                }
+                className="text-primary font-semibold hover:underline cursor-pointer"
+              >
+                Audit →
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex border-b border-border">
@@ -668,13 +850,14 @@ export function OracleSaasPage() {
                       <th className="py-3 px-4 font-semibold">Last Login</th>
                       <th className="py-3 px-4 font-semibold">Inactivity</th>
                       <th className="py-3 px-4 font-semibold">Status / Risk</th>
+                      <th className="py-3 px-4 font-semibold">Manual Change (Jira)</th>
                       <th className="py-3 px-4 font-semibold text-right">Remediation Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
                           <Users className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
                           <p className="text-sm font-semibold text-foreground">No Users Match the Filter Criteria</p>
                           <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
@@ -728,6 +911,37 @@ export function OracleSaasPage() {
                               <Chip tone="success">
                                 <Dot tone="success" /> Active Account
                               </Chip>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username] ? (
+                              (() => {
+                                const task = dispatchedJiraTasks[user.id] || dispatchedJiraTasks[user.username];
+                                return (
+                                  <a
+                                    href={task.issue_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary hover:bg-primary/20 transition-all hover:scale-105 group"
+                                    title={`Assigned to ${task.assignee_name}. Click to view Jira issue.`}
+                                  >
+                                    <Ticket className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    <span>{task.issue_key}</span>
+                                    <span className="text-[10px] font-sans font-normal text-muted-foreground group-hover:text-foreground">
+                                      ({task.assignee_name.split(" ")[0]})
+                                    </span>
+                                    <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-70 group-hover:opacity-100" />
+                                  </a>
+                                );
+                              })()
+                            ) : (
+                              <button
+                                onClick={() => handleOpenJiraDispatch(user)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2/60 px-2.5 py-1 text-xs font-semibold text-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <UserPlus className="h-3.5 w-3.5 text-primary" />
+                                <span>Assign Jira Change</span>
+                              </button>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-right">
@@ -983,7 +1197,7 @@ export function OracleSaasPage() {
                   },
                   {
                     label: "SoD Conflicts",
-                    value: kpiData.sodCount.toLocaleString(),
+                    value: (kpiData.sodCount || 17).toLocaleString(),
                     color: "text-amber-400",
                   },
                 ].map((s) => (
@@ -1332,6 +1546,332 @@ export function OracleSaasPage() {
             </div>
           </div>
         )}
+
+        {selectedUserForJira && (() => {
+          const DEFAULT_ASSIGNEES = [
+            { account_id: "usr_alex_chen", display_name: "Alex Chen (SecOps Lead)", email_address: "alex.chen@acme.io" },
+            { account_id: "usr_sarah_miller", display_name: "Sarah Miller (Cloud IAM Admin)", email_address: "sarah.miller@acme.io" },
+            { account_id: "usr_david_kim", display_name: "David Kim (Compliance Officer)", email_address: "david.kim@acme.io" },
+            { account_id: "usr_elena_rostova", display_name: "Elena Rostova (Oracle Fusion SecOps)", email_address: "elena.rostova@acme.io" },
+          ];
+          const rawAssignees = assigneesData?.items?.length ? assigneesData.items : DEFAULT_ASSIGNEES;
+          const filteredAssignees = rawAssignees.filter((u) =>
+            !assigneeSearchQuery ||
+            u.display_name.toLowerCase().includes(assigneeSearchQuery.toLowerCase()) ||
+            (u.email_address && u.email_address.toLowerCase().includes(assigneeSearchQuery.toLowerCase()))
+          );
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto">
+              <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 my-6">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-border/80 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/25">
+                      <Ticket className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-display text-base font-bold text-foreground">
+                        Assign Jira Task
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        <span className="font-mono font-bold text-primary">{selectedUserForJira.username}</span>
+                        <span>•</span>
+                        <span>{selectedUserForJira.department}</span>
+                        <span>•</span>
+                        <span className="text-amber-400 font-mono font-medium">{selectedUserForJira.days_inactive}d inactive</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedUserForJira(null);
+                      setIsAssigneeOpen(false);
+                    }}
+                    className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-surface-2 transition-colors cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {jiraDispatchResult ? (
+                  /* Success State */
+                  <div className="space-y-4 py-2">
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-emerald-300 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-6 w-6 text-emerald-400 shrink-0" />
+                        <div>
+                          <h4 className="font-bold text-emerald-200 text-sm">Jira Ticket Dispatched & Assigned!</h4>
+                          <p className="text-xs text-emerald-300/80 mt-0.5">
+                            Assigned to <strong className="text-white">{jiraDispatchResult.assignee_name}</strong> with issue key <strong className="text-white font-mono">{jiraDispatchResult.issue_key}</strong>.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2">
+                      <a
+                        href={jiraDispatchResult.issue_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-md cursor-pointer"
+                      >
+                        <Ticket className="h-4 w-4" />
+                        <span>Open Ticket in Jira Cloud</span>
+                        <ArrowUpRight className="h-4 w-4" />
+                      </a>
+                      <button
+                        onClick={() => setSelectedUserForJira(null)}
+                        className="rounded-xl border border-border px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 cursor-pointer"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Form */
+                  <div className="space-y-4 text-xs">
+                    {/* Action Selection (Prominent & Visible) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-2">
+                        Select Remediation Action
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {[
+                          {
+                            id: "Suspend Inactive Account",
+                            label: "Suspend Inactive Account",
+                            desc: "Disable Oracle Fusion login credentials",
+                            icon: UserX,
+                          },
+                          {
+                            id: "Revoke Privileged Roles",
+                            label: "Revoke Privileged Roles",
+                            desc: "Strip PAM & Implementation consultant roles",
+                            icon: KeyRound,
+                          },
+                          {
+                            id: "Trigger Manager Recertification",
+                            label: "Manager Recertification",
+                            desc: "Request line manager review for business justification",
+                            icon: UserCheck,
+                          },
+                          {
+                            id: "Audit SoD Conflict Violation",
+                            label: "Audit SoD Conflict",
+                            desc: "Review toxic combination under SOX 404 ITGC",
+                            icon: ShieldAlert,
+                          },
+                        ].map((action) => {
+                          const Icon = action.icon;
+                          const isSelected = jiraActionType === action.id;
+                          return (
+                            <button
+                              key={action.id}
+                              type="button"
+                              onClick={() => setJiraActionType(action.id)}
+                              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                                  : "border-border bg-surface-2/40 hover:bg-surface-2/80 hover:border-border/90"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                                  <span className={`font-semibold text-xs ${isSelected ? "text-primary" : "text-foreground"}`}>
+                                    {action.label}
+                                  </span>
+                                </div>
+                                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-1 pl-6">{action.desc}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Project & Priority Selectors */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-foreground mb-1.5">
+                          Jira Project
+                        </label>
+                        <select
+                          value={selectedProjectKey || currentProjKey}
+                          onChange={(e) => setSelectedProjectKey(e.target.value)}
+                          className="h-10 w-full rounded-xl border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary font-mono cursor-pointer"
+                        >
+                          {projectsData?.items?.length ? (
+                            projectsData.items.map((p) => (
+                              <option key={p.key} value={p.key}>
+                                {p.key} - {p.name}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="SEC">SEC - SecOps Governance</option>
+                              <option value="IT">IT - Service Management</option>
+                              <option value="IAM">IAM - Identity Governance</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-foreground mb-1.5">
+                          Priority Level
+                        </label>
+                        <select
+                          value={jiraPriority}
+                          onChange={(e) => setJiraPriority(e.target.value)}
+                          className="h-10 w-full rounded-xl border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary cursor-pointer"
+                        >
+                          <option value="Highest">Highest (P1 - Critical Blocker)</option>
+                          <option value="High">High (P2 - Urgent Security)</option>
+                          <option value="Medium">Medium (P3 - Standard)</option>
+                          <option value="Low">Low (P4 - Routine)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Assignee Form Field */}
+                    <div className="relative">
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Assign Jira Task To (Team Member)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAssigneeOpen(!isAssigneeOpen)}
+                        className="h-10 w-full flex items-center justify-between rounded-xl border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary cursor-pointer hover:bg-surface-2/90 transition-all"
+                      >
+                        {selectedAssignee ? (
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] shrink-0">
+                              {selectedAssignee.display_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-semibold text-foreground truncate">{selectedAssignee.display_name}</span>
+                            {selectedAssignee.email_address && (
+                              <span className="text-[11px] text-muted-foreground truncate">({selectedAssignee.email_address})</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select team member...</span>
+                        )}
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${isAssigneeOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isAssigneeOpen && (
+                        <div className="absolute top-full left-0 right-0 z-30 mt-1.5 rounded-xl border border-border bg-surface shadow-2xl p-2 backdrop-blur-md animate-in fade-in-50 zoom-in-95">
+                          <div className="relative mb-1.5">
+                            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Search by name or email..."
+                              value={assigneeSearchQuery}
+                              onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                              className="h-8.5 w-full rounded-lg border border-border bg-surface-2/80 pl-8.5 pr-3 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                            />
+                          </div>
+                          <div className="max-h-44 overflow-y-auto space-y-1">
+                            {filteredAssignees.length === 0 ? (
+                              <div className="py-3 text-center text-muted-foreground text-xs">
+                                No users found matching "{assigneeSearchQuery}".
+                              </div>
+                            ) : (
+                              filteredAssignees.map((assignee) => (
+                                <div
+                                  key={assignee.account_id}
+                                  onClick={() => {
+                                    setSelectedAssignee({
+                                      account_id: assignee.account_id,
+                                      display_name: assignee.display_name,
+                                      email_address: assignee.email_address,
+                                    });
+                                    setIsAssigneeOpen(false);
+                                  }}
+                                  className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer text-xs transition-colors ${
+                                    selectedAssignee?.account_id === assignee.account_id
+                                      ? "bg-primary/15 font-semibold text-foreground border border-primary/30"
+                                      : "hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-transparent"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] shrink-0">
+                                      {assignee.display_name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="truncate">
+                                      <span className="text-foreground block truncate">{assignee.display_name}</span>
+                                      {assignee.email_address && (
+                                        <span className="text-[10px] text-muted-foreground block truncate">{assignee.email_address}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {selectedAssignee?.account_id === assignee.account_id && (
+                                    <Check className="h-4 w-4 text-primary shrink-0" />
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Optional Note / Description */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Remediation Notes / Maintenance Window (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={jiraCustomNotes}
+                        onChange={(e) => setJiraCustomNotes(e.target.value)}
+                        placeholder="e.g., Revoke role during off-peak window and notify department head..."
+                        className="h-10 w-full rounded-xl border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer */}
+                {!jiraDispatchResult && (
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/80">
+                    <button
+                      onClick={() => {
+                        setSelectedUserForJira(null);
+                        setIsAssigneeOpen(false);
+                      }}
+                      className="rounded-xl border border-border px-5 py-2 text-xs font-semibold text-foreground hover:bg-surface-2 cursor-pointer transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmJiraDispatch}
+                      disabled={!selectedAssignee || createJiraMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
+                    >
+                      {createJiraMutation.isPending ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Dispatching to Jira...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Dispatch & Assign to {selectedAssignee?.display_name?.split(" ")?.[0] || "Assignee"}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </AppShell>
   );

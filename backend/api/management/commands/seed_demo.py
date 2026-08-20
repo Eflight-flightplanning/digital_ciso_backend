@@ -31,25 +31,25 @@ class Command(BaseCommand):
 
         # 1. Tenant
         tenant, created = Tenant.objects.get_or_create(
-            name="Acme Corp",
+            name="Pravahya Enterprise",
             defaults={"id": uuid.uuid4()}
         )
         self.stdout.write(f"  [OK] Tenant: {tenant.name} ({tenant.id})")
 
-        # 2. Demo User
-        user = User.objects.filter(email="admin@acme.io").first()
+        # 2. Admin User
+        user = User.objects.filter(email="akhilesh.merugu@pravahya.com").first()
         if not user:
             user = User.objects.create_user(
-                name="Nadia Harding",
-                email="admin@acme.io",
+                name="Akhilesh Merugu",
+                email="akhilesh.merugu@pravahya.com",
                 password="Admin1234!",
-                company_name="Acme Corp",
+                company_name="Pravahya Enterprise",
             )
-            self.stdout.write("  [OK] Created Demo Admin user: admin@acme.io / Admin1234!")
+            self.stdout.write("  [OK] Created Admin user: akhilesh.merugu@pravahya.com / Admin1234!")
         else:
             user.set_password("Admin1234!")
             user.save()
-            self.stdout.write("  [OK] Updated Demo Admin user password: admin@acme.io / Admin1234!")
+            self.stdout.write("  [OK] Updated Admin user password: akhilesh.merugu@pravahya.com / Admin1234!")
 
         # 3. Membership
         Membership.objects.get_or_create(
@@ -81,12 +81,12 @@ class Command(BaseCommand):
             )
             self.stdout.write("  [OK] Cloud Providers seeded: AWS (acme-prod), Azure (acme-emea), GCP (acme-core)")
 
-            # LLM Config
+            # LLM Config (Private vLLM Qwen 3.5)
             TenantLLMConfig.objects.get_or_create(
                 tenant=tenant,
-                provider_type="claude",
+                provider_type="vllm_azure",
                 defaults={
-                    "model_name": "claude-sonnet-4-6",
+                    "model_name": "/home/azureuser/models/qwen3.5-9b",
                     "is_active": True,
                 }
             )
