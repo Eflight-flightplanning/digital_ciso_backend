@@ -564,6 +564,9 @@ export function CompliancePage() {
 
   const totalAssetsCount = realResources.length > 0 ? realResources.length : 38;
 
+  const [modalSearchTerm, setModalSearchTerm] = useState("");
+  const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL">("ALL");
+
   // Dynamically compute framework metrics strictly based on their target provider's live findings
   const dynamicFrameworks = useMemo(() => {
     return ALL_COMPLIANCE_FRAMEWORKS
@@ -573,41 +576,46 @@ export function CompliancePage() {
         return connectedProviderSet.has(fw.providerTarget);
       })
       .map((fw) => {
-        let targetList = findingsByProvider.all;
+        let targetList: any[] = [];
         if (fw.providerTarget === "AZURE") targetList = findingsByProvider.azure;
         else if (fw.providerTarget === "OCI") targetList = findingsByProvider.oci;
         else if (fw.providerTarget === "AWS") targetList = findingsByProvider.aws;
         else if (fw.providerTarget === "GCP") targetList = findingsByProvider.gcp;
         else if (fw.providerTarget === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
+        else {
+          targetList = rawFindings;
+        }
 
         const fwPass = targetList.filter((f: any) => f.status === "PASS").length;
         const fwFail = targetList.filter((f: any) => f.status === "FAIL").length;
+        const fwManual = targetList.filter((f: any) => f.status === "MANUAL").length;
         const fwTotal = targetList.length;
 
-        let passed = fw.passed;
-        let failed = fw.failed;
-        let score = fw.score;
+        let passed = 0;
+        let failed = 0;
+        let manual = 0;
+        let score = 0;
 
         if (fwTotal > 0) {
           passed = fwPass;
           failed = fwFail;
-          const total = Math.max(1, passed + failed);
-          score = Math.round((passed / total) * 100);
-        } else {
-          score = fw.score;
+          manual = fwManual;
+          const evaluatedTotal = Math.max(1, passed + failed);
+          score = Math.round((passed / evaluatedTotal) * 100);
         }
 
         return {
           ...fw,
           passed,
           failed,
-          totalControls: Math.max(fw.totalControls, passed + failed + fw.manual),
+          manual,
+          totalControls: fwTotal > 0 ? fwTotal : fw.totalControls,
           score,
-          strokeColor: score >= 75 ? "#34d399" : score >= 60 ? "#fbbf24" : "#fb7185",
-          textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : "text-rose-400",
+          strokeColor: score >= 75 ? "#34d399" : score >= 60 ? "#fbbf24" : fwTotal > 0 ? "#fb7185" : "#64748b",
+          textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : fwTotal > 0 ? "text-rose-400" : "text-muted-foreground",
         };
       });
-  }, [findingsByProvider, connectedProviderSet]);
+  }, [findingsByProvider, rawFindings, connectedProviderSet]);
 
   const filteredFrameworks = useMemo(() => {
     return dynamicFrameworks.filter((f) => {
@@ -628,16 +636,30 @@ export function CompliancePage() {
   // Specific findings to display inside the selected framework modal
   const modalFindings = useMemo(() => {
     if (!selectedFramework) return [];
-    let list = rawFindings;
+    let list: any[] = [];
     if (selectedFramework.providerTarget === "AZURE") list = findingsByProvider.azure;
     else if (selectedFramework.providerTarget === "OCI") list = findingsByProvider.oci;
     else if (selectedFramework.providerTarget === "AWS") list = findingsByProvider.aws;
     else if (selectedFramework.providerTarget === "GCP") list = findingsByProvider.gcp;
     else if (selectedFramework.providerTarget === "ORACLE_SAAS") list = findingsByProvider.oracle_saas;
+    else list = rawFindings;
     
-    // If no specific provider findings exist, fallback to all findings
-    return (list.length > 0 ? list : rawFindings).slice(0, 15);
+    return list;
   }, [selectedFramework, rawFindings, findingsByProvider]);
+
+  const filteredModalFindings = useMemo(() => {
+    return modalFindings.filter((f: any) => {
+      if (modalStatusFilter !== "ALL" && f.status !== modalStatusFilter) return false;
+      if (modalSearchTerm.trim()) {
+        const q = modalSearchTerm.toLowerCase();
+        const checkId = (f.check_id || "").toLowerCase();
+        const title = (f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || "").toLowerCase();
+        const res = (f.resource_name || f.resource?.name || f.resource_id || "").toLowerCase();
+        return checkId.includes(q) || title.includes(q) || res.includes(q);
+      }
+      return true;
+    });
+  }, [modalFindings, modalStatusFilter, modalSearchTerm]);
 
   const handleExportEvidence = () => {
     setExportSuccess(true);
@@ -913,8 +935,12 @@ export function CompliancePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setSelectedFramework(null)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+                  onClick={() => {
+                    setSelectedFramework(null);
+                    setModalSearchTerm("");
+                    setModalStatusFilter("ALL");
+                  }}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -948,50 +974,99 @@ export function CompliancePage() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Audit Telemetry Controls Evaluated ({modalFindings.length} Live Checks)
-                </h4>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {modalFindings.map((f: any, i: number) => {
-                    const checkId = f.check_id || `check_${i + 1}`;
-                    const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
-                    const resName = f.resource_name || f.resource?.name || f.resource_id || "Cloud Resource";
-                    const isPass = f.status === "PASS";
-                    const provider = f.provider || f.provider_type || "Cloud";
-                    const region = f.region || "global";
-
-                    return (
-                      <div
-                        key={`${f.id || "finding"}-${i}`}
-                        className="flex items-start justify-between rounded-lg border border-border bg-surface-2/60 p-3 text-xs gap-3"
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Audit Telemetry Controls Evaluated ({modalFindings.length} Live Checks)
+                  </h4>
+                  <div className="flex items-center gap-1.5">
+                    {(["ALL", "FAIL", "PASS", "MANUAL"] as const).map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setModalStatusFilter(st)}
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                          modalStatusFilter === st
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                        }`}
                       >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            {isPass ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
-                            )}
-                            <span className="font-semibold text-foreground">
-                              {title}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground font-mono pl-6">
-                            Target: {resName} · {String(provider).toUpperCase()} ({region})
-                          </p>
-                        </div>
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${
-                            isPass
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                          }`}
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {modalFindings.length > 5 && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search check ID, title, or resource..."
+                      value={modalSearchTerm}
+                      onChange={(e) => setModalSearchTerm(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-surface-2/60 pl-8.5 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {modalFindings.length === 0 ? (
+                    <div className="rounded-xl border border-border/60 bg-surface-2/30 p-8 text-center text-xs text-muted-foreground space-y-1">
+                      <p className="font-semibold text-foreground">No Live Scan Telemetry for {selectedFramework.name}</p>
+                      <p className="text-muted-foreground">
+                        No continuous posture audit has been executed for this cloud architecture yet. Configure credentials and run a scan to evaluate live rules.
+                      </p>
+                    </div>
+                  ) : filteredModalFindings.length === 0 ? (
+                    <div className="rounded-lg border border-border/60 bg-surface-2/30 p-6 text-center text-xs text-muted-foreground">
+                      No checks match your current filter.
+                    </div>
+                  ) : (
+                    filteredModalFindings.map((f: any, i: number) => {
+                      const checkId = f.check_id || `check_${i + 1}`;
+                      const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
+                      const resName = f.resource_name || f.resource?.name || f.resource_id || "Cloud Resource";
+                      const isPass = f.status === "PASS";
+                      const isManual = f.status === "MANUAL";
+                      const provider = f.provider || f.provider_type || "Cloud";
+                      const region = f.region || "global";
+
+                      return (
+                        <div
+                          key={`${f.id || "finding"}-${i}`}
+                          className="flex items-start justify-between rounded-lg border border-border bg-surface-2/60 p-3 text-xs gap-3"
                         >
-                          {isPass ? "PASS" : "FAIL"}
-                        </span>
-                      </div>
-                    );
-                  })}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              {isPass ? (
+                                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                              ) : isManual ? (
+                                <FileText className="h-4 w-4 text-indigo-400 shrink-0" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                              )}
+                              <span className="font-semibold text-foreground">
+                                {title}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground font-mono pl-6">
+                              Target: {resName} · {String(provider).toUpperCase()} ({region})
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${
+                              isPass
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : isManual
+                                ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                            }`}
+                          >
+                            {f.status || "FAIL"}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1003,8 +1078,12 @@ export function CompliancePage() {
                   Open Findings Telemetry →
                 </Link>
                 <button
-                  onClick={() => setSelectedFramework(null)}
-                  className="rounded-lg bg-surface-2 px-4 py-2 font-semibold text-foreground hover:bg-surface-3 transition-colors"
+                  onClick={() => {
+                    setSelectedFramework(null);
+                    setModalSearchTerm("");
+                    setModalStatusFilter("ALL");
+                  }}
+                  className="rounded-lg bg-surface-2 px-4 py-2 font-semibold text-foreground hover:bg-surface-3 transition-colors cursor-pointer"
                 >
                   Close
                 </button>
