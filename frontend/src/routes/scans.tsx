@@ -163,8 +163,6 @@ function ScansPage() {
             "State",
             "Start Time",
             "Duration",
-            "Assets Ingested",
-            "Findings Detected",
             "Actions",
           ]}
         >
@@ -198,18 +196,6 @@ function ScansPage() {
               <td className="mono text-[11px] text-muted-foreground px-4 py-3">
                 {s.duration}
               </td>
-              <td className="mono text-xs font-semibold text-foreground px-4 py-3">
-                {(s.resources || 0).toLocaleString()}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`mono text-xs font-bold ${
-                    s.findings > 0 ? "text-critical" : "text-success"
-                  }`}
-                >
-                  {s.findings}
-                </span>
-              </td>
               <td className="px-4 py-3">
                 <Link
                   to="/findings"
@@ -226,7 +212,7 @@ function ScansPage() {
       {/* ── Launch Scan Modal ── */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
                 <Radar className="h-5 w-5 text-primary" />
@@ -236,7 +222,7 @@ function ScansPage() {
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 ✕
               </button>
@@ -249,7 +235,7 @@ function ScansPage() {
                   <select
                     value={selectedProviderId}
                     onChange={(e) => setSelectedProviderId(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none"
+                    className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium cursor-pointer"
                   >
                     {providers.map((p) => (
                       <option key={String(p.id)} value={String(p.id)}>
@@ -278,16 +264,20 @@ function ScansPage() {
                 <select
                   value={selectedRegion}
                   onChange={(e) => setSelectedRegion(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium"
+                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium cursor-pointer"
                 >
-                  <option value="all">🌍 All Deployed Cloud Regions (Global Fleet)</option>
-                  <option value="centralindia">🇮🇳 Central India (centralindia / ap-south-1)</option>
-                  <option value="uk-london-1">🇬🇧 UK London / West Europe (uk-london-1 / westeurope)</option>
-                  <option value="me-central-1">🇸🇦 Saudi Arabia & Middle East (me-central-1 / me-south-1)</option>
-                  <option value="us-east-1">🇺🇸 US East & North America (us-east-1 / us-west-2)</option>
+                  <option value="all">🌍 All Deployed Cloud Regions (Global Perimeter Fleet)</option>
+                  <option value="centralindia">🇮🇳 Central India (centralindia / ap-south-1 / in-mumbai-1)</option>
+                  <option value="southindia">🇮🇳 South India (southindia / ap-south-2 / in-hyderabad-1)</option>
+                  <option value="westeurope">🇬🇧 West Europe & UK (westeurope / eu-west-1 / uk-london-1)</option>
+                  <option value="northeurope">🇩🇪 North Europe & Frankfurt (northeurope / eu-central-1 / eu-frankfurt-1)</option>
+                  <option value="me-central-1">🇸🇦 Saudi Arabia & Middle East (me-central-1 / me-south-1 / sa-riyadh-1 / uae-north)</option>
+                  <option value="eastus">🇺🇸 US East & Northern Virginia (eastus / us-east-1 / us-ashburn-1)</option>
+                  <option value="westus">🇺🇸 US West & Phoenix (westus / us-west-2 / us-phoenix-1)</option>
+                  <option value="southeastasia">🇸🇬 Asia Pacific & Singapore (southeastasia / ap-southeast-1 / ap-singapore-1)</option>
                 </select>
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Select a single geographical region to run focused regional compliance or audit your full multi-region perimeter.
+                  Target a specific cloud data center region for focused sovereignty audits or inspect your complete global perimeter.
                 </p>
               </div>
 
@@ -296,31 +286,48 @@ function ScansPage() {
                 <select
                   value={selectedProfile}
                   onChange={(e) => setSelectedProfile(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium"
+                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium cursor-pointer"
                 >
-                  <optgroup label="Saudi Arabia (NCA & SAMA)">
+                  <optgroup label="Oracle Cloud & SaaS Security">
+                    <option value="CIS OCI Benchmark v3.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v3.0</option>
+                    <option value="CIS OCI Benchmark v2.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v2.0</option>
+                    <option value="Oracle Fusion SaaS Baseline">Oracle Fusion Cloud ERP & HCM Security Baseline</option>
+                  </optgroup>
+                  <optgroup label="Microsoft Azure Security">
+                    <option value="CIS Azure Foundations v3.0">CIS Microsoft Azure Foundations Benchmark v3.0</option>
+                    <option value="CIS Azure Foundations v2.0">CIS Microsoft Azure Foundations Benchmark v2.0</option>
+                    <option value="Microsoft Cloud Security Benchmark">Microsoft Cloud Security Benchmark (MCSB)</option>
+                  </optgroup>
+                  <optgroup label="AWS & GCP Security">
+                    <option value="CIS AWS Foundations v3.0">CIS Amazon Web Services (AWS) Foundations v3.0</option>
+                    <option value="CIS GCP Foundations v2.0">CIS Google Cloud Platform (GCP) Foundations v2.0</option>
+                    <option value="CIS Kubernetes v1.7">CIS Kubernetes & Container Hardening Benchmark v1.7</option>
+                  </optgroup>
+                  <optgroup label="Global Enterprise & Industry Standards">
+                    <option value="Full Comprehensive Assessment">Full Multi-Cloud Comprehensive Posture Assessment</option>
+                    <option value="SOC 2 Type II">SOC 2 Type II Security, Confidentiality & Availability</option>
+                    <option value="ISO/IEC 27001:2022">ISO/IEC 27001:2022 Information Security Management</option>
+                    <option value="PCI-DSS v4.0">PCI-DSS v4.0 Cardholder Data Environment</option>
+                    <option value="HIPAA Security Rule">HIPAA Security & Privacy Rule (45 CFR Part 164)</option>
+                    <option value="MITRE ATT&CK Cloud Matrix">MITRE ATT&CK Cloud Matrix & Threat Tactics</option>
+                    <option value="Cloud Security Alliance (CSA CCM)">Cloud Security Alliance (CSA CCM v4.0)</option>
+                  </optgroup>
+                  <optgroup label="Middle East & Saudi Arabia (NCA / SAMA)">
                     <option value="NCA ECC-1:2018">NCA ECC-1:2018 (Essential Cybersecurity Controls)</option>
                     <option value="NCA CSCC-1:2019">NCA CSCC-1:2019 (Cloud Cybersecurity Controls)</option>
                     <option value="SAMA Cyber Security">SAMA Cyber Security Framework (Saudi Central Bank)</option>
                   </optgroup>
                   <optgroup label="India (RBI & CERT-In)">
-                    <option value="RBI Cyber Security Framework">RBI Cyber Security Framework & Master Directions</option>
-                    <option value="CERT-In Directives">CERT-In 2022 Cybersecurity Directives & DPDP Act</option>
+                    <option value="RBI Cyber Security Framework">RBI Cyber Security Master Directions & Guidelines</option>
+                    <option value="CERT-In Directives">CERT-In 2022 Cybersecurity Directives & DPDP Act 2023</option>
                   </optgroup>
-                  <optgroup label="European Union (GDPR & DORA)">
-                    <option value="EU GDPR & DORA">EU GDPR & DORA Digital Operational Resilience</option>
-                    <option value="NIS2 Directive">NIS2 Directive & ENS Esquema Nacional de Seguridad</option>
+                  <optgroup label="European Union (GDPR & DORA / NIS2)">
+                    <option value="EU GDPR & DORA">EU GDPR & DORA Digital Operational Resilience Act</option>
+                    <option value="NIS2 Directive">NIS2 Cybersecurity Directive (EU 2022/2555)</option>
                   </optgroup>
                   <optgroup label="United States (FedRAMP & NIST)">
-                    <option value="FedRAMP Moderate">FedRAMP Moderate Baseline & CISA TRA</option>
+                    <option value="FedRAMP Moderate & High">FedRAMP Moderate & High Baselines (Rev. 5)</option>
                     <option value="NIST SP 800-53 Rev 5">NIST SP 800-53 Rev 5 & NIST CSF 2.0</option>
-                  </optgroup>
-                  <optgroup label="Global & Industry Standards">
-                    <option value="Full Assessment">Full Multi-Cloud Assessment (All 22 Frameworks)</option>
-                    <option value="CIS Foundations Benchmark">CIS Foundations Benchmark v3.0 (Strict)</option>
-                    <option value="SOC 2 Type II">SOC 2 Type II Security & Confidentiality</option>
-                    <option value="ISO/IEC 27001:2022">ISO/IEC 27001:2022 ISMS Controls</option>
-                    <option value="PCI-DSS v4.0">PCI-DSS v4.0 Cardholder Data Environment</option>
                   </optgroup>
                 </select>
               </div>
@@ -329,14 +336,14 @@ function ScansPage() {
             <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
               <button
                 onClick={() => setModalOpen(false)}
-                className="h-9 rounded-lg border border-border bg-surface-2 px-5 text-xs font-medium text-foreground hover:bg-surface-2/80"
+                className="h-9 rounded-lg border border-border bg-surface-2 px-5 text-xs font-medium text-foreground hover:bg-surface-2/80 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleLaunchScan}
                 disabled={launching}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 cursor-pointer disabled:opacity-50"
               >
                 <Play className={`h-3.5 w-3.5 ${launching ? "animate-spin" : ""}`} />
                 <span>{launching ? "Starting Scan..." : "Run Assessment"}</span>
