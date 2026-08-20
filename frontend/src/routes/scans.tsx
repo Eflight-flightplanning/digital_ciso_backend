@@ -147,9 +147,15 @@ function ScansPage() {
         <div className="p-4 border-b border-border/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="section-label">Assessment Execution Runs</span>
-            <span className="inline-flex items-center gap-1 text-xs text-primary font-semibold">
-              <Dot tone="primary" pulse /> {scanList.filter((s) => s.status === "Running").length} Active Scan
-            </span>
+            {scanList.some((s) => s.status === "Running") ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs text-primary font-semibold">
+                <Dot tone="primary" pulse /> {scanList.filter((s) => s.status === "Running").length} Active Scan Running
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs text-emerald-400 font-semibold">
+                <Dot tone="success" /> All Scans Completed · System Idle
+              </span>
+            )}
           </div>
           <span className="text-xs text-muted-foreground">
             {scanList.length} Total Runs Recorded
