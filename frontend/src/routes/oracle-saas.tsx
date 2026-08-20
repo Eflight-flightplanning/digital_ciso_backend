@@ -946,18 +946,18 @@ export function OracleSaasPage() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={() => handleOpenJiraDispatch(user)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#0052CC]/40 bg-[#0052CC]/15 hover:bg-[#0052CC] px-2.5 py-1 text-xs font-semibold text-blue-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#0052CC] to-[#0065FF] hover:from-[#0747A6] hover:to-[#0052CC] px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 transition-all duration-200 cursor-pointer active:scale-95 border border-blue-400/30"
                                     title="Raise Jira Remediation Ticket for this dormant account"
                                   >
-                                    <JiraIcon className="h-3.5 w-3.5" />
+                                    <JiraIcon className="h-3.5 w-3.5 fill-white text-white" />
                                     <span>Jira Ticket</span>
                                   </button>
                                   <button
                                     onClick={() => handleStageRemediation(user)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-600 px-2.5 py-1 text-xs font-semibold text-red-400 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
-                                    title="Directly deactivate account via Oracle HCM API"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-rose-500/20 hover:shadow-rose-500/35 transition-all duration-200 cursor-pointer active:scale-95 border border-rose-400/30"
+                                    title="Directly deactivate account via Oracle HCM REST API"
                                   >
-                                    <Zap className="h-3.5 w-3.5" />
+                                    <Zap className="h-3.5 w-3.5 text-amber-200 fill-amber-200" />
                                     <span>Direct Remediate</span>
                                   </button>
                                 </div>
@@ -1670,18 +1670,18 @@ export function OracleSaasPage() {
                               onClick={() => setJiraActionType(action.id)}
                               className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                                 isSelected
-                                  ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                                  ? "border-blue-500/60 bg-blue-500/10 shadow-md shadow-blue-500/15 ring-1 ring-blue-500/40"
                                   : "border-border bg-surface-2/40 hover:bg-surface-2/80 hover:border-border/90"
                               }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                                  <span className={`font-semibold text-xs ${isSelected ? "text-primary" : "text-foreground"}`}>
+                                  <Icon className={`h-4 w-4 shrink-0 ${isSelected ? "text-blue-400" : "text-muted-foreground"}`} />
+                                  <span className={`font-bold text-xs ${isSelected ? "text-blue-400" : "text-foreground"}`}>
                                     {action.label}
                                   </span>
                                 </div>
-                                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                                {isSelected && <Check className="h-4 w-4 text-blue-400 shrink-0" />}
                               </div>
                               <p className="text-[11px] text-muted-foreground mt-1 pl-6">{action.desc}</p>
                             </button>
@@ -1709,8 +1709,8 @@ export function OracleSaasPage() {
                             ))
                           ) : (
                             <>
-                              <option value="SEC">SEC - SecOps Governance</option>
-                              <option value="IT">IT - Service Management</option>
+                              <option value="SEC">SEC - Digital CISO Remediation</option>
+                              <option value="IT">IT - Enterprise Service Desk</option>
                               <option value="IAM">IAM - Identity Governance</option>
                             </>
                           )}
@@ -1746,7 +1746,7 @@ export function OracleSaasPage() {
                       >
                         {selectedAssignee ? (
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] shrink-0">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20 text-blue-400 font-bold text-[10px] shrink-0 border border-blue-500/30">
                               {selectedAssignee.display_name.charAt(0).toUpperCase()}
                             </div>
                             <span className="font-semibold text-foreground truncate">{selectedAssignee.display_name}</span>
@@ -1793,12 +1793,12 @@ export function OracleSaasPage() {
                                   }}
                                   className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer text-xs transition-colors ${
                                     selectedAssignee?.account_id === assignee.account_id
-                                      ? "bg-primary/15 font-semibold text-foreground border border-primary/30"
+                                      ? "bg-blue-500/15 font-semibold text-foreground border border-blue-500/30"
                                       : "hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-transparent"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-[10px] shrink-0">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20 text-blue-400 font-bold text-[10px] shrink-0 border border-blue-500/30">
                                       {assignee.display_name.charAt(0).toUpperCase()}
                                     </div>
                                     <div className="truncate">
@@ -1809,7 +1809,7 @@ export function OracleSaasPage() {
                                     </div>
                                   </div>
                                   {selectedAssignee?.account_id === assignee.account_id && (
-                                    <Check className="h-4 w-4 text-primary shrink-0" />
+                                    <Check className="h-4 w-4 text-blue-400 shrink-0" />
                                   )}
                                 </div>
                               ))
@@ -1843,14 +1843,14 @@ export function OracleSaasPage() {
                         setSelectedUserForJira(null);
                         setIsAssigneeOpen(false);
                       }}
-                      className="rounded-xl border border-border px-5 py-2 text-xs font-semibold text-foreground hover:bg-surface-2 cursor-pointer transition-colors"
+                      className="rounded-xl border border-border px-5 py-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 cursor-pointer transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleConfirmJiraDispatch}
                       disabled={!selectedAssignee || createJiraMutation.isPending}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0052CC] to-[#0065FF] hover:from-[#0747A6] hover:to-[#0052CC] px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95 border border-blue-400/30"
                     >
                       {createJiraMutation.isPending ? (
                         <>
