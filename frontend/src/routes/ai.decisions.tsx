@@ -337,6 +337,22 @@ function generateProviderRemediation(
   };
 }
 
+function extractFindingProvider(f: any): string {
+  const rawP = f.provider || f.provider_type || f.scan?.provider?.provider || f.raw_result?.Provider || f.check_metadata?.Provider;
+  if (rawP) {
+    const s = String(rawP).toUpperCase();
+    if (s === "ORACLECLOUD") return "OCI";
+    return s;
+  }
+  const uid = String(f.uid || f.id || f.prowler_uid || "").toLowerCase();
+  if (uid.includes("prowler-azure") || uid.includes("/subscriptions/") || uid.includes("azure")) return "AZURE";
+  if (uid.includes("prowler-aws") || uid.includes("arn:aws:")) return "AWS";
+  if (uid.includes("prowler-gcp") || uid.includes("projects/")) return "GCP";
+  if (uid.includes("prowler-oci") || uid.includes("oraclecloud") || uid.includes("ocid1.")) return "OCI";
+  if (uid.includes("saas") || uid.includes("fusion") || uid.includes("oracle")) return "ORACLE_SAAS";
+  return "AZURE";
+}
+
 function AIDecisionsPage() {
   const { data: providersRaw } = useProviders();
   const { data: findingsRaw } = useFindings();
@@ -378,6 +394,7 @@ function AIDecisionsPage() {
 
   // Remediation Solution Multi-Modal Tab State
   const [activeRemediationTab, setActiveRemediationTab] = useState<"cli" | "terraform" | "console">("cli");
+  const [activeInspectorTab, setActiveInspectorTab] = useState<"playbook" | "timeline">("playbook");
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   
   // Modal / Drawer state for Ticket Creation
@@ -429,7 +446,7 @@ function AIDecisionsPage() {
   const realFindings = findingsRaw?.items ?? [];
   const executions = executionsRaw ?? [];
 
-  // Default rich dynamic multi-cloud enterprise findings catalog (5-6 findings per provider)
+  // Default rich dynamic multi-cloud enterprise findings catalog
   const defaultEnterpriseCatalog = [
     // ── AWS (6 Findings) ──
     {
@@ -449,81 +466,81 @@ function AIDecisionsPage() {
     },
     {
       id: "cat-aws-02",
-      finding_id: "find-aws-sg-ssh",
-      check_id: "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22",
-      finding_title: "Security Group Allows Unrestricted Ingress to SSH Port 22",
-      provider: "AWS",
-      region: "us-east-1",
-      resource_uid: "sg-0a8f912b5c4d3e210",
-      resource_name: "prod-dmz-bastion-sg",
-      severity: "high",
-      risk_score: 85,
-      risk_summary: "Inbound rule grants 0.0.0.0/0 direct access to port 22 on production instances.",
-      compliance_rules: ["CIS AWS Benchmark v1.4", "PCI DSS v3.2.1 Requirement 1.3"],
-      status_extended: "Security Group 'prod-dmz-bastion-sg' contains 0.0.0.0/0 on port 22.",
-    },
-    {
-      id: "cat-aws-03",
       finding_id: "find-aws-iam-mfa",
-      check_id: "iam_root_hardware_mfa_enabled",
-      finding_title: "AWS Root Account Lacks Hardware Multi-Factor Authentication",
+      check_id: "iam_root_mfa_enabled",
+      finding_title: "Root Account MFA Not Enabled on Master Billing Account",
       provider: "AWS",
       region: "Global",
-      resource_uid: "aws-account-123456789012",
+      resource_uid: "arn:aws:iam::112233445566:root",
       resource_name: "aws-root-account",
       severity: "critical",
       risk_score: 98,
-      risk_summary: "AWS Root Account has no hardware MFA device associated, creating critical takeover exposure.",
-      compliance_rules: ["CIS AWS Benchmark v1.4 1.5", "ISO 27001:2013 A.9.4.2"],
-      status_extended: "Root account MFA is disabled or using virtual MFA instead of FIPS-compliant hardware key.",
+      risk_summary: "Root account without hardware or virtual MFA presents catastrophic account takeover vulnerability.",
+      compliance_rules: ["CIS AWS Foundations Benchmark v1.4 1.5", "PCI DSS Requirement 8.3"],
+      status_extended: "Root account lacks virtual/hardware MFA token association.",
+    },
+    {
+      id: "cat-aws-03",
+      finding_id: "find-aws-sg-open",
+      check_id: "ec2_security_group_ingress_open_ssh_22",
+      finding_title: "Security Group Ingress Allows 0.0.0.0/0 on Port 22 (SSH)",
+      provider: "AWS",
+      region: "us-east-1",
+      resource_uid: "sg-0982348a8f8e819b1",
+      resource_name: "sg-production-public-bastion",
+      severity: "high",
+      risk_score: 88,
+      risk_summary: "Unrestricted Internet ingress on port 22 allows automated brute-force attacks against compute instances.",
+      compliance_rules: ["CIS AWS Foundations Benchmark v1.4 5.2", "NCA ECC-1:2018 2-3-1"],
+      status_extended: "Security Group sg-0982348a8f8e819b1 contains 0.0.0.0/0 inbound rule on TCP port 22.",
     },
     {
       id: "cat-aws-04",
-      finding_id: "find-aws-cloudtrail-multi",
-      check_id: "cloudtrail_multi_region_enabled",
-      finding_title: "CloudTrail Multi-Region Logging Disabled Across Regions",
+      finding_id: "find-aws-ebs-enc",
+      check_id: "ec2_ebs_volume_default_encryption",
+      finding_title: "EBS Volume Default Encryption Not Enabled in Region",
       provider: "AWS",
       region: "us-east-1",
-      resource_uid: "arn:aws:cloudtrail:us-east-1:123456789012:trail/corp-trail",
-      resource_name: "corporate-audit-trail",
+      resource_uid: "arn:aws:ec2:us-east-1:112233445566:volume/vol-0a1b2c3d4e5f6g7h8",
+      resource_name: "vol-payment-db-data",
       severity: "high",
-      risk_score: 80,
-      risk_summary: "CloudTrail trail does not capture API calls across all AWS regions.",
-      compliance_rules: ["CIS AWS Benchmark v1.4 3.1", "SOC 2 Type II CC6.1"],
-      status_extended: "CloudTrail trail 'corporate-audit-trail' has IsMultiRegionTrail=false.",
+      risk_score: 84,
+      risk_summary: "Unencrypted storage volumes expose at-rest sensitive customer records in case of physical disk decommissioning.",
+      compliance_rules: ["CIS AWS Foundations Benchmark v1.4 2.2.1", "ISO 27001 A.10.1.1"],
+      status_extended: "EBS Volume 'vol-payment-db-data' is unencrypted at rest.",
     },
     {
       id: "cat-aws-05",
-      finding_id: "find-aws-rds-unencrypted",
-      check_id: "rds_instance_storage_encrypted",
-      finding_title: "RDS PostgreSQL Database Storage Unencrypted at Rest",
+      finding_id: "find-aws-rds-public",
+      check_id: "rds_instance_publicly_accessible",
+      finding_title: "RDS PostgreSQL Production Database Publicly Accessible",
       provider: "AWS",
-      region: "us-east-1",
-      resource_uid: "arn:aws:rds:us-east-1:123456789012:db:rds-pg-billing-master",
-      resource_name: "rds-pg-billing-master",
-      severity: "high",
-      risk_score: 87,
-      risk_summary: "Financial database volumes are unencrypted, exposing sensitive tables.",
-      compliance_rules: ["PCI DSS v3.2.1 3.4", "HIPAA Security Rule 164.312(a)(2)(iv)"],
-      status_extended: "RDS instance 'rds-pg-billing-master' StorageEncrypted is false.",
+      region: "us-west-2",
+      resource_uid: "arn:aws:rds:us-west-2:112233445566:db:prod-pg-orders-master",
+      resource_name: "prod-pg-orders-master",
+      severity: "critical",
+      risk_score: 92,
+      risk_summary: "Database instance is provisioned with a public IP address accessible from the Internet.",
+      compliance_rules: ["CIS AWS Foundations Benchmark v1.4 2.3.1", "HIPAA Security Rule §164.312"],
+      status_extended: "RDS instance 'prod-pg-orders-master' has PubliclyAccessible set to true.",
     },
     {
       id: "cat-aws-06",
-      finding_id: "find-aws-kms-rotation",
-      check_id: "kms_key_rotation_enabled",
-      finding_title: "Customer-Managed KMS Key Automatic Yearly Rotation Disabled",
+      finding_id: "find-aws-cloudtrail-all",
+      check_id: "cloudtrail_multi_region_enabled",
+      finding_title: "AWS CloudTrail Multi-Region Audit Logging Disabled",
       provider: "AWS",
-      region: "us-east-1",
-      resource_uid: "arn:aws:kms:us-east-1:123456789012:key/b8492041-9a71-4d13",
-      resource_name: "kms-app-secrets-key",
+      region: "Global",
+      resource_uid: "arn:aws:cloudtrail:us-east-1:112233445566:trail/security-trail",
+      resource_name: "security-trail",
       severity: "medium",
       risk_score: 65,
-      risk_summary: "Cryptographic keys used to encrypt production secrets are not rotated annually.",
-      compliance_rules: ["CIS AWS Benchmark v1.4 2.8", "NIST SP 800-57"],
-      status_extended: "KMS Key 'kms-app-secrets-key' has KeyRotationEnabled set to false.",
+      risk_summary: "API activities in secondary AWS regions are unmonitored and vulnerable to stealth adversary persistence.",
+      compliance_rules: ["CIS AWS Foundations Benchmark v1.4 3.1", "SOC 2 Type II CC7.2"],
+      status_extended: "Trail 'security-trail' is single-region only.",
     },
 
-    // ── Azure (6 Findings) ──
+    // ── AZURE (6 Findings) ──
     {
       id: "cat-azure-01",
       finding_id: "find-az-storage-https",
@@ -535,9 +552,9 @@ function AIDecisionsPage() {
       resource_name: "stproddatafinance01",
       severity: "high",
       risk_score: 88,
-      risk_summary: "Storage account allows HTTP plaintext requests and outdated TLS versions.",
-      compliance_rules: ["CIS Microsoft Azure Benchmark v2.0 5.1.1", "NCA ECC 2-3-3"],
-      status_extended: "Storage account 'stproddatafinance01' has enableHttpsTrafficOnly=false.",
+      risk_summary: "Storage account allows unencrypted HTTP transit and deprecated TLS 1.0 ciphers.",
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 5.1.1", "NCA ECC-1:2018"],
+      status_extended: "Storage account 'stproddatafinance01' has enableHttpsTrafficOnly set to false.",
     },
     {
       id: "cat-azure-02",
@@ -546,57 +563,57 @@ function AIDecisionsPage() {
       finding_title: "Azure SQL Database Transparent Data Encryption (TDE) Disabled",
       provider: "AZURE",
       region: "westeurope",
-      resource_uid: "/subscriptions/sub-core/resourceGroups/rg-prod/providers/Microsoft.Sql/servers/sql-primary-db-prod",
-      resource_name: "sql-primary-db-prod",
+      resource_uid: "/subscriptions/sub-core/resourceGroups/rg-prod/providers/Microsoft.Sql/servers/sql-core-prod/databases/db-customers",
+      resource_name: "db-customers",
       severity: "critical",
-      risk_score: 92,
-      risk_summary: "Database storage files and backups are unencrypted at rest.",
-      compliance_rules: ["CIS Microsoft Azure Benchmark v2.0 4.1.1", "HIPAA Security Rule 164.312(a)(2)(iv)"],
-      status_extended: "Server 'sql-primary-db-prod' has TDE status set to Disabled.",
+      risk_score: 91,
+      risk_summary: "SQL database customer records are unencrypted at rest at the page and log file level.",
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 4.1.1", "GDPR Article 32"],
+      status_extended: "Transparent Data Encryption is DISABLED on 'db-customers'.",
     },
     {
       id: "cat-azure-03",
-      finding_id: "find-az-defender-vms",
+      finding_id: "find-az-defender-vm",
       check_id: "defender_pricing_virtualmachines_standard",
       finding_title: "Microsoft Defender for Cloud Standard Tier Disabled on VMs",
       provider: "AZURE",
       region: "Global",
-      resource_uid: "/subscriptions/sub-core-infrastructure-01",
-      resource_name: "sub-prod-core-infrastructure",
+      resource_uid: "/subscriptions/sub-core/providers/Microsoft.Security/pricings/VirtualMachines",
+      resource_name: "Defender-Pricing-VMs",
       severity: "high",
-      risk_score: 84,
-      risk_summary: "Workload protection and real-time behavioral malware detection disabled.",
-      compliance_rules: ["CIS Azure Benchmark v2.0 2.1", "ISO 27001 A.12.6.1"],
-      status_extended: "Subscription pricing tier for VirtualMachines is set to Free instead of Standard.",
+      risk_score: 80,
+      risk_summary: "Advanced threat detection and behavioral heuristics are inactive across production virtual machines.",
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 2.1", "NIST CSF DE.CM-1"],
+      status_extended: "Defender plan for VirtualMachines is set to Free tier.",
     },
     {
       id: "cat-azure-04",
       finding_id: "find-az-nsg-rdp",
       check_id: "network_nsg_inbound_rdp_3389_prohibited",
-      finding_title: "Network Security Group (NSG) Exposes RDP Port 3389 to Internet",
+      finding_title: "Network Security Group Ingress Allows Unrestricted RDP (Port 3389)",
       provider: "AZURE",
       region: "eastus2",
-      resource_uid: "/subscriptions/sub-core/resourceGroups/rg-prod/providers/Microsoft.Network/networkSecurityGroups/nsg-internal-app-vnet",
-      resource_name: "nsg-internal-app-vnet",
+      resource_uid: "/subscriptions/sub-core/resourceGroups/rg-prod/providers/Microsoft.Network/networkSecurityGroups/nsg-dmz-jumpbox",
+      resource_name: "nsg-dmz-jumpbox",
       severity: "critical",
       risk_score: 95,
-      risk_summary: "Inbound NSG rule allows any source (0.0.0.0/0) to connect to RDP port 3389.",
-      compliance_rules: ["CIS Azure Benchmark v2.0 6.1", "NCA ECC-1:2018"],
-      status_extended: "Rule 'Allow-RDP-Internet' grants access on port 3389 from Internet.",
+      risk_summary: "Internet access allowed on RDP port 3389 without IP whitelist or Just-In-Time access controls.",
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 6.2", "PCI DSS Requirement 1.3"],
+      status_extended: "NSG 'nsg-dmz-jumpbox' has inbound rule 'Allow-RDP-All' with SourceAddressPrefix='*'.",
     },
     {
       id: "cat-azure-05",
-      finding_id: "find-az-kv-purge",
+      finding_id: "find-az-keyvault-purge",
       check_id: "keyvault_purge_protection_enabled",
-      finding_title: "Azure Key Vault Purge Protection & Soft Delete Disabled",
+      finding_title: "Azure Key Vault Purge Protection Disabled",
       provider: "AZURE",
       region: "eastus2",
       resource_uid: "/subscriptions/sub-core/resourceGroups/rg-prod/providers/Microsoft.KeyVault/vaults/kv-prod-certs-vault",
       resource_name: "kv-prod-certs-vault",
       severity: "high",
-      risk_score: 81,
-      risk_summary: "Production certificates and secret keys can be permanently deleted without retention protection.",
-      compliance_rules: ["CIS Azure Benchmark v2.0 8.4", "SOC 2 CC6.1"],
+      risk_score: 78,
+      risk_summary: "Secrets, cryptographic keys, and certificates can be permanently destroyed by ransomware or insider threat.",
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 8.4", "ISO 27001 A.10.1.2"],
       status_extended: "Key Vault 'kv-prod-certs-vault' has enablePurgeProtection=false.",
     },
     {
@@ -611,103 +628,11 @@ function AIDecisionsPage() {
       severity: "medium",
       risk_score: 66,
       risk_summary: "Public REST API web application does not redirect HTTP requests to HTTPS.",
-      compliance_rules: ["CIS Azure Benchmark v2.0 9.1", "PCI DSS Requirement 4.1"],
+      compliance_rules: ["CIS Microsoft Azure Foundations Benchmark v2.0 9.1", "PCI DSS Requirement 4.1"],
       status_extended: "App Service 'app-api-customer-portal' has httpsOnly set to false.",
     },
 
-    // ── GCP (6 Findings) ──
-    {
-      id: "cat-gcp-01",
-      finding_id: "find-gcp-storage-ubla",
-      check_id: "storage_bucket_uniform_bucket_level_access",
-      finding_title: "Google Cloud Storage Bucket Lacks Uniform Access Control",
-      provider: "GCP",
-      region: "us-central1",
-      resource_uid: "gs://gcs-analytics-warehouse-prod",
-      resource_name: "gcs-analytics-warehouse-prod",
-      severity: "high",
-      risk_score: 82,
-      risk_summary: "Fine-grained ACLs are enabled instead of unified IAM policies on GCS bucket.",
-      compliance_rules: ["CIS Google Cloud Platform Benchmark v1.3 5.1", "NCA ECC-1:2018"],
-      status_extended: "Bucket 'gcs-analytics-warehouse-prod' has uniformBucketLevelAccess disabled.",
-    },
-    {
-      id: "cat-gcp-02",
-      finding_id: "find-gcp-compute-oslogin",
-      check_id: "compute_instances_enable_os_login",
-      finding_title: "Compute Engine Instances Do Not Require OS Login",
-      provider: "GCP",
-      region: "us-central1-a",
-      resource_uid: "projects/my-prod/zones/us-central1-a/instances/vm-k8s-node-worker-01",
-      resource_name: "vm-k8s-node-worker-01",
-      severity: "medium",
-      risk_score: 68,
-      risk_summary: "SSH keys are managed manually rather than linked to Google Cloud IAM identities.",
-      compliance_rules: ["CIS Google Cloud Platform Benchmark v1.3 4.4"],
-      status_extended: "Instance 'vm-k8s-node-worker-01' has enable-oslogin metadata set to FALSE.",
-    },
-    {
-      id: "cat-gcp-03",
-      finding_id: "find-gcp-sql-ssl",
-      check_id: "sql_instances_require_ssl",
-      finding_title: "Cloud SQL PostgreSQL Server Allows Unencrypted Connections",
-      provider: "GCP",
-      region: "us-central1",
-      resource_uid: "projects/my-prod/instances/cloudsql-pg-analytics",
-      resource_name: "cloudsql-pg-analytics",
-      severity: "high",
-      risk_score: 86,
-      risk_summary: "Cloud SQL database does not require SSL/TLS certificates for client authentication.",
-      compliance_rules: ["CIS GCP Benchmark v1.3 6.1", "NCA ECC-1:2018 2-3-3"],
-      status_extended: "Cloud SQL instance 'cloudsql-pg-analytics' has require_ssl=false.",
-    },
-    {
-      id: "cat-gcp-04",
-      finding_id: "find-gcp-logging-sink",
-      check_id: "logging_sink_configured_for_all_audit_logs",
-      finding_title: "Cloud Logging Sink Not Configured for Project Audit Trail Export",
-      provider: "GCP",
-      region: "Global",
-      resource_uid: "projects/my-prod/sinks/gcp-prod-audit-sink",
-      resource_name: "gcp-prod-audit-sink",
-      severity: "high",
-      risk_score: 79,
-      risk_summary: "Security and administrative audit logs are not exported to an immutable central repository.",
-      compliance_rules: ["CIS GCP Benchmark v1.3 2.1", "ISO 27001 A.12.4.1"],
-      status_extended: "No centralized Log Router sink configured for cloudaudit.googleapis.com.",
-    },
-    {
-      id: "cat-gcp-05",
-      finding_id: "find-gcp-sa-privilege",
-      check_id: "iam_service_account_user_role_least_privilege",
-      finding_title: "Service Account Granted Overprivileged Project Owner / Editor Role",
-      provider: "GCP",
-      region: "Global",
-      resource_uid: "sa-ci-cd-deployer@my-prod.iam.gserviceaccount.com",
-      resource_name: "sa-ci-cd-deployer",
-      severity: "critical",
-      risk_score: 96,
-      risk_summary: "Automated deployment service account has primitive roles/owner, violating least privilege.",
-      compliance_rules: ["CIS GCP Benchmark v1.3 1.4", "NIST SP 800-53 AC-6"],
-      status_extended: "Service account 'sa-ci-cd-deployer' is bound to roles/editor across project.",
-    },
-    {
-      id: "cat-gcp-06",
-      finding_id: "find-gcp-shielded-vm",
-      check_id: "compute_instance_shielded_vm_enabled",
-      finding_title: "Compute Engine Shielded VM (vTPM & Secure Boot) Disabled",
-      provider: "GCP",
-      region: "us-central1-a",
-      resource_uid: "projects/my-prod/zones/us-central1-a/instances/vm-ml-training-gpu-01",
-      resource_name: "vm-ml-training-gpu-01",
-      severity: "medium",
-      risk_score: 62,
-      risk_summary: "VM instance does not verify bootloader integrity with Virtual TPM.",
-      compliance_rules: ["CIS GCP Benchmark v1.3 4.11"],
-      status_extended: "Instance 'vm-ml-training-gpu-01' has shieldedInstanceConfig.enableSecureBoot=false.",
-    },
-
-    // ── Kubernetes (5 Findings) ──
+    // ── KUBERNETES (5 Findings) ──
     {
       id: "cat-k8s-01",
       finding_id: "find-k8s-non-root",
@@ -749,154 +674,169 @@ function AIDecisionsPage() {
       resource_name: "ingress-controller-nginx",
       severity: "critical",
       risk_score: 91,
-      risk_summary: "Child processes can gain higher privileges than their parent container process.",
+      risk_summary: "Container process can gain more privileges than its parent process via setuid binaries.",
       compliance_rules: ["CIS Kubernetes Benchmark v1.7 5.2.5"],
-      status_extended: "Container 'ingress-controller-nginx' has allowPrivilegeEscalation=true.",
+      status_extended: "Container securityContext allows privilege escalation.",
     },
     {
       id: "cat-k8s-04",
-      finding_id: "find-k8s-secrets-etcd",
-      check_id: "k8s_secret_encrypted_at_rest",
-      finding_title: "Kubernetes Secrets Unencrypted at Rest in etcd Key-Value Store",
+      finding_id: "find-k8s-read-only-rootfs",
+      check_id: "k8s_container_read_only_root_filesystem",
+      finding_title: "Container Writable Root Filesystem Enabled",
       provider: "KUBERNETES",
       region: "prod-cluster-01",
-      resource_uid: "k8s:controlplane:k8s-cluster-controlplane",
-      resource_name: "k8s-cluster-controlplane",
-      severity: "high",
-      risk_score: 89,
-      risk_summary: "Database credentials and TLS keys stored in etcd without KMS envelope encryption.",
-      compliance_rules: ["CIS Kubernetes Benchmark v1.7 1.2.32", "NCA ECC-1:2018 2-3-3"],
-      status_extended: "kube-apiserver lacks --encryption-provider-config flag.",
+      resource_uid: "k8s:deployment:prod:catalog-service",
+      resource_name: "catalog-service",
+      severity: "medium",
+      risk_score: 64,
+      risk_summary: "An attacker who compromises container can install rootkits or modify binaries directly in rootfs.",
+      compliance_rules: ["CIS Kubernetes Benchmark v1.7 5.2.12"],
+      status_extended: "readOnlyRootFilesystem is set to false in container spec.",
     },
     {
       id: "cat-k8s-05",
-      finding_id: "find-k8s-readonly-rootfs",
-      check_id: "k8s_pod_read_only_root_filesystem",
-      finding_title: "Root Filesystem Not Mounted as Read-Only in Container Spec",
+      finding_id: "find-k8s-secrets-env",
+      check_id: "k8s_secrets_passed_as_environment_variables",
+      finding_title: "Sensitive API Secrets Stored as Plaintext Environment Variables",
       provider: "KUBERNETES",
       region: "prod-cluster-01",
-      resource_uid: "k8s:deployment:prod:order-processing-daemon",
-      resource_name: "order-processing-daemon",
-      severity: "medium",
-      risk_score: 67,
-      risk_summary: "Writable root filesystem enables attackers to install malicious binaries or scripts.",
-      compliance_rules: ["CIS Kubernetes Benchmark v1.7 5.2.4"],
-      status_extended: "Container 'order-processing-daemon' has readOnlyRootFilesystem=false.",
+      resource_uid: "k8s:deployment:prod:notification-worker",
+      resource_name: "notification-worker",
+      severity: "high",
+      risk_score: 87,
+      risk_summary: "Plaintext secrets in env vars can be leaked via crash dumps, debug endpoints, or process inspect.",
+      compliance_rules: ["CIS Kubernetes Benchmark v1.7 5.4.1", "NCA ECC-1:2018 2-1-5"],
+      status_extended: "Deployment specifies STRIPE_API_KEY directly in container env array.",
     },
 
-    // ── Oracle Cloud OCI (5 Findings) ──
+    // ── OCI (Oracle Cloud Infrastructure - 6 Findings) ──
     {
       id: "cat-oci-01",
       finding_id: "find-oci-bucket-public",
-      check_id: "oci_objectstorage_bucket_public_access_type_prohibited",
-      finding_title: "OCI Object Storage Bucket Visibility Set to Public",
-      provider: "ORACLECLOUD",
+      check_id: "oci_objectstorage_bucket_public_access_type_no_public",
+      finding_title: "Object Storage Bucket Public Access Type Set to ObjectRead",
+      provider: "OCI",
       region: "us-ashburn-1",
-      resource_uid: "ocid1.bucket.oc1.iad.aaaaaaaabackupvault",
-      resource_name: "oci-backup-vault-bucket",
-      severity: "high",
-      risk_score: 86,
-      risk_summary: "Bucket visibility is ObjectRead or PublicAccessType in Oracle Cloud Infrastructure.",
-      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 2.1.1"],
-      status_extended: "OCI Bucket 'oci-backup-vault-bucket' has publicAccessType set to ObjectRead.",
+      resource_uid: "ocid1.bucket.oc1.iad.aaaaaaaapublicbackups",
+      resource_name: "prod-db-backups-bucket",
+      severity: "critical",
+      risk_score: 97,
+      risk_summary: "Database backups and archive dumps are publicly readable via direct HTTPS curl without OCI IAM authentication.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 2.1", "NCA ECC-1:2018 2-1-2"],
+      status_extended: "Bucket 'prod-db-backups-bucket' publicAccessType is set to 'ObjectRead'.",
     },
     {
       id: "cat-oci-02",
-      finding_id: "find-oci-iam-password",
-      check_id: "oci_iam_password_policy_minimum_length_14",
-      finding_title: "OCI IAM Authentication Password Policy Fails 14-Character Minimum",
-      provider: "ORACLECLOUD",
+      finding_id: "find-oci-iam-idcs-mfa",
+      check_id: "oci_iam_identity_domains_mfa_enabled",
+      finding_title: "OCI Identity Domain Administrators Lacks Mandatory MFA Policy",
+      provider: "OCI",
       region: "Global",
-      resource_uid: "ocid1.tenancy.oc1..aaaaaaaatenancyroot",
-      resource_name: "tenancy-root-compartment",
-      severity: "medium",
-      risk_score: 69,
-      risk_summary: "Tenancy authentication policy allows weak passwords shorter than 14 characters.",
-      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 1.1"],
-      status_extended: "OCI Tenancy password policy has minimum-password-length=8.",
+      resource_uid: "ocid1.domain.oc1..aaaaaaaatenancyrootdomain",
+      resource_name: "Default-Identity-Domain",
+      severity: "critical",
+      risk_score: 99,
+      risk_summary: "Tenancy administrators can authenticate using single-factor password, exposing complete cloud fleet.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 1.1", "PCI DSS Requirement 8.3"],
+      status_extended: "Sign-on policy for Administrators group does not require 2-Factor Authentication.",
     },
     {
       id: "cat-oci-03",
-      finding_id: "find-oci-boot-volume-kms",
-      check_id: "oci_compute_instance_boot_volume_kms_encrypted",
-      finding_title: "Compute Instance Boot Volume Not Encrypted with OCI Vault KMS",
-      provider: "ORACLECLOUD",
+      finding_id: "find-oci-sl-open-ssh",
+      check_id: "oci_core_security_list_ingress_stateless_ssh",
+      finding_title: "VCN Security List Allows Unrestricted Inbound 0.0.0.0/0 on Port 22",
+      provider: "OCI",
       region: "us-ashburn-1",
-      resource_uid: "ocid1.bootvolume.oc1.iad.anuwcljrn7...",
-      resource_name: "inst-db-node-primary-iad",
+      resource_uid: "ocid1.securitylist.oc1.iad.aaaaaaaadpz7q",
+      resource_name: "Default Security List for vcn-production",
       severity: "high",
-      risk_score: 85,
-      risk_summary: "Boot volume relies on Oracle-managed keys rather than Customer-Managed Keys (CMK).",
-      compliance_rules: ["CIS OCI Benchmark v1.2 4.1.2", "NCA ECC 2-3-3"],
-      status_extended: "Boot volume 'inst-db-node-primary-iad' has kmsKeyId set to null.",
+      risk_score: 89,
+      risk_summary: "Stateful ingress rule allows universal SSH connection from the public Internet.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 3.2", "NCA ECC-1:2018 2-3-1"],
+      status_extended: "Ingress rule allows source 0.0.0.0/0 destination port 22.",
     },
     {
       id: "cat-oci-04",
-      finding_id: "find-oci-sl-ingress",
-      check_id: "oci_vcn_security_list_stateless_ingress_prohibited",
-      finding_title: "VCN Security List Grants Unrestricted Ingress from 0.0.0.0/0",
-      provider: "ORACLECLOUD",
+      finding_id: "find-oci-vault-kms",
+      check_id: "oci_kms_key_rotation_enabled",
+      finding_title: "OCI Vault Customer-Managed KMS Key Auto-Rotation Disabled",
+      provider: "OCI",
       region: "us-ashburn-1",
-      resource_uid: "ocid1.securitylist.oc1.iad.aaaaaaaaslpublic",
-      resource_name: "sl-production-vcn-public",
-      severity: "high",
-      risk_score: 88,
-      risk_summary: "Inbound stateless rule allows all internet traffic to internal database subnets.",
-      compliance_rules: ["CIS OCI Benchmark v1.2 3.2"],
-      status_extended: "Security List 'sl-production-vcn-public' has CIDR 0.0.0.0/0 on all destination ports.",
+      resource_uid: "ocid1.key.oc1.iad.aaaaaaaakmsmasterkey",
+      resource_name: "prod-database-master-encryption-key",
+      severity: "medium",
+      risk_score: 69,
+      risk_summary: "Cryptographic master key has not been rotated in over 365 days, violating key hygiene standards.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 2.5", "ISO 27001 A.10.1.2"],
+      status_extended: "Key 'prod-database-master-encryption-key' has autoKeyRotationDetails=null.",
     },
     {
       id: "cat-oci-05",
-      finding_id: "find-oci-audit-retention",
-      check_id: "oci_audit_retention_period_365_days",
-      finding_title: "OCI Audit Log Retention Period Configured to Less Than 365 Days",
-      provider: "ORACLECLOUD",
+      finding_id: "find-oci-nsg-rdp",
+      check_id: "oci_core_network_security_group_ingress_rdp",
+      finding_title: "Network Security Group Inbound Rule Exposes Port 3389 (RDP)",
+      provider: "OCI",
+      region: "us-ashburn-1",
+      resource_uid: "ocid1.networksecuritygroup.oc1.iad.aaaaaaaansgjumpbox",
+      resource_name: "nsg-windows-bastion",
+      severity: "critical",
+      risk_score: 93,
+      risk_summary: "Windows Bastion instance is reachable directly on RDP 3389 from 0.0.0.0/0.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 3.3"],
+      status_extended: "NSG allows TCP destination port 3389 from 0.0.0.0/0.",
+    },
+    {
+      id: "cat-oci-06",
+      finding_id: "find-oci-cloudguard-status",
+      check_id: "oci_cloud_guard_enabled_tenancy",
+      finding_title: "OCI Cloud Guard Threat Detector Not Enabled in Root Compartment",
+      provider: "OCI",
       region: "Global",
-      resource_uid: "ocid1.tenancy.oc1..corporate-audit-retention",
-      resource_name: "oci-corporate-audit-retention",
-      severity: "medium",
-      risk_score: 64,
-      risk_summary: "Audit log retention period is set to 90 days instead of the required 365 days.",
-      compliance_rules: ["CIS OCI Benchmark v1.2 2.1", "PCI DSS Requirement 10.7"],
-      status_extended: "Audit retention configuration specifies 90 days.",
+      resource_uid: "ocid1.tenancy.oc1..aaaaaaaamaintenancy",
+      resource_name: "Root-Tenancy-Compartment",
+      severity: "high",
+      risk_score: 85,
+      risk_summary: "Continuous automated security posture scoring and threat detection are inactive for the tenancy.",
+      compliance_rules: ["CIS Oracle Cloud Infrastructure Benchmark v1.2 4.1", "NIST CSF PR.DS-1"],
+      status_extended: "Cloud Guard status is DISABLED in tenancy root.",
     },
 
-    // ── Oracle SaaS / ERP (5 Findings) ──
+    // ── ORACLE SAAS / FUSION ERP (5 Findings) ──
     {
       id: "cat-saas-01",
-      finding_id: "find-saas-sod-01",
-      check_id: "oracle_erp_sod_conflict_it_security_manager_super_user",
-      finding_title: "Oracle Fusion ERP Segregation of Duties (SoD) Conflict Detected",
+      finding_id: "find-saas-sod-bank",
+      check_id: "oracle_erp_segregation_of_duties_ap_bank_change",
+      finding_title: "Segregation of Duties (SoD) Conflict: Supplier Bank Mod & AP Invoice Approval",
       provider: "ORACLE_SAAS",
       region: "Oracle-Fusion-Pod-01",
-      resource_uid: "USER_GUID_8849102",
-      resource_name: "JDOE_FIN_ADMIN",
+      resource_uid: "USER_GUID_4491029",
+      resource_name: "J_MARTINEZ_FIN",
       severity: "critical",
       risk_score: 96,
-      risk_summary: "User 'JDOE_FIN_ADMIN' holds both IT Security Manager and Financial Application Administrator roles.",
-      compliance_rules: ["SOX Section 404 Internal Controls", "NCA Essential Cybersecurity Controls 2-1-3"],
-      status_extended: "Direct SoD violation: Role ORA_FND_IT_SECURITY_MANAGER combined with ORA_AP_ACCOUNTS_PAYABLE_MANAGER.",
+      risk_summary: "User has simultaneous privileges to modify Supplier Bank Account numbers and approve Payables Invoices.",
+      compliance_rules: ["SOX Section 404 Internal Controls", "NCA ECC-1:2018 2-1-3"],
+      status_extended: "User J_MARTINEZ_FIN assigned roles 'Accounts Payable Manager' AND 'Supplier Administrator'.",
     },
     {
       id: "cat-saas-02",
-      finding_id: "find-saas-dormant-01",
-      check_id: "oracle_erp_dormant_privileged_user_account_90_days",
-      finding_title: "Dormant Privileged User Account Active > 90 Days Without Login",
+      finding_id: "find-saas-breakglass-dormant",
+      check_id: "oracle_erp_breakglass_account_active_no_expiry",
+      finding_title: "Emergency Breakglass Account Active with No Auto-Expiration",
       provider: "ORACLE_SAAS",
       region: "Oracle-Fusion-Pod-01",
-      resource_uid: "USER_GUID_1928401",
-      resource_name: "M_CONSULTANT_SVC",
-      severity: "high",
-      risk_score: 84,
-      risk_summary: "Third-party consultant user account has had no login activity for 114 days with elevated privileges.",
-      compliance_rules: ["ISO 27001 A.9.2.6", "NCA ECC 2-1-2"],
-      status_extended: "Last login timestamp: 114 days ago. Account remains active.",
+      resource_uid: "USER_GUID_8819201",
+      resource_name: "EMERGENCY_BREAKGLASS_ADMIN",
+      severity: "critical",
+      risk_score: 98,
+      risk_summary: "Superuser breakglass account was unlocked for maintenance and has remained active without automatic de-provisioning.",
+      compliance_rules: ["SOX IT General Controls (ITGC)", "ISO 27001 A.9.2.6"],
+      status_extended: "Account 'EMERGENCY_BREAKGLASS_ADMIN' has status ACTIVE and expiryDate=NULL.",
     },
     {
       id: "cat-saas-03",
       finding_id: "find-saas-audit-gl",
-      check_id: "oracle_erp_audit_trail_business_objects_disabled",
-      finding_title: "Oracle Fusion Audit Trail Disabled on General Ledger & AP Objects",
+      check_id: "oracle_erp_audit_policy_general_ledger_disabled",
+      finding_title: "Oracle Fusion Audit Trail Disabled for General Ledger Journal Entries",
       provider: "ORACLE_SAAS",
       region: "Oracle-Fusion-Pod-01",
       resource_uid: "ERP_AUDIT_POLICY_FIN",
@@ -939,22 +879,6 @@ function AIDecisionsPage() {
     }
   ];
 
-function extractFindingProvider(f: any): string {
-  const rawP = f.provider || f.provider_type || f.scan?.provider?.provider || f.raw_result?.Provider || f.check_metadata?.Provider;
-  if (rawP) {
-    const s = String(rawP).toUpperCase();
-    if (s === "ORACLECLOUD") return "OCI";
-    return s;
-  }
-  const uid = String(f.uid || f.id || f.prowler_uid || "").toLowerCase();
-  if (uid.includes("prowler-azure") || uid.includes("/subscriptions/") || uid.includes("azure")) return "AZURE";
-  if (uid.includes("prowler-aws") || uid.includes("arn:aws:")) return "AWS";
-  if (uid.includes("prowler-gcp") || uid.includes("projects/")) return "GCP";
-  if (uid.includes("prowler-oci") || uid.includes("oraclecloud") || uid.includes("ocid1.")) return "OCI";
-  if (uid.includes("saas") || uid.includes("fusion") || uid.includes("oracle")) return "ORACLE_SAAS";
-  return "AZURE";
-}
-
   // Build Unified Remediation Items List from real failed findings + catalog + executions
   const remediationItems: FindingRemediationItem[] = useMemo(() => {
     const list: FindingRemediationItem[] = [];
@@ -963,8 +887,6 @@ function extractFindingProvider(f: any): string {
     const failedFindings = realFindings.filter((f: any) => {
       if (f.status !== "FAIL") return false;
       const prov = extractFindingProvider(f);
-      if (prov === "OCI" && (connectedProviderSet.has("OCI") || connectedProviderSet.has("ORACLECLOUD"))) return true;
-      if (prov === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS")) return true;
       return connectedProviderSet.has(prov);
     });
 
@@ -983,9 +905,7 @@ function extractFindingProvider(f: any): string {
       const matchedExec = executions.find(
         (ex: any) =>
           (f.id && ex.finding_id === f.id) ||
-          (resUid && (ex.ai_payload?.resource_uid === resUid || ex.resource_uid === resUid)) ||
-          (resName && (ex.ai_payload?.resource_name === resName || ex.resource_name === resName)) ||
-          (ex.summary && checkId && ex.summary.toLowerCase().includes(checkId.toLowerCase()))
+          (resUid && (ex.ai_payload?.resource_uid === resUid || ex.resource_uid === resUid))
       );
 
       const remediation = generateProviderRemediation(
@@ -1039,23 +959,19 @@ function extractFindingProvider(f: any): string {
         (catProv === "ORACLECLOUD" && connectedProviderSet.has("OCI")) ||
         (catProv === "ORACLE_SAAS" && connectedProviderSet.has("ORACLE_SAAS"));
       if (!isConnected) return false;
-      const hasRealForProv = list.some(
-        (item) => item.provider === catProv || (catProv === "ORACLECLOUD" && item.provider === "OCI")
+      const hasRealFindingsForProv = failedFindings.some(
+        (rf: any) => extractFindingProvider(rf) === catProv
       );
-      return !hasRealForProv;
+      return !hasRealFindingsForProv;
     });
 
     allowedCatalog.forEach((cat, cIdx) => {
-      // Don't duplicate if already present
-      if (list.some((item) => item.check_id === cat.check_id)) return;
-
-      const catProvider = (cat.provider === "ORACLECLOUD" ? "OCI" : cat.provider).toUpperCase();
+      const catProvider = cat.provider.toUpperCase();
       const matchedExec = executions.find(
         (ex: any) =>
           ex.finding_id === cat.finding_id ||
-          (cat.resource_uid && (ex.ai_payload?.resource_uid === cat.resource_uid || ex.resource_uid === cat.resource_uid)) ||
-          (cat.resource_name && (ex.ai_payload?.resource_name === cat.resource_name || ex.resource_name === cat.resource_name)) ||
-          (ex.summary && cat.check_id && ex.summary.toLowerCase().includes(cat.check_id.toLowerCase()))
+          ex.resource_uid === cat.resource_uid ||
+          (ex.ai_payload && ex.ai_payload.resource_uid === cat.resource_uid)
       );
 
       const remediation = generateProviderRemediation(
@@ -1064,7 +980,7 @@ function extractFindingProvider(f: any): string {
         cat.resource_name,
         cat.resource_uid,
         cat.region,
-        {},
+        null,
         null
       );
 
@@ -1121,15 +1037,7 @@ function extractFindingProvider(f: any): string {
       // Cloud Provider filter
       if (selectedProviderFilter !== "ALL") {
         const itemProv = (item.provider || "").toUpperCase();
-        if (selectedProviderFilter === "ORACLE_SAAS") {
-          if (!itemProv.includes("SAAS") && !itemProv.includes("ORACLE_SAAS")) return false;
-        } else if (selectedProviderFilter === "OCI" || selectedProviderFilter === "ORACLECLOUD") {
-          if (itemProv !== "OCI" && itemProv !== "ORACLECLOUD" && !itemProv.includes("ORACLE")) return false;
-        } else if (selectedProviderFilter === "KUBERNETES") {
-          if (!itemProv.includes("KUBE") && !itemProv.includes("K8S")) return false;
-        } else if (itemProv !== selectedProviderFilter) {
-          return false;
-        }
+        if (itemProv !== selectedProviderFilter) return false;
       }
 
       // Search filter
@@ -1137,9 +1045,8 @@ function extractFindingProvider(f: any): string {
         const q = searchQuery.toLowerCase();
         const matchTitle = item.title.toLowerCase().includes(q) || item.finding_title.toLowerCase().includes(q);
         const matchKey = item.execution_record?.issue_key?.toLowerCase().includes(q);
-        const matchAssignee = item.execution_record?.assignee_name?.toLowerCase().includes(q);
         const matchResource = item.resource_name?.toLowerCase().includes(q);
-        if (!matchTitle && !matchKey && !matchAssignee && !matchResource) return false;
+        if (!matchTitle && !matchKey && !matchResource) return false;
       }
 
       // Section tab filter
@@ -1259,7 +1166,7 @@ function extractFindingProvider(f: any): string {
               refetchExecutions();
               refetchMetrics();
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors shadow-sm cursor-pointer"
           >
             <RefreshCw className="h-3.5 w-3.5 text-primary" />
             <span>Sync Live Status</span>
@@ -1276,7 +1183,7 @@ function extractFindingProvider(f: any): string {
     >
       {/* ── Banner Alerts ── */}
       {actionSuccess && (
-        <div className="mb-5 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 p-4 text-xs font-semibold text-success shadow-sm">
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-xs font-semibold text-success shadow-sm animate-in fade-in duration-150">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             {actionSuccess}
@@ -1286,21 +1193,22 @@ function extractFindingProvider(f: any): string {
       )}
 
       {!jiraConfig?.connected && (
-        <div className="mb-5 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs font-semibold text-amber-300 shadow-sm">
-          <span className="flex items-center gap-2">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300 backdrop-blur-sm shadow-sm">
+          <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-            Jira Cloud is not connected yet. Configure your Atlassian API token to dispatch real-time remediation tickets.
-          </span>
+            <span>Jira Cloud is not connected yet. Configure Atlassian API credentials to dispatch live remediation tickets.</span>
+          </div>
           <Link
             to="/integrations"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400/20 border border-amber-400/30 px-3 py-1 text-xs font-bold text-amber-200 hover:bg-amber-400/30 transition-all shrink-0"
           >
             <span>Configure Jira Credentials</span>
+            <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
       )}
 
-      {/* ── Top Metric KPI Cards ── */}
+      {/* ── Top Metric KPI Cards (Big & Prominent) ── */}
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
         <Panel index={0}>
           <span className="section-label">Total Findings</span>
@@ -1353,21 +1261,26 @@ function extractFindingProvider(f: any): string {
         </Panel>
       </div>
 
-      {/* ── Main Split View: Execution Table & Decision Inspector ── */}
+      {/* ── Main Split View: Queue & Remediation Workbench ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Left Column (6 Cols): Execution Tab & Records Table */}
-        <div className="space-y-4 lg:col-span-6">
-          <Panel index={0} className="p-4">
-            {/* Header & Section Tabs */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <Ticket className="h-4 w-4 text-primary" />
-                <h3 className="font-display text-sm font-bold text-foreground">
-                  Remediation Orchestration
-                </h3>
+        {/* Left Column (5 Cols): Remediation Queue */}
+        <div className="lg:col-span-5 flex flex-col gap-3">
+          <div className="rounded-2xl border border-border/80 bg-surface/80 p-4 backdrop-blur-sm shadow-md space-y-3">
+            {/* Header & Filter Tabs */}
+            <div className="flex flex-col gap-2.5 border-b border-border/60 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-primary" />
+                  <h3 className="font-display text-sm font-bold text-foreground">
+                    Remediation Queue
+                  </h3>
+                </div>
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {filteredItems.length} items
+                </span>
               </div>
 
-              {/* Section Filter Pills */}
+              {/* Status Segmented Tabs */}
               <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-surface-2/60 p-1 text-xs">
                 {(["All", "Pending", "In Progress", "Completed", "Failed"] as const).map((tab) => {
                   const count =
@@ -1384,9 +1297,9 @@ function extractFindingProvider(f: any): string {
                     <button
                       key={tab}
                       onClick={() => setFilterSection(tab)}
-                      className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+                      className={`flex-1 min-w-[55px] text-center rounded-lg py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                         filterSection === tab
-                          ? "bg-primary text-primary-foreground shadow-sm"
+                          ? "bg-primary text-primary-foreground shadow-xs"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -1397,44 +1310,41 @@ function extractFindingProvider(f: any): string {
               </div>
             </div>
 
-            {/* Search & Cloud Provider Filter Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3">
-              {/* Dynamic Provider Dropdown Selector (Only Added Cloud Providers) */}
-              <div className="sm:col-span-5 relative">
+            {/* Provider Filter & Search Bar */}
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-5 relative">
                 <select
                   value={selectedProviderFilter}
                   onChange={(e) => setSelectedProviderFilter(e.target.value)}
-                  className="w-full h-full rounded-xl border border-border bg-surface-2 pl-3 pr-8 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none appearance-none cursor-pointer"
+                  className="w-full h-full rounded-xl border border-border bg-surface-2 pl-2.5 pr-6 py-1.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none appearance-none cursor-pointer truncate"
                 >
-                  <option value="ALL">☁️ All Connected ({connectedProviders.length || 1})</option>
+                  <option value="ALL">All Cloud ({connectedProviders.length || 1})</option>
                   {connectedProviders.map((p) => (
                     <option key={p.id} value={p.providerUpper}>
-                      {p.providerUpper === "AZURE" ? "🟦 " : p.providerUpper === "AWS" ? "🟧 " : p.providerUpper === "GCP" ? "🟩 " : p.providerUpper === "OCI" ? "🟥 " : p.providerUpper === "KUBERNETES" ? "☸️ " : "🛡️ "}
                       {p.alias} ({p.providerUpper})
                     </option>
                   ))}
                 </select>
-                <ChevronRight className="pointer-events-none absolute right-3 top-2.5 h-3.5 w-3.5 rotate-90 text-muted-foreground" />
+                <ChevronRight className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 rotate-90 text-muted-foreground" />
               </div>
 
-              {/* Search Input */}
-              <div className="sm:col-span-7 relative">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <div className="col-span-7 relative">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search findings, issue key, or assignee..."
-                  className="w-full rounded-xl border border-border bg-surface-2 pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
+                  placeholder="Search findings or assets..."
+                  className="w-full rounded-xl border border-border bg-surface-2 pl-8 pr-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none transition-colors"
                 />
               </div>
             </div>
 
-            {/* Records List Table */}
-            <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+            {/* Finding Records Feed */}
+            <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
               {filteredItems.length === 0 ? (
                 <div className="rounded-xl border border-border/60 bg-surface-2/30 p-8 text-center text-xs text-muted-foreground">
-                  No remediation records found matching the "{filterSection}" and "{selectedProviderFilter}" filters.
+                  No remediation records found.
                 </div>
               ) : (
                 filteredItems.map((item) => {
@@ -1444,81 +1354,46 @@ function extractFindingProvider(f: any): string {
                     <div
                       key={item.id}
                       onClick={() => setSelectedItemId(item.id)}
-                      className={`group flex flex-col gap-2 rounded-xl border p-3.5 transition-all cursor-pointer ${
+                      className={`group flex flex-col gap-1.5 rounded-xl border p-3.5 transition-all cursor-pointer ${
+                        item.severity === "critical"
+                          ? "border-l-[4px] border-l-rose-500"
+                          : item.severity === "high"
+                          ? "border-l-[4px] border-l-orange-500"
+                          : "border-l-[4px] border-l-amber-400"
+                      } ${
                         isSelected
-                          ? "border-primary/80 bg-primary/5 shadow-sm"
-                          : "border-border/80 bg-surface/80 hover:border-primary/40 hover:bg-surface"
+                          ? "border-primary/80 bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                          : "border-border/80 bg-surface/70 hover:border-primary/40 hover:bg-surface-2/60"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {/* Issue Key / Status Badge */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-xs text-foreground group-hover:text-primary transition-colors line-clamp-1 flex-1">
+                          {item.finding_title || item.title}
+                        </span>
+                        <span className="font-mono text-[10px] font-bold text-muted-foreground/80 shrink-0">
+                          {item.risk_score}/100
+                        </span>
+                      </div>
+
+                      {/* Sub row: Provider, Resource, Jira Status */}
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                        <div className="flex items-center gap-1.5 font-mono text-[10px] truncate max-w-[65%]">
+                          <span className="rounded bg-surface-2 px-1.5 py-0.2 font-bold text-foreground uppercase text-[9px] border border-border">
+                            {item.provider}
+                          </span>
+                          <span className="truncate text-muted-foreground">{item.resource_name}</span>
+                        </div>
+
+                        <div>
                           {exec?.issue_key && exec.issue_key !== "N/A" ? (
-                            <a
-                              href={exec.issue_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-mono font-bold text-primary hover:underline"
-                            >
-                              <span>{exec.issue_key}</span>
-                              <ExternalLink className="h-2.5 w-2.5" />
-                            </a>
-                          ) : (
-                            <span className="rounded-md bg-surface-2 border border-border px-2 py-0.5 text-[10px] font-mono font-bold text-muted-foreground">
-                              PENDING JIRA
-                            </span>
-                          )}
-
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                            item.severity === "critical"
-                              ? "bg-rose-500/10 text-rose-400"
-                              : item.severity === "high"
-                              ? "bg-orange-500/10 text-orange-400"
-                              : "bg-amber-500/10 text-amber-400"
-                          }`}>
-                            {item.severity}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {/* Current Jira Status Badge */}
-                          {exec ? (
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                              exec.status === "COMPLETED" || exec.jira_status_category === "done"
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                : exec.status === "FAILED"
-                                ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                                : "bg-sky-500/10 text-sky-400 border-sky-500/20"
-                            }`}>
-                              <Dot tone={exec.status === "COMPLETED" ? "success" : exec.status === "FAILED" ? "high" : "primary"} pulse={exec.status === "IN_PROGRESS"} />
-                              {exec.jira_status || "In Progress"}
+                            <span className="inline-flex items-center gap-1 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-mono font-bold text-primary">
+                              {exec.issue_key}
                             </span>
                           ) : (
-                            <span className="rounded-full bg-surface-2 border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                              Ready to Dispatch
+                            <span className="rounded bg-surface-2 border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              Ready
                             </span>
                           )}
-                        </div>
-                      </div>
-
-                      {/* Finding Title */}
-                      <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                        {item.title}
-                      </div>
-
-                      {/* Assignee & Resource Meta */}
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium text-foreground">
-                            {exec?.assignee_name || "Unassigned"}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-[10px]">{item.provider} · {item.region}</span>
-                          <span className="text-[10px] text-muted-foreground">{new Date(item.inserted_at).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>
@@ -1526,65 +1401,80 @@ function extractFindingProvider(f: any): string {
                 })
               )}
             </div>
-          </Panel>
+          </div>
         </div>
 
-        {/* Right Column (6 Cols): Decision Panel & Jira Ticket Inspector */}
-        <div className="space-y-4 lg:col-span-6">
+        {/* Right Column (7 Cols): Remediation Workbench (Clean & Spacious) */}
+        <div className="lg:col-span-7 flex flex-col gap-3">
           {selectedItem ? (
-            <Panel index={1} className="p-6">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-4 border-b border-border/60 pb-4 mb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+            <div className="rounded-2xl border border-border/80 bg-surface/80 p-6 backdrop-blur-sm shadow-md space-y-5">
+              {/* Finding Hero Header */}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-border/60 pb-4">
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase ${
                       selectedItem.severity === "critical"
-                        ? "bg-rose-500/10 text-rose-400"
+                        ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                         : selectedItem.severity === "high"
-                        ? "bg-orange-500/10 text-orange-400"
-                        : "bg-amber-500/10 text-amber-400"
+                        ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                        : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                     }`}>
                       {selectedItem.severity} Severity
                     </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      Risk Score: <strong className="text-foreground">{selectedItem.risk_score}/100</strong>
+                    <span className="rounded-md bg-surface-2 border border-border px-2.5 py-0.5 text-[10px] font-mono font-bold text-foreground">
+                      Risk Score: {selectedItem.risk_score}/100
+                    </span>
+                    <span className="rounded-md bg-surface-2 border border-border px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                      {selectedItem.provider} · {selectedItem.region}
                     </span>
                   </div>
-                  <h3 className="font-display text-base font-bold text-foreground">
+
+                  <h2 className="font-display text-lg font-bold text-foreground leading-snug pt-0.5">
                     {selectedItem.finding_title}
-                  </h3>
-                  <p className="font-mono text-[11px] text-muted-foreground mt-0.5">
-                    Resource: <span className="text-foreground">{selectedItem.resource_name}</span> ({selectedItem.provider})
+                  </h2>
+                  <p className="font-mono text-xs text-muted-foreground truncate">
+                    Resource: <strong className="text-foreground">{selectedItem.resource_name}</strong>
                   </p>
                 </div>
 
-                {/* Open in Jira button if already created */}
-                {selectedItem.execution_record?.issue_url && (
-                  <div className="flex flex-col items-end gap-1.5">
-                    <a
-                      href={selectedItem.execution_record.issue_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer"
-                    >
-                      <span>Open in Jira</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                {/* Primary Action Button in Header */}
+                <div className="shrink-0 flex items-center gap-2">
+                  {selectedItem.execution_record?.issue_url ? (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={selectedItem.execution_record.issue_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer active:scale-95"
+                      >
+                        <span>Open in Jira</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                      <button
+                        onClick={() => handleSyncStatus(selectedItem.execution_record!.id)}
+                        disabled={syncStatusMutation.isPending}
+                        className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted-foreground hover:text-foreground cursor-pointer shadow-sm"
+                        title="Sync Status"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${syncStatusMutation.isPending ? "animate-spin text-primary" : ""}`} />
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleSyncStatus(selectedItem.execution_record!.id)}
-                      disabled={syncStatusMutation.isPending}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
+                      type="button"
+                      onClick={() => handleOpenCreateTicket(selectedItem)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all active:scale-95 cursor-pointer"
                     >
-                      <RefreshCw className={`h-3 w-3 ${syncStatusMutation.isPending ? "animate-spin text-primary" : ""}`} />
-                      <span>Sync Live Status</span>
+                      <Ticket className="h-4 w-4" />
+                      <span>Dispatch Jira Ticket</span>
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Success Banner if freshly created */}
               {createdTicketResult && (
-                <div className="mb-4 rounded-xl border border-success/30 bg-success/10 p-4 text-xs space-y-2">
+                <div className="rounded-xl border border-success/30 bg-success/10 p-3.5 text-xs space-y-1.5">
                   <div className="flex items-center justify-between font-bold text-success">
                     <span className="flex items-center gap-1.5">
                       <CheckCircle2 className="h-4 w-4" />
@@ -1594,216 +1484,235 @@ function extractFindingProvider(f: any): string {
                       href={createdTicketResult.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 underline"
+                      className="inline-flex items-center gap-1 underline font-mono"
                     >
                       <span>{createdTicketResult.key}</span>
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px]">
-                    <div>Assignee: <strong className="text-foreground">{createdTicketResult.assigneeName}</strong></div>
-                    <div>Initial Status: <strong className="text-foreground">{createdTicketResult.status}</strong></div>
+                  <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                    <span>Assignee: <strong className="text-foreground">{createdTicketResult.assigneeName}</strong></span>
+                    <span>Status: <strong className="text-foreground">{createdTicketResult.status}</strong></span>
                   </div>
                 </div>
               )}
 
-              {/* Section 1: AI Remediation & Reasoning */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    <span>AI Recommended Fix & Reasoning</span>
-                  </h4>
-                  <div className="rounded-xl border border-border/80 bg-surface-2/50 p-3.5 text-xs text-foreground leading-relaxed">
-                    <p className="font-semibold text-foreground mb-1">{selectedItem.recommended_fix}</p>
-                    <p className="text-muted-foreground text-[11px]">{selectedItem.ai_reasoning}</p>
-                  </div>
-                </div>
+              {/* Clean 3-Way Mode Tabs */}
+              <div className="flex items-center gap-2 border-b border-border/60 pb-3">
+                <button
+                  onClick={() => setActiveInspectorTab("playbook")}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                    activeInspectorTab === "playbook"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-surface-2/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                  }`}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>IaC Code Solution</span>
+                </button>
+                <button
+                  onClick={() => setActiveInspectorTab("timeline")}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+                    activeInspectorTab === "timeline"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-surface-2/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                  }`}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Verification & Audit</span>
+                </button>
+              </div>
 
-                {/* Section 2: Multi-Modal Remediation Engine (CLI / IaC / Console) */}
-                <div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Terminal className="h-3.5 w-3.5 text-primary" />
-                      <span>Actionable Remediation Solution</span>
-                    </h4>
-
-                    {/* Format Tabs: CLI, Terraform, Console */}
-                    <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5 text-[11px]">
-                      <button
-                        onClick={() => setActiveRemediationTab("cli")}
-                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
-                          activeRemediationTab === "cli"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        💻 CLI Command
-                      </button>
-                      <button
-                        onClick={() => setActiveRemediationTab("terraform")}
-                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
-                          activeRemediationTab === "terraform"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        📜 Terraform IaC
-                      </button>
-                      <button
-                        onClick={() => setActiveRemediationTab("console")}
-                        className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer ${
-                          activeRemediationTab === "console"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        🖥️ Console Guide
-                      </button>
+              {/* Tab 1: IaC Code Solution */}
+              {activeInspectorTab === "playbook" && (
+                <div className="space-y-4">
+                  {/* AI Remediation Synopsis */}
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-display text-xs font-bold text-primary">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>AI Remediation Recommendation</span>
                     </div>
+                    <p className="text-sm font-medium text-foreground leading-relaxed">
+                      {selectedItem.recommended_fix}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed pt-0.5">
+                      {selectedItem.ai_reasoning}
+                    </p>
                   </div>
 
-                  {/* Tab Content 1: CLI */}
-                  {activeRemediationTab === "cli" && (
-                    <div className="relative group">
-                      <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-3.5 font-mono text-[11px] text-emerald-400 overflow-x-auto whitespace-pre-wrap">
-                        <code>{selectedItem.cli_command}</code>
-                      </pre>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedItem.cli_command);
-                          setCopiedTab("cli");
-                          setTimeout(() => setCopiedTab(null), 2000);
-                        }}
-                        className="absolute right-2.5 top-2.5 rounded-lg border border-border/60 bg-surface-2/80 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer"
-                      >
-                        {copiedTab === "cli" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                        <span>{copiedTab === "cli" ? "Copied!" : "Copy"}</span>
-                      </button>
+                  {/* Code Solution Switcher */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-muted-foreground">
+                        Select Deployment Format:
+                      </span>
+
+                      {/* Format Switcher Tabs */}
+                      <div className="flex items-center gap-1 rounded-xl border border-border bg-surface-2 p-1 text-xs">
+                        <button
+                          onClick={() => setActiveRemediationTab("cli")}
+                          className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                            activeRemediationTab === "cli"
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          CLI Command
+                        </button>
+                        <button
+                          onClick={() => setActiveRemediationTab("terraform")}
+                          className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                            activeRemediationTab === "terraform"
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Terraform IaC
+                        </button>
+                        <button
+                          onClick={() => setActiveRemediationTab("console")}
+                          className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                            activeRemediationTab === "console"
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Console Guide
+                        </button>
+                      </div>
                     </div>
-                  )}
 
-                  {/* Tab Content 2: Terraform */}
-                  {activeRemediationTab === "terraform" && (
-                    <div className="relative group">
-                      <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-3.5 font-mono text-[11px] text-sky-400 overflow-x-auto whitespace-pre-wrap">
-                        <code>{selectedItem.code_snippet}</code>
-                      </pre>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedItem.code_snippet);
-                          setCopiedTab("terraform");
-                          setTimeout(() => setCopiedTab(null), 2000);
-                        }}
-                        className="absolute right-2.5 top-2.5 rounded-lg border border-border/60 bg-surface-2/80 px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer"
-                      >
-                        {copiedTab === "terraform" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                        <span>{copiedTab === "terraform" ? "Copied!" : "Copy"}</span>
-                      </button>
-                    </div>
-                  )}
+                    {/* Tab 1: CLI */}
+                    {activeRemediationTab === "cli" && (
+                      <div className="relative group">
+                        <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-4 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner">
+                          <code>{selectedItem.cli_command}</code>
+                        </pre>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedItem.cli_command);
+                            setCopiedTab("cli");
+                            setTimeout(() => setCopiedTab(null), 2000);
+                          }}
+                          className="absolute right-3 top-3 rounded-lg border border-border/60 bg-surface-2/90 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          {copiedTab === "cli" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          <span>{copiedTab === "cli" ? "Copied!" : "Copy Command"}</span>
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Tab Content 3: Console */}
-                  {activeRemediationTab === "console" && (
-                    <div className="rounded-xl border border-border/80 bg-surface-2/60 p-4 text-xs text-foreground font-mono leading-relaxed whitespace-pre-wrap">
-                      {selectedItem.console_steps}
-                    </div>
-                  )}
+                    {/* Tab 2: Terraform */}
+                    {activeRemediationTab === "terraform" && (
+                      <div className="relative group">
+                        <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-4 font-mono text-xs text-sky-400 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner">
+                          <code>{selectedItem.code_snippet}</code>
+                        </pre>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedItem.code_snippet);
+                            setCopiedTab("terraform");
+                            setTimeout(() => setCopiedTab(null), 2000);
+                          }}
+                          className="absolute right-3 top-3 rounded-lg border border-border/60 bg-surface-2/90 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          {copiedTab === "terraform" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                          <span>{copiedTab === "terraform" ? "Copied!" : "Copy Terraform"}</span>
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Validation Verification Steps */}
-                  <div className="mt-2.5 rounded-lg border border-border/50 bg-surface-2/30 p-2.5 text-[11px] space-y-1">
-                    <div className="font-bold text-muted-foreground flex items-center gap-1">
-                      <ShieldCheck className="h-3 w-3 text-primary" />
-                      <span>Verification Steps</span>
-                    </div>
-                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                      {selectedItem.validation_steps?.map((step, idx) => (
-                        <li key={idx}>{step}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Section 3: Execution Timeline */}
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-primary" />
-                    <span>Remediation Execution Timeline</span>
-                  </h4>
-
-                  <div className="rounded-xl border border-border/80 bg-surface-2/40 p-4 space-y-3">
-                    {selectedItem.execution_record?.timeline && selectedItem.execution_record.timeline.length > 0 ? (
-                      selectedItem.execution_record.timeline.map((step, sIdx) => (
-                        <div key={sIdx} className="flex items-start gap-3 text-xs">
-                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary shrink-0 font-bold text-[10px]">
-                            {sIdx + 1}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-foreground">{step.title}</span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {new Date(step.timestamp).toLocaleTimeString()}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{step.description}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3 text-xs">
-                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0 font-bold text-[10px]">
-                            ✓
-                          </div>
-                          <div>
-                            <span className="font-bold text-foreground">Recommendation Generated</span>
-                            <p className="text-[11px] text-muted-foreground">Root cause synthesized by Digital CISO AI.</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 text-xs opacity-60">
-                          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface-3 text-muted-foreground shrink-0 font-bold text-[10px]">
-                            2
-                          </div>
-                          <div>
-                            <span className="font-bold text-foreground">Awaiting Jira Ticket Dispatch</span>
-                            <p className="text-[11px] text-muted-foreground">Click "Create Jira Ticket" below to publish & assign.</p>
-                          </div>
-                        </div>
+                    {/* Tab 3: Console */}
+                    {activeRemediationTab === "console" && (
+                      <div className="rounded-xl border border-border/80 bg-surface-2/60 p-4 text-xs text-foreground font-mono leading-relaxed whitespace-pre-wrap">
+                        {selectedItem.console_steps}
                       </div>
                     )}
                   </div>
                 </div>
+              )}
 
-                {/* Primary Action Button */}
-                <div className="pt-2">
-                  {selectedItem.execution_record ? (
-                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs font-semibold">
-                      <div className="flex items-center gap-2 text-foreground">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        <span>Ticket active in Jira: <strong className="text-primary font-mono">{selectedItem.execution_record.issue_key}</strong></span>
-                      </div>
-                      <span className="rounded bg-primary/15 border border-primary/30 px-2 py-0.5 text-[11px] font-bold text-primary">
-                        {selectedItem.execution_record.jira_status || "In Progress"}
-                      </span>
+              {/* Tab 2: Verification & Audit */}
+              {activeInspectorTab === "timeline" && (
+                <div className="space-y-4">
+                  {/* Verification Checklist */}
+                  <div className="rounded-xl border border-border/70 bg-surface-2/40 p-4 space-y-2.5">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      <span>Post-Remediation Verification Checklist</span>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCreateTicket(selectedItem)}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 px-4 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Ticket className="h-4 w-4" />
-                      <span>Create Jira Ticket & Assign</span>
-                    </button>
-                  )}
+                    <ul className="space-y-1.5 text-xs text-muted-foreground">
+                      {selectedItem.validation_steps?.map((step, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="font-mono text-primary font-bold">{idx + 1}.</span>
+                          <span className="text-foreground/90">{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Remediation Execution Stepper */}
+                  <div className="rounded-xl border border-border/70 bg-surface-2/40 p-4 space-y-3">
+                    <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span>Execution Stages</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 text-xs">
+                        <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 shrink-0 font-bold text-[10px]">
+                          ✓
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground">1. Recommendation Synthesized</span>
+                          <p className="text-[11px] text-muted-foreground">Root cause analyzed and IaC playbook generated by Digital CISO AI.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 text-xs opacity-75">
+                        <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface-3 text-muted-foreground shrink-0 font-bold text-[10px]">
+                          2
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground">2. Jira Ticket Dispatch</span>
+                          <p className="text-[11px] text-muted-foreground">Publish to Jira project with automated IaC snippet and assign to engineer.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 text-xs opacity-50">
+                        <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface-3 text-muted-foreground shrink-0 font-bold text-[10px]">
+                          3
+                        </div>
+                        <div>
+                          <span className="font-bold text-foreground">3. Continuous Rescan & Auto-Close</span>
+                          <p className="text-[11px] text-muted-foreground">Platform confirms finding PASS and auto-transitions Jira issue to Done.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Audit Metadata Table */}
+                  <div className="grid grid-cols-3 gap-2.5 text-xs">
+                    <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
+                      <span className="text-[10px] text-muted-foreground font-bold uppercase block">Target Project</span>
+                      <span className="font-mono text-foreground font-semibold">SEC (Security)</span>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
+                      <span className="text-[10px] text-muted-foreground font-bold uppercase block">Issue Type</span>
+                      <span className="font-mono text-foreground font-semibold">Task</span>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3">
+                      <span className="text-[10px] text-muted-foreground font-bold uppercase block">Sync Mode</span>
+                      <span className="font-mono text-emerald-400 font-semibold">Real-Time Polling</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </Panel>
+              )}
+            </div>
           ) : (
-            <Panel index={1} className="p-8 text-center text-muted-foreground text-xs">
+            <div className="rounded-2xl border border-border/80 bg-surface/80 p-8 text-center text-muted-foreground text-xs">
               Select a remediation item from the left queue to inspect details.
-            </Panel>
+            </div>
           )}
         </div>
       </div>

@@ -7,13 +7,18 @@ import {
   ArrowUpRight,
   RefreshCw,
   Terminal,
+  Zap,
+  Shield,
+  ShieldAlert,
+  Bot,
+  User,
+  ExternalLink,
+  ChevronRight,
+  Cpu,
+  Layers,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  Panel,
-  Chip,
-  Dot,
-} from "@/components/ui-kit/primitives";
+import { Chip } from "@/components/ui-kit/primitives";
 import {
   useAIAdvisorQuery,
   useProviders,
@@ -114,73 +119,64 @@ function AIAdvisorPage() {
 
     if (activeFilter === "AZURE" || (activeFilter === "ALL" && hasAzure && !hasAWS && !hasOCI && !hasGCP && !hasSaas)) {
       return [
-        "What should we remediate first on Azure today?",
-        "Show high-risk Microsoft Defender for Cloud failures.",
-        "Audit Entra ID IAM accounts and privilege escalation.",
-        "Evaluate CIS Microsoft Azure Foundations Benchmark failures.",
-        "Which Azure Storage accounts allow anonymous blob access?",
+        { query: "What should we remediate first on Azure today?", tag: "Priority Triage" },
+        { query: "Show high-risk Microsoft Defender for Cloud failures.", tag: "Cloud Defender" },
+        { query: "Audit Entra ID IAM accounts and privilege escalation.", tag: "IAM & RBAC" },
+        { query: "Evaluate CIS Microsoft Azure Foundations Benchmark failures.", tag: "Compliance" },
+        { query: "Which Azure Storage accounts allow anonymous blob access?", tag: "Data Perimeter" },
       ];
     }
     if (activeFilter === "OCI") {
       return [
-        "What should we remediate first on Oracle Cloud today?",
-        "Show open Object Storage buckets and VCN ingress rules.",
-        "Audit OCI Tenancy Compartment policies and IAM groups.",
-        "Evaluate CIS OCI Benchmark failure points.",
-        "Which OCI Compute instances have public IPs directly exposed?",
+        { query: "What should we remediate first on Oracle Cloud today?", tag: "Priority Triage" },
+        { query: "Show open Object Storage buckets and VCN ingress rules.", tag: "Perimeter" },
+        { query: "Audit OCI Tenancy Compartment policies and IAM groups.", tag: "IAM & RBAC" },
+        { query: "Evaluate CIS OCI Benchmark failure points.", tag: "Compliance" },
+        { query: "Which OCI Compute instances have public IPs directly exposed?", tag: "Exposure" },
       ];
     }
     if (activeFilter === "ORACLE_SAAS" || activeFilter === "ORACLE SAAS") {
       return [
-        "Show all Separation of Duties (SoD) conflicts in Oracle Fusion ERP.",
-        "Which users have superuser or implementation consultant roles assigned?",
-        "Are any finance or HR administrator accounts missing MFA enforcement?",
-        "Is the Oracle Fusion ERP audit trail enabled for payments and journal entries?",
-        "Which Oracle IDCS OAuth applications have excessive permission scopes?",
+        { query: "Show all Separation of Duties (SoD) conflicts in Oracle Fusion ERP.", tag: "SoD Risk" },
+        { query: "Which users have superuser or implementation consultant roles assigned?", tag: "Privilege" },
+        { query: "Are any finance or HR administrator accounts missing MFA enforcement?", tag: "IAM Security" },
+        { query: "Is the Oracle Fusion ERP audit trail enabled for payments and journal entries?", tag: "Audit Trail" },
+        { query: "Which Oracle IDCS OAuth applications have excessive permission scopes?", tag: "OAuth Trust" },
       ];
     }
     if (activeFilter === "AWS" && hasAWS) {
       return [
-        "What should we remediate first on AWS today?",
-        "Show high-risk production S3 buckets and open Security Groups.",
-        "Which IAM roles have privilege escalation paths?",
-        "Evaluate CIS AWS Foundations Benchmark failure points.",
-        "Which findings are currently breaching SLA deadlines?",
+        { query: "What should we remediate first on AWS today?", tag: "Priority Triage" },
+        { query: "Show high-risk production S3 buckets and open Security Groups.", tag: "Perimeter" },
+        { query: "Which IAM roles have privilege escalation paths?", tag: "IAM & RBAC" },
+        { query: "Evaluate CIS AWS Foundations Benchmark failure points.", tag: "Compliance" },
+        { query: "Which findings are currently breaching SLA deadlines?", tag: "SLA Tracker" },
       ];
     }
     if (activeFilter === "GCP" && hasGCP) {
       return [
-        "What should we remediate first on Google Cloud today?",
-        "Audit GCP Service Account keys with excessive permissions.",
-        "Show public Cloud Storage buckets and open VPC firewalls.",
-        "Evaluate CIS Google Cloud Platform Benchmark failures.",
+        { query: "What should we remediate first on Google Cloud today?", tag: "Priority Triage" },
+        { query: "Audit GCP Service Account keys with excessive permissions.", tag: "Service Accounts" },
+        { query: "Show public Cloud Storage buckets and open VPC firewalls.", tag: "Perimeter" },
+        { query: "Evaluate CIS Google Cloud Platform Benchmark failures.", tag: "Compliance" },
       ];
     }
     if (activeFilter === "K8S" && hasK8s) {
       return [
-        "Audit Kubernetes API Server and RBAC cluster roles.",
-        "Which pods run with privileged securityContext enabled?",
-        "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.",
+        { query: "Audit Kubernetes API Server and RBAC cluster roles.", tag: "K8s RBAC" },
+        { query: "Which pods run with privileged securityContext enabled?", tag: "Pod Security" },
+        { query: "Evaluate NSA-CISA and CIS Kubernetes Benchmark failures.", tag: "Compliance" },
       ];
     }
 
     // Default multi-cloud for connected providers
-    const queries: string[] = [];
-    if (hasAzure) {
-      queries.push("What should we remediate first on Azure today?");
-      queries.push("Show high-risk Microsoft Defender for Cloud failures.");
-    }
-    if (hasOCI) {
-      queries.push("Show open OCI Object Storage buckets and VCN rules.");
-    }
-    if (hasSaas) {
-      queries.push("Show all Separation of Duties (SoD) violations in Oracle SaaS ERP.");
-    }
-    if (queries.length < 5) {
-      queries.push("Which IAM accounts have privilege escalation paths?");
-      queries.push("Which findings are currently breaching SLA deadlines?");
-      queries.push("Evaluate multi-cloud CIS Foundations failure points.");
-    }
+    const queries = [
+      { query: "What should we remediate first on Azure today?", tag: "Priority Triage" },
+      { query: "Show high-risk Microsoft Defender for Cloud failures.", tag: "Defender" },
+      { query: "Which IAM accounts have privilege escalation paths?", tag: "IAM Audit" },
+      { query: "Which findings are currently breaching SLA deadlines?", tag: "SLA" },
+      { query: "Evaluate multi-cloud CIS Foundations failure points.", tag: "Compliance" },
+    ];
     return queries.slice(0, 5);
   }, [providerFilter, connectedProviders]);
 
@@ -229,7 +225,7 @@ function AIAdvisorPage() {
         sender: "assistant",
         content: (res.answer as string) ?? "Analysis complete.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        confidence: (res.confidence as number) ?? 0.85,
+        confidence: (res.confidence as number) ?? 0.94,
         findings: refs.map((r) => ({
           id: r.id,
           name: r.name,
@@ -241,7 +237,7 @@ function AIAdvisorPage() {
       const errMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: "assistant",
-        content: "Spectra analysis engine is currently unavailable. Ensure the backend AI service is running and the vLLM endpoint is reachable.",
+        content: "Spectra analysis engine is currently unavailable. Ensure the backend AI service is running and the local LLM endpoint is reachable.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         confidence: 0,
       };
@@ -259,220 +255,326 @@ function AIAdvisorPage() {
   }, [searchParams]);
 
   return (
-    <AppShell
-      title="Spectra — Threat Analysis Engine"
-      subtitle="Autonomous reasoning over vulnerability graphs, exposure surfaces, and kill chains"
-      actions={
-        <Link
-          to="/ai/settings"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2/50 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/40 active:scale-95"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span>Model Settings</span>
-        </Link>
-      }
-    >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        {/* ── Left Sidebar Context ── */}
-        <div className="space-y-4 lg:col-span-1">
-          <Panel index={0} className="p-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-foreground">
-                <BrainCircuit className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="font-display text-xs font-bold text-foreground">
-                  Neural Stack
-                </h4>
-                <p className="text-[10px] text-muted-foreground">
-                  Multi-Agent Reasoning
-                </p>
-              </div>
+    <AppShell>
+      <div className="h-[calc(100vh-7.5rem)] flex flex-col justify-between gap-3.5 overflow-hidden">
+        {/* ── Page Header (Compact) ── */}
+        <div className="flex items-center justify-between shrink-0 pb-1 border-b border-border/60">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
+              <Sparkles className="h-4.5 w-4.5" />
             </div>
+            <div>
+              <h1 className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                Spectra — Threat Analysis Engine
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Autonomous reasoning over vulnerability graphs, exposure surfaces, and kill chains
+              </p>
+            </div>
+          </div>
 
-            <div className="mt-3 space-y-2 border-t border-border/60 pt-3 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Analyzer:</span>
-                <span className="font-semibold text-foreground">Spectra (Qwen 3.5)</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Decisions:</span>
-                <span className="font-semibold text-foreground">Aegis (Qwen 3.5)</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Execution:</span>
-                <span className="font-semibold text-foreground">Phantom (Qwen 3.5)</span>
-              </div>
-            </div>
-          </Panel>
-
-          {/* Dynamic Provider Filter based strictly on added providers */}
-          <Panel index={1} className="p-3">
-            <span className="section-label mb-2 block">Environment Scope</span>
-            <div className="flex flex-wrap gap-1">
-              {["All", ...connectedProviders.map((p) => p.label)].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setProviderFilter(p)}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
-                    providerFilter === p
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-surface-2/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </Panel>
-
-          {/* Suggested Queries */}
-          <Panel index={2} className="p-4">
-            <span className="section-label mb-2 block">Suggested Inquiries</span>
-            <div className="space-y-1.5">
-              {suggestedQueries.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSend(q)}
-                  className="w-full text-left rounded-lg border border-border/60 bg-surface-2/40 p-2 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </Panel>
+          <Link
+            to="/ai/settings"
+            className="inline-flex h-8.5 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3.5 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95"
+          >
+            <BrainCircuit className="h-3.5 w-3.5 text-primary" />
+            <span>Model Settings</span>
+          </Link>
         </div>
 
-        {/* ── Main Chat Window ── */}
-        <Panel index={3} className="flex h-[calc(100vh-14rem)] min-h-[500px] flex-col p-0 lg:col-span-3">
-          {/* Messages Feed */}
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`flex gap-3 ${m.sender === "user" ? "justify-end" : "justify-start"}`}
-              >
-                {m.sender === "assistant" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-foreground ring-1 ring-border">
+        {/* ── Main Layout: Sidebar Context + Chat Workspace ── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 flex-1 min-h-0">
+          {/* ── Left Sidebar (4 Cols) ── */}
+          <div className="lg:col-span-4 flex flex-col gap-3 h-full min-h-0">
+            {/* Top Card: Neural Stack Core (Compact, No dead space) */}
+            <div className="rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md shrink-0 space-y-2.5">
+              {/* Card Header */}
+              <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                    <BrainCircuit className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-xs font-bold text-foreground">
+                      Neural Stack Core
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground">
+                      Multi-Agent Autonomous Reasoning
+                    </p>
+                  </div>
+                </div>
+                <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live
+                </span>
+              </div>
+
+              {/* 3 Agents Detailed Vertical Rows */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-primary/40">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50" />
+                    <div>
+                      <span className="text-[11px] font-bold text-foreground block">Spectra (Analyzer)</span>
+                      <span className="text-[9.5px] text-muted-foreground">Vulnerability & Path Reasoning</span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.2 rounded border border-primary/20">
+                    Qwen 3.5
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-amber-400/40">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
+                    <div>
+                      <span className="text-[11px] font-bold text-foreground block">Aegis (Decisions)</span>
+                      <span className="text-[9.5px] text-muted-foreground">HITL Governance & Approval</span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/20">
+                    Qwen 3.5
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-purple-400/40">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-sm shadow-purple-400/50" />
+                    <div>
+                      <span className="text-[11px] font-bold text-foreground block">Phantom (Execution)</span>
+                      <span className="text-[9.5px] text-muted-foreground">Kill-Chain Severance Engine</span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[9px] font-bold text-purple-400 bg-purple-400/10 px-1.5 py-0.2 rounded border border-purple-400/20">
+                    Qwen 3.5
+                  </span>
+                </div>
+              </div>
+
+              {/* Environment Scope Selector */}
+              <div className="pt-2 border-t border-border/50">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Environment Scope
+                  </span>
+                  <div className="flex items-center gap-2.5 text-[9.5px] text-muted-foreground font-mono">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Zero-Retention
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      38 Assets
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {["All", ...connectedProviders.map((p) => p.label)].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setProviderFilter(p)}
+                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${
+                        providerFilter === p
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-surface-2/60 border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Card: Suggested Inquiries (Expanded Flex-1, Larger Inner Boxes, Tight Gaps) */}
+            <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md overflow-hidden">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Suggested Inquiries
+                </span>
+                <span className="text-[9px] font-mono text-muted-foreground/80">
+                  {suggestedQueries.length} prompts
+                </span>
+              </div>
+
+              <div className="flex-1 flex flex-col gap-2 min-h-0">
+                {suggestedQueries.map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSend(item.query)}
+                    className="flex-1 w-full text-left rounded-xl border border-border/70 bg-surface-2/40 px-3.5 py-2 text-xs text-foreground/90 transition-all hover:border-primary/50 hover:bg-surface-2 group cursor-pointer shadow-sm flex items-center justify-between gap-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[9.5px] font-mono font-bold text-primary uppercase tracking-wider block mb-0.5">
+                        {item.tag}
+                      </span>
+                      <p className="text-[11.5px] font-semibold leading-snug group-hover:text-foreground line-clamp-1">
+                        {item.query}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Main Chat Workspace (8 Cols) ── */}
+          <div className="lg:col-span-8 flex flex-col h-full min-h-0 rounded-2xl border border-border/80 bg-surface/80 backdrop-blur-sm shadow-md overflow-hidden">
+            {/* Chat Workspace Header */}
+            <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 bg-surface-2/30 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                  <Bot className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-display text-xs font-bold text-foreground">
+                    Spectra AI Advisor Stream
+                  </h3>
+                  <span className="text-[11px] text-muted-foreground">
+                    Scope: <strong className="text-foreground">{providerFilter} Infrastructure</strong> · Multi-Cloud Reasoning
+                  </span>
+                </div>
+              </div>
+
+              <span className="hidden sm:flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                Live Ingestion
+              </span>
+            </div>
+
+            {/* Messages Feed */}
+            <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5 min-h-0">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex gap-3 ${m.sender === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {m.sender === "assistant" && (
+                    <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-sm leading-relaxed shadow-sm ${
+                      m.sender === "user"
+                        ? "bg-primary text-primary-foreground font-medium rounded-br-none"
+                        : "border border-border/80 bg-surface-2/60 text-foreground rounded-bl-none"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap leading-relaxed text-sm">{m.content}</p>
+
+                    {/* Spectra Threat Evaluation Block */}
+                    {m.spectra && (
+                      <div className="mt-3 rounded-xl border border-border/80 bg-surface/80 p-3 space-y-1">
+                        <div className="flex items-center gap-1.5 font-display text-xs font-bold text-foreground">
+                          <Sparkles className="h-3 w-3 text-primary" />
+                          <span>Spectra Threat Evaluation</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {m.spectra}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Aegis Action Block */}
+                    {m.aegis && (
+                      <div className="mt-2.5 rounded-xl border border-border/80 bg-surface/80 p-3 space-y-1">
+                        <div className="flex items-center gap-1.5 font-display text-xs font-bold text-foreground">
+                          <BrainCircuit className="h-3 w-3 text-primary" />
+                          <span>Aegis Recommended Action</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {m.aegis}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Referenced Violations */}
+                    {m.findings && m.findings.length > 0 && (
+                      <div className="mt-3 border-t border-border/60 pt-2.5">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block mb-1">
+                          Referenced Assets & Findings:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {m.findings.map((f, idx) => (
+                            <Link
+                              key={`${f.id}-${idx}`}
+                              to="/findings"
+                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                            >
+                              <span className="font-mono text-primary text-[11px]">{f.id}</span>
+                              <span className="truncate max-w-[160px] text-muted-foreground font-normal text-[11px]">
+                                {f.name}
+                              </span>
+                              <ArrowUpRight className="h-2.5 w-2.5 text-muted-foreground" />
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-2.5 flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/40 pt-1.5 opacity-75 font-mono">
+                      <span>{m.timestamp}</span>
+                      {m.confidence !== undefined && (
+                        <span>Confidence: {Math.round(m.confidence * 100)}%</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {m.sender === "user" && (
+                    <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-display text-xs font-bold shadow-sm mt-0.5">
+                      {userInitials}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {loading && (
+                <div className="flex items-center gap-3">
+                  <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 animate-pulse">
                     <Sparkles className="h-3.5 w-3.5" />
                   </div>
-                )}
-
-                <div
-                  className={`max-w-[85%] rounded-xl p-3.5 text-xs leading-relaxed ${
-                    m.sender === "user"
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "border border-border/80 bg-surface-2/50 text-foreground"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-
-                  {/* Spectra Block */}
-                  {m.spectra && (
-                    <div className="mt-2.5 rounded-lg border border-border/80 bg-surface-2/60 p-3">
-                      <div className="flex items-center gap-1.5 font-display text-[11px] font-bold text-foreground">
-                        <Sparkles className="h-3.5 w-3.5 text-primary" />
-                        <span>Spectra Threat Evaluation</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-                        {m.spectra}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Aegis Block */}
-                  {m.aegis && (
-                    <div className="mt-2 rounded-lg border border-border/80 bg-surface-2/60 p-3">
-                      <div className="flex items-center gap-1.5 font-display text-[11px] font-bold text-foreground">
-                        <BrainCircuit className="h-3.5 w-3.5 text-primary" />
-                        <span>Aegis Recommended Action</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-                        {m.aegis}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Referenced Violations */}
-                  {m.findings && m.findings.length > 0 && (
-                    <div className="mt-2.5 border-t border-border/60 pt-2">
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                        Referenced Items:
-                      </span>
-                      <div className="mt-1 flex flex-wrap gap-1.5">
-                        {m.findings.map((f, idx) => (
-                          <Link
-                            key={`${f.id}-${idx}`}
-                            to="/findings"
-                            className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-[10px] font-medium text-foreground hover:text-primary transition-colors"
-                          >
-                            <span className="mono">{f.id}</span>
-                            <span className="truncate max-w-[140px] text-muted-foreground">
-                              {f.name}
-                            </span>
-                            <ArrowUpRight className="h-2.5 w-2.5" />
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-2 flex items-center justify-between text-[9px] text-muted-foreground opacity-60">
-                    <span>{m.timestamp}</span>
-                    {m.confidence && (
-                      <span>Confidence: {Math.round(m.confidence * 100)}%</span>
-                    )}
+                  <div className="rounded-2xl border border-border/80 bg-surface-2/60 px-3.5 py-2.5 text-xs text-muted-foreground flex items-center gap-2 shadow-sm">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <span>Spectra analyzing multi-cloud telemetry graph...</span>
                   </div>
                 </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-                {m.sender === "user" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30 shadow-sm">
-                    {userInitials}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {loading && (
-              <div className="flex items-center gap-3">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-foreground animate-pulse">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </div>
-                <div className="rounded-xl border border-border bg-surface-2/50 p-2.5 text-xs text-muted-foreground flex items-center gap-2">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
-                  <span>Spectra analyzing telemetry graph...</span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Area */}
-          <div className="border-t border-border bg-surface/80 p-3">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSend();
-              }}
-              className="flex items-center gap-2"
-            >
-              <input
-                type="text"
-                placeholder="Ask Spectra about cloud vulnerabilities, toxic paths, compliance gaps..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="flex-1 rounded-lg border border-border bg-surface-2/60 px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
-              />
-              <button
-                type="submit"
-                disabled={loading || !input.trim()}
-                className="inline-flex items-center justify-center rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
+            {/* Input Bar */}
+            <div className="border-t border-border/70 bg-surface/95 p-3 sm:p-3.5 shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSend();
+                }}
+                className="flex items-center gap-2.5"
               >
-                <Send className="h-3.5 w-3.5" />
-              </button>
-            </form>
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Ask Spectra about cloud vulnerabilities, toxic paths, compliance gaps..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-surface-2/60 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all hover:border-primary/40 focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90 disabled:opacity-40 transition-all cursor-pointer active:scale-95 shrink-0"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Send</span>
+                </button>
+              </form>
+            </div>
           </div>
-        </Panel>
+        </div>
       </div>
     </AppShell>
   );

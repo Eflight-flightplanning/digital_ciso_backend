@@ -94,7 +94,7 @@ export const navSections: NavSection[] = [
 function useTheme() {
   const [dark, setDark] = useState(true);
   useEffect(() => {
-    const saved = localStorage.getItem("dciso-theme");
+    const saved = localStorage.getItem("theme") || localStorage.getItem("dciso-theme");
     const isDark = saved !== "light";
     setDark(isDark);
     document.documentElement.classList.toggle("light", !isDark);
@@ -103,6 +103,7 @@ function useTheme() {
     setDark((d) => {
       const next = !d;
       document.documentElement.classList.toggle("light", !next);
+      localStorage.setItem("theme", next ? "dark" : "light");
       localStorage.setItem("dciso-theme", next ? "dark" : "light");
       return next;
     });
@@ -116,18 +117,13 @@ function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label="Toggle theme"
-      className="relative h-7 w-14 rounded-full border border-border bg-surface-2/60 transition-colors hover:border-primary/40"
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-200 active:scale-95 cursor-pointer ${
+        dark
+          ? "border-white/15 bg-white/[0.05] text-amber-300 hover:bg-white/10"
+          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-xs"
+      }`}
     >
-      <span
-        className="absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
-        style={{
-          left: dark ? "2px" : "calc(100% - 22px)",
-          transition: "left 300ms cubic-bezier(0.34,1.56,0.64,1), transform 300ms",
-          transform: dark ? "rotate(0deg)" : "rotate(180deg)",
-        }}
-      >
-        {dark ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
-      </span>
+      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
 }

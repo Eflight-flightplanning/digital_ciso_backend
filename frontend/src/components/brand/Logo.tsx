@@ -51,20 +51,19 @@ export function ShieldMark({ size = 34, className = "" }: { size?: number; class
   );
 }
 
-export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
+export function Wordmark({ collapsed = false, className = "" }: { collapsed?: boolean; className?: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <ShieldMark size={collapsed ? 30 : 36} />
+    <div className={`flex items-center gap-3 group shrink-0 ${className}`}>
+      <div className="transition-transform duration-300 group-hover:scale-105">
+        <ShieldMark size={collapsed ? 30 : 38} />
+      </div>
       {!collapsed && (
         <div className="flex flex-col">
-          <div className="font-display text-sm font-black tracking-tight text-foreground flex items-center gap-1">
-            <span>DIGITAL</span>
-            <span className="bg-gradient-to-r from-blue-400 via-sky-400 to-emerald-400 bg-clip-text text-transparent">
-              CISO
-            </span>
-          </div>
-          <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold">
-            Autonomous Defense
+          <span className="text-base font-black tracking-tight leading-none text-foreground">
+            DIGITAL <span className="text-primary font-black">CISO</span>
+          </span>
+          <span className="text-[11px] font-bold tracking-wide text-primary leading-none mt-1">
+            AI Cloud Security
           </span>
         </div>
       )}

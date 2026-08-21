@@ -521,12 +521,12 @@ function ProvidersPage() {
 
       {/* ── Multi-Cloud Connection Modal (Full Real-Time Setup with OCI) ── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 sm:p-8 shadow-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-md overflow-hidden animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border pb-4">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-surface-2/40 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
                   <Cloud className="h-5 w-5" />
                 </div>
                 <div>
@@ -539,571 +539,600 @@ function ProvidersPage() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-surface-2"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors cursor-pointer"
+                title="Close modal"
               >
-                ✕
+                <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Provider Type Switcher Tabs */}
-            <div className="mt-5 flex flex-wrap gap-2 border-b border-border pb-4">
-              {[
-                { type: "AWS" as ProviderType, label: "Amazon AWS" },
-                { type: "OCI" as ProviderType, label: "Oracle Cloud (OCI)" },
-                { type: "AZURE" as ProviderType, label: "Microsoft Azure" },
-                { type: "GCP" as ProviderType, label: "Google Cloud (GCP)" },
-                { type: "KUBERNETES" as ProviderType, label: "Kubernetes" },
-                { type: "GITHUB" as ProviderType, label: "GitHub" },
-                { type: "ORACLE_SAAS" as ProviderType, label: "Oracle SaaS / ERP" },
-              ].map((tab) => (
-                <button
-                  key={tab.type}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.type);
-                    setErrorMsg(null);
-                  }}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
-                    activeTab === tab.type
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "border border-border bg-surface-2 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="px-6 py-3 border-b border-border bg-surface-2/20 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                {[
+                  { type: "AWS" as ProviderType, label: "Amazon AWS" },
+                  { type: "OCI" as ProviderType, label: "Oracle Cloud (OCI)" },
+                  { type: "AZURE" as ProviderType, label: "Microsoft Azure" },
+                  { type: "GCP" as ProviderType, label: "Google Cloud (GCP)" },
+                  { type: "KUBERNETES" as ProviderType, label: "Kubernetes" },
+                  { type: "GITHUB" as ProviderType, label: "GitHub" },
+                  { type: "ORACLE_SAAS" as ProviderType, label: "Oracle SaaS / ERP" },
+                ].map((tab) => (
+                  <button
+                    key={tab.type}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.type);
+                      setErrorMsg(null);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === tab.type
+                        ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/20"
+                        : "border border-border bg-surface-2/80 text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {errorMsg && (
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-critical/30 bg-critical/10 px-3.5 py-2.5 text-xs text-critical">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3.5 py-2.5 text-xs text-success">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
             {/* Dynamic Provider Form */}
-            <form onSubmit={handleConnect} className="mt-5 space-y-4 text-xs">
-              {/* Account Alias (Common) */}
-              <div>
-                <label className="section-label mb-1.5 block">Account Alias / Environment Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={alias}
-                  onChange={(e) => setAlias(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
-                />
-              </div>
-
-              {/* ── AWS Specific Form ── */}
-              {activeTab === "AWS" && (
-                <div className="space-y-4 pt-1">
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={awsAuthMode === "role"}
-                        onChange={() => setAwsAuthMode("role")}
-                        className="accent-primary"
-                      />
-                      <span className="font-semibold text-foreground">IAM Role Delegation (Recommended)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={awsAuthMode === "keys"}
-                        onChange={() => setAwsAuthMode("keys")}
-                        className="accent-primary"
-                      />
-                      <span className="font-semibold text-foreground">Access Keys</span>
-                    </label>
+            <form onSubmit={handleConnect} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-xs">
+                {errorMsg && (
+                  <div className="flex items-center gap-2 rounded-lg border border-critical/30 bg-critical/10 px-3.5 py-2.5 text-xs text-critical">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{errorMsg}</span>
                   </div>
+                )}
 
-                  {awsAuthMode === "role" ? (
-                    <div className="space-y-3.5">
-                      <div>
-                        <label className="section-label mb-1 block">Role ARN *</label>
-                        <input
-                          type="text"
-                          required
-                          value={awsRoleArn}
-                          onChange={(e) => setAwsRoleArn(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="section-label mb-1 block">External ID (Optional)</label>
-                        <input
-                          type="text"
-                          value={awsExternalId}
-                          onChange={(e) => setAwsExternalId(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="section-label mb-1 block">AWS Access Key ID *</label>
-                        <input
-                          type="text"
-                          required
-                          value={awsAccessKey}
-                          onChange={(e) => setAwsAccessKey(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="section-label mb-1 block">AWS Secret Access Key *</label>
-                        <input
-                          type="password"
-                          required
-                          value={awsSecretKey}
-                          onChange={(e) => setAwsSecretKey(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="section-label mb-1 block">Default Region</label>
-                    <select
-                      value={awsRegion}
-                      onChange={(e) => setAwsRegion(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
-                    >
-                      <option value="us-east-1">us-east-1 (N. Virginia)</option>
-                      <option value="us-west-2">us-west-2 (Oregon)</option>
-                      <option value="eu-west-1">eu-west-1 (Ireland)</option>
-                      <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
-                      <option value="ap-south-1">ap-south-1 (Mumbai)</option>
-                    </select>
+                {successMsg && (
+                  <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3.5 py-2.5 text-xs text-success">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{successMsg}</span>
                   </div>
+                )}
+
+                {/* Account Alias (Common) */}
+                <div>
+                  <label className="section-label mb-1.5 block">Account Alias / Environment Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. production-fusion-erp or aws-prod-account"
+                    value={alias}
+                    onChange={(e) => setAlias(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary placeholder:text-muted-foreground/50"
+                  />
                 </div>
-              )}
 
-              {/* ── OCI (Oracle Cloud Infrastructure) Form ── */}
-              {activeTab === "OCI" && (
-                <div className="space-y-3.5 pt-1">
-                  <div>
-                    <label className="section-label mb-1 block">Tenancy OCID *</label>
-                    <input
-                      type="text"
-                      required
-                      value={ociTenancyOcid}
-                      onChange={(e) => setOciTenancyOcid(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="section-label mb-1 block">User OCID *</label>
-                      <input
-                        type="text"
-                        required
-                        value={ociUserOcid}
-                        onChange={(e) => setOciUserOcid(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="section-label mb-1 block">API Key Fingerprint *</label>
-                      <input
-                        type="text"
-                        required
-                        value={ociFingerprint}
-                        onChange={(e) => setOciFingerprint(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="section-label mb-1 block">Private Key (.pem content) *</label>
-                    <textarea
-                      required
-                      rows={3}
-                      value={ociPrivateKey}
-                      onChange={(e) => setOciPrivateKey(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <label className="section-label">Home Region Identifier *</label>
-                      <span className="text-[10px] text-muted-foreground">Select from list or type custom</span>
-                    </div>
-                    <div className="space-y-2">
-                      <select
-                        value={ociRegion}
-                        onChange={(e) => setOciRegion(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
-                      >
-                        <optgroup label="Europe">
-                          <option value="uk-london-1">uk-london-1 (UK South - London)</option>
-                          <option value="uk-cardiff-1">uk-cardiff-1 (UK West - Newport)</option>
-                          <option value="eu-frankfurt-1">eu-frankfurt-1 (Germany Central - Frankfurt)</option>
-                          <option value="eu-amsterdam-1">eu-amsterdam-1 (Netherlands - Amsterdam)</option>
-                          <option value="eu-paris-1">eu-paris-1 (France - Paris)</option>
-                          <option value="eu-marseille-1">eu-marseille-1 (France - Marseille)</option>
-                          <option value="eu-zurich-1">eu-zurich-1 (Switzerland - Zurich)</option>
-                          <option value="eu-milan-1">eu-milan-1 (Italy - Milan)</option>
-                          <option value="eu-madrid-1">eu-madrid-1 (Spain - Madrid)</option>
-                          <option value="eu-stockholm-1">eu-stockholm-1 (Sweden - Stockholm)</option>
-                        </optgroup>
-                        <optgroup label="Asia Pacific">
-                          <option value="ap-mumbai-1">ap-mumbai-1 (India West - Mumbai)</option>
-                          <option value="ap-hyderabad-1">ap-hyderabad-1 (India South - Hyderabad)</option>
-                          <option value="ap-singapore-1">ap-singapore-1 (Singapore)</option>
-                          <option value="ap-tokyo-1">ap-tokyo-1 (Japan East - Tokyo)</option>
-                          <option value="ap-osaka-1">ap-osaka-1 (Japan Central - Osaka)</option>
-                          <option value="ap-seoul-1">ap-seoul-1 (South Korea - Seoul)</option>
-                          <option value="ap-chuncheon-1">ap-chuncheon-1 (South Korea - Chuncheon)</option>
-                          <option value="ap-sydney-1">ap-sydney-1 (Australia East - Sydney)</option>
-                          <option value="ap-melbourne-1">ap-melbourne-1 (Australia - Melbourne)</option>
-                        </optgroup>
-                        <optgroup label="North America">
-                          <option value="us-ashburn-1">us-ashburn-1 (US East - Ashburn)</option>
-                          <option value="us-phoenix-1">us-phoenix-1 (US West - Phoenix)</option>
-                          <option value="us-sanjose-1">us-sanjose-1 (US West - San Jose)</option>
-                          <option value="us-chicago-1">us-chicago-1 (US Central - Chicago)</option>
-                          <option value="ca-toronto-1">ca-toronto-1 (Canada - Toronto)</option>
-                          <option value="ca-montreal-1">ca-montreal-1 (Canada - Montreal)</option>
-                          <option value="mx-queretaro-1">mx-queretaro-1 (Mexico - Queretaro)</option>
-                          <option value="mx-monterrey-1">mx-monterrey-1 (Mexico - Monterrey)</option>
-                        </optgroup>
-                        <optgroup label="Middle East & Africa">
-                          <option value="me-dubai-1">me-dubai-1 (UAE East - Dubai)</option>
-                          <option value="me-abudhabi-1">me-abudhabi-1 (UAE - Abu Dhabi)</option>
-                          <option value="me-jeddah-1">me-jeddah-1 (Saudi Arabia - Jeddah)</option>
-                          <option value="me-riyadh-1">me-riyadh-1 (Saudi Arabia - Riyadh)</option>
-                          <option value="il-jerusalem-1">il-jerusalem-1 (Israel - Jerusalem)</option>
-                          <option value="af-johannesburg-1">af-johannesburg-1 (South Africa - Johannesburg)</option>
-                        </optgroup>
-                        <optgroup label="Latin America">
-                          <option value="sa-saopaulo-1">sa-saopaulo-1 (Brazil - Sao Paulo)</option>
-                          <option value="sa-vinhedo-1">sa-vinhedo-1 (Brazil - Vinhedo)</option>
-                          <option value="sa-santiago-1">sa-santiago-1 (Chile - Santiago)</option>
-                          <option value="sa-bogota-1">sa-bogota-1 (Colombia - Bogota)</option>
-                          <option value="sa-valparaiso-1">sa-valparaiso-1 (Chile - Valparaiso)</option>
-                        </optgroup>
-                      </select>
-
-                      <input
-                        type="text"
-                        placeholder="Or type custom OCI region key (e.g. uk-london-1, ap-mumbai-1)"
-                        value={ociRegion}
-                        onChange={(e) => setOciRegion(e.target.value.trim().toLowerCase())}
-                        className="h-9 w-full rounded-lg border border-border bg-surface-2/40 px-3 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Azure Specific Form ── */}
-              {activeTab === "AZURE" && (
-                <div className="space-y-3.5 pt-1">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="section-label mb-1 block">Tenant ID (Directory ID) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={azureTenantId}
-                        onChange={(e) => setAzureTenantId(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="section-label mb-1 block">Client ID (Application ID) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={azureClientId}
-                        onChange={(e) => setAzureClientId(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="section-label mb-1 block">Client Secret *</label>
-                      <input
-                        type="password"
-                        required
-                        value={azureClientSecret}
-                        onChange={(e) => setAzureClientSecret(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="section-label mb-1 block">Subscription ID *</label>
-                      <input
-                        type="text"
-                        required
-                        value={azureSubscriptionId}
-                        onChange={(e) => setAzureSubscriptionId(e.target.value)}
-                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── GCP Specific Form ── */}
-              {activeTab === "GCP" && (
-                <div className="space-y-3.5 pt-1">
-                  <div>
-                    <label className="section-label mb-1 block">GCP Project ID *</label>
-                    <input
-                      type="text"
-                      required
-                      value={gcpProjectId}
-                      onChange={(e) => setGcpProjectId(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="section-label mb-1 block">Service Account Key JSON *</label>
-                    <textarea
-                      required
-                      rows={3}
-                      value={gcpServiceAccountKey}
-                      onChange={(e) => setGcpServiceAccountKey(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* ── Kubernetes Form ── */}
-              {activeTab === "KUBERNETES" && (
-                <div className="space-y-3.5 pt-1">
-                  <div>
-                    <label className="section-label mb-1 block">Cluster Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={k8sClusterName}
-                      onChange={(e) => setK8sClusterName(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="section-label mb-1 block">Kubeconfig YAML (Read-only ServiceAccount) *</label>
-                    <textarea
-                      required
-                      rows={3}
-                      value={k8sKubeconfig}
-                      onChange={(e) => setK8sKubeconfig(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* ── Oracle SaaS / ERP Form ── */}
-              {activeTab === "ORACLE_SAAS" && (
-                <div className="space-y-3.5 pt-1">
-                  {/* Auth Mode Toggle */}
-                  <div className="flex gap-2 p-1 rounded-lg border border-border bg-surface-2/40">
-                    <button
-                      type="button"
-                      onClick={() => setOciSaasAuthMode("BASIC_AUTH")}
-                      className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all ${
-                        ociSaasAuthMode === "BASIC_AUTH"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Basic Auth (Direct Pod)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOciSaasAuthMode("OAUTH2")}
-                      className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all ${
-                        ociSaasAuthMode === "OAUTH2"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      OAuth 2.0 (IDCS Domain)
-                    </button>
-                  </div>
-
-                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2 text-[11px] text-emerald-400 flex items-start gap-2">
-                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <span>
-                      {ociSaasAuthMode === "BASIC_AUTH"
-                        ? "Connects directly using your Fusion ERP Pod URL and read-only audit user. No IDCS application setup required."
-                        : "Connects using OAuth 2.0 Confidential Application registered in your Oracle Identity Domain."}
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="section-label mb-1 block">Oracle ERP Product *</label>
-                    <select
-                      value={ociSaasErpType}
-                      onChange={(e) => setOciSaasErpType(e.target.value as any)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
-                    >
-                      <option value="FUSION_ERP">Oracle Fusion Cloud ERP (Financials & SoD)</option>
-                      <option value="FUSION_HCM">Oracle Fusion Cloud HCM (HR & Payroll)</option>
-                      <option value="NETSUITE">Oracle NetSuite ERP</option>
-                      <option value="ORACLE_SCM">Oracle Fusion Cloud SCM (Supply Chain)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="section-label mb-1 block">Fusion ERP Base URL *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="https://fa-xxxx-saasfaprod1.fa.ocs.oraclecloud.com"
-                      value={ociSaasErpBaseUrl}
-                      onChange={(e) => setOciSaasErpBaseUrl(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  {ociSaasAuthMode === "BASIC_AUTH" ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="section-label mb-1 block">Auditor Username *</label>
+                {/* ── AWS Specific Form ── */}
+                {activeTab === "AWS" && (
+                  <div className="space-y-4 pt-1">
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
-                          type="text"
-                          required
-                          placeholder="ciso_auditor"
-                          value={ociSaasUsername}
-                          onChange={(e) => setOciSaasUsername(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                          type="radio"
+                          checked={awsAuthMode === "role"}
+                          onChange={() => setAwsAuthMode("role")}
+                          className="accent-primary"
                         />
-                      </div>
-                      <div>
-                        <label className="section-label mb-1 block">Auditor Password *</label>
+                        <span className="font-semibold text-foreground">IAM Role Delegation (Recommended)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
-                          type="password"
-                          required
-                          placeholder="••••••••••••"
-                          value={ociSaasPassword}
-                          onChange={(e) => setOciSaasPassword(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                          type="radio"
+                          checked={awsAuthMode === "keys"}
+                          onChange={() => setAwsAuthMode("keys")}
+                          className="accent-primary"
                         />
-                      </div>
+                        <span className="font-semibold text-foreground">Access Keys</span>
+                      </label>
                     </div>
-                  ) : (
-                    <>
-                      <div>
-                        <label className="section-label mb-1 block">Oracle Identity Domain URL *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="https://idcs-xxxxxxxx.identity.oraclecloud.com"
-                          value={ociSaasDomainUrl}
-                          onChange={(e) => setOciSaasDomainUrl(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                    {awsAuthMode === "role" ? (
+                      <div className="space-y-3.5">
                         <div>
-                          <label className="section-label mb-1 block">OAuth Client ID *</label>
+                          <label className="section-label mb-1 block">Role ARN *</label>
                           <input
                             type="text"
                             required
-                            placeholder="c9284fa019284091..."
-                            value={ociSaasClientId}
-                            onChange={(e) => setOciSaasClientId(e.target.value)}
-                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                            placeholder="arn:aws:iam::123456789012:role/SecurityAuditRole"
+                            value={awsRoleArn}
+                            onChange={(e) => setAwsRoleArn(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
                           />
                         </div>
                         <div>
-                          <label className="section-label mb-1 block">OAuth Client Secret *</label>
+                          <label className="section-label mb-1 block">External ID (Optional)</label>
                           <input
-                            type="password"
-                            required
-                            value={ociSaasClientSecret}
-                            onChange={(e) => setOciSaasClientSecret(e.target.value)}
-                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
+                            type="text"
+                            placeholder="Optional external verification token"
+                            value={awsExternalId}
+                            onChange={(e) => setAwsExternalId(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
                           />
                         </div>
                       </div>
-                    </>
-                  )}
-
-                  <div className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-1.5 text-[11px]">
-                    <p className="font-bold text-foreground">Security Checks Performed (Read-Only):</p>
-                    {[
-                      "Separation of Duties (SoD) Role Conflict Detection",
-                      "Superuser & Implementation Role Audit",
-                      "MFA Enforcement for Finance & HR Admins",
-                      "ERP Audit Trail & Tamper-Proofing Status",
-                      "OAuth API Integration Scope Validation",
-                      "IP Allowlist & Network Access Restrictions",
-                      "Dormant Privileged Account Review",
-                      "SOC 1 / ITGC Control Validation",
-                    ].map((check, i) => (
-                      <div key={i} className="flex items-center gap-2 text-muted-foreground">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
-                        <span>{check}</span>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="section-label mb-1 block">AWS Access Key ID *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="AKIAIOSFODNN7EXAMPLE"
+                            value={awsAccessKey}
+                            onChange={(e) => setAwsAccessKey(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="section-label mb-1 block">AWS Secret Access Key *</label>
+                          <input
+                            type="password"
+                            required
+                            placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                            value={awsSecretKey}
+                            onChange={(e) => setAwsSecretKey(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    )}
 
-              {/* ── GitHub Form ── */}
-              {activeTab === "GITHUB" && (
-                <div className="space-y-3.5 pt-1">
-                  <div>
-                    <label className="section-label mb-1 block">GitHub Organization Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={githubOrg}
-                      onChange={(e) => setGithubOrg(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary"
-                    />
+                    <div>
+                      <label className="section-label mb-1 block">Default Region</label>
+                      <select
+                        value={awsRegion}
+                        onChange={(e) => setAwsRegion(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
+                      >
+                        <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                        <option value="us-west-2">us-west-2 (Oregon)</option>
+                        <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                        <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+                        <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="section-label mb-1 block">Personal Access Token / App Secret *</label>
-                    <input
-                      type="password"
-                      required
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* Footer Actions */}
-              <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
+                {/* ── OCI (Oracle Cloud Infrastructure) Form ── */}
+                {activeTab === "OCI" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div>
+                      <label className="section-label mb-1 block">Tenancy OCID *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ocid1.tenancy.oc1..aaaaaaa..."
+                        value={ociTenancyOcid}
+                        onChange={(e) => setOciTenancyOcid(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="section-label mb-1 block">User OCID *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ocid1.user.oc1..aaaaaaa..."
+                          value={ociUserOcid}
+                          onChange={(e) => setOciUserOcid(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="section-label mb-1 block">API Key Fingerprint *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="20:3b:97:13:55:1c:..."
+                          value={ociFingerprint}
+                          onChange={(e) => setOciFingerprint(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="section-label mb-1 block">Private Key (.pem content) *</label>
+                      <textarea
+                        required
+                        rows={3}
+                        placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
+                        value={ociPrivateKey}
+                        onChange={(e) => setOciPrivateKey(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <label className="section-label">Home Region Identifier *</label>
+                        <span className="text-[10px] text-muted-foreground">Select from list or type custom</span>
+                      </div>
+                      <div className="space-y-2">
+                        <select
+                          value={ociRegion}
+                          onChange={(e) => setOciRegion(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
+                        >
+                          <optgroup label="Europe">
+                            <option value="uk-london-1">uk-london-1 (UK South - London)</option>
+                            <option value="uk-cardiff-1">uk-cardiff-1 (UK West - Newport)</option>
+                            <option value="eu-frankfurt-1">eu-frankfurt-1 (Germany Central - Frankfurt)</option>
+                            <option value="eu-amsterdam-1">eu-amsterdam-1 (Netherlands - Amsterdam)</option>
+                            <option value="eu-paris-1">eu-paris-1 (France - Paris)</option>
+                            <option value="eu-marseille-1">eu-marseille-1 (France - Marseille)</option>
+                            <option value="eu-zurich-1">eu-zurich-1 (Switzerland - Zurich)</option>
+                            <option value="eu-milan-1">eu-milan-1 (Italy - Milan)</option>
+                            <option value="eu-madrid-1">eu-madrid-1 (Spain - Madrid)</option>
+                            <option value="eu-stockholm-1">eu-stockholm-1 (Sweden - Stockholm)</option>
+                          </optgroup>
+                          <optgroup label="Asia Pacific">
+                            <option value="ap-mumbai-1">ap-mumbai-1 (India West - Mumbai)</option>
+                            <option value="ap-hyderabad-1">ap-hyderabad-1 (India South - Hyderabad)</option>
+                            <option value="ap-singapore-1">ap-singapore-1 (Singapore)</option>
+                            <option value="ap-tokyo-1">ap-tokyo-1 (Japan East - Tokyo)</option>
+                            <option value="ap-osaka-1">ap-osaka-1 (Japan Central - Osaka)</option>
+                            <option value="ap-seoul-1">ap-seoul-1 (South Korea - Seoul)</option>
+                            <option value="ap-chuncheon-1">ap-chuncheon-1 (South Korea - Chuncheon)</option>
+                            <option value="ap-sydney-1">ap-sydney-1 (Australia East - Sydney)</option>
+                            <option value="ap-melbourne-1">ap-melbourne-1 (Australia - Melbourne)</option>
+                          </optgroup>
+                          <optgroup label="North America">
+                            <option value="us-ashburn-1">us-ashburn-1 (US East - Ashburn)</option>
+                            <option value="us-phoenix-1">us-phoenix-1 (US West - Phoenix)</option>
+                            <option value="us-sanjose-1">us-sanjose-1 (US West - San Jose)</option>
+                            <option value="us-chicago-1">us-chicago-1 (US Central - Chicago)</option>
+                            <option value="ca-toronto-1">ca-toronto-1 (Canada - Toronto)</option>
+                            <option value="ca-montreal-1">ca-montreal-1 (Canada - Montreal)</option>
+                            <option value="mx-queretaro-1">mx-queretaro-1 (Mexico - Queretaro)</option>
+                            <option value="mx-monterrey-1">mx-monterrey-1 (Mexico - Monterrey)</option>
+                          </optgroup>
+                          <optgroup label="Middle East & Africa">
+                            <option value="me-dubai-1">me-dubai-1 (UAE East - Dubai)</option>
+                            <option value="me-abudhabi-1">me-abudhabi-1 (UAE - Abu Dhabi)</option>
+                            <option value="me-jeddah-1">me-jeddah-1 (Saudi Arabia - Jeddah)</option>
+                            <option value="me-riyadh-1">me-riyadh-1 (Saudi Arabia - Riyadh)</option>
+                            <option value="il-jerusalem-1">il-jerusalem-1 (Israel - Jerusalem)</option>
+                            <option value="af-johannesburg-1">af-johannesburg-1 (South Africa - Johannesburg)</option>
+                          </optgroup>
+                          <optgroup label="Latin America">
+                            <option value="sa-saopaulo-1">sa-saopaulo-1 (Brazil - Sao Paulo)</option>
+                            <option value="sa-vinhedo-1">sa-vinhedo-1 (Brazil - Vinhedo)</option>
+                            <option value="sa-santiago-1">sa-santiago-1 (Chile - Santiago)</option>
+                            <option value="sa-bogota-1">sa-bogota-1 (Colombia - Bogota)</option>
+                            <option value="sa-valparaiso-1">sa-valparaiso-1 (Chile - Valparaiso)</option>
+                          </optgroup>
+                        </select>
+
+                        <input
+                          type="text"
+                          placeholder="Or type custom OCI region key (e.g. uk-london-1, ap-mumbai-1)"
+                          value={ociRegion}
+                          onChange={(e) => setOciRegion(e.target.value.trim().toLowerCase())}
+                          className="h-9 w-full rounded-lg border border-border bg-surface-2/40 px-3 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Azure Specific Form ── */}
+                {activeTab === "AZURE" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="section-label mb-1 block">Tenant ID (Directory ID) *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                          value={azureTenantId}
+                          onChange={(e) => setAzureTenantId(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="section-label mb-1 block">Client ID (Application ID) *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                          value={azureClientId}
+                          onChange={(e) => setAzureClientId(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="section-label mb-1 block">Client Secret *</label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="••••••••••••••••"
+                          value={azureClientSecret}
+                          onChange={(e) => setAzureClientSecret(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="section-label mb-1 block">Subscription ID *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                          value={azureSubscriptionId}
+                          onChange={(e) => setAzureSubscriptionId(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── GCP Specific Form ── */}
+                {activeTab === "GCP" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div>
+                      <label className="section-label mb-1 block">GCP Project ID *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="my-gcp-project-12345"
+                        value={gcpProjectId}
+                        onChange={(e) => setGcpProjectId(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="section-label mb-1 block">Service Account Key JSON *</label>
+                      <textarea
+                        required
+                        rows={3}
+                        placeholder='{"type": "service_account", "project_id": "...", ...}'
+                        value={gcpServiceAccountKey}
+                        onChange={(e) => setGcpServiceAccountKey(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Kubernetes Form ── */}
+                {activeTab === "KUBERNETES" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div>
+                      <label className="section-label mb-1 block">Cluster Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="eks-prod-us-east-1"
+                        value={k8sClusterName}
+                        onChange={(e) => setK8sClusterName(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="section-label mb-1 block">Kubeconfig YAML (Read-only ServiceAccount) *</label>
+                      <textarea
+                        required
+                        rows={3}
+                        placeholder="apiVersion: v1&#10;clusters: ...&#10;users: ..."
+                        value={k8sKubeconfig}
+                        onChange={(e) => setK8sKubeconfig(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-surface-2/60 p-3 font-mono text-[11px] text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Oracle SaaS / ERP Form ── */}
+                {activeTab === "ORACLE_SAAS" && (
+                  <div className="space-y-3.5 pt-1">
+                    {/* Auth Mode Toggle */}
+                    <div className="flex gap-2 p-1 rounded-lg border border-border bg-surface-2/40">
+                      <button
+                        type="button"
+                        onClick={() => setOciSaasAuthMode("BASIC_AUTH")}
+                        className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                          ociSaasAuthMode === "BASIC_AUTH"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Basic Auth (Direct Pod)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOciSaasAuthMode("OAUTH2")}
+                        className={`flex-1 rounded-md py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                          ociSaasAuthMode === "OAUTH2"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        OAuth 2.0 (IDCS Domain)
+                      </button>
+                    </div>
+
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2.5 text-[11px] text-emerald-400 flex items-start gap-2">
+                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      <span>
+                        {ociSaasAuthMode === "BASIC_AUTH"
+                          ? "Connects directly using your Fusion ERP Pod URL and read-only audit user. No IDCS application setup required."
+                          : "Connects using OAuth 2.0 Confidential Application registered in your Oracle Identity Domain."}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="section-label mb-1 block">Oracle ERP Product *</label>
+                      <select
+                        value={ociSaasErpType}
+                        onChange={(e) => setOciSaasErpType(e.target.value as any)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3 text-xs text-foreground outline-none focus:border-primary"
+                      >
+                        <option value="FUSION_ERP">Oracle Fusion Cloud ERP (Financials & SoD)</option>
+                        <option value="FUSION_HCM">Oracle Fusion Cloud HCM (HR & Payroll)</option>
+                        <option value="NETSUITE">Oracle NetSuite ERP</option>
+                        <option value="ORACLE_SCM">Oracle Fusion Cloud SCM (Supply Chain)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="section-label mb-1 block">Fusion ERP Base URL *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="https://fa-xxxx-saasfaprod1.fa.ocs.oraclecloud.com"
+                        value={ociSaasErpBaseUrl}
+                        onChange={(e) => setOciSaasErpBaseUrl(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+
+                    {ociSaasAuthMode === "BASIC_AUTH" ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="section-label mb-1 block">Auditor Username *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="ciso_auditor"
+                            value={ociSaasUsername}
+                            onChange={(e) => setOciSaasUsername(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="section-label mb-1 block">Auditor Password *</label>
+                          <input
+                            type="password"
+                            required
+                            placeholder="••••••••••••"
+                            value={ociSaasPassword}
+                            onChange={(e) => setOciSaasPassword(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="section-label mb-1 block">Oracle Identity Domain URL *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="https://idcs-xxxxxxxx.identity.oraclecloud.com"
+                            value={ociSaasDomainUrl}
+                            onChange={(e) => setOciSaasDomainUrl(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="section-label mb-1 block">OAuth Client ID *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="c9284fa019284091..."
+                              value={ociSaasClientId}
+                              onChange={(e) => setOciSaasClientId(e.target.value)}
+                              className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                            />
+                          </div>
+                          <div>
+                            <label className="section-label mb-1 block">OAuth Client Secret *</label>
+                            <input
+                              type="password"
+                              required
+                              placeholder="••••••••••••••••"
+                              value={ociSaasClientSecret}
+                              onChange={(e) => setOciSaasClientSecret(e.target.value)}
+                              className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Security Checks Grid - Clean 2 Columns */}
+                    <div className="rounded-xl border border-border bg-surface-2/30 p-3.5 space-y-2 text-[11px]">
+                      <p className="font-bold text-foreground">Security Checks Performed (Read-Only):</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+                        {[
+                          "Separation of Duties (SoD) Role Conflict Detection",
+                          "Superuser & Implementation Role Audit",
+                          "MFA Enforcement for Finance & HR Admins",
+                          "ERP Audit Trail & Tamper-Proofing Status",
+                          "OAuth API Integration Scope Validation",
+                          "IP Allowlist & Network Access Restrictions",
+                          "Dormant Privileged Account Review",
+                          "SOC 1 / ITGC Control Validation",
+                        ].map((check, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-muted-foreground">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                            <span className="leading-tight">{check}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── GitHub Form ── */}
+                {activeTab === "GITHUB" && (
+                  <div className="space-y-3.5 pt-1">
+                    <div>
+                      <label className="section-label mb-1 block">GitHub Organization Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="my-github-org"
+                        value={githubOrg}
+                        onChange={(e) => setGithubOrg(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="section-label mb-1 block">Personal Access Token / App Secret *</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions - Fixed at Bottom */}
+              <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4 bg-surface-2/40 shrink-0">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="h-10 rounded-lg border border-border bg-surface-2 px-5 text-xs font-semibold text-foreground hover:bg-surface-2/80"
+                  className="h-9 rounded-lg border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground hover:bg-surface-2/80 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={connecting}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 disabled:opacity-50"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${connecting ? "animate-spin" : ""}`}
