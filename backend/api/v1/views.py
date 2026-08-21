@@ -28,6 +28,7 @@ from api.compliance import (
 from api.constants import SEVERITY_ORDER
 from api.db_router import MainRouter
 from api.db_utils import rls_transaction
+from api.pagination import StandardFindingPagination
 from api.exceptions import (
     ComplianceWarmingError,
     TaskFailedException,
@@ -3542,6 +3543,7 @@ class FindingViewSet(PaginateByPkMixin, BaseRLSViewSet):
     queryset = Finding.all_objects.all()
     serializer_class = FindingSerializer
     filterset_class = FindingFilter
+    pagination_class = StandardFindingPagination
     http_method_names = ["get"]
     ordering = ["-inserted_at"]
     ordering_fields = [

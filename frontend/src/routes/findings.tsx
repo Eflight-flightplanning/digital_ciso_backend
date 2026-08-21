@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ShieldAlert,
@@ -58,9 +58,51 @@ export function formatFindingId(rawId: string): string {
   return rawId.replace(/^prowler-/i, "CISO-");
 }
 
+export function formatScanTime(isoDateString?: string): string {
+  if (!isoDateString) return "Recently";
+  try {
+    const d = new Date(isoDateString);
+    if (isNaN(d.getTime())) return "Recently";
+    const datePart = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${datePart}, ${timePart} UTC`;
+  } catch {
+    return "Recently";
+  }
+}
+
 export const Route = createFileRoute("/findings")({
   component: FindingsPage,
 });
+
+function extractFindingProvider(f: any): string {
+  const meta = f.check_metadata || f.raw_result || {};
+  let p = "";
+  if (typeof meta.provider === "string" && meta.provider) p = meta.provider.toUpperCase();
+  else if (typeof f.provider === "string" && f.provider && f.provider !== "[object Object]") p = f.provider.toUpperCase();
+  else if (f.provider && typeof f.provider === "object" && typeof f.provider.provider === "string") p = f.provider.provider.toUpperCase();
+  else if (f.scan?.provider && typeof f.scan.provider === "object" && typeof f.scan.provider.provider === "string") p = f.scan.provider.provider.toUpperCase();
+  else if (typeof f.provider_type === "string" && f.provider_type) p = f.provider_type.toUpperCase();
+  else if (typeof meta.Provider === "string" && meta.Provider) p = meta.Provider.toUpperCase();
+
+  const checkId = String(f.check_id || meta.checkid || meta.check_id || "").toLowerCase();
+  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || checkId.startsWith("erp_") || checkId.startsWith("oracle_saas_")) return "ORACLE_SAAS";
+  if (p === "OCI" || p === "ORACLECLOUD" || checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
+  if (p === "AZURE" || checkId.startsWith("azure_") || checkId.startsWith("iam_") || checkId.startsWith("storage_") || checkId.startsWith("network_") || checkId.startsWith("sql_") || checkId.startsWith("defender_") || checkId.startsWith("entra_") || checkId.startsWith("vm_")) return "AZURE";
+  if (p === "AWS" || checkId.startsWith("aws_") || checkId.startsWith("s3_") || checkId.startsWith("ec2_") || checkId.startsWith("rds_")) return "AWS";
+  if (p === "GCP" || checkId.startsWith("gcp_")) return "GCP";
+  if (p === "K8S" || p === "KUBERNETES" || checkId.startsWith("k8s_")) return "K8S";
+
+  const uid = String(f.uid || f.resource_uid || f.id || "").toLowerCase();
+  if (uid.includes("azure") || uid.includes("/subscriptions/")) return "AZURE";
+  if (uid.includes("oracle_saas") || uid.includes("oracle-saas")) return "ORACLE_SAAS";
+  if (uid.includes("oci") || uid.includes("oraclecloud") || uid.includes("ocid1.")) return "OCI";
+  if (uid.includes("aws") || uid.includes("arn:aws:")) return "AWS";
+  if (uid.includes("gcp") || uid.includes("projects/")) return "GCP";
+  if (uid.includes("k8s") || uid.includes("kubernetes")) return "K8S";
+
+  return p || "AZURE";
+}
 
 function FindingsPage() {
   const { data: apiFindings, isLoading } = useFindings();
@@ -68,23 +110,15 @@ function FindingsPage() {
 
   const rawData: Finding[] = useMemo(() => {
     if (apiFindings?.items && apiFindings.items.length > 0) {
-      return (apiFindings.items as Array<Record<string, unknown>>).map((f) => {
+      return (apiFindings.items as Array<Record<string, unknown>>).map((f: any) => {
         const meta = (f.check_metadata as Record<string, any>) || (f.raw_result as Record<string, any>) || {};
         const uid = String(f.uid || f.id || "");
         const checkId = String(f.check_id || meta.checkid || meta.check_id || "");
 
         // 1. Provider
-        let prov = String(meta.provider || f.provider || f.provider_type || "").toUpperCase();
-        if (!prov) {
-          if (uid.includes("prowler-azure-") || uid.includes("/subscriptions/")) prov = "AZURE";
-          else if (uid.includes("prowler-oracle_saas-") || uid.includes("oracle-saas") || checkId.startsWith("erp_")) prov = "ORACLE_SAAS";
-          else if (uid.includes("prowler-oci-") || uid.includes("ocid1.")) prov = "OCI";
-          else if (uid.includes("prowler-gcp-") || uid.includes("projects/")) prov = "GCP";
-          else if (uid.includes("prowler-aws-") || uid.includes("arn:aws:")) prov = "AWS";
-          else prov = "AZURE";
-        }
+        let prov = extractFindingProvider(f);
         if (prov === "ORACLECLOUD") prov = "OCI";
-        if (prov === "ORACLE-SAAS" || prov === "ORACLE_SAAS" || checkId.startsWith("erp_")) prov = "ORACLE_SAAS";
+        if (prov === "ORACLE-SAAS" || checkId.startsWith("erp_")) prov = "ORACLE_SAAS";
         if (prov === "KUBERNETES") prov = "K8S";
 
         // 2. Real Human-Readable Security Title
@@ -158,19 +192,22 @@ function FindingsPage() {
         } else if (typeof meta.remediation === "string") {
           remediation = meta.remediation;
         } else if (f.status_extended) {
-          remediation = String(f.status_extended);
+          remediation = `Remediate control: ${f.status_extended}`;
         }
 
         return {
-          id: uid || (f.id as string) || "FND-00000",
+          id: String(f.id || f.uid || "FND-0000"),
+          check_id: checkId,
           title,
-          severity: ((f.severity as string) || (meta.severity as string) || "medium").toLowerCase() as Finding["severity"],
-          status: ((f.status as string) || "FAIL").toUpperCase(),
+          severity: (String(f.severity || "medium").toLowerCase() as any) || "medium",
+          status: String(f.status || "FAIL"),
+          status_extended: String(f.status_extended || ""),
+          resource,
+          resource_id: String(f.resource_uid || f.resource_id || uid),
           provider: prov,
           region,
           service,
-          resource,
-          scanned: (f.first_seen_at as string) || (f.inserted_at as string) || (f.updated_at as string) || new Date().toISOString(),
+          scanned: String(f.inserted_at || f.first_seen_at || f.updated_at || ""),
           remediation,
         };
       });
@@ -202,8 +239,26 @@ function FindingsPage() {
     });
   }, [rawData, mutedIds, remediatedIds]);
 
-  const filtered = useMemo(() => {
+  // Pre-filter findings by selected cloud provider so that tab counts update dynamically
+  const providerFilteredData = useMemo(() => {
     return data.filter((item) => {
+      const selProv = (selectedProvider || "ALL").toUpperCase();
+      if (selProv !== "ALL") {
+        const itemProv = (item.provider || "").toUpperCase();
+        const matchesProv =
+          itemProv === selProv ||
+          (selProv === "AZURE" && (itemProv === "AZURE" || itemProv === "AZ")) ||
+          (selProv === "OCI" && (itemProv === "OCI" || itemProv === "ORACLECLOUD")) ||
+          (selProv === "ORACLE_SAAS" && (itemProv === "ORACLE_SAAS" || itemProv === "ORACLE-SAAS" || itemProv === "ERP")) ||
+          (selProv === "K8S" && (itemProv === "K8S" || itemProv === "KUBERNETES"));
+        if (!matchesProv) return false;
+      }
+      return true;
+    });
+  }, [data, selectedProvider]);
+
+  const filtered = useMemo(() => {
+    return providerFilteredData.filter((item) => {
       if (search) {
         const query = search.toLowerCase();
         const matches =
@@ -213,35 +268,28 @@ function FindingsPage() {
           item.service.toLowerCase().includes(query);
         if (!matches) return false;
       }
-      if (
-        selectedProvider !== "All" &&
-        item.provider.toUpperCase() !== selectedProvider.toUpperCase()
-      ) {
+      const selSev = (selectedSeverity || "ALL").toLowerCase();
+      if (selSev !== "all" && item.severity.toLowerCase() !== selSev) {
         return false;
       }
-      if (
-        selectedSeverity !== "All" &&
-        item.severity.toLowerCase() !== selectedSeverity.toLowerCase()
-      ) {
-        return false;
-      }
-      if (selectedStatus !== "All" && item.status !== selectedStatus) {
+      const selStat = (selectedStatus || "ALL").toUpperCase();
+      if (selStat !== "ALL" && item.status.toUpperCase() !== selStat) {
         return false;
       }
       return true;
     });
-  }, [data, search, selectedProvider, selectedSeverity, selectedStatus]);
+  }, [providerFilteredData, search, selectedSeverity, selectedStatus]);
 
   const counts = useMemo(() => {
     return {
-      total: data.length,
-      critical: data.filter((d) => d.severity === "critical").length,
-      high: data.filter((d) => d.severity === "high").length,
-      medium: data.filter((d) => d.severity === "medium").length,
-      low: data.filter((d) => d.severity === "low").length,
-      muted: data.filter((d) => d.status === "MUTED").length,
+      total: providerFilteredData.length,
+      critical: providerFilteredData.filter((d) => d.severity === "critical").length,
+      high: providerFilteredData.filter((d) => d.severity === "high").length,
+      medium: providerFilteredData.filter((d) => d.severity === "medium").length,
+      low: providerFilteredData.filter((d) => d.severity === "low").length,
+      muted: providerFilteredData.filter((d) => d.status === "MUTED").length,
     };
-  }, [data]);
+  }, [providerFilteredData]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -295,56 +343,56 @@ function FindingsPage() {
       }
     >
       {/* ── Unified Filter & Control Bar ── */}
-      <Panel index={0} className="mb-5 p-3.5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <Panel index={0} className="mb-5 p-3.5 sm:p-4">
+        <div className="flex flex-col gap-3.5 xl:flex-row xl:items-center xl:justify-between">
           {/* Quick Severity Tabs */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none">
             <button
               onClick={() => setSelectedSeverity("All")}
-              className={`h-8 rounded-lg px-4 text-xs font-medium transition-all ${
+              className={`h-8 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedSeverity === "All"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-surface-2/60 text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/30"
+                  : "bg-surface-2/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               All ({counts.total})
             </button>
             <button
               onClick={() => setSelectedSeverity("critical")}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold transition-all ${
+              className={`inline-flex h-8 whitespace-nowrap items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedSeverity === "critical"
-                  ? "bg-critical text-destructive-foreground shadow-sm"
-                  : "bg-surface-2/60 text-critical hover:bg-critical/10"
+                  ? "bg-critical text-destructive-foreground shadow-sm ring-1 ring-critical/40"
+                  : "bg-surface-2/70 text-critical hover:bg-critical/10"
               }`}
             >
               <Dot tone="critical" pulse /> Critical ({counts.critical})
             </button>
             <button
               onClick={() => setSelectedSeverity("high")}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-4 text-xs font-semibold transition-all ${
+              className={`inline-flex h-8 whitespace-nowrap items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedSeverity === "high"
-                  ? "bg-high text-primary-foreground shadow-sm"
-                  : "bg-surface-2/60 text-high hover:bg-high/10"
+                  ? "bg-high text-primary-foreground shadow-sm ring-1 ring-high/40"
+                  : "bg-surface-2/70 text-high hover:bg-high/10"
               }`}
             >
               <Dot tone="high" /> High ({counts.high})
             </button>
             <button
               onClick={() => setSelectedSeverity("medium")}
-              className={`h-8 rounded-lg px-4 text-xs font-medium transition-all ${
+              className={`h-8 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedSeverity === "medium"
-                  ? "bg-surface-2 text-foreground font-bold"
-                  : "bg-surface-2/60 text-muted-foreground hover:text-foreground"
+                  ? "bg-surface-3 text-foreground font-bold ring-1 ring-border"
+                  : "bg-surface-2/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               Medium ({counts.medium})
             </button>
             <button
               onClick={() => setSelectedSeverity("low")}
-              className={`h-8 rounded-lg px-4 text-xs font-medium transition-all ${
+              className={`h-8 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedSeverity === "low"
-                  ? "bg-surface-2 text-foreground font-bold"
-                  : "bg-surface-2/60 text-muted-foreground hover:text-foreground"
+                  ? "bg-surface-3 text-foreground font-bold ring-1 ring-border"
+                  : "bg-surface-2/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               Low ({counts.low})
@@ -353,10 +401,10 @@ function FindingsPage() {
               onClick={() =>
                 setSelectedStatus(selectedStatus === "MUTED" ? "All" : "MUTED")
               }
-              className={`h-8 rounded-lg px-4 text-xs font-medium transition-all ${
+              className={`h-8 whitespace-nowrap rounded-lg px-3.5 text-xs font-semibold transition-all ${
                 selectedStatus === "MUTED"
-                  ? "bg-neutral text-background font-bold"
-                  : "bg-surface-2/60 text-muted-foreground hover:text-foreground"
+                  ? "bg-neutral text-background font-bold ring-1 ring-neutral/50"
+                  : "bg-surface-2/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               Muted ({counts.muted})
@@ -364,45 +412,57 @@ function FindingsPage() {
           </div>
 
           {/* Search & Provider Selector */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
-              <Search className="absolute top-3 left-3 h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex flex-wrap items-center gap-2.5 sm:flex-nowrap">
+            <div className="relative min-w-[200px] flex-1 sm:w-64 sm:flex-initial">
+              <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search findings..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-surface-2/60 pr-3 pl-9 text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
+                className="h-9 w-full rounded-lg border border-border bg-surface-2/70 pr-3 pl-9 text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
               />
             </div>
 
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value)}
-              className="h-10 min-w-[140px] rounded-lg border border-border bg-surface-2/60 px-4 text-xs font-medium text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
+              className="h-9 min-w-[150px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
             >
               <option value="All">All Providers</option>
-              <option value="AWS">AWS</option>
+              <option value="AZURE">Azure</option>
               <option value="OCI">Oracle Cloud (OCI)</option>
               <option value="ORACLE_SAAS">Oracle SaaS / ERP</option>
-              <option value="Azure">Azure</option>
+              <option value="AWS">AWS</option>
               <option value="GCP">GCP</option>
-              <option value="K8s">Kubernetes</option>
-              <option value="GitHub">GitHub</option>
-              <option value="M365">M365</option>
+              <option value="K8S">Kubernetes</option>
             </select>
           </div>
         </div>
       </Panel>
 
       {/* ── Findings Table ── */}
-      <Panel index={1} className="p-0">
+      <Panel index={1} className="p-0 overflow-hidden border border-border/80 shadow-sm">
         <DataTable
+          tableClassName="w-full table-fixed text-left text-sm"
+          colgroup={
+            <colgroup>
+              <col style={{ width: "36px" }} />
+              <col style={{ width: "135px" }} />
+              <col style={{ width: "85px" }} />
+              <col />
+              <col style={{ width: "100px" }} />
+              <col style={{ width: "95px" }} />
+              <col style={{ width: "80px" }} />
+              <col style={{ width: "115px" }} />
+              <col style={{ width: "70px" }} />
+            </colgroup>
+          }
           head={[
             "",
             "Finding ID",
             "Severity",
-            "Security Title",
+            "Security Title & Resource",
             "Provider",
             "Service",
             "Status",
@@ -445,24 +505,24 @@ function FindingsPage() {
               const isRemediating = remediatingId === f.id;
 
               return (
-                <div key={`${f.id}-${i}`} className="contents">
+                <Fragment key={`${f.id}-${i}`}>
                   <Row
                     index={i}
                     onClick={() => setExpandedId(isExpanded ? null : f.id)}
                     className={isExpanded ? "bg-primary/5 border-l-2 border-l-primary" : ""}
                   >
-                    <td className="px-3 py-3 w-8 text-muted-foreground">
+                    <td className="px-2 py-2.5 text-center text-muted-foreground">
                       {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-primary" />
+                        <ChevronDown className="h-3.5 w-3.5 text-primary inline-block" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-3.5 w-3.5 inline-block" />
                       )}
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-2 py-2.5 truncate">
+                      <div className="flex items-center gap-1">
                         <span
                           title={f.id}
-                          className="mono inline-flex items-center rounded-md bg-surface-2 px-2 py-1 text-[11px] font-bold text-foreground ring-1 ring-border/80"
+                          className="mono inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-bold text-foreground ring-1 ring-border/80 truncate"
                         >
                           {formatFindingId(f.id)}
                         </span>
@@ -475,7 +535,7 @@ function FindingsPage() {
                             setTimeout(() => setCopiedId(null), 2000);
                           }}
                           title={`Copy Raw UID: ${f.id}`}
-                          className="rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-primary transition-colors cursor-pointer"
+                          className="rounded p-0.5 text-muted-foreground hover:bg-surface-2 hover:text-primary transition-colors cursor-pointer shrink-0"
                         >
                           {copiedId === f.id ? (
                             <Check className="h-3 w-3 text-success" />
@@ -485,31 +545,33 @@ function FindingsPage() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-2 py-2.5 truncate">
                       <Chip tone={severityTone(f.severity)}>
                         {f.severity.toUpperCase()}
                       </Chip>
                     </td>
-                    <td className="px-3 py-3 max-w-[320px]">
-                      <p className="truncate text-xs font-semibold text-foreground">
-                        {f.title}
-                      </p>
-                      <p className="mono truncate text-[11px] text-muted-foreground">
-                        {f.resource}
-                      </p>
+                    <td className="px-2.5 py-2.5 truncate">
+                      <div className="min-w-0 flex flex-col justify-center">
+                        <p className="truncate text-xs font-semibold text-foreground" title={f.title}>
+                          {f.title}
+                        </p>
+                        <p className="mono truncate text-[10px] text-muted-foreground" title={f.resource}>
+                          {f.resource}
+                        </p>
+                      </div>
                     </td>
-                    <td className="px-3 py-3">
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground">
+                    <td className="px-2 py-2.5 truncate">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground truncate" title={`${f.provider} (${f.region})`}>
                         {f.provider}
                         <span className="text-[10px] text-muted-foreground">
                           ({f.region})
                         </span>
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-xs text-muted-foreground font-medium">
+                    <td className="px-2 py-2.5 text-xs text-muted-foreground font-medium truncate" title={f.service}>
                       {f.service}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-2 py-2.5 truncate">
                       <Chip
                         tone={
                           f.status === "PASS"
@@ -522,15 +584,15 @@ function FindingsPage() {
                         {f.status}
                       </Chip>
                     </td>
-                    <td className="mono text-[11px] text-muted-foreground px-3 py-3">
-                      {f.scanned ? f.scanned.slice(11, 16) + 'Z' : '12:00Z'}
+                    <td className="mono text-[11px] text-muted-foreground px-2 py-2.5 truncate" title={formatScanTime(f.scanned)}>
+                      {formatScanTime(f.scanned)}
                     </td>
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-2 py-2.5 text-right truncate" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={(e) => handleToggleMute(f.id, e)}
                           title={f.status === "MUTED" ? "Unmute" : "Mute"}
-                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground cursor-pointer shrink-0"
                         >
                           {f.status === "MUTED" ? (
                             <Volume2 className="h-3.5 w-3.5 text-primary" />
@@ -545,7 +607,7 @@ function FindingsPage() {
                             provider: f.provider.toLowerCase(),
                           }}
                           title="Ask Spectra"
-                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-primary"
+                          className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-primary shrink-0"
                         >
                           <Sparkles className="h-3.5 w-3.5" />
                         </Link>
@@ -652,7 +714,7 @@ function FindingsPage() {
                       </td>
                     </tr>
                   )}
-                </div>
+                </Fragment>
               );
             })
           )}

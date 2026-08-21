@@ -535,18 +535,34 @@ function FleetCircularGauge({ score }: { score: number }) {
 }
 
 function getProviderOfFinding(f: any): "AZURE" | "OCI" | "AWS" | "GCP" | "KUBERNETES" | "ORACLE_SAAS" | "OTHER" {
-  const p = String(f.provider || f.provider_type || f.scan?.provider?.provider || f.check_metadata?.provider || f.raw_result?.Provider || "").toUpperCase();
+  const meta = f.check_metadata || f.raw_result || {};
+  let p = "";
+  if (typeof meta.provider === "string" && meta.provider) p = meta.provider.toUpperCase();
+  else if (typeof f.provider === "string" && f.provider && f.provider !== "[object Object]") p = f.provider.toUpperCase();
+  else if (f.provider && typeof f.provider === "object" && typeof f.provider.provider === "string") p = f.provider.provider.toUpperCase();
+  else if (f.scan?.provider && typeof f.scan.provider === "object" && typeof f.scan.provider.provider === "string") p = f.scan.provider.provider.toUpperCase();
+  else if (typeof f.provider_type === "string" && f.provider_type) p = f.provider_type.toUpperCase();
+
+  const checkId = String(f.check_id || meta.checkid || meta.check_id || "");
+  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || checkId.startsWith("erp_") || checkId.startsWith("oracle_saas_")) return "ORACLE_SAAS";
+  if (p === "OCI" || p === "ORACLECLOUD" || checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
+  if (p === "AZURE" || checkId.startsWith("azure_") || checkId.startsWith("iam_") || checkId.startsWith("storage_") || checkId.startsWith("network_") || checkId.startsWith("sql_") || checkId.startsWith("defender_") || checkId.startsWith("entra_") || checkId.startsWith("vm_")) return "AZURE";
+  if (p === "AWS" || checkId.startsWith("aws_") || checkId.startsWith("s3_") || checkId.startsWith("ec2_")) return "AWS";
+  if (p === "GCP" || checkId.startsWith("gcp_")) return "GCP";
+  if (p === "KUBERNETES" || p === "K8S" || checkId.startsWith("k8s_")) return "KUBERNETES";
+
   const uid = String(f.uid || f.id || f.prowler_uid || f.resources?.[0]?.uid || f.resource_uid || "").toLowerCase();
-  if (p === "AZURE" || uid.includes("/subscriptions/") || uid.includes("azure")) return "AZURE";
-  if (p === "AWS" || uid.includes("arn:aws:")) return "AWS";
-  if (p === "GCP" || uid.includes("projects/")) return "GCP";
-  if (p === "OCI" || p === "ORACLECLOUD" || uid.includes("ocid1.") || uid.includes("oraclecloud")) return "OCI";
-  if (p === "KUBERNETES" || p === "K8S" || uid.includes("k8s") || uid.includes("kube")) return "KUBERNETES";
-  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || uid.includes(".oraclecloud.com") || uid.includes("fusion")) return "ORACLE_SAAS";
-  return "OTHER";
+  if (uid.includes("/subscriptions/") || uid.includes("azure") || uid.includes("prowler-azure")) return "AZURE";
+  if (uid.includes("arn:aws:") || uid.includes("aws")) return "AWS";
+  if (uid.includes("projects/") || uid.includes("gcp")) return "GCP";
+  if (uid.includes("ocid1.") || uid.includes("oraclecloud") || uid.includes("oci")) return "OCI";
+  if (uid.includes(".oraclecloud.com") || uid.includes("fusion") || uid.includes("saas")) return "ORACLE_SAAS";
+  if (uid.includes("k8s") || uid.includes("kube")) return "KUBERNETES";
+
+  return "AZURE";
 }
 
-export function CompliancePage() {
+function CompliancePage() {
   const { data: findingsData } = useFindings();
   const { data: providersData } = useProviders();
   const { data: resourcesData } = useResources();

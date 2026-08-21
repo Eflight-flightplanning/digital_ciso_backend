@@ -237,14 +237,27 @@ export function Row({ children, index = 0, className, onClick }: { children: Rea
   );
 }
 
-export function DataTable({ head, children, className }: { head: string[]; children: ReactNode; className?: string }) {
+export function DataTable({
+  head,
+  children,
+  className,
+  tableClassName,
+  colgroup,
+}: {
+  head: string[];
+  children: ReactNode;
+  className?: string;
+  tableClassName?: string;
+  colgroup?: ReactNode;
+}) {
   return (
-    <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full min-w-[720px] text-left text-sm">
+    <div className={cn("w-full overflow-x-auto", className)}>
+      <table className={cn("w-full text-left text-sm", tableClassName)}>
+        {colgroup}
         <thead>
           <tr className="border-b border-border">
-            {head.map((h) => (
-              <th key={h} className="section-label px-3 py-2.5 whitespace-nowrap">
+            {head.map((h, i) => (
+              <th key={h || i} className="section-label px-2.5 py-2.5 whitespace-nowrap">
                 {h}
               </th>
             ))}

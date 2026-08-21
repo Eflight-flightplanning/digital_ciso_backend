@@ -814,8 +814,8 @@ export function DashboardPage() {
     return providers.find((p) => (p.id as string) === selectedProviderId);
   }, [providers, selectedProviderId]);
 
-  const providersCount = providers.length || 5;
-  const onlineCount = providersCount;
+  const providersCount = providers.length;
+  const onlineCount = providers.filter((p: any) => p.status === "connected" || !p.status || p.status === "active").length;
 
   // Real live numbers from database findings
   const realPass = filteredFindings.filter((f: any) => f.status === "PASS").length;
@@ -834,22 +834,22 @@ export function DashboardPage() {
   // Posture Score calculation directly from live findings
   const postureScore = totalFindingsCount > 0
     ? Math.round((totalPassCount / totalFindingsCount) * 100)
-    : (selectedProviderObj ? 72 : 78);
+    : (providers.length > 0 ? 100 : 0);
 
   // Dynamic Threat Score calculation directly from live exploitability & failed vulnerabilities
   const threatScore = totalFindingsCount > 0
-    ? Math.min(100, Math.max(5, Math.round(100 - postureScore + (realCritical > 0 ? 8 : 0))))
-    : (selectedProviderObj ? (String(selectedProviderObj.provider).includes("azure") ? 32 : 24) : 28);
+    ? Math.min(100, Math.max(0, Math.round(100 - postureScore + (realCritical > 0 ? 8 : 0))))
+    : 0;
 
   const threatRiskLevel = threatScore >= 70 ? "Critical Risk" : threatScore >= 45 ? "High Risk" : threatScore >= 25 ? "Moderate" : "Low Risk";
 
-  // Radar chart data metrics
+  // Radar chart data metrics derived from live compliance posture
   const radarData = [
-    { label: "NCA ECC", value: Math.min(100, Math.max(45, postureScore + 6)) },
-    { label: "CIS Benchmark", value: Math.min(100, Math.max(40, postureScore + 8)) },
-    { label: "SOC 2", value: Math.min(100, Math.max(40, postureScore + 2)) },
-    { label: "ISO 27001", value: Math.min(100, Math.max(35, postureScore - 4)) },
-    { label: "PCI-DSS", value: Math.min(100, Math.max(45, postureScore + 10)) },
+    { label: "NCA ECC", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
+    { label: "CIS Benchmark", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
+    { label: "SOC 2", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
+    { label: "ISO 27001", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
+    { label: "PCI-DSS", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
   ];
 
   // Dynamically count resources per cloud provider from live DB telemetry
@@ -857,7 +857,7 @@ export function DashboardPage() {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     const uid = String(r.uid || r.id || "");
     return p === "AZURE" || uid.includes("/subscriptions/") || uid.includes("prowler-azure-");
-  }).length || (resources.length > 0 ? resources.length : 38);
+  }).length;
 
   const awsAssets = resources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
@@ -879,7 +879,7 @@ export function DashboardPage() {
     return p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || String(r.uid || "").includes(".identity.oraclecloud.com");
   }).length;
 
-  const totalDiscoveredAssets = resources.length > 0 ? resources.length : 38;
+  const totalDiscoveredAssets = resources.length > 0 ? resources.length : totalFindingsCount;
 
   // Startup Animation Trigger
   const [dashboardReady, setDashboardReady] = useState(false);
@@ -888,23 +888,23 @@ export function DashboardPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // Animated KPI numbers (3x slower, highly visible majestic count-up)
+  // Animated KPI numbers
   const animPosture = useCountUp(postureScore, 4200, dashboardReady);
   const animClouds = useCountUp(providersCount, 3200, dashboardReady);
-  const animCompliance = useCountUp(22, 3600, dashboardReady);
-  const animOpenFail = useCountUp(totalOpenFail > 0 ? totalOpenFail : (selectedProviderObj ? 28 : 34), 4500, dashboardReady);
+  const animCompliance = useCountUp(totalFindingsCount > 0 ? Math.min(22, totalFindingsCount) : 0, 3600, dashboardReady);
+  const animOpenFail = useCountUp(totalOpenFail, 4500, dashboardReady);
 
-  // Animated Radar Breakdown Scores (4.0s count-up)
+  // Animated Radar Breakdown Scores
   const animCis = useCountUp(radarData[0].value, 4000, dashboardReady);
   const animSoc2 = useCountUp(radarData[1].value, 4000, dashboardReady);
   const animIso = useCountUp(radarData[2].value, 4000, dashboardReady);
   const animNist = useCountUp(radarData[3].value, 4000, dashboardReady);
   const animPci = useCountUp(radarData[4].value, 4000, dashboardReady);
 
-  // Animated Triage Counts (4.2s count-up)
-  const animPassCount = useCountUp(totalPassCount > 0 ? totalPassCount : 142, 4200, dashboardReady);
-  const animFailCount = useCountUp(totalOpenFail > 0 ? totalOpenFail : 28, 4200, dashboardReady);
-  const animMutedCount = useCountUp(totalMutedCount > 0 ? totalMutedCount : 4, 3200, dashboardReady);
+  // Animated Triage Counts
+  const animPassCount = useCountUp(totalPassCount, 4200, dashboardReady);
+  const animFailCount = useCountUp(totalOpenFail, 4200, dashboardReady);
+  const animMutedCount = useCountUp(totalMutedCount, 3200, dashboardReady);
 
   return (
     <AppShell>

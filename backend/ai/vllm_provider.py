@@ -318,29 +318,80 @@ class VLLMAzureProvider(AIProvider):
             f_sev = (top_f.get("severity") or "HIGH").upper()
             f_prov = (top_f.get("provider") or "").lower()
 
+            # Build structured multi-tier playbooks based on provider
+            cli_snippet = ""
+            tf_snippet = ""
+            console_guide = ""
+            check_id = top_f.get("check_id", "").lower()
+
             if "oracle_saas" in f_prov or "erp" in f_prov:
                 prov_display = "Oracle SaaS / Fusion Cloud ERP"
                 fw_display = "Oracle Fusion ERP Separation of Duties Matrix & SOX ITGC"
                 tool_display = "Oracle Security Console / Fusion REST API"
+                cli_snippet = f"# Deactivate unapproved privilege or dormant account via Oracle HCM REST API\ncurl -X PATCH -u \"admin_user:API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{{\"Suspended\": true}}' \\\n  \"https://fa-pod.oraclecloud.com/hcmRestApi/resources/11.13.18.05/userAccounts/{f_res}\""
+                tf_snippet = f"# Manage Oracle SaaS IDCS User via OCI Identity Domain\nresource \"oci_identity_user\" \"saas_user\" {{\n  compartment_id = var.tenancy_ocid\n  description    = \"Governance Managed Oracle Fusion User\"\n  name           = \"{f_res}\"\n  email          = \"{f_res.lower()}@company.com\"\n}}"
+                console_guide = "1. Sign in to **Oracle Fusion Cloud Applications** as a Security Administrator.\n2. Navigate to **Tools** > **Security Console** > **Users**.\n3. Search for the target account and review assigned Duty Roles & SoD conflict matrices.\n4. Click **Edit** and set **Active** to **Disabled** or remove the conflicting duty role."
+
             elif "oracle" in f_prov or "oci" in f_prov:
                 prov_display = "Oracle Cloud Infrastructure (OCI)"
                 fw_display = "CIS Oracle Cloud Infrastructure Foundations Benchmark"
                 tool_display = "OCI CLI / Terraform"
+                if "bucket" in check_id or "objectstorage" in check_id:
+                    cli_snippet = f"oci os bucket update \\\n  --name \"{f_res}\" \\\n  --public-access-type \"NoPublicAccess\""
+                    tf_snippet = f"resource \"oci_objectstorage_bucket\" \"secure_bucket\" {{\n  compartment_id = var.compartment_ocid\n  name           = \"{f_res}\"\n  namespace      = var.bucket_namespace\n  access_type    = \"NoPublicAccess\"\n}}"
+                    console_guide = "1. Open the **OCI Console** and navigate to **Storage** > **Object Storage & Archive Storage**.\n2. Select the target bucket from the compartment.\n3. Click **Edit Visibility** and change visibility to **Private** (No Public Access)."
+                elif "ssh" in check_id or "security_list" in check_id or "nsg" in check_id:
+                    cli_snippet = f"oci network security-list update \\\n  --security-list-id \"{f_res}\" \\\n  --ingress-security-rules '[{{\"source\": \"10.0.0.0/16\", \"protocol\": \"6\", \"tcpOptions\": {{\"destinationPortRange\": {{\"min\": 22, \"max\": 22}}}}}}]'"
+                    tf_snippet = f"resource \"oci_core_security_list\" \"vcn_sec_list\" {{\n  compartment_id = var.compartment_ocid\n  vcn_id         = var.vcn_ocid\n  display_name   = \"{f_res}\"\n\n  ingress_security_rules {{\n    protocol = \"6\"\n    source   = \"10.0.0.0/16\"\n    tcp_options {{\n      min = 22\n      max = 22\n    }}\n  }}\n}}"
+                    console_guide = "1. Navigate to **Networking** > **Virtual Cloud Networks (VCN)** in OCI Console.\n2. Select the VCN and click **Security Lists**.\n3. Locate the unrestricted ingress rule (0.0.0.0/0 on port 22/3389) and restrict it to authorized enterprise CIDRs."
+                else:
+                    cli_snippet = f"oci identity policy update --policy-id \"{f_res}\" --statements '[\"ALLOW GROUP SecurityAdmins to manage all-resources IN TENANCY\"]'"
+                    tf_snippet = f"resource \"oci_identity_policy\" \"strict_policy\" {{\n  compartment_id = var.tenancy_ocid\n  name           = \"{f_res}\"\n  description    = \"Enforce least privilege\"\n  statements     = [\"ALLOW GROUP SecurityAdmins to manage all-resources in tenancy\"]\n}}"
+                    console_guide = "1. Navigate to **Identity & Security** in the OCI Console.\n2. Select **Policies** or **Domains**.\n3. Review active rule configurations and enforce least privilege."
+
             elif "aws" in f_prov:
                 prov_display = "Amazon Web Services (AWS)"
                 fw_display = "CIS AWS Foundations Benchmark"
                 tool_display = "AWS CLI / Terraform"
+                if "s3" in check_id:
+                    cli_snippet = f"aws s3api put-public-access-block \\\n  --bucket \"{f_res}\" \\\n  --public-access-block-configuration \"BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true\""
+                    tf_snippet = f"resource \"aws_s3_bucket_public_access_block\" \"secure_s3\" {{\n  bucket = \"{f_res}\"\n\n  block_public_acls       = true\n  block_public_policy     = true\n  ignore_public_acls      = true\n  restrict_public_buckets = true\n}}"
+                    console_guide = "1. Open **AWS Management Console** and navigate to **Amazon S3**.\n2. Select the target bucket name.\n3. Go to the **Permissions** tab and click **Edit** under **Block public access (bucket settings)**.\n4. Enable all 4 public access blocks and save changes."
+                else:
+                    cli_snippet = f"aws ec2 revoke-security-group-ingress \\\n  --group-id \"{f_res}\" \\\n  --protocol tcp \\\n  --port 22 \\\n  --cidr 0.0.0.0/0"
+                    tf_snippet = f"resource \"aws_security_group_rule\" \"secure_ingress\" {{\n  type              = \"ingress\"\n  from_port         = 22\n  to_port           = 22\n  protocol          = \"tcp\"\n  cidr_blocks       = [\"10.0.0.0/8\"]\n  security_group_id = \"{f_res}\"\n}}"
+                    console_guide = "1. Open the **Amazon EC2 Console** and click **Security Groups**.\n2. Select the affected security group.\n3. Under **Inbound rules**, click **Edit inbound rules** and remove or restrict 0.0.0.0/0 entries."
+
             elif "gcp" in f_prov:
                 prov_display = "Google Cloud Platform (GCP)"
                 fw_display = "CIS GCP Foundations Benchmark"
                 tool_display = "gcloud / Terraform"
+                cli_snippet = f"gcloud compute firewall-rules update \"{f_res}\" \\\n  --source-ranges=\"10.0.0.0/8\" \\\n  --rules=\"tcp:22\""
+                tf_snippet = f"resource \"google_compute_firewall\" \"secure_fw\" {{\n  name    = \"{f_res}\"\n  network = \"default\"\n\n  allow {{\n    protocol = \"tcp\"\n    ports    = [\"22\"]\n  }}\n  source_ranges = [\"10.0.0.0/8\"]\n}}"
+                console_guide = "1. Go to **VPC network** > **Firewall** in Google Cloud Console.\n2. Click the firewall rule name.\n3. Click **Edit** and restrict IP ranges to corporate networks."
+
             else:
                 prov_display = "Microsoft Azure"
                 fw_display = "CIS Microsoft Azure Foundations Benchmark"
                 tool_display = "Azure CLI / Terraform"
+                if "storage" in check_id:
+                    cli_snippet = f"az storage account update \\\n  --name \"{f_res}\" \\\n  --resource-group \"rg-production\" \\\n  --allow-blob-public-access false \\\n  --min-tls-version TLS1_2"
+                    tf_snippet = f"resource \"azurerm_storage_account\" \"secure_storage\" {{\n  name                     = \"{f_res}\"\n  resource_group_name      = \"rg-production\"\n  location                 = \"eastus\"\n  account_tier             = \"Standard\"\n  account_replication_type = \"GRS\"\n  allow_nested_items_to_be_public = false\n  min_tls_version                 = \"TLS1_2\"\n}}"
+                    console_guide = "1. Open the **Azure Portal** and navigate to **Storage accounts**.\n2. Select the storage account and click **Configuration** under **Settings**.\n3. Set **Allow Blob public access** to **Disabled** and **Minimum TLS version** to **Version 1.2**.\n4. Click **Save**."
+                elif "iam" in check_id or "entra" in check_id or "user" in check_id:
+                    cli_snippet = f"# Enforce Conditional Access MFA for Privileged Roles\naz rest --method POST \\\n  --uri \"https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies\" \\\n  --body '{{\"displayName\": \"Require-MFA-For-Admins\", \"state\": \"enabled\", \"conditions\": {{\"users\": {{\"includeRoles\": [\"62e90394-69f5-4237-9190-012177145e10\"]}}}}}}'"
+                    tf_snippet = f"resource \"azuread_conditional_access_policy\" \"mfa_policy\" {{\n  display_name = \"Require MFA for Privileged Administrators\"\n  state        = \"enabled\"\n\n  conditions {{\n    client_app_types = [\"all\"]\n    applications {{\n      included_applications = [\"All\"]\n    }}\n    users {{\n      included_roles = [\"62e90394-69f5-4237-9190-012177145e10\"]\n    }}\n  }}\n  grant_controls {{\n    operator          = \"OR\"\n    built_in_controls = [\"mfa\"]\n  }}\n}}"
+                    console_guide = "1. In **Microsoft Entra admin center**, go to **Protection** > **Conditional Access**.\n2. Select **New policy**.\n3. Assign policy to all Directory Roles and set Access control to **Require multifactor authentication**.\n4. Enable policy and click **Save**."
+                elif "network" in check_id or "nsg" in check_id or "ssh" in check_id or "rdp" in check_id:
+                    cli_snippet = f"az network nsg rule update \\\n  --resource-group \"rg-production\" \\\n  --nsg-name \"{f_res}\" \\\n  --name \"Allow-SSH\" \\\n  --access Deny"
+                    tf_snippet = f"resource \"azurerm_network_security_rule\" \"deny_public_ssh\" {{\n  name                        = \"Deny-Public-SSH\"\n  priority                    = 100\n  direction                   = \"Inbound\"\n  access                      = \"Deny\"\n  protocol                    = \"Tcp\"\n  source_port_range           = \"*\"\n  destination_port_range      = \"22\"\n  source_address_prefix       = \"*\"\n  destination_address_prefix  = \"*\"\n  resource_group_name         = \"rg-production\"\n  network_security_group_name = \"{f_res}\"\n}}"
+                    console_guide = "1. Navigate to **Network security groups** in Azure Portal.\n2. Select the NSG and open **Inbound security rules**.\n3. Locate any rule with Source `*` / `0.0.0.0/0` targeting ports 22 or 3389 and update Access to **Deny** or restrict source IP."
+                else:
+                    cli_snippet = f"az resource update --ids \"{f_res}\" --set properties.encryption.status=Enabled"
+                    tf_snippet = f"# Enforce security baseline policy\nresource \"azurerm_resource_group_policy_assignment\" \"baseline\" {{\n  name                 = \"secure-baseline\"\n  resource_group_id    = \"/subscriptions/sub-id/resourceGroups/rg-prod\"\n  policy_definition_id = \"/providers/Microsoft.Authorization/policyDefinitions/...\n}}"
+                    console_guide = "1. Open the **Azure Portal** and locate the resource.\n2. Review security recommendations under **Microsoft Defender for Cloud**.\n3. Click **Remediate** to apply the recommended security posture."
 
             f_details = top_f.get("status_extended") or f"Security control violation detected on asset {f_res}."
-            f_rem = top_f.get("remediation") or f"Apply secure configuration policy via {tool_display}."
 
             multi_summary = ""
             if len(relevant_findings) > 1:
@@ -356,16 +407,22 @@ class VLLMAzureProvider(AIProvider):
                 f"**Target Resource / Asset:** `{f_res}`\n\n"
                 f"**Risk Evaluation & Technical Root Cause:**\n"
                 f"{f_details}{multi_summary}\n\n"
-                f"**Actionable Remediation Strategy:**\n"
-                f"1. **Primary Remediation**: {f_rem}\n"
-                f"2. **Aegis Decision Core**: Review and authorize the automated {tool_display} execution playbook.\n"
-                f"3. **Verification**: Re-run the compliance audit to confirm validation against **{fw_display}**."
+                f"### 🛠️ Actionable Remediation Playbook\n\n"
+                f"#### 1. 💻 CLI Command (Immediate Fix)\n"
+                f"```bash\n{cli_snippet}\n```\n\n"
+                f"#### 2. 📜 Terraform IaC (Permanent Baseline)\n"
+                f"```terraform\n{tf_snippet}\n```\n\n"
+                f"#### 3. 🖥️ Management Console Guide\n"
+                f"{console_guide}\n\n"
+                f"### 🛡️ Compliance Alignment & Verification\n"
+                f"- **Compliance Benchmark**: `{fw_display}`\n"
+                f"- **Verification Procedure**: Re-run the automated security scan or inspect resource properties in `{tool_display}` to confirm compliance."
             )
             refs = [
                 {"id": f.get("finding_id", f_id), "name": f.get("check_title", f_title), "severity": f.get("severity", "high")}
                 for f in relevant_findings[:4]
             ]
-            return AdvisorOutput(answer=answer, finding_references=refs, confidence=0.90)
+            return AdvisorOutput(answer=answer, finding_references=refs, confidence=0.92)
 
         # General conversational fallback if LLM is offline
         return AdvisorOutput(

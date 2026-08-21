@@ -4,3 +4,9 @@ from drf_spectacular_jsonapi.schemas.pagination import JsonApiPageNumberPaginati
 class ComplianceOverviewPagination(JsonApiPageNumberPagination):
     page_size = 50
     max_page_size = 100
+
+
+class StandardFindingPagination(JsonApiPageNumberPagination):
+    page_size = 100
+    max_page_size = 1000
+    page_size_query_param = "page[size]"

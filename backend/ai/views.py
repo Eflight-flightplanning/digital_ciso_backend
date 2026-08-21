@@ -500,11 +500,11 @@ class AIAdvisorQueryView(APIView):
             # Natural Language Provider Intent Detection from question
             if not provider_filter:
                 q_lower = clean_question.lower()
-                if any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "netsuite")):
+                if any(k in q_lower for k in ("oracle saas", "fusion saas", "fusion cloud", "fusion erp", "fusion hcm", "oracle erp", "oracle hcm", "sod matrix", "toxic combination")):
                     provider_filter = "oracle_saas"
-                elif any(k in q_lower for k in ("oci", "oracle cloud", "oracle infrastructure", "oraclecloud", "tenancy", "compartment", "vcn", "oracle")):
+                elif any(k in q_lower for k in ("oci", "oracle cloud infrastructure", "oraclecloud", "tenancy", "compartment", "vcn")):
                     provider_filter = "oraclecloud"
-                elif any(k in q_lower for k in ("azure", "defender", "virtual machine", "vnet", "nsg", "entra")):
+                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription")):
                     provider_filter = "azure"
                 elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role")):
                     provider_filter = "aws"
@@ -682,8 +682,12 @@ def _retrieve_relevant_findings(
             matching_ids = set()
             matching_findings = []
 
-            # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry if relevant
-            is_saas_query = any(k in q_lower for k in ("saas", "fusion", "erp", "hcm", "sod", "dormant", "inactive", "consultant", "pam", "curtis", "alan", "mandy", "finance", "hr", "account", "user", "mfa"))
+            # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
+            is_saas_query = (
+                (provider is None or provider == "oracle_saas")
+                and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes")
+                and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "curtis", "alan", "mandy", "oracle erp"))
+            )
             if is_saas_query:
                 try:
                     from api.v1.oracle_saas_views import load_real_pod_users, SOD_TOXIC_MATRICES
