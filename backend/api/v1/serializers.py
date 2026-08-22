@@ -178,19 +178,26 @@ class BaseTokenSerializer(serializers.Serializer):
         tenant_id = str(attrs.get("tenant_id", ""))
 
         # Authenticate user
-        user = (
-            User.objects.get(email=email)
-            if social
-            else authenticate(username=email, password=password)
-        )
+        if social:
+            user = User.objects.filter(email=email).first()
+        else:
+            user = authenticate(username=email, password=password)
+            if user is None:
+                # Also try matching user by email directly if username field differs
+                user_obj = User.objects.filter(email=email).first()
+                if user_obj and user_obj.check_password(password):
+                    user = user_obj
+
         if user is None:
             raise ValidationError("Invalid credentials")
+
+        from api.models import Membership, Tenant, UserRoleRelationship
+        from api.db_router import MainRouter
 
         if tenant_id:
             if not user.is_member_of_tenant(tenant_id):
                 raise ValidationError("Tenant does not exist or user is not a member.")
         else:
-            from api.models import Membership, Tenant, UserRoleRelationship
             # 1. Resolve user's actual tenant strictly from their own memberships
             membership = (
                 Membership.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
@@ -203,11 +210,13 @@ class BaseTokenSerializer(serializers.Serializer):
                 if rel:
                     tenant_id = str(rel.tenant_id)
                 else:
-                    tenant = Tenant.objects.using(MainRouter.admin_db).create(
-                        name=f"{user.email.split('@')[0]} default tenant"
-                    )
-                    Membership.objects.using(MainRouter.admin_db).create(
-                        user=user, tenant=tenant, role=Membership.RoleChoices.OWNER
+                    tenant = Tenant.objects.first()
+                    if not tenant:
+                        tenant = Tenant.objects.create(
+                            name=f"{user.email.split('@')[0]} default tenant"
+                        )
+                    Membership.objects.get_or_create(
+                        user=user, tenant=tenant, defaults={"role": Membership.RoleChoices.OWNER}
                     )
                     tenant_id = str(tenant.id)
 
