@@ -22,8 +22,16 @@ ATTACK_PATHS_SINK_DATABASE = env.str("ATTACK_PATHS_SINK_DATABASE", default="neo4
 ATTACK_PATHS_SCAN_INACTIVITY_THRESHOLD_MINUTES = env.int("ATTACK_PATHS_SCAN_INACTIVITY_THRESHOLD_MINUTES", default=30)
 ATTACK_PATHS_SCAN_STALE_THRESHOLD_MINUTES = env.int("ATTACK_PATHS_SCAN_STALE_THRESHOLD_MINUTES", default=60)
 CACHE_MAX_AGE = env.int("CACHE_MAX_AGE", default=300)
-CACHE_STALE_WHILE_REVALIDATE = env.int("CACHE_STALE_WHILE_REVALIDATE", default=60)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
+CSRF_TRUSTED_ORIGINS = env.list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    default=[
+        "https://demo-digitalciso.centralindia.cloudapp.azure.com",
+        "http://demo-digitalciso.centralindia.cloudapp.azure.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
