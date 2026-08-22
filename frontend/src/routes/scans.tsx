@@ -95,7 +95,6 @@ function ScansPage() {
   const providers = (apiProviders?.items || []) as Array<Record<string, any>>;
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
-  const [selectedProfile, setSelectedProfile] = useState("Full Assessment");
   const [selectedRegion, setSelectedRegion] = useState("all");
   const [launching, setLaunching] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -115,10 +114,10 @@ function ScansPage() {
     setLaunching(true);
     setErrorMsg(null);
     try {
-      const regionSuffix = selectedRegion !== "all" ? ` [${selectedRegion.toUpperCase()}]` : "";
+      const regionSuffix = selectedRegion !== "all" ? ` [${selectedRegion.toUpperCase()}]` : " [GLOBAL]";
       await launchScanMutation.mutateAsync({
         providerId: selectedProviderId || String(providers[0]?.id),
-        name: `${selectedProfile}${regionSuffix} — ${new Date().toLocaleDateString()}`,
+        name: `Full Security & Compliance Assessment${regionSuffix} — ${new Date().toLocaleDateString()}`,
       });
       setLaunching(false);
       setModalOpen(false);
@@ -287,55 +286,14 @@ function ScansPage() {
                 </p>
               </div>
 
-              <div>
-                <label className="section-label mb-1 block">Compliance Standard & Assessment Profile</label>
-                <select
-                  value={selectedProfile}
-                  onChange={(e) => setSelectedProfile(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium cursor-pointer"
-                >
-                  <optgroup label="Oracle Cloud & SaaS Security">
-                    <option value="CIS OCI Benchmark v3.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v3.0</option>
-                    <option value="CIS OCI Benchmark v2.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v2.0</option>
-                    <option value="Oracle Fusion SaaS Baseline">Oracle Fusion Cloud ERP & HCM Security Baseline</option>
-                  </optgroup>
-                  <optgroup label="Microsoft Azure Security">
-                    <option value="CIS Azure Foundations v3.0">CIS Microsoft Azure Foundations Benchmark v3.0</option>
-                    <option value="CIS Azure Foundations v2.0">CIS Microsoft Azure Foundations Benchmark v2.0</option>
-                    <option value="Microsoft Cloud Security Benchmark">Microsoft Cloud Security Benchmark (MCSB)</option>
-                  </optgroup>
-                  <optgroup label="AWS & GCP Security">
-                    <option value="CIS AWS Foundations v3.0">CIS Amazon Web Services (AWS) Foundations v3.0</option>
-                    <option value="CIS GCP Foundations v2.0">CIS Google Cloud Platform (GCP) Foundations v2.0</option>
-                    <option value="CIS Kubernetes v1.7">CIS Kubernetes & Container Hardening Benchmark v1.7</option>
-                  </optgroup>
-                  <optgroup label="Global Enterprise & Industry Standards">
-                    <option value="Full Comprehensive Assessment">Full Multi-Cloud Comprehensive Posture Assessment</option>
-                    <option value="SOC 2 Type II">SOC 2 Type II Security, Confidentiality & Availability</option>
-                    <option value="ISO/IEC 27001:2022">ISO/IEC 27001:2022 Information Security Management</option>
-                    <option value="PCI-DSS v4.0">PCI-DSS v4.0 Cardholder Data Environment</option>
-                    <option value="HIPAA Security Rule">HIPAA Security & Privacy Rule (45 CFR Part 164)</option>
-                    <option value="MITRE ATT&CK Cloud Matrix">MITRE ATT&CK Cloud Matrix & Threat Tactics</option>
-                    <option value="Cloud Security Alliance (CSA CCM)">Cloud Security Alliance (CSA CCM v4.0)</option>
-                  </optgroup>
-                  <optgroup label="Middle East & Saudi Arabia (NCA / SAMA)">
-                    <option value="NCA ECC-1:2018">NCA ECC-1:2018 (Essential Cybersecurity Controls)</option>
-                    <option value="NCA CSCC-1:2019">NCA CSCC-1:2019 (Cloud Cybersecurity Controls)</option>
-                    <option value="SAMA Cyber Security">SAMA Cyber Security Framework (Saudi Central Bank)</option>
-                  </optgroup>
-                  <optgroup label="India (RBI & CERT-In)">
-                    <option value="RBI Cyber Security Framework">RBI Cyber Security Master Directions & Guidelines</option>
-                    <option value="CERT-In Directives">CERT-In 2022 Cybersecurity Directives & DPDP Act 2023</option>
-                  </optgroup>
-                  <optgroup label="European Union (GDPR & DORA / NIS2)">
-                    <option value="EU GDPR & DORA">EU GDPR & DORA Digital Operational Resilience Act</option>
-                    <option value="NIS2 Directive">NIS2 Cybersecurity Directive (EU 2022/2555)</option>
-                  </optgroup>
-                  <optgroup label="United States (FedRAMP & NIST)">
-                    <option value="FedRAMP Moderate & High">FedRAMP Moderate & High Baselines (Rev. 5)</option>
-                    <option value="NIST SP 800-53 Rev 5">NIST SP 800-53 Rev 5 & NIST CSF 2.0</option>
-                  </optgroup>
-                </select>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  <span className="text-xs font-semibold text-foreground">Comprehensive Full Fleet Assessment</span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  Executing a scan automatically audits your complete infrastructure across all <strong>28+ Global Compliance Frameworks</strong> (CIS Benchmarks, SOC 2, ISO 27001, PCI-DSS, RBI, NCA, NIST CSF, and HIPAA) simultaneously.
+                </p>
               </div>
             </div>
 
