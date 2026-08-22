@@ -1,5 +1,8 @@
 from rest_framework.parsers import JSONParser
 from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
+from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 import fnmatch
 import glob
 import json
@@ -375,23 +378,35 @@ class CustomTokenObtainView(GenericAPIView):
         return None
 
     def post(self, request):
-        raw_data = request.data
-        if isinstance(raw_data, dict) and "data" in raw_data and "attributes" in raw_data["data"]:
-            payload = raw_data["data"]["attributes"]
-        else:
-            payload = raw_data
-
-        serializer = TokenSerializer(data=payload)
-
         try:
-            serializer.is_valid(raise_exception=True)
-        except TokenError as e:
-            raise InvalidToken(e.args[0])
+            raw_data = request.data
+            if isinstance(raw_data, dict) and "data" in raw_data and "attributes" in raw_data["data"]:
+                payload = raw_data["data"]["attributes"]
+            else:
+                payload = raw_data
 
-        return Response(
-            data={"type": "tokens", "attributes": serializer.validated_data},
-            status=status.HTTP_200_OK,
-        )
+            serializer = TokenSerializer(data=payload, context={"request": request})
+
+            try:
+                serializer.is_valid(raise_exception=True)
+            except TokenError as e:
+                raise InvalidToken(e.args[0])
+
+            return Response(
+                data={"type": "tokens", "attributes": serializer.validated_data},
+                status=status.HTTP_200_OK,
+            )
+        except (ValidationError, serializers.ValidationError) as e:
+            detail = getattr(e, "detail", str(e))
+            return Response({"errors": detail if isinstance(detail, list) else [{"detail": str(detail)}]}, status=status.HTTP_400_BAD_REQUEST)
+        except InvalidToken as e:
+            return Response({"errors": [{"detail": str(e)}]}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            logger.exception(f"Unexpected error in CustomTokenObtainView: {e}")
+            return Response(
+                {"errors": [{"detail": f"Authentication failed: {str(e)}"}]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 @extend_schema(
