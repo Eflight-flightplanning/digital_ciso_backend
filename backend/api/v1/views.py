@@ -371,6 +371,9 @@ class CustomTokenObtainView(GenericAPIView):
     http_method_names = ["post"]
     parser_classes = [JSONParser, JSONAPIParser]
 
+    def get_queryset(self):
+        return None
+
     def post(self, request):
         raw_data = request.data
         if isinstance(raw_data, dict) and "data" in raw_data and "attributes" in raw_data["data"]:
@@ -403,6 +406,9 @@ class CustomTokenRefreshView(GenericAPIView):
     http_method_names = ["post"]
     parser_classes = [JSONParser, JSONAPIParser]
 
+    def get_queryset(self):
+        return None
+
     def post(self, request):
         raw_data = request.data
         if isinstance(raw_data, dict) and "data" in raw_data and "attributes" in raw_data["data"]:
@@ -433,6 +439,9 @@ class CustomTokenSwitchTenantView(GenericAPIView):
     resource_name = "tokens-switch-tenant"
     serializer_class = TokenSwitchTenantSerializer
     http_method_names = ["post"]
+
+    def get_queryset(self):
+        return None
 
     def post(self, request):
         serializer = TokenSwitchTenantSerializer(
