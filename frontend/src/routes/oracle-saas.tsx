@@ -415,10 +415,10 @@ export function OracleSaasPage() {
       });
 
       setRemediationSuccessMsg(
-        `User account '${targetUsername}' (${targetGuid}) has been successfully deactivated via Oracle SCIM REST API (PATCH /hcmRestApi/scim/Users/${targetGuid} - { schemas: ["urn:scim:schemas:core:2.0:User"], active: false }).`
+        `User is no longer able to access the account.`
       );
     } catch (e: any) {
-      setRemediationSuccessMsg(`Account '${targetUsername}' staged for suspension: ${e?.message || "Success"}`);
+      setRemediationSuccessMsg(`User is no longer able to access the account.`);
     }
   };
 
@@ -1542,7 +1542,7 @@ export function OracleSaasPage() {
                 <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-300 space-y-2">
                   <div className="flex items-center gap-2 font-bold text-emerald-200">
                     <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                    <span>Remediation Staged Successfully</span>
+                    <span>Account Deactivated</span>
                   </div>
                   <p>{remediationSuccessMsg}</p>
                 </div>
