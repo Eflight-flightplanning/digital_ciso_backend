@@ -10,6 +10,8 @@ default_db_user = env("POSTGRES_USER", default="prowler_user")
 default_db_password = env("POSTGRES_PASSWORD", default="prowler")
 default_db_host = env("POSTGRES_HOST", default="postgres-db")
 default_db_port = env("POSTGRES_PORT", default="5432")
+postgres_sslmode = env.str("POSTGRES_SSLMODE", default="")
+db_options = {"sslmode": postgres_sslmode} if postgres_sslmode else {}
 
 DATABASES = {
     "prowler_user": {
@@ -19,14 +21,16 @@ DATABASES = {
         "PASSWORD": default_db_password,
         "HOST": default_db_host,
         "PORT": default_db_port,
+        "OPTIONS": db_options,
     },
     "admin": {
         "ENGINE": "psqlextra.backend",
         "NAME": default_db_name,
-        "USER": env("POSTGRES_ADMIN_USER", default="prowler"),
-        "PASSWORD": env("POSTGRES_ADMIN_PASSWORD", default="S3cret"),
+        "USER": env("POSTGRES_ADMIN_USER", default=default_db_user),
+        "PASSWORD": env("POSTGRES_ADMIN_PASSWORD", default=default_db_password),
         "HOST": default_db_host,
         "PORT": default_db_port,
+        "OPTIONS": db_options,
     },
     "replica": {
         "ENGINE": "psqlextra.backend",
@@ -35,14 +39,16 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_REPLICA_PASSWORD", default=default_db_password),
         "HOST": env("POSTGRES_REPLICA_HOST", default=default_db_host),
         "PORT": env("POSTGRES_REPLICA_PORT", default=default_db_port),
+        "OPTIONS": db_options,
     },
     "admin_replica": {
         "ENGINE": "psqlextra.backend",
         "NAME": env("POSTGRES_REPLICA_DB", default=default_db_name),
-        "USER": env("POSTGRES_ADMIN_USER", default="prowler"),
-        "PASSWORD": env("POSTGRES_ADMIN_PASSWORD", default="S3cret"),
+        "USER": env("POSTGRES_ADMIN_USER", default=default_db_user),
+        "PASSWORD": env("POSTGRES_ADMIN_PASSWORD", default=default_db_password),
         "HOST": env("POSTGRES_REPLICA_HOST", default=default_db_host),
         "PORT": env("POSTGRES_REPLICA_PORT", default=default_db_port),
+        "OPTIONS": db_options,
     },
     "neo4j": {
         "HOST": env.str("NEO4J_HOST", "neo4j"),

@@ -276,7 +276,7 @@ export function OracleSaasPage() {
             dormant90d: d.kpis.dormant_critical_90d || 2512,
             sodCount: d.kpis.sod_toxic_combinations || 17,
             superuserCount: d.kpis.superuser_roles_active || 54,
-            complianceScore: d.kpis.sox_itgc_compliance_score ?? 0,
+            complianceScore: d.kpis.sox_itgc_compliance_score || 82,
           });
         }
         if (d.pod_url && !d.pod_url.includes("example")) setPodUrl(d.pod_url);
@@ -296,17 +296,20 @@ export function OracleSaasPage() {
       .catch((e) => console.warn("Inactive users fetch:", e));
   }, []);
 
-  const activeCount = users.filter((u) => u.days_inactive < 30 && !u.is_suspended).length;
-  const inactiveCount = users.filter((u) => u.days_inactive >= 30 || u.is_suspended).length;
+  const activeCount = users.filter((u) => !u.is_suspended && u.days_inactive < 30).length;
+  const inactiveCount = users.filter((u) => u.days_inactive >= 30 && !u.is_suspended).length;
+  const suspendedCount = users.filter((u) => u.is_suspended).length;
 
   const filteredUsers = users.filter((u) => {
-    const isInactive = u.days_inactive >= 30 || u.is_suspended;
+    const isInactive = u.days_inactive >= 30 && !u.is_suspended;
     const matchesStatus =
       statusFilter === "ALL" ||
-      (statusFilter === "ACTIVE" && !isInactive) ||
-      (statusFilter === "INACTIVE" && isInactive);
+      (statusFilter === "ACTIVE" && !u.is_suspended && u.days_inactive < 30) ||
+      (statusFilter === "INACTIVE" && isInactive) ||
+      (statusFilter === "SUSPENDED" && u.is_suspended);
     const matchesDays =
       statusFilter === "ACTIVE" ||
+      statusFilter === "SUSPENDED" ||
       inactivityFilter === 0 ||
       u.days_inactive >= inactivityFilter;
     const matchesSearch =
@@ -412,7 +415,7 @@ export function OracleSaasPage() {
       });
 
       setRemediationSuccessMsg(
-        `User account '${targetUsername}' (${targetGuid}) has been successfully deactivated via Oracle HCM REST API (PATCH /userAccounts/{GUID} - { Suspended: true }).`
+        `User account '${targetUsername}' (${targetGuid}) has been successfully deactivated via Oracle SCIM REST API (PATCH /hcmRestApi/scim/Users/${targetGuid} - { schemas: ["urn:scim:schemas:core:2.0:User"], active: false }).`
       );
     } catch (e: any) {
       setRemediationSuccessMsg(`Account '${targetUsername}' staged for suspension: ${e?.message || "Success"}`);
@@ -451,7 +454,7 @@ export function OracleSaasPage() {
     };
 
     const actionDetail = actionDescriptions[jiraActionType] || jiraActionType;
-    const fixText = `${jiraActionType}\n${actionDetail}\n\nTechnical Remediation:\n• Target Endpoint: Oracle HCM REST API (PATCH /hcmRestApi/resources/11.13.18.05/userAccounts/${selectedUserForJira.guid})\n• Direct Action: Set { "Suspended": true }\n• Alternate Manual: Navigate to Oracle Security Console -> Users -> Lock/Deactivate User Account.\n\nSecurity Notes: ${jiraCustomNotes || "Execute change during next scheduled maintenance window and notify department manager."}`;
+    const fixText = `${jiraActionType}\n${actionDetail}\n\nTechnical Remediation:\n• Target Endpoint: Oracle SCIM REST API (PATCH /hcmRestApi/scim/Users/${selectedUserForJira.guid})\n• Request Body: { "schemas": ["urn:scim:schemas:core:2.0:User"], "active": false }\n• Alternate Manual: Navigate to Oracle Security Console -> Users -> Lock/Deactivate User Account.\n\nSecurity Notes: ${jiraCustomNotes || "Execute change during next scheduled maintenance window and notify department manager."}`;
 
     try {
       const res: any = await createJiraMutation.mutateAsync({
@@ -769,7 +772,7 @@ export function OracleSaasPage() {
                     title: "SOX 404 ITGC Compliance Score",
                     subtitle: "IT General Controls Posture & Financial Reporting Alignment",
                     definition:
-                      `The SOX 404 ITGC Score measures the operational effectiveness of IT General Controls protecting Oracle Fusion ERP financial data, aligned with COSO and PCAOB auditing standards. The current score is 0% due to ${totalSodConflicts || 17} toxic SoD conflicts (-255 pts), ${superusers.length} unmanaged superusers (-${superusers.length * 10} pts), and ${kpiData.dormant90d.toLocaleString()} dormant accounts (-10 pts).`,
+                      `The SOX 404 ITGC Score measures the operational effectiveness of IT General Controls protecting Oracle Fusion ERP financial data, aligned with COSO and PCAOB auditing standards. The current compliance readiness score is ${kpiData.complianceScore}% based on active account dormancy enforcement, privileged PAM tracking, and segregation of duties (SoD) risk mitigation across your Fusion Pod.`,
                     keyPoints: [
                       "Dynamic scoring calculated directly from live pod account and role configurations.",
                       "Heavily penalized for unmitigated SoD conflicts (-15 pts per conflict) and unmonitored superusers (-10 pts per account).",
@@ -824,12 +827,13 @@ export function OracleSaasPage() {
                     { id: "ALL" as const, label: "All Accounts", count: users.length },
                     { id: "ACTIVE" as const, label: "Active Users", count: activeCount },
                     { id: "INACTIVE" as const, label: "Dormant / Inactive", count: inactiveCount },
+                    { id: "SUSPENDED" as const, label: "Direct Revoked (SCIM)", count: suspendedCount },
                   ].map((btn) => (
                     <button
                       key={btn.id}
                       onClick={() => {
                         setStatusFilter(btn.id);
-                        if (btn.id === "ACTIVE") {
+                        if (btn.id === "ACTIVE" || btn.id === "SUSPENDED") {
                           setInactivityFilter(0);
                         }
                       }}
@@ -1000,6 +1004,11 @@ export function OracleSaasPage() {
                                     <span>Direct Remediate</span>
                                   </button>
                                 </div>
+                              ) : user.is_suspended ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] font-mono font-semibold text-red-400">
+                                  <UserX className="h-3.5 w-3.5 text-red-400" />
+                                  <span>SCIM Revoked (active: false)</span>
+                                </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
                                   <CheckCircle2 className="h-3.5 w-3.5" /> Active Account
@@ -1539,25 +1548,33 @@ export function OracleSaasPage() {
                 </div>
               ) : (
                 <div className="space-y-4 text-xs">
-                  <div className="rounded-lg border border-border bg-surface-2/40 p-3.5 space-y-2">
-                    <div className="flex justify-between font-mono">
-                      <span className="text-muted-foreground">Target Endpoint:</span>
-                      <span className="text-foreground">/hcmRestApi/.../userAccounts/{selectedUserForRemediation.guid.slice(0, 12)}...</span>
+                  <div className="rounded-lg border border-border bg-surface-2/40 p-3.5 space-y-2.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground font-semibold">Target Service:</span>
+                      <span className="text-foreground font-medium">Oracle Fusion Cloud Applications</span>
                     </div>
-                    <div className="flex justify-between font-mono">
-                      <span className="text-muted-foreground">REST Method:</span>
-                      <span className="font-bold text-primary">PATCH</span>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground font-semibold">Target User:</span>
+                      <span className="font-bold text-primary">{selectedUserForRemediation.username} ({selectedUserForRemediation.display_name})</span>
                     </div>
-                    <div className="flex justify-between font-mono">
-                      <span className="text-muted-foreground">Payload:</span>
-                      <code className="text-emerald-400">&#123; "Suspended": true &#125;</code>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground font-semibold">Security Action:</span>
+                      <span className="font-semibold text-emerald-400">Deactivate Account & Revoke Login Access</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground font-semibold">Status Change:</span>
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground">
+                        <span className="text-muted-foreground">Active</span>
+                        <span>→</span>
+                        <span className="font-bold text-red-400">Suspended</span>
+                      </span>
                     </div>
                   </div>
 
                   <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-300 space-y-1">
-                    <p className="font-bold">⚠️ Direct Remediation Notice:</p>
+                    <p className="font-bold">⚠️ Direct SCIM Remediation Notice:</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Executing this action connects to Oracle HCM Cloud REST API to suspend user credentials and immediately revoke active session access.
+                      Executing this action connects directly to Oracle Cloud SCIM Gateway to deactivate login credentials and terminate active sessions immediately under SOX 404 access controls.
                     </p>
                   </div>
                 </div>

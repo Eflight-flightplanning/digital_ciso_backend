@@ -172,9 +172,10 @@ class VLLMAzureProvider(AIProvider):
                     cleaned_text = marker + cleaned_text.split(marker, 1)[1]
                     break
         else:
-            lines = [l for l in raw_text.split("\n") if not re.match(r"^\s*(?:\d+\.|\*|-)?\s*(?:Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON)\b", l, re.IGNORECASE)]
-            if lines:
-                cleaned_text = "\n".join(lines).strip()
+            # Strip out step-by-step thinking traces, prompt evaluations, and internal reasoning scratchpads
+            cleaned_text = re.sub(r"(?i)(?:^|\n)\s*(?:\d+\.|\*|-)?\s*\*\*?(?:Analyze the Request|Analyze the Payload|Context|System Instruction|Critical Constraint|Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON)[^\n]*", "", raw_text)
+            lines = [l for l in cleaned_text.split("\n") if not re.match(r"^\s*(?:\d+\.|\*|-)?\s*(?:Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON|Analyze|Context:|User Question:|Critical Constraint)\b", l, re.IGNORECASE)]
+            cleaned_text = "\n".join(lines).strip()
 
         return {"answer": cleaned_text, "raw_text": cleaned_text}
 
@@ -275,7 +276,8 @@ class VLLMAzureProvider(AIProvider):
         """Answer CISO security queries using 100% dynamic live LLM generation with multi-turn context."""
         # 1. Always invoke the live LLM (Qwen / vLLM on Azure or OpenAI/Claude)
         context_str = json.dumps(relevant_findings[:25], indent=2) if relevant_findings else "[]"
-        user_prompt = f"Active Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
+        prov_str = json.dumps(connected_providers, indent=2) if connected_providers else "[]"
+        user_prompt = f"Connected Environments:\n{prov_str}\n\nActive Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
         try:
             data = self._call_vllm_chat(
                 system_prompt=ADVISOR_SYSTEM_PROMPT,

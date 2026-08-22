@@ -380,11 +380,23 @@ class OracleFusionClient:
 
 
     def remediate_suspend_user(self, user_guid: str) -> dict[str, Any]:
-        """Remediation: Suspend inactive user account."""
-        url = f"{self.erp_base_url}/hcmRestApi/resources/11.13.18.05/userAccounts/{user_guid}"
-        payload = {"Suspended": True}
-        headers = {"Content-Type": "application/vnd.oracle.adf.resourceitem+json"}
-        return self._make_request(url, method="PATCH", data=payload, headers=headers)
+        """Remediation: Suspend/Deactivate inactive user account via Oracle SCIM REST API."""
+        url = f"{self.erp_base_url}/hcmRestApi/scim/Users/{user_guid}"
+        payload = {
+            "schemas": [
+                "urn:scim:schemas:core:2.0:User"
+            ],
+            "active": False,
+        }
+        headers = {
+            "Content-Type": "application/scim+json",
+            "Accept": "application/scim+json, application/json",
+        }
+        try:
+            return self._make_request(url, method="PATCH", data=payload, headers=headers)
+        except Exception:
+            headers["Content-Type"] = "application/json"
+            return self._make_request(url, method="PATCH", data=payload, headers=headers)
 
     def remediate_revoke_role(self, user_guid: str, role_guid: str) -> dict[str, Any]:
         """Remediation: Revoke a specific role from a user."""

@@ -170,9 +170,9 @@
     "job_title": "Implementation Consultant",
     "last_login": "2017-10-26",
     "days_inactive": 3215,
-    "is_suspended": false,
+    "is_suspended": true,
     "risk_level": "CRITICAL",
-    "status": "ACTIVE",
+    "status": "SUSPENDED",
     "roles": [
       "ORA_FND_SYSTEM_ADMIN_JOB"
     ],
@@ -431,20 +431,21 @@
   },
   {
     "id": "USR-HCM-0020",
-    "guid": "300000162747293",
+    "guid": "61C09B5AFF33BDDAE050FD0A6BA01D61",
     "username": "Tomasz.Pach",
     "display_name": "Tomasz Pach",
-    "email": "tomasz.pach@fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com",
-    "person_number": "300000162747293",
-    "department": "General Enterprise",
-    "job_title": "Fusion Cloud User",
+    "email": "Tomasz.Pach_etar-dev13@oraclepdemos.com",
+    "person_number": "4037",
+    "department": "Receivables PL",
+    "job_title": "Receivables Specialist",
     "last_login": "2018-01-03",
     "days_inactive": 3146,
     "is_suspended": false,
     "risk_level": "CRITICAL",
     "status": "ACTIVE",
     "roles": [
-      "ORA_FND_APPLICATION_USER"
+      "ORA_AR_ACCOUNTS_RECEIVABLE_SPECIALIST_JOB",
+      "PER_EMPLOYEE_ABSTRACT"
     ],
     "sod_conflicts": [],
     "is_superuser": false,
@@ -461,9 +462,9 @@
     "job_title": "Fusion Cloud User",
     "last_login": "2018-01-03",
     "days_inactive": 3146,
-    "is_suspended": false,
+    "is_suspended": true,
     "risk_level": "CRITICAL",
-    "status": "ACTIVE",
+    "status": "SUSPENDED",
     "roles": [
       "ORA_FND_APPLICATION_USER"
     ],
@@ -12789,9 +12790,9 @@
     "job_title": "Fusion Cloud User",
     "last_login": "2019-05-29",
     "days_inactive": 2635,
-    "is_suspended": false,
+    "is_suspended": true,
     "risk_level": "CRITICAL",
-    "status": "ACTIVE",
+    "status": "SUSPENDED",
     "roles": [
       "ORA_FND_APPLICATION_USER"
     ],
@@ -25166,9 +25167,9 @@
     "job_title": "Fusion Cloud User",
     "last_login": "Active Account",
     "days_inactive": 1497,
-    "is_suspended": false,
+    "is_suspended": true,
     "risk_level": "MEDIUM",
-    "status": "ACTIVE",
+    "status": "SUSPENDED",
     "roles": [
       "ORA_FND_APPLICATION_USER"
     ],
@@ -31788,9 +31789,9 @@
     "job_title": "Fusion Cloud User",
     "last_login": "Active Account",
     "days_inactive": 1497,
-    "is_suspended": false,
+    "is_suspended": true,
     "risk_level": "MEDIUM",
-    "status": "ACTIVE",
+    "status": "SUSPENDED",
     "roles": [
       "ORA_FND_APPLICATION_USER"
     ],

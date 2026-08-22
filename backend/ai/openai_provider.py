@@ -196,7 +196,8 @@ class OpenAIProvider(AIProvider):
         connected_providers: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
         context_str = json.dumps(relevant_findings[:35], indent=2) if relevant_findings else "[]"
-        user_message = f"Active Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
+        prov_str = json.dumps(connected_providers, indent=2) if connected_providers else "[]"
+        user_message = f"Connected Environments:\n{prov_str}\n\nActive Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
         raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, 1500, history=history)
         data = self._parse_json(raw)
         return AdvisorOutput(
