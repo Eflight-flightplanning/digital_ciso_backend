@@ -349,8 +349,8 @@ from tasks.tasks import (
 logger = logging.getLogger(BackendLogger.API)
 
 CACHE_DECORATOR = cache_control(
-    max_age=django_settings.CACHE_MAX_AGE,
-    stale_while_revalidate=django_settings.CACHE_STALE_WHILE_REVALIDATE,
+    max_age=getattr(django_settings, "CACHE_MAX_AGE", 300),
+    stale_while_revalidate=getattr(django_settings, "CACHE_STALE_WHILE_REVALIDATE", 60),
 )
 
 
