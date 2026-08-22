@@ -40,18 +40,12 @@ function getStoredUser(): User | null {
 }
 
 const initialToken = getStoredToken();
-const initialUser = getStoredUser() || {
-  id: "9871f836-2e7b-4761-a840-70986d96b955",
-  email: "admin@securityplatform.com",
-  name: "Alex CISO",
-  company_name: "Eflight Global Defense",
-  role: "Admin",
-};
+const initialUser = getStoredUser();
 
 let currentAuth: AuthState = {
   user: initialUser,
   token: initialToken,
-  isAuthenticated: !!initialToken || true,
+  isAuthenticated: !!initialToken && !!initialUser,
   isLoading: false,
 };
 
@@ -89,7 +83,12 @@ export const authStore = {
     listeners.forEach((l) => l(currentAuth));
   },
 
-  async signIn(email: string, password: string): Promise<User> {
+  async signIn(
+    email: string,
+    password: string,
+    providedName?: string,
+    providedCompany?: string
+  ): Promise<User> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
 
@@ -107,7 +106,11 @@ export const authStore = {
         let errDetail = "Invalid email or password.";
         try {
           const errJson = await res.json();
-          errDetail = errJson?.errors?.[0]?.detail || errJson?.detail || errJson?.message || errDetail;
+          errDetail =
+            errJson?.errors?.[0]?.detail ||
+            errJson?.detail ||
+            errJson?.message ||
+            errDetail;
         } catch {}
         throw new Error(errDetail);
       }
@@ -124,11 +127,23 @@ export const authStore = {
         localStorage.setItem("refresh_token", refreshToken);
       }
 
+      let tokenPayload: any = {};
+      try {
+        const base64Url = accessToken.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        tokenPayload = JSON.parse(window.atob(base64));
+      } catch {}
+
+      const cleanName =
+        providedName ||
+        (email.split("@")[0].charAt(0).toUpperCase() +
+          email.split("@")[0].slice(1));
+
       const loggedUser: User = {
-        id: data?.data?.id || "9871f836-2e7b-4761-a840-70986d96b955",
+        id: tokenPayload?.user_id || data?.data?.id || "user",
         email: email,
-        name: email.split("@")[0].toUpperCase(),
-        company_name: "Eflight Global Defense",
+        name: cleanName,
+        company_name: providedCompany || (email.endsWith("@eflight.aero") ? "Eflight Global Defense" : "Enterprise Security"),
         role: "Administrator",
       };
 
@@ -141,9 +156,17 @@ export const authStore = {
     }
   },
 
-  async signUp(email: string, password: string, name: string, company_name: string): Promise<User> {
+  async signUp(
+    email: string,
+    password: string,
+    name: string,
+    company_name: string
+  ): Promise<User> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
+
+    // Clear any existing session before registration
+    this.logout();
 
     try {
       // 1. Attempt user registration on Django backend
@@ -168,8 +191,21 @@ export const authStore = {
         body: JSON.stringify(payload),
       });
 
-      // 2. Automatically log the user in
-      return await this.signIn(email, password);
+      if (!res.ok) {
+        let errDetail = "Registration failed. Please check your details.";
+        try {
+          const errJson = await res.json();
+          errDetail =
+            errJson?.errors?.[0]?.detail ||
+            errJson?.detail ||
+            errJson?.message ||
+            errDetail;
+        } catch {}
+        throw new Error(errDetail);
+      }
+
+      // 2. Automatically log the newly registered user into their own isolated tenant
+      return await this.signIn(email, password, name, company_name);
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));

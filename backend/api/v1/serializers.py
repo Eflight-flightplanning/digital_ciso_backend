@@ -190,16 +190,26 @@ class BaseTokenSerializer(serializers.Serializer):
             if not user.is_member_of_tenant(tenant_id):
                 raise ValidationError("Tenant does not exist or user is not a member.")
         else:
-            from api.models import UserRoleRelationship
-            rel = UserRoleRelationship.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
-            if rel:
-                tenant_id = str(rel.tenant_id)
+            from api.models import Membership, Tenant, UserRoleRelationship
+            # 1. Resolve user's actual tenant strictly from their own memberships
+            membership = (
+                Membership.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
+                or Membership.objects.filter(user=user).order_by("-date_joined").first()
+            )
+            if membership:
+                tenant_id = str(membership.tenant_id)
             else:
                 rel = UserRoleRelationship.objects.filter(user=user).first()
                 if rel:
                     tenant_id = str(rel.tenant_id)
                 else:
-                    tenant_id = "3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47"
+                    tenant = Tenant.objects.using(MainRouter.admin_db).create(
+                        name=f"{user.email.split('@')[0]} default tenant"
+                    )
+                    Membership.objects.using(MainRouter.admin_db).create(
+                        user=user, tenant=tenant, role=Membership.RoleChoices.OWNER
+                    )
+                    tenant_id = str(tenant.id)
 
         return generate_tokens(user, tenant_id)
 
