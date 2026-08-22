@@ -198,27 +198,31 @@ sudo systemctl status digital_ciso_frontend
 
 ## 🌐 6. Nginx Reverse Proxy Configuration
 
-Create `/etc/nginx/sites-available/digital_ciso`:
+Create or update `/etc/nginx/sites-available/digital_ciso`:
 
 ```nginx
+# HTTP -> HTTPS Redirect
 server {
     listen 80;
-    server_name _;
+    server_name demo-digitalciso.centralindia.cloudapp.azure.com;
+
     return 301 https://$host$request_uri;
 }
 
+# HTTPS Server
 server {
-    listen 443 ssl default_server;
-    server_name _;
+    listen 443 ssl http2;
+    server_name demo-digitalciso.centralindia.cloudapp.azure.com;
 
-    ssl_certificate /etc/ssl/certs/digital_ciso.crt;
-    ssl_certificate_key /etc/ssl/private/digital_ciso.key;
+    # Let's Encrypt TLS/SSL Certificates
+    ssl_certificate /etc/letsencrypt/live/demo-digitalciso.centralindia.cloudapp.azure.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/demo-digitalciso.centralindia.cloudapp.azure.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
 
     client_max_body_size 50M;
 
-    # Frontend SSR Application
+    # 1. TanStack Start SSR Frontend (Node.js Server on Port 3000)
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -227,20 +231,47 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
         proxy_cache_bypass $http_upgrade;
     }
 
-    # Django API & AI Inference Endpoints
-    location ~ ^/(api|ai|admin)/ {
+    # 2. Django REST API
+    location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 180s;
+    }
+
+    # 3. Spectra AI Copilot & Streaming Inference
+    location /ai/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_buffering off;
         proxy_read_timeout 300s;
-        proxy_connect_timeout 300s;
+    }
+
+    # 4. Django Admin & Static / Media Assets
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location /static/ {
+        alias /opt/security_platform/backend/staticfiles/;
+    }
+
+    location /media/ {
+        alias /opt/security_platform/backend/media/;
     }
 }
 ```
