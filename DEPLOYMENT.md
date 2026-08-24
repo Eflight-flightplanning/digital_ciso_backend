@@ -83,8 +83,8 @@ python manage.py migrate
 DJANGO_SETTINGS_MODULE=config.django.devel
 DJANGO_DEBUG=False
 DJANGO_SECRET_KEY=production-secret-key-change-in-prod-xyz123!
-DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost,<YOUR_AZURE_VM_PUBLIC_IP>,<YOUR_DOMAIN>
-CSRF_TRUSTED_ORIGINS=http://<YOUR_AZURE_VM_PUBLIC_IP>,https://<YOUR_AZURE_VM_PUBLIC_IP>,http://localhost:3000
+DJANGO_ALLOWED_HOSTS=*
+CSRF_TRUSTED_ORIGINS=https://demo-digitalciso.centralindia.cloudapp.azure.com,http://localhost:3000,http://127.0.0.1:8000
 
 # Azure Flexible PostgreSQL (SSL Mode Require)
 POSTGRES_HOST=digitalciso.postgres.database.azure.com
