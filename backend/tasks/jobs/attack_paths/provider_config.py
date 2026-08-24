@@ -12,7 +12,7 @@ write the same shape and queries are portable across them.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tasks.jobs.attack_paths import aws
+from tasks.jobs.attack_paths import aws, azure
 
 
 @dataclass(frozen=True)
@@ -415,6 +415,12 @@ AWS_NORMALIZED_LISTS: list[NormalizedList] = [
 ]
 
 
+def passthrough_provider_ingestion(*args, **kwargs):
+    return {}
+
+def extract_provider_uid(uid: str) -> str:
+    return uid
+
 AWS_CONFIG = ProviderConfig(
     name="aws",
     root_node_label="AWSAccount",
@@ -425,7 +431,40 @@ AWS_CONFIG = ProviderConfig(
     normalized_lists=AWS_NORMALIZED_LISTS,
 )
 
+AZURE_CONFIG = ProviderConfig(
+    name="azure",
+    root_node_label="AzureSubscription",
+    uid_field="id",
+    resource_label="_AzureResource",
+    ingestion_function=azure.start_azure_ingestion,
+    short_uid_extractor=azure.extract_short_uid,
+    normalized_lists=[],
+)
+
+OCI_CONFIG = ProviderConfig(
+    name="oci",
+    root_node_label="OCICompartment",
+    uid_field="ocid",
+    resource_label="_OCIResource",
+    ingestion_function=passthrough_provider_ingestion,
+    short_uid_extractor=extract_provider_uid,
+    normalized_lists=[],
+)
+
+ORACLE_SAAS_CONFIG = ProviderConfig(
+    name="oracle_fusion_saas",
+    root_node_label="OracleSaaSAccount",
+    uid_field="uid",
+    resource_label="_OracleSaaSResource",
+    ingestion_function=passthrough_provider_ingestion,
+    short_uid_extractor=extract_provider_uid,
+    normalized_lists=[],
+)
 
 PROVIDER_CONFIGS: dict[str, ProviderConfig] = {
     "aws": AWS_CONFIG,
+    "azure": AZURE_CONFIG,
+    "oci": OCI_CONFIG,
+    "oracle_fusion_saas": ORACLE_SAAS_CONFIG,
+    "oracle_saas": ORACLE_SAAS_CONFIG,
 }

@@ -383,6 +383,18 @@ export function useScans(params?: Record<string, string>) {
   });
 }
 
+export function useScanDelta(scanId?: string) {
+  return useQuery({
+    queryKey: ["scans", scanId, "delta"],
+    queryFn: async () => {
+      if (!scanId) return null;
+      const res = await api.get(`/scans/${scanId}/delta`);
+      return res?.data?.attributes || res?.attributes || res;
+    },
+    enabled: !!scanId,
+  });
+}
+
 export function useLaunchScan() {
   const qc = useQueryClient();
   return useMutation({

@@ -24,6 +24,8 @@ function SignInPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,10 +53,28 @@ function SignInPage() {
     setLoading(true);
     setError(null);
     try {
-      await authStore.signIn(email, password);
-      navigate({ to: "/dashboard" });
+      const res = await authStore.signIn(email, password, mfaRequired ? otp : undefined);
+      if (res.mfa_required) {
+        setMfaRequired(true);
+      } else if (res.user) {
+        navigate({ to: "/dashboard" });
+      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Invalid credentials";
+      const msg = err instanceof Error ? err.message : "Authentication failed";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!email || !password) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await authStore.signIn(email, password);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not resend OTP";
       setError(msg);
     } finally {
       setLoading(false);
@@ -119,7 +139,7 @@ function SignInPage() {
               DIGITAL <span className="text-primary font-black">CISO</span>
             </h1>
             <p className="mt-1 text-xs font-bold text-primary tracking-wide">
-              AI Cloud Security
+              AI Cloud Security & Multi-Factor Auth
             </p>
           </div>
 
@@ -135,15 +155,21 @@ function SignInPage() {
             <div className={`border-b pb-4 ${isDark ? "border-white/10" : "border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-950"}`}>
-                  Sign In to Console
+                  {mfaRequired ? "MFA Verification Required" : "Sign In to Console"}
                 </h2>
-                <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${isDark ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-emerald-50 border-emerald-300 text-emerald-700"}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Secure Gate
+                <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
+                  mfaRequired
+                    ? (isDark ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400" : "bg-cyan-50 border-cyan-300 text-cyan-700")
+                    : (isDark ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-emerald-50 border-emerald-300 text-emerald-700")
+                }`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  {mfaRequired ? "Step 2 of 2" : "Secure Gate"}
                 </span>
               </div>
               <p className={`mt-1 text-xs ${isDark ? "text-slate-400" : "text-slate-600 font-medium"}`}>
-                Enter authorized security credentials to proceed
+                {mfaRequired
+                  ? `Enter the 6-digit MFA OTP sent to ${email}`
+                  : "Enter authorized security credentials to proceed"}
               </p>
             </div>
 
@@ -157,87 +183,124 @@ function SignInPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs">
-              <div>
-                <label className={`mb-1.5 block font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                  Work Email
-                </label>
-                <div className="relative">
-                  <Mail className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
-                    className={`h-11 w-full rounded-xl border pr-3.5 pl-10 text-xs font-medium outline-none transition-all ${
-                      isDark
-                        ? "border-white/10 bg-white/[0.03] text-white placeholder-slate-500 focus:border-cyan-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-500/20"
-                        : "border-slate-300 bg-slate-50/70 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:bg-white focus:ring-2 focus:ring-cyan-500/20"
-                    }`}
-                  />
-                </div>
-              </div>
+              {!mfaRequired ? (
+                <>
+                  <div>
+                    <label className={`mb-1.5 block font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                      Work Email
+                    </label>
+                    <div className="relative">
+                      <Mail className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@company.com"
+                        className={`h-11 w-full rounded-xl border pr-3.5 pl-10 text-xs font-medium outline-none transition-all ${
+                          isDark
+                            ? "border-white/10 bg-white/[0.03] text-white placeholder-slate-500 focus:border-cyan-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-500/20"
+                            : "border-slate-300 bg-slate-50/70 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:bg-white focus:ring-2 focus:ring-cyan-500/20"
+                        }`}
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={`font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                    Master Password
-                  </label>
-                  <a href="#" className="text-[11px] text-primary hover:underline font-semibold">
-                    Forgot Password?
-                  </a>
-                </div>
-                <div className="relative">
-                  <Lock className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className={`h-11 w-full rounded-xl border pr-10 pl-10 text-xs font-medium outline-none transition-all ${
-                      isDark
-                        ? "border-white/10 bg-white/[0.03] text-white placeholder-slate-500 focus:border-cyan-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-500/20"
-                        : "border-slate-300 bg-slate-50/70 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:bg-white focus:ring-2 focus:ring-cyan-500/20"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label="Toggle password visibility"
-                    className={`absolute top-3 right-3 p-0.5 transition-colors cursor-pointer ${
-                      isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-700"
-                    }`}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <label className={`flex items-center gap-2 cursor-pointer text-xs ${isDark ? "text-slate-400" : "text-slate-600 font-medium"}`}>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="h-3.5 w-3.5 rounded border-slate-300 accent-primary focus:ring-primary"
-                  />
-                  <span>Remember session for 30 days</span>
-                </label>
-              </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                        Master Password
+                      </label>
+                      <a href="#" className="text-[11px] text-primary hover:underline font-semibold">
+                        Forgot Password?
+                      </a>
+                    </div>
+                    <div className="relative">
+                      <Lock className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className={`h-11 w-full rounded-xl border pr-10 pl-10 text-xs font-medium outline-none transition-all ${
+                          isDark
+                            ? "border-white/10 bg-white/[0.03] text-white placeholder-slate-500 focus:border-cyan-500 focus:bg-white/[0.06] focus:ring-2 focus:ring-cyan-500/20"
+                            : "border-slate-300 bg-slate-50/70 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:bg-white focus:ring-2 focus:ring-cyan-500/20"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label="Toggle password visibility"
+                        className={`absolute top-3 right-3 p-0.5 transition-colors cursor-pointer ${
+                          isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-700"
+                        }`}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                        6-Digit MFA Verification Code
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={loading}
+                        className="text-[11px] text-cyan-400 hover:underline font-semibold cursor-pointer disabled:opacity-50"
+                      >
+                        Resend Code
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-cyan-400" : "text-cyan-600"}`} />
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        placeholder="123456"
+                        autoFocus
+                        className={`h-11 w-full rounded-xl border pr-3.5 pl-10 text-base font-mono font-bold tracking-widest outline-none transition-all ${
+                          isDark
+                            ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300 placeholder-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
+                            : "border-cyan-400 bg-cyan-50 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20"
+                        }`}
+                      />
+                    </div>
+                    <div className="mt-2 text-[11px] flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setMfaRequired(false); setOtp(""); }}
+                        className="text-slate-400 hover:text-white underline cursor-pointer"
+                      >
+                        Change Email
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (mfaRequired && otp.length < 6)}
                 className="mt-2 flex h-11 w-full items-center justify-center gap-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-6 text-xs font-bold text-white shadow-[0_0_24px_rgba(6,182,212,0.4)] transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
                   <>
                     <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    <span>Authenticating Session...</span>
+                    <span>{mfaRequired ? "Verifying OTP Code..." : "Authenticating Credentials..."}</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In to Command Console</span>
+                    <span>{mfaRequired ? "Verify MFA & Sign In" : "Sign In to Command Console"}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}

@@ -168,7 +168,7 @@ function generateProviderRemediation(
       console_steps: `1. Log in to AWS Management Console.\n2. Locate resource '${rName}' in region ${reg}.\n3. Apply security configuration according to AWS CIS Benchmark.\n4. Save changes and trigger compliance evaluation.`,
       validation_steps: [
         `Verify resource status in AWS CLI or Management Console.`,
-        `Trigger on-demand Prowler assessment scan.`,
+        `Trigger on-demand security assessment scan.`,
         `Ensure finding status transitions to PASS.`
       ],
       remediation_url: metaUrl || "https://aws.amazon.com/security/",

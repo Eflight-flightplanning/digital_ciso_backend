@@ -484,7 +484,9 @@ class AIAdvisorQueryView(APIView):
             provider_filter = None
             if raw_prov:
                 p_lower = str(raw_prov).strip().lower()
-                if p_lower in ("oci", "oracle", "oraclecloud"):
+                if p_lower in ("oracle_saas", "oracle-saas", "fusion", "fusion_saas", "fusion-saas", "oracle fusion saas", "oracle saas"):
+                    provider_filter = "oracle_saas"
+                elif p_lower in ("oci", "oracle", "oraclecloud"):
                     provider_filter = "oraclecloud"
                 elif p_lower in ("azure", "az"):
                     provider_filter = "azure"
@@ -601,13 +603,10 @@ def _retrieve_relevant_findings(
             request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None
         )
         if not tenant_id:
-            try:
-                from api.models import Tenant
-                default_tenant = Tenant.objects.first()
-                if default_tenant:
-                    tenant_id = default_tenant.id
-            except Exception:
-                pass
+            # Fail closed — never guess a tenant via Tenant.objects.first(),
+            # that would leak an arbitrary tenant's findings into this
+            # request's AI context.
+            return []
 
         if tenant_id:
             cm = rls_transaction(tenant_id)

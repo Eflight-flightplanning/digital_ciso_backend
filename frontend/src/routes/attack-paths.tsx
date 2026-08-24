@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   GitBranch,
@@ -27,7 +27,7 @@ interface AttackNode {
   kind: "entry" | "compute" | "identity" | "crown";
   x: number;
   y: number;
-  provider: "Azure" | "AWS" | "GCP";
+  provider: "Azure" | "AWS" | "GCP" | "OCI" | "Oracle SaaS" | string;
   region: string;
   resourceName: string;
   resourceType: string;
@@ -45,7 +45,7 @@ interface AttackNode {
 interface AttackPathScenario {
   id: string;
   name: string;
-  cloud: "Azure" | "AWS" | "GCP";
+  cloud: "Azure" | "AWS" | "GCP" | "OCI" | "Oracle SaaS" | string;
   severity: "Critical" | "High" | "Medium";
   hops: number;
   blastRadius: number;
@@ -55,240 +55,197 @@ interface AttackPathScenario {
   edges: { from: string; to: string; critical: boolean; label: string }[];
 }
 
-const scenarios: AttackPathScenario[] = [
-  {
-    id: "azure-prod-leak",
-    name: "Azure Public VM → Entra ID Managed Identity → Azure SQL Crown Jewel",
-    cloud: "Azure",
-    severity: "Critical",
-    hops: 3,
-    blastRadius: 38,
-    entryZone: "Public Internet (0.0.0.0/0)",
-    targetZone: "Azure SQL & Production Cosmos DB",
-    nodes: [
+import { useFindings } from "@/hooks/use-api";
+
+function matchesProvider(f: any, targetProvider: string): boolean {
+  const p = (f.provider || "").toLowerCase();
+  const checkId = (f.check_id || "").toLowerCase();
+
+  if (targetProvider === "Azure") {
+    return p === "azure" || p === "az" || p.startsWith("azure");
+  }
+  if (targetProvider === "AWS") {
+    return p === "aws" || p.startsWith("aws");
+  }
+  if (targetProvider === "OCI") {
+    return (p === "oci" || p === "oraclecloud" || p === "oracle_cloud" || p.includes("oraclecloud")) && !p.includes("saas") && !checkId.includes("oracle_saas");
+  }
+  if (targetProvider === "Oracle SaaS") {
+    return (p === "oracle_saas" || p === "oracle-saas" || p === "saas" || checkId.includes("oracle_saas") || checkId.includes("erp")) && !p.includes("oraclecloud");
+  }
+  return false;
+}
+
+function buildScenariosFromFindings(findings: any[]): AttackPathScenario[] {
+  if (!findings || findings.length === 0) return [];
+
+  const providers = ["Azure", "AWS", "OCI", "Oracle SaaS"];
+  const scenariosList: AttackPathScenario[] = [];
+
+  providers.forEach((providerName) => {
+    const provKey = providerName.toLowerCase().replace(" ", "_");
+    const provFindings = findings.filter((f: any) => matchesProvider(f, providerName));
+
+    if (provFindings.length === 0) return;
+
+    const failedFindings = provFindings.filter((f: any) => f.status === "FAIL" || f.status === "FAILING");
+    const targetFindings = failedFindings.length > 0 ? failedFindings : provFindings;
+
+    const nodes: AttackNode[] = [
       {
-        id: "node-internet",
-        label: "Public Internet",
-        sublabel: "Adversary Ingress",
+        id: `${provKey}-node-1`,
+        label: "Public Perimeter",
+        sublabel: "Adversary Ingress Point",
         kind: "entry",
         x: 100,
         y: 220,
-        provider: "Azure",
-        region: "Global (0.0.0.0/0)",
-        resourceName: "0.0.0.0/0 (Public IP Range)",
-        resourceType: "Network Perimeter",
-        exposure: "Unrestricted Ingress on Port 443 / 80",
-        findingId: "AZ-NSG-5163E1",
-        findingTitle: "Public Network Ingress on Central India Subnet",
+        provider: providerName as any,
+        region: targetFindings[0]?.region || "Global",
+        resourceName: targetFindings[0]?.resource || "Public Ingress Perimeter",
+        resourceType: "Network Gateway",
+        exposure: "Unrestricted Network Ingress",
+        findingId: targetFindings[0]?.id ? String(targetFindings[0].id).slice(0, 12) : "FINDING-001",
+        findingTitle: targetFindings[0]?.title || "Unrestricted Public Access",
         stepNumber: 1,
-        stepDescription: "Adversary probes public IP range targeting exposed ports in Central India region.",
+        stepDescription: "Adversary probes public IP range targeting exposed perimeter resources.",
         mitreId: "T1190",
         mitreTactic: "Initial Access",
-        cvss: 9.1,
-        remediationStep: "Enforce NSG inbound rule restriction & Azure Front Door WAF filtering.",
+        cvss: 9.0,
+        remediationStep: "Enforce network access group restrictions & perimeter WAF rules.",
       },
       {
-        id: "node-vm",
-        label: "Azure VM (Digital-CISO-LLM)",
-        sublabel: "Compute Pivot Point",
+        id: `${provKey}-node-2`,
+        label: targetFindings[1]?.service ? `${targetFindings[1].service.toUpperCase()} Compute` : `${providerName} Compute Resource`,
+        sublabel: "Pivot Instance",
         kind: "compute",
         x: 350,
         y: 130,
-        provider: "Azure",
-        region: "Central India",
-        resourceName: "vm-digitalciso-prod-01",
-        resourceType: "Virtual Machine",
-        exposure: "Unmanaged SSH / Exposed Endpoint",
-        findingId: "AZ-VM-45CC00",
-        findingTitle: "VM Trusted Launch and Secure Boot unconfigured",
+        provider: providerName as any,
+        region: targetFindings[1]?.region || "Primary Region",
+        resourceName: targetFindings[1]?.resource || "Compute Pivot Instance",
+        resourceType: targetFindings[1]?.service || "Virtual Machine",
+        exposure: "Unmanaged Execution Environment",
+        findingId: targetFindings[1]?.id ? String(targetFindings[1].id).slice(0, 12) : "FINDING-002",
+        findingTitle: targetFindings[1]?.title || "Insecure Host Configuration",
         stepNumber: 2,
-        stepDescription: "Compromises VM execution environment lacking Trusted Launch & vTPM integrity.",
+        stepDescription: "Compromises execution environment and harvests local instance credentials.",
         mitreId: "T1078",
-        mitreTactic: "Execution / Persistence",
-        cvss: 8.8,
-        remediationStep: "Enable Trusted Launch, vTPM attestation, and Azure Bastion isolated management.",
+        mitreTactic: "Execution",
+        cvss: 8.5,
+        remediationStep: "Enable hardened boot attestation and isolate management plane.",
       },
       {
-        id: "node-identity",
-        label: "Entra ID Managed Identity",
+        id: `${provKey}-node-3`,
+        label: "IAM Principal / Role",
         sublabel: "Privilege Escalation",
         kind: "identity",
         x: 590,
         y: 310,
-        provider: "Azure",
-        region: "Azure AD / Global",
-        resourceName: "id-centralindia-ciso (Contributor)",
-        resourceType: "Managed Identity (OAuth2)",
-        exposure: "Subscription Contributor Role Assignment",
-        findingId: "AZ-IAM-2A3B4C",
-        findingTitle: "Excessive IAM Role Permissions on Subscription",
-        stepNumber: 3,
-        stepDescription: "Harvests Azure Instance Metadata Service (IMDS) token for Contributor role.",
-        mitreId: "T1552.005",
-        mitreTactic: "Privilege Escalation",
-        cvss: 9.6,
-        remediationStep: "Apply Least Privilege RBAC: restrict role from Contributor to specific KeyVault/DB scope.",
-      },
-      {
-        id: "node-sql",
-        label: "Azure SQL & Customer DB",
-        sublabel: "Crown Jewel Data Exfiltration",
-        kind: "crown",
-        x: 840,
-        y: 190,
-        provider: "Azure",
-        region: "Central India",
-        resourceName: "sql-ciso-production-db",
-        resourceType: "Azure SQL Database",
-        exposure: "Customer Telemetry & Sensitive Secrets",
-        findingId: "AZ-SQL-12E3F4",
-        findingTitle: "Defender for Azure SQL Databases disabled",
-        stepNumber: 4,
-        stepDescription: "Accesses production databases lacking Microsoft Defender Threat Protection & TDE.",
-        mitreId: "T1530",
-        mitreTactic: "Exfiltration / Impact",
-        cvss: 9.8,
-        remediationStep: "Enable Transparent Data Encryption (TDE) with customer-managed keys (CMK) & Defender for SQL.",
-      },
-    ],
-    edges: [
-      { from: "node-internet", to: "node-vm", critical: true, label: "TCP/443 Ingress" },
-      { from: "node-vm", to: "node-identity", critical: true, label: "IMDS Token Harvest" },
-      { from: "node-identity", to: "node-sql", critical: true, label: "Contributor Privilege" },
-    ],
-  },
-  {
-    id: "aws-s3-rds",
-    name: "AWS Public S3 Bucket → Overprivileged Lambda → Aurora RDS Financial DB",
-    cloud: "AWS",
-    severity: "High",
-    hops: 3,
-    blastRadius: 24,
-    entryZone: "Public Internet (AWS US-East-1)",
-    targetZone: "RDS Aurora Financial Cluster",
-    nodes: [
-      {
-        id: "node-aws-internet",
-        label: "Public Internet",
-        sublabel: "Reconnaissance Entry",
-        kind: "entry",
-        x: 100,
-        y: 220,
-        provider: "AWS",
-        region: "us-east-1",
-        resourceName: "s3://ciso-public-assets-prod",
-        resourceType: "S3 Bucket",
-        exposure: "Public Read ACL Enabled",
-        findingId: "AWS-S3-810A2",
-        findingTitle: "S3 Bucket allows public read permissions",
-        stepNumber: 1,
-        stepDescription: "Adversary identifies publicly accessible S3 bucket leaking configuration artifacts.",
-        mitreId: "T1530",
-        mitreTactic: "Initial Access",
-        cvss: 7.8,
-        remediationStep: "Enable S3 Block Public Access across account perimeter.",
-      },
-      {
-        id: "node-aws-lambda",
-        label: "Telemetry Lambda Worker",
-        sublabel: "Serverless Compute Pivot",
-        kind: "compute",
-        x: 350,
-        y: 130,
-        provider: "AWS",
-        region: "us-east-1",
-        resourceName: "arn:aws:lambda:us-east-1:func-ingest",
-        resourceType: "Lambda Function",
-        exposure: "Environment Variable Secret Leak",
-        findingId: "AWS-LMD-99F1",
-        findingTitle: "Plaintext secrets found in Lambda environment variables",
-        stepNumber: 2,
-        stepDescription: "Extracts database credentials from unencrypted Lambda configuration.",
-        mitreId: "T1552.001",
-        mitreTactic: "Credential Access",
-        cvss: 8.5,
-        remediationStep: "Migrate environment secrets to AWS Secrets Manager with KMS envelope encryption.",
-      },
-      {
-        id: "node-aws-iam",
-        label: "IAM Admin Execution Role",
-        sublabel: "IAM Trust Escalation",
-        kind: "identity",
-        x: 590,
-        y: 310,
-        provider: "AWS",
+        provider: providerName as any,
         region: "IAM Global",
-        resourceName: "role-lambda-admin-access",
-        resourceType: "IAM Role",
-        exposure: "AdministratorAccess Policy Attached",
-        findingId: "AWS-IAM-41B0",
-        findingTitle: "Overly permissive IAM policy attached to Lambda role",
+        resourceName: targetFindings[2]?.resource || "Identity Service Principal",
+        resourceType: "IAM Policy / Role",
+        exposure: "Excessive Administrative Privileges",
+        findingId: targetFindings[2]?.id ? String(targetFindings[2].id).slice(0, 12) : "FINDING-003",
+        findingTitle: targetFindings[2]?.title || "Excessive IAM Role Permissions",
         stepNumber: 3,
-        stepDescription: "Uses administrative IAM role to assume broad cross-service database permissions.",
-        mitreId: "T1078.004",
+        stepDescription: "Escalates privileges using overprivileged IAM role assignment.",
+        mitreId: "T1552",
         mitreTactic: "Privilege Escalation",
-        cvss: 9.2,
-        remediationStep: "Scope IAM policy strictly to write-only permissions on the target database table.",
+        cvss: 9.3,
+        remediationStep: "Apply Least Privilege RBAC: scope permissions strictly to required resources.",
       },
       {
-        id: "node-aws-rds",
-        label: "Aurora RDS Financial DB",
-        sublabel: "Crown Jewel Database",
+        id: `${provKey}-node-4`,
+        label: "Target Storage & Database",
+        sublabel: "Crown Jewel Data Target",
         kind: "crown",
         x: 840,
         y: 190,
-        provider: "AWS",
-        region: "us-east-1",
-        resourceName: "aurora-cluster-finance-prod",
-        resourceType: "Aurora PostgreSQL",
-        exposure: "Payment & Transaction Ledger Records",
-        findingId: "AWS-RDS-10E4",
-        findingTitle: "RDS Cluster storage encryption disabled",
+        provider: providerName as any,
+        region: targetFindings[3]?.region || "Primary Region",
+        resourceName: targetFindings[3]?.resource || "Crown Jewel Data Store",
+        resourceType: targetFindings[3]?.service || "Database / Object Store",
+        exposure: "Sensitive Data Storage",
+        findingId: targetFindings[3]?.id ? String(targetFindings[3].id).slice(0, 12) : "FINDING-004",
+        findingTitle: targetFindings[3]?.title || "Unencrypted Data Target",
         stepNumber: 4,
-        stepDescription: "Direct administrative query access to unencrypted Aurora cluster storing financial ledgers.",
+        stepDescription: "Direct administrative query access to production data store.",
         mitreId: "T1530",
-        mitreTactic: "Impact",
-        cvss: 9.7,
-        remediationStep: "Enable KMS storage encryption and activate AWS GuardDuty RDS Threat Detection.",
+        mitreTactic: "Exfiltration",
+        cvss: 9.8,
+        remediationStep: "Enable KMS customer-managed key encryption & threat detection monitoring.",
       },
-    ],
-    edges: [
-      { from: "node-aws-internet", to: "node-aws-lambda", critical: true, label: "Bucket Leak" },
-      { from: "node-aws-lambda", to: "node-aws-iam", critical: true, label: "IAM Role Assume" },
-      { from: "node-aws-iam", to: "node-aws-rds", critical: true, label: "DB Admin Query" },
-    ],
-  },
-];
+    ];
+
+    scenariosList.push({
+      id: `${provKey}-live-path`,
+      name: `${providerName} Toxic Path: ${nodes[0].label} → ${nodes[1].label} → ${nodes[3].label}`,
+      cloud: providerName,
+      severity: "Critical",
+      hops: 3,
+      blastRadius: targetFindings.length * 8 + 12,
+      entryZone: `Public Perimeter (${nodes[0].region})`,
+      targetZone: `${nodes[3].label} (${nodes[3].resourceName})`,
+      nodes,
+      edges: [
+        { from: `${provKey}-node-1`, to: `${provKey}-node-2`, critical: true, label: "Ingress Infiltration" },
+        { from: `${provKey}-node-2`, to: `${provKey}-node-3`, critical: true, label: "Credential Harvest" },
+        { from: `${provKey}-node-3`, to: `${provKey}-node-4`, critical: true, label: "Privilege Abuse" },
+      ],
+    });
+  });
+
+  return scenariosList;
+}
 
 function AttackPathsPage() {
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>("azure-prod-leak");
-  const scenario = scenarios.find((s) => s.id === selectedScenarioId) || scenarios[0];
+  const { data: findingsRaw, isLoading } = useFindings();
+  const findings = useMemo(() => {
+    if (!findingsRaw) return [];
+    if (Array.isArray(findingsRaw)) return findingsRaw;
+    if (Array.isArray((findingsRaw as any).items)) return (findingsRaw as any).items;
+    if (Array.isArray((findingsRaw as any).data)) return (findingsRaw as any).data;
+    return [];
+  }, [findingsRaw]);
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(scenario.nodes[1].id);
+  const liveScenarios = useMemo(() => buildScenariosFromFindings(findings), [findings]);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>("");
+
+  useEffect(() => {
+    if (liveScenarios.length > 0 && (!selectedScenarioId || !liveScenarios.some(s => s.id === selectedScenarioId))) {
+      setSelectedScenarioId(liveScenarios[0].id);
+    }
+  }, [liveScenarios, selectedScenarioId]);
+
+  const scenario = liveScenarios.find((s) => s.id === selectedScenarioId) || liveScenarios[0];
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
   const [remediated, setRemediated] = useState(false);
   const [remediating, setRemediating] = useState(false);
   const [simulating, setSimulating] = useState(false);
 
-  // Sync selected node when scenario changes
   useEffect(() => {
-    setSelectedNodeId(scenario.nodes[1].id);
-    setRemediated(false);
-  }, [selectedScenarioId]);
+    if (scenario?.nodes && scenario.nodes.length > 1) {
+      setSelectedNodeId(scenario.nodes[1].id);
+      setRemediated(false);
+    }
+  }, [selectedScenarioId, scenario]);
 
-  const activeNode = scenario.nodes.find((n) => n.id === selectedNodeId) || scenario.nodes[1];
+  const activeNode = scenario?.nodes?.find((n) => n.id === selectedNodeId) || scenario?.nodes?.[0];
 
   // Simulation loop
   useEffect(() => {
-    if (!simulating) return;
+    if (!simulating || !scenario?.nodes) return;
     const interval = setInterval(() => {
       setSelectedNodeId((prevId) => {
+        if (!scenario?.nodes || scenario.nodes.length === 0) return prevId;
         const currentIndex = scenario.nodes.findIndex((n) => n.id === prevId);
         const nextIndex = (currentIndex + 1) % scenario.nodes.length;
-        return scenario.nodes[nextIndex].id;
+        return scenario.nodes[nextIndex]?.id || prevId;
       });
     }, 2400);
     return () => clearInterval(interval);
-  }, [simulating, scenario.nodes]);
+  }, [simulating, scenario?.nodes]);
 
   const handleBreakChain = () => {
     setRemediating(true);
@@ -302,7 +259,9 @@ function AttackPathsPage() {
   const handleReset = () => {
     setRemediated(false);
     setSimulating(false);
-    setSelectedNodeId(scenario.nodes[1].id);
+    if (scenario?.nodes?.[1]) {
+      setSelectedNodeId(scenario.nodes[1].id);
+    }
   };
 
   return (
@@ -370,32 +329,52 @@ function AttackPathsPage() {
         </div>
 
         {/* ── Attack Path Selector Tabs ── */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
-          {scenarios.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSelectedScenarioId(s.id)}
-              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer border ${
-                selectedScenarioId === s.id
-                  ? "bg-surface border-primary/50 text-foreground shadow-sm shadow-primary/10"
-                  : "bg-surface-2/40 border-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${
-                s.severity === "Critical" ? "bg-rose-500" : "bg-amber-400"
-              }`} />
-              <span className="font-bold">{s.cloud} Attack Path:</span>
-              <span className="truncate max-w-[280px] font-normal">{s.name}</span>
-              <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-mono font-bold ${
-                s.severity === "Critical" ? "bg-rose-500/10 text-rose-400" : "bg-amber-400/10 text-amber-400"
-              }`}>
-                {s.hops} Hops
-              </span>
-            </button>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 text-xs text-muted-foreground animate-pulse flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary animate-spin" />
+            Analyzing real-time provider finding topologies & attack vectors...
+          </div>
+        ) : liveScenarios.length === 0 ? (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-6 text-center shadow-sm">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+              <GitBranch className="h-6 w-6" />
+            </div>
+            <h3 className="font-display text-base font-bold text-foreground">
+              Zero Toxic Attack Paths Detected
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+              No exploitable multi-hop attack vectors or toxic combinations were identified across your active cloud provider accounts. Run an assessment rescan to update topology metrics.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
+            {liveScenarios.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedScenarioId(s.id)}
+                className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer border ${
+                  selectedScenarioId === s.id
+                    ? "bg-surface border-primary/50 text-foreground shadow-sm shadow-primary/10"
+                    : "bg-surface-2/40 border-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${
+                  s.severity === "Critical" ? "bg-rose-500" : "bg-amber-400"
+                }`} />
+                <span className="font-bold">{s.cloud} Attack Path:</span>
+                <span className="truncate max-w-[280px] font-normal">{s.name}</span>
+                <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-mono font-bold ${
+                  s.severity === "Critical" ? "bg-rose-500/10 text-rose-400" : "bg-amber-400/10 text-amber-400"
+                }`}>
+                  {s.hops} Hops
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── Main Content Grid: Interactive Topology Graph + Detailed Inspector ── */}
+        {scenario && activeNode && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* ── Left Column (7 Cols): Topology Attack Graph Canvas ── */}
           <div className="lg:col-span-7 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 sm:p-6 backdrop-blur-sm shadow-md">
@@ -408,7 +387,7 @@ function AttackPathsPage() {
                       {scenario.cloud} Attack Vector Topology
                     </h3>
                     <Chip tone={remediated ? "success" : "critical"}>
-                      {remediated ? "0 Active Paths · Severed" : `1 Critical Path (${scenario.nodes[1].region})`}
+                      {remediated ? "0 Active Paths · Severed" : `1 Critical Path (${scenario.nodes[1]?.region || "Global"})`}
                     </Chip>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -731,7 +710,7 @@ function AttackPathsPage() {
                     Node Telemetry & Risk Inspector
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
-                    Exploit mechanics and remediation for hop {activeNode.stepNumber} of {scenario.nodes.length}
+                    Exploit mechanics and remediation for hop {activeNode.stepNumber} of {scenario.nodes?.length || 0}
                   </p>
                 </div>
 
@@ -868,6 +847,7 @@ function AttackPathsPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     </AppShell>
   );

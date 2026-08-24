@@ -18,11 +18,11 @@ This document contains the complete, step-by-step production deployment guide fo
   Node.js (Port 3000)                                 Gunicorn (Port 8000)
   systemd: digital_ciso_frontend                       systemd: digital_ciso
                                                              │
-         ┌───────────────────────────────────────────────────┼────────────────────────┐
-         ▼                                                   ▼                        ▼
-[ Azure PostgreSQL Flexible ]                      [ Azure Private vLLM ]    [ Oracle Fusion SaaS ]
-  Private DNS / SSL Required                         Private VNet (Port 8000)   SCIM 2.0 REST API
-  Multi-Tenant / 279 Findings                        Qwen 2.5 Security Model    Dormant PAM Remediation
+         ┌───────────────────────────────────────────────────┼────────────────────────┬──────────────────────┐
+         ▼                                                   ▼                        ▼                      ▼
+[ Azure PostgreSQL Flexible ]                      [ Azure Private vLLM ]    [ Oracle Fusion SaaS ]   [ Neo4j Enterprise ]
+  Private DNS / SSL Required                         Private VNet (Port 8000)   SCIM 2.0 REST API       Attack Paths graph
+  Multi-Tenant / 279 Findings                        Qwen 2.5 Security Model    Dormant PAM Remediation  Bolt (7687) / systemd: neo4j
 ```
 
 ---
@@ -113,6 +113,13 @@ JIRA_BASE_URL=https://pravahya1.atlassian.net
 JIRA_USER_EMAIL=alex.ciso@eflight.aero
 JIRA_API_TOKEN=<JIRA_API_TOKEN>
 JIRA_DEFAULT_PROJECT=SEC
+
+# Neo4j (Attack Paths graph — see Section 8.5 for install)
+NEO4J_HOST=127.0.0.1
+NEO4J_PORT=7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD="<YOUR_COMPLEX_PASSWORD_IN_QUOTES>"
+ATTACK_PATHS_SINK_DATABASE=neo4j
 ```
 
 ---
@@ -319,12 +326,98 @@ sudo systemctl restart nginx
 
 ---
 
-## 🛠️ 9. Day-2 Operations & Maintenance Runbook
+## 🕸️ 9. Neo4j Enterprise Installation (Attack Paths Graph)
+
+Attack Paths requires **Neo4j Enterprise** specifically — Community Edition does not
+support `CREATE DATABASE` (multi-database), which this platform relies on for
+per-scan staging databases and per-tenant sink databases. Enterprise Edition is
+free to run under Neo4j's license for this kind of use; no purchased license is
+required to start it, only accepting the license agreement via an environment
+variable at install/start time.
+
+### 9.1 Install via apt (Ubuntu/Debian)
+
+```bash
+# 1. Add Neo4j's package signing key and repository
+wget -O - https://debian.neo4j.com/neotechnology.gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/neo4j.gpg
+echo 'deb https://debian.neo4j.com stable latest' | sudo tee /etc/apt/sources.list.d/neo4j.list
+sudo apt-get update
+
+# 2. Install Neo4j Enterprise, accepting the license non-interactively
+sudo NEO4J_ACCEPT_LICENSE_AGREEMENT=yes apt-get install -y neo4j-enterprise
+
+# 3. Set the initial password (must happen before first start)
+sudo neo4j-admin dbms set-initial-password '<YOUR_COMPLEX_PASSWORD_IN_QUOTES>'
+
+# 4. Enable and start as a systemd service
+sudo systemctl enable neo4j
+sudo systemctl start neo4j
+sudo systemctl status neo4j
+```
+
+### 9.2 Network configuration
+
+By default Neo4j only binds to `localhost`. Since this platform's backend runs on
+the same host (per the topology above), the default is correct and no public
+exposure of Bolt (7687) or HTTP (7474) is needed — do **not** open these ports on
+the VM's network security group. If the backend and Neo4j ever run on separate
+hosts, use a private VNet connection, not a public listener.
+
+### 9.3 Verify
+
+```bash
+cypher-shell -u neo4j -p '<YOUR_COMPLEX_PASSWORD_IN_QUOTES>' "CREATE DATABASE verify_install; SHOW DATABASES; DROP DATABASE verify_install;"
+```
+
+If `CREATE DATABASE` fails with `Unsupported administration command`, the
+`neo4j-enterprise` package didn't install correctly (Community was installed
+instead) — check `apt list --installed | grep neo4j`.
+
+### 9.4 Required post-install patch — do not skip
+
+The pip-installed `cartography` library (which drives the real graph ingestion for
+AWS/Azure/OCI) has two real bugs against the exact dependency versions this
+project pins: a stale Azure SDK import (`SubscriptionClient` moved from
+`azure-mgmt-resource` to `azure-mgmt-subscription` in the SDK versions this
+project uses) and calls to Neo4j driver methods removed in `neo4j>=6.2.0`
+(`write_transaction`/`read_transaction`, renamed to `execute_write`/`execute_read`).
+These patches live in site-packages, not in this repo, so they are **wiped out by
+every `uv sync`**. Run this after every dependency install or update, including
+first deploy:
+
+```bash
+cd /opt/security_platform/backend
+source .venv/bin/activate
+python manage.py patch_cartography
+```
+
+It's idempotent — safe to run every time, reports "Already patched" if there's
+nothing to do. Add it to CI/deploy scripts right after `uv sync`, not as a manual
+step someone has to remember.
+
+**Do not** reintroduce a local `backend/cartography/` package for any reason —
+a stub package under that exact name previously shadowed the real installed
+library for this entire project's history, silently breaking Attack Paths for
+every provider from day one. If `cartography.intel.aws.RESOURCE_FUNCTIONS` (or
+similarly `.intel.azure`, `.intel.oci`) ever fails to import or comes back empty,
+check `python -c "import cartography; print(cartography.__file__)"` resolves into
+`site-packages`, not into this repo.
+
+---
+
+## 🛠️ 10. Day-2 Operations & Maintenance Runbook
 
 ### Updating Code from Git:
 ```bash
 cd /opt/security_platform
 git pull origin main
+
+# If backend dependencies changed
+cd /opt/security_platform/backend
+source .venv/bin/activate
+uv sync
+python manage.py patch_cartography  # required every time uv sync runs — see Section 9.4
+python manage.py migrate
 
 # Restart Backend
 sudo systemctl restart digital_ciso

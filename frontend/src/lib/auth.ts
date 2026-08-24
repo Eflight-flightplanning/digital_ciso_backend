@@ -86,9 +86,10 @@ export const authStore = {
   async signIn(
     email: string,
     password: string,
+    otp?: string,
     providedName?: string,
     providedCompany?: string
-  ): Promise<User> {
+  ): Promise<{ user?: User; mfa_required?: boolean; message?: string }> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
 
@@ -99,7 +100,7 @@ export const authStore = {
           "Content-Type": "application/json",
           "Accept": "application/json, application/vnd.api+json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, otp: otp || "" }),
       });
 
       if (!res.ok) {
@@ -108,6 +109,7 @@ export const authStore = {
           const errJson = await res.json();
           errDetail =
             errJson?.errors?.[0]?.detail ||
+            errJson?.errors?.otp?.[0] ||
             errJson?.detail ||
             errJson?.message ||
             errDetail;
@@ -116,8 +118,19 @@ export const authStore = {
       }
 
       const data = await res.json();
-      const accessToken = data?.data?.attributes?.access || data?.access;
-      const refreshToken = data?.data?.attributes?.refresh || data?.refresh;
+      const attributes = data?.data?.attributes || data;
+
+      if (attributes?.mfa_required) {
+        currentAuth.isLoading = false;
+        listeners.forEach((l) => l(currentAuth));
+        return {
+          mfa_required: true,
+          message: attributes.message || `Verification code sent to ${email}.`,
+        };
+      }
+
+      const accessToken = attributes?.access;
+      const refreshToken = attributes?.refresh;
 
       if (!accessToken) {
         throw new Error("No access token returned by server.");
@@ -148,7 +161,7 @@ export const authStore = {
       };
 
       this.setUser(loggedUser, accessToken);
-      return loggedUser;
+      return { user: loggedUser };
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));

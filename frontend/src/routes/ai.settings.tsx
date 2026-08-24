@@ -31,7 +31,7 @@ export const Route = createFileRoute("/ai/settings")({
 
 function AISettingsPage() {
   const [vllmEndpoint, setVllmEndpoint] = useState("http://20.235.254.33:8000/v1");
-  const [modelName, setModelName] = useState("/home/azureuser/models/qwen3.5-9b");
+  const [modelName, setModelName] = useState("/home/azureuser/models/digital-ciso-llm");
   const [vllmApiKey, setVllmApiKey] = useState("");
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"healthy" | "testing" | "error">("healthy");
@@ -90,7 +90,7 @@ function AISettingsPage() {
   return (
     <AppShell
       title="Private AI Engine & Sovereign LLM Architecture"
-      subtitle="Model architectures for Spectra (Analysis), Aegis (Decisions), and Phantom (Remediation) powered by private Qwen 3.5"
+      subtitle="Model architectures for Spectra (Analysis), Aegis (Decisions), and Phantom (Remediation) powered by private Digital CISO LLM"
       actions={
         <button
           onClick={handleSave}
@@ -124,7 +124,7 @@ function AISettingsPage() {
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              All 3 security agents run entirely on private dedicated Qwen 3.5 models. Cloud telemetry, IAM policies, and finding evidence never touch third-party APIs.
+              All 3 security agents run entirely on private dedicated Digital CISO LLM models. Cloud telemetry, IAM policies, and finding evidence never touch third-party APIs.
             </p>
           </div>
         </div>
@@ -154,7 +154,7 @@ function AISettingsPage() {
                 </div>
               </div>
               <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-400 border border-cyan-500/20">
-                Qwen 3.5 Security
+                Digital CISO Security
               </span>
             </div>
 
@@ -165,7 +165,7 @@ function AISettingsPage() {
             <div className="mt-4 space-y-2 rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Architecture:</span>
-                <span className="font-mono text-foreground font-semibold">Qwen-3.5-9B-Instruct</span>
+                <span className="font-mono text-foreground font-semibold">Digital-CISO-LLM</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Inference Node:</span>
@@ -206,7 +206,7 @@ function AISettingsPage() {
                 </div>
               </div>
               <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
-                Qwen Decision Core
+                Digital CISO Decision Core
               </span>
             </div>
 
@@ -217,7 +217,7 @@ function AISettingsPage() {
             <div className="mt-4 space-y-2 rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Decision Core:</span>
-                <span className="font-mono text-foreground font-semibold">Qwen Policy & Risk Core</span>
+                <span className="font-mono text-foreground font-semibold">Digital CISO Policy & Risk Core</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Governance:</span>
@@ -258,7 +258,7 @@ function AISettingsPage() {
                 </div>
               </div>
               <span className="inline-flex items-center rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-400 border border-sky-500/20">
-                Qwen IaC Synthesizer
+                Digital CISO IaC Synthesizer
               </span>
             </div>
 
@@ -269,11 +269,11 @@ function AISettingsPage() {
             <div className="mt-4 space-y-2 rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Synthesis Engine:</span>
-                <span className="font-semibold text-foreground">Private Qwen Code Synthesizer</span>
+                <span className="font-semibold text-foreground">Private Digital CISO Code Synthesizer</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Architecture:</span>
-                <span className="font-mono text-foreground font-semibold">Qwen-3.5-9B (Private vLLM)</span>
+                <span className="font-mono text-foreground font-semibold">Digital CISO LLM (Private vLLM)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">P1 Guardrail:</span>
@@ -293,11 +293,11 @@ function AISettingsPage() {
         </div>
       </div>
 
-      {/* ── Private Qwen vLLM Node Configuration ── */}
+      {/* ── Private vLLM Node Configuration ── */}
       <div className="mb-6 rounded-2xl border border-border/80 bg-surface/80 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
         <PanelTitle
           title="Private AI Engine — Sovereign vLLM Cluster Configuration"
-          hint="All 3 agents operate exclusively on your private Qwen 3.5 instance with zero data egress and zero external API dependencies."
+          hint="All 3 agents operate exclusively on your private Digital CISO LLM instance with zero data egress and zero external API dependencies."
         />
 
         <div className="mt-5 space-y-4 max-w-2xl">
@@ -338,7 +338,7 @@ function AISettingsPage() {
               <Cpu className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="/home/azureuser/models/qwen3.5-9b"
+                placeholder="/home/azureuser/models/digital-ciso-llm"
                 value={modelName}
                 onChange={(e) => setModelName(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-surface-2/60 pr-4 pl-9 font-mono text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
@@ -349,7 +349,7 @@ function AISettingsPage() {
           <div className="flex items-center gap-2 text-xs pt-1">
             {connectionStatus === "healthy" ? (
               <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-                <CheckCircle2 className="h-4 w-4" /> Private Qwen 3.5 Instance Online · Zero External Egress
+                <CheckCircle2 className="h-4 w-4" /> Private Digital CISO LLM Instance Online · Zero External Egress
               </span>
             ) : connectionStatus === "error" ? (
               <span className="flex items-center gap-1.5 text-rose-400 font-medium">

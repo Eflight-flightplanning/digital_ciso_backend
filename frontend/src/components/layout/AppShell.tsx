@@ -128,33 +128,26 @@ function ThemeToggle() {
   );
 }
 
-function Sidebar({
-  collapsed,
-  onToggle,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-}) {
+function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
+
+  useEffect(() => {
+    setUser(authStore.getState().user);
+    const unsub = authStore.subscribe((s) => setUser(s.user));
+    return unsub;
+  }, []);
 
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-xl md:flex",
-        collapsed ? "w-16" : "w-60",
+        "flex flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200 shrink-0",
+        collapsed ? "w-16" : "w-64",
       )}
-      style={{ transition: "width 220ms cubic-bezier(0.22,1,0.36,1)" }}
     >
-      {/* Header with generous breathing space */}
-      <div
-        className={cn(
-          "flex min-h-[68px] items-center px-4 py-3.5 border-b border-sidebar-border/70",
-          collapsed ? "justify-center" : "justify-between",
-        )}
-      >
-        <Link to="/" className="min-w-0 transition-opacity hover:opacity-90">
-          <Wordmark collapsed={collapsed} />
-        </Link>
+      {/* Brand Header */}
+      <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border/80">
+        {!collapsed && <Wordmark collapsed={collapsed} />}
         {!collapsed && (
           <button
             onClick={onToggle}
@@ -219,12 +212,12 @@ function Sidebar({
       <div className={cn("border-t border-sidebar-border p-3", collapsed && "flex justify-center")}>
         <Link to="/profile" className="flex items-center gap-2.5">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
-            {(authStore.getState().user?.name || "SA").slice(0, 2).toUpperCase()}
+            {(user?.name || "SA").slice(0, 2).toUpperCase()}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">{authStore.getState().user?.name || "Security Administrator"}</span>
-              <span className="block text-[10px] text-muted-foreground">{authStore.getState().user?.role || "CISO"}</span>
+              <span className="block truncate text-xs font-semibold">{user?.name || "Security Administrator"}</span>
+              <span className="block text-[10px] text-muted-foreground">{user?.role || "CISO"}</span>
             </span>
           )}
           {!collapsed && <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}

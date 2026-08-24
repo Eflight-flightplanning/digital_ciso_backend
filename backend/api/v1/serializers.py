@@ -175,6 +175,7 @@ class BaseTokenSerializer(serializers.Serializer):
     def custom_validate(self, attrs, social: bool = False):
         email = attrs.get("email")
         password = attrs.get("password")
+        otp = attrs.get("otp", "").strip()
         tenant_id = str(attrs.get("tenant_id", ""))
 
         # Authenticate user
@@ -191,8 +192,23 @@ class BaseTokenSerializer(serializers.Serializer):
         if user is None:
             raise ValidationError("Invalid credentials")
 
+        from api.mfa_service import generate_and_store_otp, verify_otp
+
+        # Check MFA OTP verification
+        if not otp:
+            # First step of login: Credentials valid -> generate OTP & send email via SendGrid
+            generate_and_store_otp(email)
+            return {
+                "mfa_required": True,
+                "email": user.email,
+                "message": f"Verification code sent to {user.email}.",
+            }
+
+        # Step 2 of login: Verify OTP
+        if not verify_otp(email, otp):
+            raise ValidationError({"otp": ["Invalid or expired 6-digit MFA verification code."]})
+
         from api.models import Membership, Tenant, UserRoleRelationship
-        from api.db_router import MainRouter
 
         if tenant_id:
             if not user.is_member_of_tenant(tenant_id):
@@ -226,6 +242,7 @@ class BaseTokenSerializer(serializers.Serializer):
 class TokenSerializer(BaseTokenSerializer):
     email = serializers.EmailField(write_only=True)
     password = serializers.CharField(write_only=True)
+    otp = serializers.CharField(write_only=True, required=False, allow_blank=True)
     tenant_id = serializers.UUIDField(
         write_only=True,
         required=False,

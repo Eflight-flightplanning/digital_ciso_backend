@@ -32,10 +32,21 @@ def _build_celery_broker_url(
     return f"{scheme}://{auth}{host}:{port}/{db}"
 
 
+import socket
+
+def _get_valkey_host() -> str:
+    host = env("VALKEY_HOST", default="valkey")
+    if host == "valkey":
+        try:
+            socket.gethostbyname("valkey")
+        except socket.gaierror:
+            return "127.0.0.1"
+    return host
+
 VALKEY_SCHEME = env("VALKEY_SCHEME", default="redis")
 VALKEY_USERNAME = env("VALKEY_USERNAME", default="")
 VALKEY_PASSWORD = env("VALKEY_PASSWORD", default="")
-VALKEY_HOST = env("VALKEY_HOST", default="valkey")
+VALKEY_HOST = _get_valkey_host()
 VALKEY_PORT = env("VALKEY_PORT", default="6379")
 VALKEY_DB = env("VALKEY_DB", default="0")
 

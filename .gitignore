@@ -48,3 +48,15 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Neo4j & Large Installers
+neo4j-install/
+*.tar.gz
+*.jar
+*.bin
+
+# Secrets & Environment Configuration
+.env
+*.env
+backend/.env
+frontend/.env

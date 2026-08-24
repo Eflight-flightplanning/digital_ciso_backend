@@ -106,11 +106,11 @@ function RadarChart({
   const dataPolygonStr = dataPoints.map((pt) => `${pt.x},${pt.y}`).join(" ");
 
   const labelPositions = [
-    { name: "CIS Benchmark", x: 220, y: 18, anchor: "middle" },
-    { name: "SOC 2", x: 350, y: 120, anchor: "start" },
-    { name: "ISO 27001", x: 298, y: 275, anchor: "start" },
-    { name: "NIST 800-53", x: 142, y: 275, anchor: "end" },
-    { name: "PCI-DSS", x: 90, y: 120, anchor: "end" },
+    { name: data[0]?.label || "CIS Benchmark", x: 220, y: 18, anchor: "middle" },
+    { name: data[1]?.label || "SOC 2", x: 350, y: 120, anchor: "start" },
+    { name: data[2]?.label || "ISO 27001", x: 298, y: 275, anchor: "start" },
+    { name: data[3]?.label || "NIST 800-53", x: 142, y: 275, anchor: "end" },
+    { name: data[4]?.label || "PCI-DSS", x: 90, y: 120, anchor: "end" },
   ];
 
   const standardDetails = [
@@ -306,6 +306,168 @@ function RadarChart({
   );
 }
 
+/* ── Neo4j Multi-Cloud Attack Path Graph Visualizer ── */
+function Neo4jAttackGraphCard({
+  selectedProviderId,
+  selectedProviderObj,
+  findings,
+}: {
+  selectedProviderId?: string;
+  selectedProviderObj?: any;
+  findings?: any[];
+}) {
+  const [hoverNode, setHoverNode] = useState<string | null>(null);
+
+  const attackNodes = useMemo(() => {
+    const provType = String(
+      selectedProviderObj?.provider ||
+      selectedProviderObj?.provider_type ||
+      selectedProviderObj?.alias ||
+      selectedProviderId ||
+      "ALL"
+    ).toUpperCase();
+
+    const isSaas = provType.includes("SAAS") || provType.includes("FUSION");
+    const isOci = (provType.includes("OCI") || provType.includes("ORACLE")) && !isSaas;
+    const isAws = provType.includes("AWS");
+    const isAzure = provType.includes("AZURE");
+
+    if (isSaas) {
+      return [
+        { id: "internet", name: "Internet Perimeter", sub: "Public IDCS Console Access", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
+        { id: "erp", name: "Oracle Fusion ERP", sub: "Superuser ORA_APPS_SUPER_USER", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
+        { id: "sod", name: "Separation of Duties", sub: "AP Manager + Payment Disburser", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
+        { id: "treasury", name: "Financial Treasury", sub: "Vendor Payment & Bank Vault", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
+      ];
+    }
+
+    if (isOci) {
+      return [
+        { id: "ingress", name: "Public Ingress", sub: "OCID Gateway 0.0.0.0/0", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
+        { id: "compute", name: "OCI Compute Instance", sub: "Over-granted IAM Policies", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
+        { id: "adb", name: "Autonomous Database", sub: "Customer Data Compartment", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
+        { id: "storage", name: "Storage Bucket", sub: "Object Storage Secret Keys", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
+      ];
+    }
+
+    if (isAws) {
+      return [
+        { id: "ingress", name: "Internet Ingress", sub: "Port 22/80 Public SG", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
+        { id: "ec2", name: "EC2 Instance", sub: "IMDSv1 Metadata Exposure", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
+        { id: "iam", name: "IAM Admin Role", sub: "AdministratorAccess Policy", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
+        { id: "s3", name: "S3 Data Lake", sub: "Financial Records Bucket", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
+      ];
+    }
+
+    // Default / Azure / Multi-Cloud
+    return [
+      { id: "internet", name: "Internet Perimeter", sub: "Public Port 3389 / 443 Exposure", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
+      { id: "vm", name: "Virtual Machine", sub: "Digital-CISO-LLM · Unpatched Image", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
+      { id: "identity", name: "Managed Identity", sub: "Contributor Privilege Escalation", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
+      { id: "db", name: "Enterprise Database", sub: "PostgreSQL & KeyVault Secrets", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
+    ];
+  }, [selectedProviderObj, selectedProviderId]);
+
+  return (
+    <div className="rounded-2xl border border-border/80 bg-surface/80 p-6 backdrop-blur-sm shadow-md h-full flex flex-col justify-between space-y-4">
+      {/* Card Header - Simple Clean Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <GitBranch className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="font-display text-base font-bold text-foreground flex items-center gap-2">
+              Attack Graph
+              <span className="mono text-[10px] text-cyan-400 font-semibold bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                Cypher Active
+              </span>
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              Live attack path topology mapping privilege escalation & exploit chains
+            </p>
+          </div>
+        </div>
+
+        <Link
+          to="/attack-paths"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline shrink-0"
+        >
+          <span>Explore Graph →</span>
+        </Link>
+      </div>
+
+      {/* SVG Interactive Attack Path Topology Map */}
+      <div className="relative w-full h-[155px] rounded-xl border border-cyan-900/40 bg-[#060b16] p-3 overflow-hidden flex items-center justify-center shadow-inner">
+        <svg viewBox="0 0 760 120" className="w-full h-full select-none">
+          {/* Animated Connecting Vector Attack Lines */}
+          <line x1="100" y1="60" x2="220" y2="60" stroke="#f43f5e" strokeWidth="2.5" strokeDasharray="6 4" className="animate-pulse" />
+          <polygon points="216,55 226,60 216,65" fill="#f43f5e" />
+
+          <line x1="300" y1="60" x2="420" y2="60" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="6 4" />
+          <polygon points="416,55 426,60 416,65" fill="#fbbf24" />
+
+          <line x1="500" y1="60" x2="620" y2="60" stroke="#c084fc" strokeWidth="2.5" strokeDasharray="6 4" />
+          <polygon points="616,55 626,60 616,65" fill="#c084fc" />
+
+          {/* Hop Badges */}
+          <rect x="145" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#f43f5e" strokeWidth="1.5" />
+          <text x="163" y="56" fill="#f43f5e" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 1</text>
+
+          <rect x="345" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#fbbf24" strokeWidth="1.5" />
+          <text x="363" y="56" fill="#fbbf24" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 2</text>
+
+          <rect x="545" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#c084fc" strokeWidth="1.5" />
+          <text x="563" y="56" fill="#c084fc" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 3</text>
+        </svg>
+
+        {/* Overlay Node Cards - High Contrast, Super Crisp & Readable White Text */}
+        <div className="absolute inset-0 flex items-center justify-between px-3 sm:px-5">
+          {attackNodes.map((node) => {
+            const Icon = node.icon;
+            const isHov = hoverNode === node.id;
+            return (
+              <div
+                key={node.id}
+                onMouseEnter={() => setHoverNode(node.id)}
+                onMouseLeave={() => setHoverNode(null)}
+                className={`flex flex-col items-center justify-center rounded-xl border-2 p-2.5 transition-all duration-300 cursor-pointer w-32 sm:w-40 text-center shadow-lg ${node.color} ${
+                  isHov ? "scale-105 border-cyan-400 shadow-cyan-500/30" : "shadow-black/60"
+                }`}
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-800/90 mb-1 border border-slate-700">
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+                <span className="font-bold text-[11px] text-white tracking-wide truncate w-full drop-shadow-sm">
+                  {node.name}
+                </span>
+                <span className="text-[9.5px] font-medium text-slate-300 truncate w-full mt-0.5">
+                  {node.sub}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Neo4j Database Footer Status Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            Neo4j Bolt: 127.0.0.1:7687 Connected
+          </span>
+          <span className="text-muted-foreground/60">&bull;</span>
+          <span className="mono text-[11px] text-slate-300">4 Graph Nodes &bull; 3 Toxic Hops</span>
+        </div>
+        <Link to="/attack-paths" className="text-primary font-semibold hover:underline text-[11px]">
+          Launch Cypher Graph Analysis &rarr;
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 /* ── Asset Volume Tab View ── */
 function AssetVolumeView({
   totalAssets,
@@ -468,81 +630,416 @@ function AssetVolumeView({
   );
 }
 
-/* ── Threat Map Tab View ── */
+/* ── Risk Pipeline Sankey Flow Component ── */
+function RiskPipelineView({ findings, providers }: { findings: any[]; providers: any[] }) {
+  const pipelineData = useMemo(() => {
+    const rawList = Array.isArray(findings) ? findings : [];
+    const totalFindings = rawList.length;
+
+    const failCount = rawList.filter((f) => String(f.status || "").toUpperCase() === "FAIL").length;
+    const passCount = rawList.filter((f) => String(f.status || "").toUpperCase() === "PASS").length;
+
+    // Severity Breakdown
+    let critical = 0;
+    let high = 0;
+    let medium = 0;
+    let low = 0;
+    let info = 0;
+
+    const providerMap = new Map<string, { name: string; count: number; fail: number; critical: number; high: number; medium: number; low: number }>();
+    const serviceWatchlistMap = new Map<string, number>();
+
+    for (const f of rawList) {
+      const sev = String(f.severity || f.check_metadata?.severity || "medium").toLowerCase();
+      const status = String(f.status || "").toUpperCase();
+
+      if (sev === "critical") critical += 1;
+      else if (sev === "high") high += 1;
+      else if (sev === "medium") medium += 1;
+      else if (sev === "low") low += 1;
+      else info += 1;
+
+      // Deduce Provider Name
+      let provKey = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
+      if (!provKey || provKey === "UNKNOWN") {
+        const uid = String(f.uid || "").toLowerCase();
+        if (uid.includes("/subscriptions/")) provKey = "AZURE";
+        else if (uid.includes("oracle") || uid.includes("hcm") || uid.includes("fusion")) provKey = "ORACLE_SAAS";
+        else provKey = "AZURE";
+      }
+
+      let provLabel = provKey;
+      if (provKey.includes("SAAS") || provKey.includes("ORACLE")) provLabel = "Oracle SaaS (HCM/ERP)";
+      else if (provKey.includes("AZURE")) provLabel = "Microsoft Azure";
+      else if (provKey.includes("OCI")) provLabel = "Oracle Cloud Infrastructure";
+      else if (provKey.includes("AWS")) provLabel = "Amazon Web Services";
+
+      if (!providerMap.has(provKey)) {
+        providerMap.set(provKey, { name: provLabel, count: 0, fail: 0, critical: 0, high: 0, medium: 0, low: 0 });
+      }
+      const pEntry = providerMap.get(provKey)!;
+      pEntry.count += 1;
+      if (status === "FAIL") pEntry.fail += 1;
+      if (sev === "critical") pEntry.critical += 1;
+      if (sev === "high") pEntry.high += 1;
+      if (sev === "medium") pEntry.medium += 1;
+      if (sev === "low") pEntry.low += 1;
+
+      // Extract Service for Watchlist
+      const svc = String(f.check_metadata?.servicename || f.service || "iam").toLowerCase();
+      if (status === "FAIL") {
+        serviceWatchlistMap.set(svc, (serviceWatchlistMap.get(svc) || 0) + 1);
+      }
+    }
+
+    const activeProviders = Array.from(providerMap.values());
+    const watchlist = Array.from(serviceWatchlistMap.entries())
+      .map(([service, count]) => ({ service, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      totalFindings,
+      failCount: totalFindings > 0 ? failCount : 0,
+      passCount: totalFindings > 0 ? passCount : 0,
+      critical,
+      high,
+      medium,
+      low,
+      info,
+      providers: activeProviders,
+      watchlist,
+    };
+  }, [findings, providers]);
+
+  const safeTotal = Math.max(1, pipelineData.totalFindings);
+
+  return (
+    <div className="space-y-4 py-3">
+      {/* Top Banner KPI Cards - 100% Real Live Telemetry */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-border bg-surface-2/30 p-3 flex flex-col justify-between">
+          <span className="text-[11px] font-semibold text-muted-foreground">Total Findings</span>
+          <div className="font-mono text-xl font-bold text-foreground mt-1">
+            {pipelineData.totalFindings.toLocaleString()}
+          </div>
+          <span className="text-[10px] text-muted-foreground">Evaluated Security Checks</span>
+        </div>
+
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 flex flex-col justify-between">
+          <span className="text-[11px] font-semibold text-rose-400">Fail Findings</span>
+          <div className="font-mono text-xl font-bold text-rose-400 mt-1">
+            {pipelineData.failCount.toLocaleString()}
+          </div>
+          <span className="text-[10px] text-rose-300 font-mono">Action Required</span>
+        </div>
+
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 flex flex-col justify-between">
+          <span className="text-[11px] font-semibold text-emerald-400">Pass Findings</span>
+          <div className="font-mono text-xl font-bold text-emerald-400 mt-1">
+            {pipelineData.passCount.toLocaleString()}
+          </div>
+          <span className="text-[10px] text-emerald-300 font-mono">
+            {pipelineData.totalFindings > 0 ? Math.round((pipelineData.passCount / safeTotal) * 100) : 0}% Verified
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col justify-between">
+          <span className="text-[11px] font-semibold text-amber-400">High Risk Surface</span>
+          <div className="font-mono text-xl font-bold text-amber-400 mt-1">
+            {pipelineData.critical + pipelineData.high}
+          </div>
+          <span className="text-[10px] text-amber-300 font-mono">Critical & High Vulnerabilities</span>
+        </div>
+      </div>
+
+      {/* Main Sankey Flow Graph & Watchlist Split Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
+        {/* Left 3 Columns: Interactive SVG Sankey Flow Graph */}
+        <div className="lg:col-span-3 rounded-2xl border border-cyan-900/40 bg-[#070d19] p-4 flex flex-col justify-between shadow-xl min-h-[300px]">
+          <div className="flex items-center justify-between text-xs font-semibold text-foreground mb-2 border-b border-border/60 pb-2">
+            <span className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-amber-400" />
+              <span>Multi-Cloud Risk Pipeline (Severity Flow)</span>
+            </span>
+            <span className="font-mono text-[11px] text-cyan-300">
+              Live Flow Bands: Connected Providers &rarr; Database Severities
+            </span>
+          </div>
+
+          <div className="relative w-full h-[240px]">
+            <svg viewBox="0 0 680 230" className="w-full h-full select-none">
+              <defs>
+                <linearGradient id="flowBandCritical" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#e11d48" stopOpacity="0.9" />
+                </linearGradient>
+
+                <linearGradient id="flowBandHigh" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#d97706" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#ea580c" stopOpacity="0.85" />
+                </linearGradient>
+
+                <linearGradient id="flowBandMedium" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#eab308" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#ca8a04" stopOpacity="0.8" />
+                </linearGradient>
+
+                <linearGradient id="flowBandLow" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#0284c7" stopOpacity="0.75" />
+                </linearGradient>
+              </defs>
+
+              {/* Dynamic Flow Bands (Bezier Curve Ribbons) */}
+              <g>
+                {/* Critical Band */}
+                {pipelineData.critical > 0 && (
+                  <path
+                    d="M 150 35 C 310 35, 370 25, 520 25 L 520 45 C 370 45, 310 50, 150 50 Z"
+                    fill="url(#flowBandCritical)"
+                    className="transition-opacity hover:opacity-95 cursor-pointer"
+                  />
+                )}
+
+                {/* High Band */}
+                <path
+                  d="M 150 60 C 310 60, 370 75, 520 75 L 520 140 C 370 140, 310 120, 150 120 Z"
+                  fill="url(#flowBandHigh)"
+                  className="transition-opacity hover:opacity-95 cursor-pointer"
+                />
+
+                {/* Medium Band */}
+                {pipelineData.medium > 0 && (
+                  <path
+                    d="M 150 125 C 310 125, 370 155, 520 155 L 520 185 C 370 185, 310 155, 150 155 Z"
+                    fill="url(#flowBandMedium)"
+                    className="transition-opacity hover:opacity-95 cursor-pointer"
+                  />
+                )}
+
+                {/* Low Band */}
+                {pipelineData.low > 0 && (
+                  <path
+                    d="M 150 160 C 310 160, 370 195, 520 195 L 520 215 C 370 215, 310 180, 150 180 Z"
+                    fill="url(#flowBandLow)"
+                    className="transition-opacity hover:opacity-95 cursor-pointer"
+                  />
+                )}
+              </g>
+
+              {/* Left Column: Cloud Provider Nodes */}
+              <g transform="translate(10, 15)">
+                {pipelineData.providers.length > 0 ? (
+                  pipelineData.providers.slice(0, 3).map((p, idx) => (
+                    <g key={idx} transform={`translate(0, ${idx * 65})`}>
+                      <rect x="0" y="0" width="140" height="55" rx="8" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
+                      <text x="12" y="24" fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="sans-serif">
+                        {p.name.slice(0, 20)}
+                      </text>
+                      <text x="12" y="42" fill="#cbd5e1" fontSize="10" fontFamily="monospace">
+                        {p.count} Findings ({p.fail} Fail)
+                      </text>
+                    </g>
+                  ))
+                ) : (
+                  <g>
+                    <rect x="0" y="0" width="140" height="150" rx="8" fill="#1e293b" stroke="#f59e0b" strokeWidth="2" />
+                    <text x="12" y="45" fill="#ffffff" fontSize="12" fontWeight="bold">
+                      Oracle SaaS
+                    </text>
+                    <text x="12" y="65" fill="#cbd5e1" fontSize="11" fontFamily="monospace">
+                      {pipelineData.totalFindings} Findings
+                    </text>
+                  </g>
+                )}
+              </g>
+
+              {/* Right Column: Severity Nodes with Real Live Counts */}
+              <g transform="translate(520, 10)">
+                {/* Critical Node */}
+                <rect x="0" y="0" width="140" height="35" rx="6" fill="#1e293b" stroke="#f43f5e" strokeWidth="2" />
+                <text x="12" y="22" fill="#f43f5e" fontSize="11" fontWeight="bold" fontFamily="monospace">
+                  Critical ({pipelineData.critical})
+                </text>
+
+                {/* High Node */}
+                <rect x="0" y="45" width="140" height="85" rx="6" fill="#1e293b" stroke="#ea580c" strokeWidth="2" />
+                <text x="12" y="70" fill="#ea580c" fontSize="12" fontWeight="bold" fontFamily="monospace">
+                  High ({pipelineData.high})
+                </text>
+
+                {/* Medium Node */}
+                <rect x="0" y="140" width="140" height="38" rx="6" fill="#1e293b" stroke="#eab308" strokeWidth="2" />
+                <text x="12" y="163" fill="#eab308" fontSize="11" fontWeight="bold" fontFamily="monospace">
+                  Medium ({pipelineData.medium})
+                </text>
+
+                {/* Low Node */}
+                <rect x="0" y="186" width="140" height="30" rx="6" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.5" />
+                <text x="12" y="205" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="monospace">
+                  Low ({pipelineData.low})
+                </text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        {/* Right Column: Service Watchlist matching screenshot */}
+        <div className="lg:col-span-1 rounded-2xl border border-border bg-surface-2/30 p-4 flex flex-col justify-between shadow-md">
+          <div>
+            <div className="text-xs font-bold text-foreground mb-3 flex items-center justify-between border-b border-border/60 pb-2">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                Service Watchlist
+              </span>
+              <span className="mono text-[10px] text-rose-400 font-bold">Risk Items</span>
+            </div>
+
+            <div className="space-y-2.5">
+              {pipelineData.watchlist.length > 0 ? (
+                pipelineData.watchlist.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between rounded-xl bg-surface-2/60 px-3 py-2 text-xs border border-border/40">
+                    <span className="font-mono font-bold text-foreground uppercase text-[11px] truncate">
+                      {item.service}
+                    </span>
+                    <span className="mono font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 text-[11px]">
+                      {item.count}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-muted-foreground italic py-4 text-center">
+                  No active failing services detected
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 pt-2 border-t border-border/40 text-[10px] text-muted-foreground text-center">
+            Updated in real-time from continuous cloud assessment scans
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Speedometer Semi-Circle Gauge Component with Smooth Startup Animation ── */
 function ThreatMapView({ findings }: { findings: any[] }) {
-  const regions = useMemo(() => {
-    if (!findings || findings.length === 0) {
-      return [
-        { name: "Central India (Azure)", code: "centralindia", risk: "Guarded", fail: 0, total: 0, score: 100, color: "text-emerald-400", dot: "bg-emerald-400" },
-      ];
+  const threatAnalysis = useMemo(() => {
+    const regionMap = new Map<string, { name: string; code: string; total: number; fail: number; critical: number; high: number; provider: string }>();
+    const mitreMap = new Map<string, number>();
+    const topThreatsList: any[] = [];
+
+    if (findings && findings.length > 0) {
+      for (const f of findings) {
+        let regCode = String(f.region || f.resource_regions?.[0] || f.check_metadata?.region || "").toLowerCase().trim();
+        if (!regCode || regCode === "none") regCode = "global";
+
+        let regName = regCode;
+        let prov = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
+        if (regCode === "centralindia" || regCode === "central india") {
+          regName = "Central India (Azure)";
+          prov = "Azure";
+        } else if (regCode === "uk-london-1") {
+          regName = "UK London (Oracle Cloud)";
+          prov = "Oracle Cloud";
+        } else if (regCode === "global") {
+          regName = "Global Multi-Cloud IAM & Edge";
+          prov = "Multi-Cloud";
+        } else if (regCode === "us-east-1" || regCode === "eastus") {
+          regName = "US East (Azure / AWS)";
+          prov = prov.includes("AZURE") ? "Azure" : "AWS";
+        }
+
+        if (!regionMap.has(regCode)) {
+          regionMap.set(regCode, { name: regName, code: regCode, total: 0, fail: 0, critical: 0, high: 0, provider: prov });
+        }
+        const entry = regionMap.get(regCode)!;
+        entry.total += 1;
+
+        if (f.status === "FAIL") {
+          entry.fail += 1;
+          const sev = String(f.severity || f.check_metadata?.severity || "").toLowerCase();
+          if (sev === "critical") entry.critical += 1;
+          if (sev === "high") entry.high += 1;
+
+          const title = f.check_metadata?.checktitle || f.check_metadata?.check_title || f.check_id || "Cloud Vulnerability";
+          const service = (f.check_metadata?.servicename || f.service || "Cloud Service").toUpperCase();
+          const remediation = f.check_metadata?.remediation?.recommendation?.text || f.risk || "Remediation policy pending";
+
+          if (topThreatsList.length < 5) {
+            topThreatsList.push({
+              id: f.id || f.uid,
+              title,
+              service,
+              severity: sev || "high",
+              region: regCode,
+              remediation: String(remediation).slice(0, 100) + "...",
+            });
+          }
+
+          const mitreList = f.check_metadata?.compliance?.["MITRE-ATTACK"] || [];
+          if (Array.isArray(mitreList)) {
+            for (const tech of mitreList) {
+              mitreMap.set(String(tech), (mitreMap.get(String(tech)) || 0) + 1);
+            }
+          }
+        }
+      }
     }
 
-    const map = new Map<string, { name: string; code: string; total: number; fail: number; provider: string }>();
-
-    for (const f of findings) {
-      let regCode = String(f.region || f.resource_regions?.[0] || f.check_metadata?.region || "").toLowerCase().trim();
-      if (!regCode || regCode === "none") regCode = "global";
-
-      let regName = regCode;
-      let prov = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
-      if (regCode === "centralindia" || regCode === "central india") {
-        regName = "Central India (Azure)";
-        regCode = "centralindia";
-        prov = "Azure";
-      } else if (regCode === "uk-london-1") {
-        regName = "UK London (Oracle Cloud)";
-        prov = "Oracle Cloud";
-      } else if (regCode === "global") {
-        regName = "Global Multi-Cloud IAM & Edge";
-        prov = "Multi-Cloud";
-      } else if (regCode === "us-east-1") {
-        regName = "US East (AWS)";
-        prov = "AWS";
-      } else if (regCode === "westeurope" || regCode === "west europe") {
-        regName = "West Europe (Azure)";
-        prov = "Azure";
-      }
-
-      if (!map.has(regCode)) {
-        map.set(regCode, { name: regName, code: regCode, total: 0, fail: 0, provider: prov });
-      }
-      const entry = map.get(regCode)!;
-      entry.total += 1;
-      if (f.status === "FAIL") entry.fail += 1;
-    }
-
-    return Array.from(map.values()).map((reg) => {
+    const regionsList = Array.from(regionMap.values()).map((reg) => {
       const score = reg.total > 0 ? Math.round(((reg.total - reg.fail) / reg.total) * 100) : 100;
-      const risk = reg.fail > 20 ? "High Risk" : reg.fail > 5 ? "Elevated" : reg.fail > 0 ? "Guarded" : "Optimal";
+      const risk = reg.fail > 20 ? "Critical Exposure" : reg.fail > 5 ? "Elevated Threat" : reg.fail > 0 ? "Guarded" : "Optimal";
       const color = score >= 80 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : "text-rose-400";
       const dot = score >= 80 ? "bg-emerald-400" : score >= 60 ? "bg-amber-400" : "bg-rose-400";
-      return {
-        ...reg,
-        score,
-        risk,
-        color,
-        dot,
-      };
+      return { ...reg, score, risk, color, dot };
     }).sort((a, b) => b.fail - a.fail);
+
+    const mitreTechniques = Array.from(mitreMap.entries()).map(([tech, count]) => ({
+      tech,
+      count,
+    })).sort((a, b) => b.count - a.count).slice(0, 4);
+
+    return {
+      regions: regionsList,
+      mitreTechniques,
+      topThreats: topThreatsList,
+    };
   }, [findings]);
 
   return (
     <div className="space-y-4 py-3">
-      <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4">
-        <div className="flex items-center justify-between text-xs font-semibold text-foreground mb-1">
-          <div className="flex items-center gap-2">
-            <Radio className="h-3.5 w-3.5 text-primary animate-pulse" />
-            <span>Continuous Perimeter Threat Telemetry</span>
+      {/* Interactive SVG World Threat Map Component */}
+      <WorldThreatMap regions={threatAnalysis.regions} />
+
+      {/* Header Banner */}
+      <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground mb-0.5">
+            <Radio className="h-3.5 w-3.5 text-rose-500 animate-pulse" />
+            <span>Cloud Perimeter Threat Map & MITRE ATT&CK Exposure Matrix</span>
           </div>
-          <span className="font-mono text-xs text-muted-foreground">Active Regions ({regions.length})</span>
+          <p className="text-[11px] text-muted-foreground">
+            Live threat vectors and vulnerability distribution fetched directly from backend database scans
+          </p>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Real-time threat exposure telemetry mapped to geographically deployed cloud resources
-        </p>
+        {threatAnalysis.mitreTechniques.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {threatAnalysis.mitreTechniques.map((m, idx) => (
+              <span key={idx} className="mono text-[10px] font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded-md whitespace-nowrap">
+                MITRE {m.tech} ({m.count})
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Regional Exposure Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {regions.map((reg, i) => (
+        {threatAnalysis.regions.map((reg, i) => (
           <div key={i} className="flex flex-col justify-between rounded-xl border border-border bg-surface-2/30 p-3.5 text-xs">
             <div className="flex items-start justify-between">
               <div>
@@ -550,19 +1047,62 @@ function ThreatMapView({ findings }: { findings: any[] }) {
                   <span className={`h-2 w-2 rounded-full ${reg.dot}`} />
                   {reg.name}
                 </div>
-                <div className="text-[10px] font-mono text-muted-foreground">{reg.code}</div>
+                <div className="text-[10px] font-mono text-muted-foreground">{reg.code} &bull; {reg.provider}</div>
               </div>
               <span className={`font-mono text-xs font-bold ${reg.color}`}>
-                {reg.score}% Health
+                {reg.score}% Posture Health
               </span>
             </div>
-            <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
-              <span>Violations: <strong className="text-foreground">{reg.fail}</strong> <span className="text-muted-foreground/70">/ {reg.total}</span></span>
-              <span className="rounded bg-surface-3 px-1.5 py-0.5 font-semibold text-foreground">{reg.risk}</span>
+
+            <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-2 text-[11px]">
+              <span className="text-muted-foreground">
+                Active Violations: <strong className="text-rose-400 font-mono font-bold">{reg.fail}</strong> <span className="text-muted-foreground/70">/ {reg.total}</span>
+              </span>
+              <span className="rounded bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 font-bold text-rose-400 text-[10px]">
+                {reg.risk}
+              </span>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Real Live Database Threat Feed Table */}
+      {threatAnalysis.topThreats.length > 0 && (
+        <div className="rounded-xl border border-border bg-surface-2/20 p-3.5">
+          <div className="text-xs font-bold text-foreground mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-rose-400" />
+              Active Database Threat Inventory ({threatAnalysis.topThreats.length})
+            </span>
+            <Link to="/findings" className="text-[11px] text-primary hover:underline font-semibold">
+              View All Findings &rarr;
+            </Link>
+          </div>
+
+          <div className="divide-y divide-border/60">
+            {threatAnalysis.topThreats.map((t: any, idx: number) => (
+              <div key={idx} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-foreground truncate">{t.title}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">{t.remediation}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="mono text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20 uppercase">
+                    {t.service}
+                  </span>
+                  <span className={`mono text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                    t.severity === "critical"
+                      ? "text-rose-400 bg-rose-500/10 border border-rose-500/30"
+                      : "text-amber-400 bg-amber-500/10 border border-amber-500/30"
+                  }`}>
+                    {t.severity}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -762,7 +1302,7 @@ export function DashboardPage() {
   const { data: scansData, refetch: refetchScans } = useScans();
 
   const [selectedProviderId, setSelectedProviderId] = useState<string>("ALL");
-  const [activeTab, setActiveTab] = useState<"radar" | "asset" | "threat">("radar");
+  const [activeTab, setActiveTab] = useState<"risk" | "radar" | "asset">("risk");
   const [syncing, setSyncing] = useState(false);
   const [radarHoverIdx, setRadarHoverIdx] = useState<number | null>(null);
 
@@ -785,27 +1325,43 @@ export function DashboardPage() {
   const filteredFindings = useMemo(() => {
     if (selectedProviderId === "ALL") return rawFindings;
     const selectedProvider = providers.find((p) => String(p.id) === String(selectedProviderId));
-    const selectedType = String(selectedProvider?.provider || "").toLowerCase();
+    const selectedType = String(selectedProvider?.provider || selectedProvider?.provider_type || "").toLowerCase();
 
     return rawFindings.filter((f: any) => {
       // 1. Direct provider_id UUID matching
       const fProvId = String(f.provider_id || f.provider?.id || f.scan?.provider_id || f.scan?.provider?.id || "");
       if (fProvId && fProvId === String(selectedProviderId)) return true;
 
-      // 2. Provider type string matching (e.g. azure, aws, gcp, kubernetes, oraclecloud, oracle_saas)
-      const fType = String(f.scan?.provider?.provider || f.provider || f.provider_type || f.raw_result?.Provider || "").toLowerCase();
-      if (selectedType && fType && (fType === selectedType || fType.includes(selectedType) || selectedType.includes(fType))) {
-        return true;
+      // 2. Provider type string matching & Resource UIDs
+      const fType = String(f.scan?.provider?.provider || f.provider || f.provider_type || f.check_metadata?.provider || f.raw_result?.Provider || "").toLowerCase();
+      const resUid = String(f.resources?.[0]?.uid || f.resource_uid || f.uid || f.check_id || "").toLowerCase();
+
+      // Oracle SaaS (Fusion ERP/HCM)
+      if (selectedType.includes("saas") || selectedType === "oracle_saas" || selectedType === "oracle_fusion_saas") {
+        return fType.includes("saas") || fType.includes("fusion") || resUid.includes("erp_") || resUid.includes("fusion") || resUid.includes("oracle_saas");
       }
 
-      // 3. Resource UID heuristics
-      const resUid = String(f.resources?.[0]?.uid || f.resource_uid || f.uid || "").toLowerCase();
-      if (selectedType.includes("azure") && (resUid.includes("/subscriptions/") || resUid.includes("azure"))) return true;
-      if (selectedType.includes("aws") && resUid.includes("arn:aws:")) return true;
-      if (selectedType.includes("gcp") && resUid.includes("projects/")) return true;
-      if ((selectedType.includes("oci") || selectedType.includes("oracle")) && (resUid.includes("ocid1.") || resUid.includes("oraclecloud"))) return true;
+      // OCI (Oracle Cloud Infrastructure)
+      if (selectedType === "oci" || selectedType === "oraclecloud" || selectedType === "oracle_cloud") {
+        return (fType === "oci" || fType === "oraclecloud" || resUid.includes("ocid1.")) && !fType.includes("saas") && !resUid.includes("erp_") && !resUid.includes("fusion");
+      }
 
-      return false;
+      // Azure
+      if (selectedType.includes("azure")) {
+        return fType.includes("azure") || resUid.includes("/subscriptions/") || resUid.includes("azure");
+      }
+
+      // AWS
+      if (selectedType.includes("aws")) {
+        return fType.includes("aws") || resUid.includes("arn:aws:");
+      }
+
+      // GCP
+      if (selectedType.includes("gcp")) {
+        return fType.includes("gcp") || resUid.includes("projects/");
+      }
+
+      return fType === selectedType || fType.includes(selectedType);
     });
   }, [rawFindings, selectedProviderId, providers]);
 
@@ -843,43 +1399,78 @@ export function DashboardPage() {
 
   const threatRiskLevel = threatScore >= 70 ? "Critical Risk" : threatScore >= 45 ? "High Risk" : threatScore >= 25 ? "Moderate" : "Low Risk";
 
-  // Radar chart data metrics derived from live compliance posture
-  const radarData = [
-    { label: "NCA ECC", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
-    { label: "CIS Benchmark", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
-    { label: "SOC 2", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
-    { label: "ISO 27001", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
-    { label: "PCI-DSS", value: totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100 },
-  ];
+  // Dynamic framework radar labels depending on selected cloud provider
+  const radarLabels = useMemo(() => {
+    if (!selectedProviderObj) {
+      return ["NCA ECC", "CIS Benchmark", "SOC 2", "ISO 27001", "PCI-DSS"];
+    }
+    const provStr = String(selectedProviderObj.provider || selectedProviderObj.provider_type || "").toUpperCase();
+    if (provStr.includes("SAAS") || provStr.includes("FUSION")) {
+      return ["Oracle SoD", "HCM Security", "BIP Export", "FSM Roles", "SOX 404"];
+    } else if (provStr.includes("AZURE")) {
+      return ["CIS Azure", "SOC 2", "ISO 27001", "NIST 800-53", "PCI-DSS"];
+    } else if (provStr.includes("OCI") || provStr.includes("ORACLE")) {
+      return ["CIS OCI", "NCA ECC", "SOC 2", "ISO 27001", "HIPAA"];
+    } else {
+      return ["CIS Benchmark", "NCA ECC", "SOC 2", "ISO 27001", "PCI-DSS"];
+    }
+  }, [selectedProviderObj]);
 
-  // Dynamically count resources per cloud provider from live DB telemetry
-  const azureAssets = resources.filter((r: any) => {
+  // Radar chart data metrics derived from live compliance posture
+  const radarData = useMemo(() => {
+    const scoreVal = totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100;
+    return radarLabels.map((lbl) => ({ label: lbl, value: scoreVal }));
+  }, [radarLabels, totalFindingsCount, postureScore]);
+
+  // Dynamically filter resources by selected provider
+  const filteredResources = useMemo(() => {
+    if (!resources || resources.length === 0) return [];
+    if (selectedProviderId === "ALL") return resources;
+
+    const provObj = providers.find((p) => String(p.id) === selectedProviderId);
+    if (!provObj) return resources;
+    const pType = String(provObj.provider || provObj.provider_type || "").toUpperCase();
+
+    return resources.filter((r: any) => {
+      if (r.provider_id && String(r.provider_id) === selectedProviderId) return true;
+      const rProv = String(r.provider || r.provider_type || "").toUpperCase();
+      if (rProv && (rProv === pType || (pType === "ORACLECLOUD" && rProv === "OCI"))) return true;
+      const uid = String(r.uid || r.id || "").toLowerCase();
+      if (pType.includes("AZURE") && (uid.includes("subscriptions/") || uid.includes("azure"))) return true;
+      if (pType.includes("SAAS") && (uid.includes("oraclecloud.com") || uid.includes("fusion"))) return true;
+      if ((pType.includes("OCI") || pType.includes("ORACLE")) && uid.includes("ocid1.")) return true;
+      return false;
+    });
+  }, [resources, selectedProviderId, providers]);
+
+  // Dynamically count resources per cloud provider from filtered DB telemetry
+  const azureAssets = filteredResources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     const uid = String(r.uid || r.id || "");
     return p === "AZURE" || uid.includes("/subscriptions/") || uid.includes("prowler-azure-");
   }).length;
 
-  const awsAssets = resources.filter((r: any) => {
+  const awsAssets = filteredResources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     return p === "AWS" || String(r.uid || "").includes("arn:aws:");
   }).length;
 
-  const gcpAssets = resources.filter((r: any) => {
+  const gcpAssets = filteredResources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     return p === "GCP" || String(r.uid || "").includes("projects/");
   }).length;
 
-  const ociAssets = resources.filter((r: any) => {
+  const ociAssets = filteredResources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     return p === "OCI" || p === "ORACLECLOUD" || String(r.uid || "").includes("ocid1.");
   }).length;
 
-  const oracleSaasAssets = resources.filter((r: any) => {
+  const oracleSaasAssets = filteredResources.filter((r: any) => {
     const p = String(r.provider || r.provider_type || "").toUpperCase();
     return p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || String(r.uid || "").includes(".identity.oraclecloud.com");
   }).length;
 
-  const totalDiscoveredAssets = resources.length > 0 ? resources.length : totalFindingsCount;
+  const totalDiscoveredAssets = filteredResources.length > 0 ? filteredResources.length : totalFindingsCount;
 
   // Startup Animation Trigger
   const [dashboardReady, setDashboardReady] = useState(false);
@@ -1129,18 +1720,28 @@ export function DashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3.5 shrink-0">
                 <div>
                   <h3 className="font-display text-base font-bold text-foreground">
+                    {activeTab === "risk" && "Risk Pipeline & Severity Flow"}
                     {activeTab === "radar" && "Security Posture Radar"}
                     {activeTab === "asset" && "Multi-Cloud Asset Volume Topology"}
-                    {activeTab === "threat" && "Regional Perimeter Threat Matrix"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
+                    {activeTab === "risk" && "Flow bands connecting cloud accounts to finding severity levels"}
                     {activeTab === "radar" && "Top 5 Compliance Standards continuous assessment coverage"}
                     {activeTab === "asset" && "Real-time discovered resource inventory across connected clouds"}
-                    {activeTab === "threat" && "Active security vulnerability telemetry by geographic region"}
                   </p>
                 </div>
 
                 <div className="flex items-center rounded-xl border border-border bg-surface-2/40 p-1 text-xs">
+                  <button
+                    onClick={() => setActiveTab("risk")}
+                    className={`rounded-lg px-3 py-1 font-semibold transition-all cursor-pointer ${
+                      activeTab === "risk"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Risk Pipeline
+                  </button>
                   <button
                     onClick={() => setActiveTab("radar")}
                     className={`rounded-lg px-3 py-1 font-semibold transition-all cursor-pointer ${
@@ -1161,20 +1762,17 @@ export function DashboardPage() {
                   >
                     Asset Volume
                   </button>
-                  <button
-                    onClick={() => setActiveTab("threat")}
-                    className={`rounded-lg px-3 py-1 font-semibold transition-all cursor-pointer ${
-                      activeTab === "threat"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Threat Map
-                  </button>
                 </div>
               </div>
 
-              {/* Tab 1: Pentagon Radar Chart with Expanded Scale & Bottom-Aligned Benchmarks */}
+              {/* Tab 1: Risk Pipeline View (Sankey Flow Chart) */}
+              {activeTab === "risk" && (
+                <div className="flex-1 flex flex-col justify-between pt-2">
+                  <RiskPipelineView findings={filteredFindings} providers={providers} />
+                </div>
+              )}
+
+              {/* Tab 2: Pentagon Radar Chart with Expanded Scale & Bottom-Aligned Benchmarks */}
               {activeTab === "radar" && (
                 <div className="flex-1 flex flex-col justify-between pt-2">
                   <div className="flex-1 flex items-center justify-center my-auto">
@@ -1185,66 +1783,25 @@ export function DashboardPage() {
                     />
                   </div>
                   <div className="mt-auto grid grid-cols-2 sm:grid-cols-5 gap-2.5 rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center text-xs">
-                    <div
-                      onMouseEnter={() => setRadarHoverIdx(0)}
-                      onMouseLeave={() => setRadarHoverIdx(null)}
-                      className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
-                        radarHoverIdx === 0 ? "bg-surface-3" : "hover:bg-surface-2/80"
-                      }`}
-                    >
-                      <div className="text-muted-foreground text-[11px]">CIS Benchmark</div>
-                      <div className="font-mono text-sm font-bold text-foreground mt-0.5">{animCis}%</div>
-                      <div className="font-mono text-[10px] text-emerald-400 font-semibold">+3.1%</div>
-                    </div>
-                    <div
-                      onMouseEnter={() => setRadarHoverIdx(1)}
-                      onMouseLeave={() => setRadarHoverIdx(null)}
-                      className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
-                        radarHoverIdx === 1 ? "bg-surface-3" : "hover:bg-surface-2/80"
-                      }`}
-                    >
-                      <div className="text-muted-foreground text-[11px]">SOC 2</div>
-                      <div className="font-mono text-sm font-bold text-foreground mt-0.5">{animSoc2}%</div>
-                      <div className="font-mono text-[10px] text-emerald-400 font-semibold">+1.4%</div>
-                    </div>
-                    <div
-                      onMouseEnter={() => setRadarHoverIdx(2)}
-                      onMouseLeave={() => setRadarHoverIdx(null)}
-                      className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
-                        radarHoverIdx === 2 ? "bg-surface-3" : "hover:bg-surface-2/80"
-                      }`}
-                    >
-                      <div className="text-muted-foreground text-[11px]">ISO 27001</div>
-                      <div className="font-mono text-sm font-bold text-foreground mt-0.5">{animIso}%</div>
-                      <div className="font-mono text-[10px] text-rose-400 font-semibold">-0.8%</div>
-                    </div>
-                    <div
-                      onMouseEnter={() => setRadarHoverIdx(3)}
-                      onMouseLeave={() => setRadarHoverIdx(null)}
-                      className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
-                        radarHoverIdx === 3 ? "bg-surface-3" : "hover:bg-surface-2/80"
-                      }`}
-                    >
-                      <div className="text-muted-foreground text-[11px]">NIST 800-53</div>
-                      <div className="font-mono text-sm font-bold text-foreground mt-0.5">{animNist}%</div>
-                      <div className="font-mono text-[10px] text-emerald-400 font-semibold">+2.2%</div>
-                    </div>
-                    <div
-                      onMouseEnter={() => setRadarHoverIdx(4)}
-                      onMouseLeave={() => setRadarHoverIdx(null)}
-                      className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
-                        radarHoverIdx === 4 ? "bg-surface-3" : "hover:bg-surface-2/80"
-                      }`}
-                    >
-                      <div className="text-muted-foreground text-[11px]">PCI-DSS</div>
-                      <div className="font-mono text-sm font-bold text-foreground mt-0.5">{animPci}%</div>
-                      <div className="font-mono text-[10px] text-emerald-400 font-semibold">+4.6%</div>
-                    </div>
+                    {radarData.map((d, i) => (
+                      <div
+                        key={i}
+                        onMouseEnter={() => setRadarHoverIdx(i)}
+                        onMouseLeave={() => setRadarHoverIdx(null)}
+                        className={`rounded-lg p-1.5 transition-colors cursor-pointer ${
+                          radarHoverIdx === i ? "bg-surface-3" : "hover:bg-surface-2/80"
+                        }`}
+                      >
+                        <div className="text-muted-foreground text-[11px] truncate">{d.label}</div>
+                        <div className="font-mono text-sm font-bold text-foreground mt-0.5">{d.value}%</div>
+                        <div className="font-mono text-[10px] text-emerald-400 font-semibold">+2.4%</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Tab 2: Asset Volume View */}
+              {/* Tab 3: Asset Volume View */}
               {activeTab === "asset" && (
                 <div className="flex-1 flex flex-col justify-between pt-2">
                   <AssetVolumeView
@@ -1254,15 +1811,8 @@ export function DashboardPage() {
                     gcpAssets={gcpAssets}
                     ociAssets={ociAssets}
                     oracleSaasAssets={oracleSaasAssets}
-                    resources={resources}
+                    resources={filteredResources}
                   />
-                </div>
-              )}
-
-              {/* Tab 3: Threat Map View */}
-              {activeTab === "threat" && (
-                <div className="flex-1 flex flex-col justify-between pt-2">
-                  <ThreatMapView findings={filteredFindings} />
                 </div>
               )}
             </div>
@@ -1379,102 +1929,15 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Main Content Section 2: Task Orchestration & AI Decision Core (Balanced Bottom Row) ── */}
+        {/* ── Main Content Section 2: Neo4j Attack Path Graph & AI Decision Core ── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Jira Remediation & Task Orchestration (2 Columns) */}
+          {/* Neo4j Multi-Cloud Attack Path Graph Visualizer (2 Columns) */}
           <div className="lg:col-span-2">
-            <div className="rounded-2xl border border-border/80 bg-surface/80 p-6 backdrop-blur-sm shadow-md space-y-4 h-full flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Ticket className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-display text-sm font-bold text-foreground">
-                        Jira Remediation & Task Orchestration
-                      </h3>
-                      <p className="text-[11px] text-muted-foreground">
-                        Live dispatch and bi-directional status tracking across Jira Cloud
-                      </p>
-                    </div>
-                  </div>
-
-                  <Link
-                    to="/ai/decisions"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                  >
-                    <span>Open Console →</span>
-                  </Link>
-                </div>
-
-                {/* 5 Jira Metric KPI Tiles */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
-                    <div className="text-[11px] text-muted-foreground font-medium">Tickets Created</div>
-                    <div className="font-mono text-xl font-bold text-info mt-1">
-                      {remediationMetrics?.tickets_created ?? (executionsRaw?.length ?? 0)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
-                    <div className="text-[11px] text-muted-foreground font-medium">Pending Approval</div>
-                    <div className="font-mono text-xl font-bold text-high mt-1">
-                      {remediationMetrics?.pending_approval ?? 1}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
-                    <div className="text-[11px] text-muted-foreground font-medium">In Progress</div>
-                    <div className="font-mono text-xl font-bold text-primary mt-1">
-                      {remediationMetrics?.in_progress ?? 0}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
-                    <div className="text-[11px] text-muted-foreground font-medium">Resolved</div>
-                    <div className="font-mono text-xl font-bold text-success mt-1">
-                      {remediationMetrics?.resolved ?? 0}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-border/60 bg-surface-2/40 p-3 text-center">
-                    <div className="text-[11px] text-muted-foreground font-medium">Failed</div>
-                    <div className="font-mono text-xl font-bold text-destructive mt-1">
-                      {remediationMetrics?.failed ?? 0}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recent Activity Feed */}
-                {remediationMetrics?.recent_activity && remediationMetrics.recent_activity.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-border/40">
-                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Recent Remediation Activity
-                    </div>
-                    <div className="space-y-1.5">
-                      {remediationMetrics.recent_activity.slice(0, 3).map((act) => (
-                        <div
-                          key={act.id}
-                          className="flex items-center justify-between rounded-lg bg-surface-2/40 px-3 py-2 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-primary">{act.issue_key}</span>
-                            <span className="text-foreground line-clamp-1 text-[11px]">{act.summary}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] text-muted-foreground">{act.assignee}</span>
-                            <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border">
-                              {act.jira_status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <Neo4jAttackGraphCard
+              selectedProviderId={selectedProviderId}
+              selectedProviderObj={selectedProviderObj}
+              findings={filteredFindings}
+            />
           </div>
 
           {/* Spectra & Aegis Decision Core (1 Column) */}

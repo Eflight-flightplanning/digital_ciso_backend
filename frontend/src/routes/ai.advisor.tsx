@@ -320,7 +320,7 @@ function AIAdvisorPage() {
                     </div>
                   </div>
                   <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.2 rounded border border-primary/20">
-                    Qwen 3.5
+                    Digital CISO LLM
                   </span>
                 </div>
 
@@ -333,7 +333,7 @@ function AIAdvisorPage() {
                     </div>
                   </div>
                   <span className="font-mono text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/20">
-                    Qwen 3.5
+                    Digital CISO LLM
                   </span>
                 </div>
 
@@ -346,7 +346,7 @@ function AIAdvisorPage() {
                     </div>
                   </div>
                   <span className="font-mono text-[9px] font-bold text-purple-400 bg-purple-400/10 px-1.5 py-0.2 rounded border border-purple-400/20">
-                    Qwen 3.5
+                    Digital CISO LLM
                   </span>
                 </div>
               </div>
@@ -373,11 +373,10 @@ function AIAdvisorPage() {
                     <button
                       key={p}
                       onClick={() => setProviderFilter(p)}
-                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${
-                        providerFilter === p
+                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${providerFilter === p
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-surface-2/60 border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                      }`}
+                        }`}
                     >
                       {p}
                     </button>
@@ -457,11 +456,10 @@ function AIAdvisorPage() {
                   )}
 
                   <div
-                    className={`max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-sm leading-relaxed shadow-sm ${
-                      m.sender === "user"
+                    className={`max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-sm leading-relaxed shadow-sm ${m.sender === "user"
                         ? "bg-primary text-primary-foreground font-medium rounded-br-none"
                         : "border border-border/80 bg-surface-2/60 text-foreground rounded-bl-none"
-                    }`}
+                      }`}
                   >
                     <p className="whitespace-pre-wrap leading-relaxed text-sm">{m.content}</p>
 

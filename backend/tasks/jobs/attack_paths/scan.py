@@ -71,7 +71,14 @@ try:
     from cartography.intel import analysis as cartography_analysis
 except Exception:
     cartography_analysis = None
-from cartography.intel import ontology as cartography_ontology
+try:
+    # Not present in the upstream cartography package as of 0.115.0 —
+    # guard like cartography_analysis above instead of hard-failing import
+    # of this whole module (and everything that imports it) if it's ever
+    # absent.
+    from cartography.intel import ontology as cartography_ontology
+except Exception:
+    cartography_ontology = None
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from tasks.jobs.attack_paths import (
@@ -239,16 +246,18 @@ def run(tenant_id: str, scan_id: str, task_id: str) -> dict[str, Any]:
             )
 
             # Post-processing: Just keeping it to be more Cartography compliant
-            logger.info(
-                f"Syncing Cartography ontology for AWS account {prowler_api_provider.uid}"
-            )
-            cartography_ontology.run(tmp_neo4j_session, tmp_cartography_config)
+            if cartography_ontology:
+                logger.info(
+                    f"Syncing Cartography ontology for AWS account {prowler_api_provider.uid}"
+                )
+                cartography_ontology.run(tmp_neo4j_session, tmp_cartography_config)
             db_utils.update_attack_paths_scan_progress(attack_paths_scan, 94)
 
-            logger.info(
-                f"Syncing Cartography analysis for AWS account {prowler_api_provider.uid}"
-            )
-            cartography_analysis.run(tmp_neo4j_session, tmp_cartography_config)
+            if cartography_analysis:
+                logger.info(
+                    f"Syncing Cartography analysis for AWS account {prowler_api_provider.uid}"
+                )
+                cartography_analysis.run(tmp_neo4j_session, tmp_cartography_config)
             db_utils.update_attack_paths_scan_progress(attack_paths_scan, 95)
 
             # Creating Internet node and `CAN_ACCESS` relationships

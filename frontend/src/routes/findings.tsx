@@ -85,18 +85,28 @@ function extractFindingProvider(f: any): string {
   else if (typeof f.provider_type === "string" && f.provider_type) p = f.provider_type.toUpperCase();
   else if (typeof meta.Provider === "string" && meta.Provider) p = meta.Provider.toUpperCase();
 
-  const checkId = String(f.check_id || meta.checkid || meta.check_id || "").toLowerCase();
-  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || checkId.startsWith("erp_") || checkId.startsWith("oracle_saas_")) return "ORACLE_SAAS";
-  if (p === "OCI" || p === "ORACLECLOUD" || checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
-  if (p === "AZURE" || checkId.startsWith("azure_") || checkId.startsWith("iam_") || checkId.startsWith("storage_") || checkId.startsWith("network_") || checkId.startsWith("sql_") || checkId.startsWith("defender_") || checkId.startsWith("entra_") || checkId.startsWith("vm_")) return "AZURE";
-  if (p === "AWS" || checkId.startsWith("aws_") || checkId.startsWith("s3_") || checkId.startsWith("ec2_") || checkId.startsWith("rds_")) return "AWS";
-  if (p === "GCP" || checkId.startsWith("gcp_")) return "GCP";
-  if (p === "K8S" || p === "KUBERNETES" || checkId.startsWith("k8s_")) return "K8S";
+  // 1. Explicit Provider string check (highest precedence)
+  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || p === "SAAS") return "ORACLE_SAAS";
+  if (p === "OCI" || p === "ORACLECLOUD" || p === "ORACLE_CLOUD") return "OCI";
+  if (p === "AZURE" || p === "AZ") return "AZURE";
+  if (p === "AWS") return "AWS";
+  if (p === "GCP") return "GCP";
+  if (p === "KUBERNETES" || p === "K8S") return "K8S";
 
+  // 2. Explicit Check ID prefix check
+  const checkId = String(f.check_id || meta.checkid || meta.check_id || "").toLowerCase();
+  if (checkId.startsWith("oracle_saas_") || checkId.startsWith("erp_")) return "ORACLE_SAAS";
+  if (checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
+  if (checkId.startsWith("azure_") || checkId.startsWith("entra_") || checkId.startsWith("defender_")) return "AZURE";
+  if (checkId.startsWith("aws_")) return "AWS";
+  if (checkId.startsWith("gcp_")) return "GCP";
+  if (checkId.startsWith("k8s_")) return "K8S";
+
+  // 3. Resource UID / ID fallback check
   const uid = String(f.uid || f.resource_uid || f.id || "").toLowerCase();
+  if (uid.includes("oracle-saas://") || uid.includes("fusion") || uid.includes("saas")) return "ORACLE_SAAS";
+  if (uid.includes("ocid1.") || uid.includes("oraclecloud") || uid.includes("oci")) return "OCI";
   if (uid.includes("azure") || uid.includes("/subscriptions/")) return "AZURE";
-  if (uid.includes("oracle_saas") || uid.includes("oracle-saas")) return "ORACLE_SAAS";
-  if (uid.includes("oci") || uid.includes("oraclecloud") || uid.includes("ocid1.")) return "OCI";
   if (uid.includes("aws") || uid.includes("arn:aws:")) return "AWS";
   if (uid.includes("gcp") || uid.includes("projects/")) return "GCP";
   if (uid.includes("k8s") || uid.includes("kubernetes")) return "K8S";

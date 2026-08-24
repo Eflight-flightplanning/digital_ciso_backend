@@ -45,13 +45,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ORACLE_SAAS",
     totalControls: 48,
-    score: 84,
-    passed: 40,
-    failed: 6,
-    manual: 2,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "itgc-sox-oracle-saas",
@@ -60,13 +60,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Government",
     providerTarget: "ORACLE_SAAS",
     totalControls: 86,
-    score: 79,
-    passed: 68,
-    failed: 14,
-    manual: 4,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "soc1-type2-oracle-saas",
@@ -75,13 +75,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ORACLE_SAAS",
     totalControls: 124,
-    score: 81,
-    passed: 100,
-    failed: 18,
-    manual: 6,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "oracle-saas-security-baseline",
@@ -90,13 +90,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "ORACLE_SAAS",
     totalControls: 64,
-    score: 85,
-    passed: 54,
-    failed: 8,
-    manual: 2,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
 
   {
@@ -106,13 +106,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "OCI",
     totalControls: 112,
-    score: 82,
-    passed: 92,
-    failed: 16,
-    manual: 4,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "cis-oci-3.0",
@@ -121,13 +121,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "OCI",
     totalControls: 130,
-    score: 79,
-    passed: 103,
-    failed: 21,
-    manual: 6,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "cis-azure-2.0",
@@ -136,13 +136,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "AZURE",
     totalControls: 154,
-    score: 74,
-    passed: 114,
-    failed: 36,
-    manual: 4,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "cis-azure-3.0",
@@ -151,13 +151,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "AZURE",
     totalControls: 172,
-    score: 72,
-    passed: 124,
-    failed: 42,
-    manual: 6,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "cis-aws-3.0",
@@ -166,13 +166,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "AWS",
     totalControls: 168,
-    score: 84,
-    passed: 141,
-    failed: 22,
-    manual: 5,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "cis-gcp-2.0",
@@ -181,13 +181,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "GCP",
     totalControls: 126,
-    score: 81,
-    passed: 102,
-    failed: 19,
-    manual: 5,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "nca-ecc-1.2018",
@@ -196,13 +196,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Government",
     providerTarget: "ALL",
     totalControls: 114,
-    score: 82,
-    passed: 93,
-    failed: 17,
-    manual: 4,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "nca-cscc-1.2019",
@@ -211,13 +211,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "ALL",
     totalControls: 152,
-    score: 80,
-    passed: 121,
-    failed: 25,
-    manual: 6,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "soc2",
@@ -226,13 +226,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ALL",
     totalControls: 748,
-    score: 78,
-    passed: 584,
-    failed: 138,
-    manual: 26,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "iso27001-2022",
@@ -241,13 +241,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ALL",
     totalControls: 815,
-    score: 76,
-    passed: 620,
-    failed: 154,
-    manual: 41,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "nist80053",
@@ -256,13 +256,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Government",
     providerTarget: "ALL",
     totalControls: 829,
-    score: 68,
-    passed: 564,
-    failed: 210,
-    manual: 55,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "nist-csf-2.0",
@@ -271,13 +271,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Government",
     providerTarget: "ALL",
     totalControls: 186,
-    score: 80,
-    passed: 149,
-    failed: 28,
-    manual: 9,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "pci-dss-4.0",
@@ -286,13 +286,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ALL",
     totalControls: 546,
-    score: 86,
-    passed: 470,
-    failed: 64,
-    manual: 12,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "hipaa",
@@ -301,13 +301,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Industry",
     providerTarget: "ALL",
     totalControls: 450,
-    score: 81,
-    passed: 365,
-    failed: 65,
-    manual: 20,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "gdpr",
@@ -316,13 +316,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Privacy",
     providerTarget: "ALL",
     totalControls: 373,
-    score: 84,
-    passed: 314,
-    failed: 42,
-    manual: 17,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "mitre-attack",
@@ -331,13 +331,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Cloud",
     providerTarget: "ALL",
     totalControls: 309,
-    score: 73,
-    passed: 226,
-    failed: 74,
-    manual: 9,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "fedramp-moderate",
@@ -346,13 +346,13 @@ const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
     category: "Government",
     providerTarget: "ALL",
     totalControls: 759,
-    score: 65,
-    passed: 494,
-    failed: 203,
-    manual: 62,
-    color: "text-rose-400",
-    textColor: "text-rose-400",
-    strokeColor: "#fb7185",
+    score: 0,
+    passed: 0,
+    failed: 0,
+    manual: 0,
+    color: "text-muted-foreground",
+    textColor: "text-muted-foreground",
+    strokeColor: "#64748b",
   },
   {
     id: "csa-ccm-4.0",
@@ -543,20 +543,30 @@ function getProviderOfFinding(f: any): "AZURE" | "OCI" | "AWS" | "GCP" | "KUBERN
   else if (f.scan?.provider && typeof f.scan.provider === "object" && typeof f.scan.provider.provider === "string") p = f.scan.provider.provider.toUpperCase();
   else if (typeof f.provider_type === "string" && f.provider_type) p = f.provider_type.toUpperCase();
 
-  const checkId = String(f.check_id || meta.checkid || meta.check_id || "");
-  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || checkId.startsWith("erp_") || checkId.startsWith("oracle_saas_")) return "ORACLE_SAAS";
-  if (p === "OCI" || p === "ORACLECLOUD" || checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
-  if (p === "AZURE" || checkId.startsWith("azure_") || checkId.startsWith("iam_") || checkId.startsWith("storage_") || checkId.startsWith("network_") || checkId.startsWith("sql_") || checkId.startsWith("defender_") || checkId.startsWith("entra_") || checkId.startsWith("vm_")) return "AZURE";
-  if (p === "AWS" || checkId.startsWith("aws_") || checkId.startsWith("s3_") || checkId.startsWith("ec2_")) return "AWS";
-  if (p === "GCP" || checkId.startsWith("gcp_")) return "GCP";
-  if (p === "KUBERNETES" || p === "K8S" || checkId.startsWith("k8s_")) return "KUBERNETES";
+  // 1. Explicit Provider string check (highest precedence)
+  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || p === "SAAS") return "ORACLE_SAAS";
+  if (p === "OCI" || p === "ORACLECLOUD" || p === "ORACLE_CLOUD") return "OCI";
+  if (p === "AZURE" || p === "AZ") return "AZURE";
+  if (p === "AWS") return "AWS";
+  if (p === "GCP") return "GCP";
+  if (p === "KUBERNETES" || p === "K8S") return "KUBERNETES";
 
+  // 2. Explicit Check ID prefix check
+  const checkId = String(f.check_id || meta.checkid || meta.check_id || "").toLowerCase();
+  if (checkId.startsWith("oracle_saas_") || checkId.startsWith("erp_")) return "ORACLE_SAAS";
+  if (checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
+  if (checkId.startsWith("azure_") || checkId.startsWith("entra_") || checkId.startsWith("defender_")) return "AZURE";
+  if (checkId.startsWith("aws_")) return "AWS";
+  if (checkId.startsWith("gcp_")) return "GCP";
+  if (checkId.startsWith("k8s_")) return "KUBERNETES";
+
+  // 3. Resource UID / ID fallback check
   const uid = String(f.uid || f.id || f.prowler_uid || f.resources?.[0]?.uid || f.resource_uid || "").toLowerCase();
+  if (uid.includes("oracle-saas://") || uid.includes("fusion") || uid.includes("saas")) return "ORACLE_SAAS";
+  if (uid.includes("ocid1.") || uid.includes("oraclecloud") || uid.includes("oci")) return "OCI";
   if (uid.includes("/subscriptions/") || uid.includes("azure") || uid.includes("prowler-azure")) return "AZURE";
   if (uid.includes("arn:aws:") || uid.includes("aws")) return "AWS";
   if (uid.includes("projects/") || uid.includes("gcp")) return "GCP";
-  if (uid.includes("ocid1.") || uid.includes("oraclecloud") || uid.includes("oci")) return "OCI";
-  if (uid.includes(".oraclecloud.com") || uid.includes("fusion") || uid.includes("saas")) return "ORACLE_SAAS";
   if (uid.includes("k8s") || uid.includes("kube")) return "KUBERNETES";
 
   return "AZURE";
@@ -636,11 +646,11 @@ function CompliancePage() {
   const realTotal = realFindings.length || 1;
 
   // Fleet Compliance dynamic computation
-  const fleetScore = realFindings.length > 0 
-    ? Math.round((realPassCount / realTotal) * 100) 
-    : 78;
+  const fleetScore = realFindings.length > 0
+    ? Math.round((realPassCount / realTotal) * 100)
+    : 0;
 
-  const totalAssetsCount = realResources.length > 0 ? realResources.length : 38;
+  const totalAssetsCount = realResources.length;
 
   const [modalSearchTerm, setModalSearchTerm] = useState("");
   const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL">("ALL");
@@ -661,11 +671,16 @@ function CompliancePage() {
         else if (fw.providerTarget === "GCP") targetList = findingsByProvider.gcp;
         else if (fw.providerTarget === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
         else {
-          targetList = rawFindings;
+          if (selectedProvider === "AZURE") targetList = findingsByProvider.azure;
+          else if (selectedProvider === "OCI") targetList = findingsByProvider.oci;
+          else if (selectedProvider === "AWS") targetList = findingsByProvider.aws;
+          else if (selectedProvider === "GCP") targetList = findingsByProvider.gcp;
+          else if (selectedProvider === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
+          else targetList = rawFindings;
         }
 
         const fwPass = targetList.filter((f: any) => f.status === "PASS").length;
-        const fwFail = targetList.filter((f: any) => f.status === "FAIL").length;
+        const fwFail = targetList.filter((f: any) => f.status === "FAIL" || f.status === "FAILING").length;
         const fwManual = targetList.filter((f: any) => f.status === "MANUAL").length;
         const fwTotal = targetList.length;
 
@@ -693,7 +708,7 @@ function CompliancePage() {
           textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : fwTotal > 0 ? "text-rose-400" : "text-muted-foreground",
         };
       });
-  }, [findingsByProvider, rawFindings, connectedProviderSet]);
+  }, [findingsByProvider, rawFindings, connectedProviderSet, selectedProvider]);
 
   const filteredFrameworks = useMemo(() => {
     return dynamicFrameworks.filter((f) => {
@@ -727,9 +742,13 @@ function CompliancePage() {
     else if (selectedFramework.providerTarget === "GCP") list = findingsByProvider.gcp;
     else if (selectedFramework.providerTarget === "ORACLE_SAAS") list = findingsByProvider.oracle_saas;
     else list = rawFindings;
-    
+
+    if (selectedProvider !== "ALL") {
+      list = list.filter((f: any) => getProviderOfFinding(f) === selectedProvider);
+    }
+
     return list;
-  }, [selectedFramework, rawFindings, findingsByProvider]);
+  }, [selectedFramework, rawFindings, findingsByProvider, selectedProvider]);
 
   const filteredModalFindings = useMemo(() => {
     return modalFindings.filter((f: any) => {
@@ -837,21 +856,19 @@ function CompliancePage() {
             <div className="flex items-center rounded-xl border border-border bg-surface-2/60 p-0.5">
               <button
                 onClick={() => setViewMode("cards")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
-                  viewMode === "cards"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "cards"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Cards
               </button>
               <button
                 onClick={() => setViewMode("matrix")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
-                  viewMode === "matrix"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "matrix"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Matrix
               </button>
@@ -865,11 +882,10 @@ function CompliancePage() {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all shrink-0 ${
-                selectedCategory === cat
+              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all shrink-0 ${selectedCategory === cat
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-surface-2/60 text-muted-foreground hover:bg-surface-3 hover:text-foreground border border-border/60"
-              }`}
+                }`}
             >
               {cat}
             </button>
@@ -963,13 +979,12 @@ function CompliancePage() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`font-mono font-bold ${
-                            fw.score >= 75
+                          className={`font-mono font-bold ${fw.score >= 75
                               ? "text-emerald-400"
                               : fw.score >= 60
-                              ? "text-amber-400"
-                              : "text-rose-400"
-                          }`}
+                                ? "text-amber-400"
+                                : "text-rose-400"
+                            }`}
                         >
                           {fw.score}%
                         </span>
@@ -1067,11 +1082,10 @@ function CompliancePage() {
                       <button
                         key={st}
                         onClick={() => setModalStatusFilter(st)}
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${
-                          modalStatusFilter === st
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${modalStatusFilter === st
                             ? "bg-primary text-primary-foreground"
                             : "bg-surface-2 text-muted-foreground hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         {st}
                       </button>
@@ -1137,13 +1151,12 @@ function CompliancePage() {
                             </p>
                           </div>
                           <span
-                            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${
-                              isPass
+                            className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${isPass
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                 : isManual
-                                ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            }`}
+                                  ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              }`}
                           >
                             {f.status || "FAIL"}
                           </span>
