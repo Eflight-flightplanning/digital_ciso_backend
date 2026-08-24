@@ -38,9 +38,9 @@ class iam_superuser_role_assigned(Check):
 
         if not findings:
             class _TenantResource(BaseModel):
-                id = tenant_id
-                username = "all-users"
-                display_name = "All ERP Users"
+                id: str = tenant_id
+                username: str = "all-users"
+                display_name: str = "All ERP Users"
 
             report = CheckReportOracleSaas(
                 metadata=self.metadata(),

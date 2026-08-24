@@ -35,9 +35,9 @@ class iam_mfa_not_enforced_admin(Check):
 
         if not findings:
             class _TenantResource(BaseModel):
-                id = tenant_id
-                username = "all-admins"
-                display_name = "All ERP Admins"
+                id: str = tenant_id
+                username: str = "all-admins"
+                display_name: str = "All ERP Admins"
 
             report = CheckReportOracleSaas(
                 metadata=self.metadata(),

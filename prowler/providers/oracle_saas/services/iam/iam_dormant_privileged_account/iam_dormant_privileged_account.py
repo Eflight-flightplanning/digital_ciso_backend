@@ -41,9 +41,9 @@ class iam_dormant_privileged_account(Check):
 
         if not findings:
             class _TenantResource(BaseModel):
-                id = tenant_id
-                username = "all-admins"
-                display_name = "All Privileged ERP Accounts"
+                id: str = tenant_id
+                username: str = "all-admins"
+                display_name: str = "All Privileged ERP Accounts"
 
             report = CheckReportOracleSaas(
                 metadata=self.metadata(),

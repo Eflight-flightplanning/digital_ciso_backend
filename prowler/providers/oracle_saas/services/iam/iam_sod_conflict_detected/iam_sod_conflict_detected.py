@@ -29,9 +29,9 @@ class iam_sod_conflict_detected(Check):
         if not service.sod_conflicts:
             # Create a single PASS finding for the tenant
             class _TenantResource(BaseModel):
-                id = tenant_id
-                username = "all-users"
-                display_name = "All ERP Users"
+                id: str = tenant_id
+                username: str = "all-users"
+                display_name: str = "All ERP Users"
 
             report = CheckReportOracleSaas(
                 metadata=self.metadata(),
