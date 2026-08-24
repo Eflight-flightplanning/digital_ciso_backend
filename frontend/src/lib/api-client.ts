@@ -61,28 +61,38 @@ export async function apiRequest<T = any>(
 
   // Automatic token refresh on 401 Unauthorized
   if (response.status === 401 && !(options as any)._isRetry) {
-    try {
-      const tokenRes = await fetch(`${API_BASE}/tokens`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json, application/vnd.api+json" },
-        body: JSON.stringify({ email: "admin@securityplatform.com", password: "Admin@12345" }),
-      });
-      if (tokenRes.ok) {
-        const tokenJson = await tokenRes.json();
-        const freshToken = tokenJson?.attributes?.access || tokenJson?.data?.attributes?.access || tokenJson?.access;
-        if (freshToken) {
-          setAuthToken(freshToken);
-          headers.set("Authorization", `Bearer ${freshToken}`);
-          response = await fetch(url, {
-            ...options,
-            headers,
-            // @ts-ignore
-            _isRetry: true,
-          });
+    const storedRefresh = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    if (storedRefresh) {
+      try {
+        const tokenRes = await fetch(`${API_BASE}/tokens/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json, application/vnd.api+json" },
+          body: JSON.stringify({ refresh: storedRefresh }),
+        });
+        if (tokenRes.ok) {
+          const tokenJson = await tokenRes.json();
+          const freshToken = tokenJson?.attributes?.access || tokenJson?.data?.attributes?.access || tokenJson?.access;
+          if (freshToken) {
+            setAuthToken(freshToken);
+            headers.set("Authorization", `Bearer ${freshToken}`);
+            response = await fetch(url, {
+              ...options,
+              headers,
+              // @ts-ignore
+              _isRetry: true,
+            });
+          }
         }
+      } catch {
+        // Fall through to redirect handler
       }
-    } catch {
-      // Fall through to error handler
+    }
+
+    if (!response.ok && typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/sign-in";
+      return { data: [], items: [], meta: {} } as unknown as T;
     }
   }
 
