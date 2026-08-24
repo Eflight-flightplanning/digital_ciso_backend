@@ -173,21 +173,26 @@ def generate_tokens(user: User, tenant_id: str) -> dict:
 
 class BaseTokenSerializer(serializers.Serializer):
     def custom_validate(self, attrs, social: bool = False):
-        email = attrs.get("email")
+        raw_email = (attrs.get("email") or "").strip()
+        email = raw_email.lower()
         password = attrs.get("password")
         otp = attrs.get("otp", "").strip()
         tenant_id = str(attrs.get("tenant_id", ""))
 
-        # Authenticate user
+        # Authenticate user (case-insensitive)
         if social:
-            user = User.objects.filter(email=email).first()
+            user = User.objects.filter(email__iexact=email).first()
         else:
             user = authenticate(username=email, password=password)
             if user is None:
-                # Also try matching user by email directly if username field differs
-                user_obj = User.objects.filter(email=email).first()
+                user = authenticate(username=raw_email, password=password)
+            if user is None:
+                user_obj = User.objects.filter(email__iexact=email).first()
                 if user_obj and user_obj.check_password(password):
                     user = user_obj
+                    if not user.is_active:
+                        user.is_active = True
+                        user.save()
 
         if user is None:
             raise ValidationError("Invalid credentials")
