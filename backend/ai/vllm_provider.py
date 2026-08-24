@@ -50,10 +50,11 @@ class VLLMAzureProvider(AIProvider):
         api_key: str | None = None,
         model_name: str | None = None,
     ) -> None:
+        raw_url = base_url.strip() if (base_url and isinstance(base_url, str) and base_url.strip()) else None
         self.base_url = (
-            base_url
-            or os.getenv("VLLM_AZURE_ENDPOINT_URL")
+            raw_url
             or os.getenv("VLLM_AZURE_ENDPOINT")
+            or os.getenv("VLLM_AZURE_ENDPOINT_URL")
             or DEFAULT_VLLM_ENDPOINT
         ).rstrip("/")
         if not self.base_url.endswith("/v1"):
