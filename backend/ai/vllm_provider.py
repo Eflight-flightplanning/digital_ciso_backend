@@ -52,6 +52,7 @@ class VLLMAzureProvider(AIProvider):
     ) -> None:
         self.base_url = (
             base_url
+            or os.getenv("VLLM_AZURE_ENDPOINT_URL")
             or os.getenv("VLLM_AZURE_ENDPOINT")
             or DEFAULT_VLLM_ENDPOINT
         ).rstrip("/")
