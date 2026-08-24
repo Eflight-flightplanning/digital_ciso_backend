@@ -109,7 +109,30 @@ class VLLMAzureProvider(AIProvider):
             }
 
     @staticmethod
-    def _extract_json(text: str) -> dict[str, Any]:
+    def _clean_thinking_trace(raw_text: str) -> str:
+        """Strip out internal reasoning scratchpads, thinking traces, and meta-analysis headers."""
+        text = raw_text.strip()
+        if "</think>" in text:
+            text = text.split("</think>")[-1].strip()
+
+        if "Thinking Process:" in text:
+            text = text.split("Thinking Process:")[-1].strip()
+
+        # Strip lines matching scratchpad headers like "* User Input:", "* Task:", "1. Analyze the Request:"
+        lines = []
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if re.match(r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|Role|Task|Constraints|Greeting|Status|Telemetry|Offer|Formatting|Analyze|Identify|Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON|Context|System Instruction|Critical Constraint)\b", stripped, re.IGNORECASE):
+                continue
+            if stripped.startswith("Thinking Process:"):
+                continue
+            lines.append(line)
+
+        result = "\n".join(lines).strip()
+        return result or text
+
+    @classmethod
+    def _extract_json(cls, text: str) -> dict[str, Any]:
         """Extract and parse JSON safely from model response, stripping thinking traces if present."""
         raw_text = text.strip()
 
@@ -164,18 +187,13 @@ class VLLMAzureProvider(AIProvider):
             except Exception:
                 pass
 
-        # 5. Header-based preamble stripping: if Spectra header exists, cut directly to it
-        cleaned_text = raw_text
+        # 5. Header-based preamble stripping & scratchpad cleaning
+        cleaned_text = cls._clean_thinking_trace(raw_text)
         if any(h in raw_text for h in ["### Spectra", "## Current State", "## Actionable", "## Risk Profile"]):
             for marker in ["### Spectra", "## Current State", "## Actionable", "## Risk Profile"]:
                 if marker in cleaned_text:
                     cleaned_text = marker + cleaned_text.split(marker, 1)[1]
                     break
-        else:
-            # Strip out step-by-step thinking traces, prompt evaluations, and internal reasoning scratchpads
-            cleaned_text = re.sub(r"(?i)(?:^|\n)\s*(?:\d+\.|\*|-)?\s*\*\*?(?:Analyze the Request|Analyze the Payload|Context|System Instruction|Critical Constraint|Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON)[^\n]*", "", raw_text)
-            lines = [l for l in cleaned_text.split("\n") if not re.match(r"^\s*(?:\d+\.|\*|-)?\s*(?:Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON|Analyze|Context:|User Question:|Critical Constraint)\b", l, re.IGNORECASE)]
-            cleaned_text = "\n".join(lines).strip()
 
         return {"answer": cleaned_text, "raw_text": cleaned_text}
 
