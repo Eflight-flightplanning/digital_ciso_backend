@@ -499,12 +499,12 @@ class AIAdvisorQueryView(APIView):
                 elif p_lower in ("github", "m365"):
                     provider_filter = p_lower
 
-            # Natural Language Provider Intent Detection from question
+            # Natural Language Provider Intent Detection from question (with typo tolerance)
             if not provider_filter:
                 q_lower = clean_question.lower()
-                if any(k in q_lower for k in ("oracle saas", "fusion saas", "fusion cloud", "fusion erp", "fusion hcm", "oracle erp", "oracle hcm", "sod matrix", "toxic combination")):
+                if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination")):
                     provider_filter = "oracle_saas"
-                elif any(k in q_lower for k in ("oci", "oracle cloud infrastructure", "oraclecloud", "tenancy", "compartment", "vcn")):
+                elif any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn")):
                     provider_filter = "oraclecloud"
                 elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription")):
                     provider_filter = "azure"
