@@ -26,11 +26,9 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"  [OK] Existing Tenant: {tenant.name} ({tenant.id})")
 
-        # 2. Admin Users
+        # 2. Admin User
         admin_users = [
             ("digitalciso@eflight.aero", "Digital CISO Admin"),
-            ("alex.ciso@eflight.aero", "Alex CISO"),
-            ("akhilesh.merugu@pravahya.com", "Akhilesh Merugu"),
         ]
 
         for user_email, user_name in admin_users:
