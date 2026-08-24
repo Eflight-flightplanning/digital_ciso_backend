@@ -36,27 +36,28 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"  [OK] Tenant: {tenant.name} ({tenant.id})")
 
-        # 2. Admin User
-        user = User.objects.filter(email="akhilesh.merugu@pravahya.com").first()
-        if not user:
-            user = User.objects.create_user(
-                name="Akhilesh Merugu",
-                email="akhilesh.merugu@pravahya.com",
-                password="Admin1234!",
-                company_name="Pravahya Enterprise",
-            )
-            self.stdout.write("  [OK] Created Admin user: akhilesh.merugu@pravahya.com / Admin1234!")
-        else:
-            user.set_password("Admin1234!")
-            user.save()
-            self.stdout.write("  [OK] Updated Admin user password: akhilesh.merugu@pravahya.com / Admin1234!")
+        # 2. Admin Users
+        for user_email, user_name in [("akhilesh.merugu@pravahya.com", "Akhilesh Merugu"), ("alex.ciso@eflight.aero", "Alex CISO")]:
+            u = User.objects.filter(email=user_email).first()
+            if not u:
+                u = User.objects.create_user(
+                    name=user_name,
+                    email=user_email,
+                    password="Admin1234!",
+                    company_name="Pravahya Enterprise",
+                )
+                self.stdout.write(f"  [OK] Created Admin user: {user_email} / Admin1234!")
+            else:
+                u.set_password("Admin1234!")
+                u.save()
+                self.stdout.write(f"  [OK] Updated Admin user password: {user_email} / Admin1234!")
 
-        # 3. Membership
-        Membership.objects.get_or_create(
-            tenant=tenant,
-            user=user,
-            defaults={"role": Membership.RoleChoices.OWNER}
-        )
+            # 3. Membership
+            Membership.objects.get_or_create(
+                tenant=tenant,
+                user=u,
+                defaults={"role": Membership.RoleChoices.OWNER}
+            )
 
         # 4. RLS-protected records
         with rls_transaction(str(tenant.id)):
