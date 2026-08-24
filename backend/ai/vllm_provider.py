@@ -287,21 +287,22 @@ class VLLMAzureProvider(AIProvider):
                 history=history,
             )
             ans = data.get("answer", data.get("raw_text", "")).strip()
-            if ans and not ans.startswith("This is a simulated") and len(ans) > 10:
+            if ans and not data.get("_ai_unavailable") and len(ans) > 5:
+                # Strip out thinking process traces if Qwen emitted scratchpad thoughts
+                if "Thinking Process:" in ans:
+                    ans = re.sub(r"(?s)Thinking Process:.*?(?=\n\n[A-Z]|\n\n#|\n\n\*\*|\Z)", "", ans).strip()
+                    if not ans or len(ans) < 10:
+                        ans = data.get("raw_text", "").strip()
+
                 refs = data.get("finding_references", [])
                 if not refs and relevant_findings:
-                    # Only include references if the finding relates to the query or answer
                     refs = [
                         {
                             "id": f.get("finding_id", ""),
                             "name": f.get("check_title", f.get("check_id", "")),
                             "severity": f.get("severity", "high"),
-                            "resource": f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else str(f.get("resource", "")),
                         }
-                        for f in relevant_findings[:5]
-                        if any(kw in (f.get("check_title", "") + " " + f.get("check_id", "") + " " + str(f.get("resource", ""))).lower()
-                               for kw in question.lower().split() if len(kw) > 3)
-                           or f.get("finding_id", "---") in ans
+                        for f in relevant_findings[:4]
                     ]
                 return AdvisorOutput(
                     answer=ans,
