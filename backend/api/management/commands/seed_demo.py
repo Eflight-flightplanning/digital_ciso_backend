@@ -37,7 +37,11 @@ class Command(BaseCommand):
         self.stdout.write(f"  [OK] Tenant: {tenant.name} ({tenant.id})")
 
         # 2. Admin Users
-        for user_email, user_name in [("akhilesh.merugu@pravahya.com", "Akhilesh Merugu"), ("alex.ciso@eflight.aero", "Alex CISO")]:
+        for user_email, user_name in [
+            ("digitalciso@eflight.aero", "Digital CISO Admin"),
+            ("alex.ciso@eflight.aero", "Alex CISO"),
+            ("akhilesh.merugu@pravahya.com", "Akhilesh Merugu"),
+        ]:
             u = User.objects.filter(email=user_email).first()
             if not u:
                 u = User.objects.create_user(
