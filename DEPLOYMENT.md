@@ -71,8 +71,7 @@ PGPASSWORD="<YOUR_PASSWORD>" psql -h digitalciso.postgres.database.azure.com -U 
 # 3. Run Django migrations
 cd /opt/security_platform/backend
 source .venv/bin/activate
-python manage.py migrate_schemas --shared
-python manage.py migrate_schemas --tenant
+python manage.py migrate
 ```
 
 ---
