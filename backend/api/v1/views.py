@@ -879,6 +879,21 @@ class UserViewSet(BaseUserViewset):
             )
         return Response(data=UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
+    def destroy(self, request, *args, **kwargs):
+        user_instance = self.get_object()
+        if request.user.is_authenticated and user_instance.email.lower() == request.user.email.lower():
+            raise ValidationError("You cannot remove your own active administrator account while logged in.")
+
+        user_id = user_instance.id
+        email = user_instance.email
+
+        Membership.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
+        UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
+        user_instance.delete(using=MainRouter.admin_db)
+
+        logger.info("Removed user account %s (%s)", email, user_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @extend_schema_view(
     create=extend_schema(

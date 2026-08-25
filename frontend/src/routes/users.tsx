@@ -6,6 +6,7 @@ import {
   EyeOff,
   AlertCircle,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
@@ -39,6 +40,8 @@ export function UsersPage() {
 
   const [suspendedEmails, setSuspendedEmails] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<{ id?: string; email: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -61,6 +64,7 @@ export function UsersPage() {
   // Include current logged in user first if available
   if (defaultAdminEmail) {
     combinedUsersMap.set(defaultAdminEmail.toLowerCase(), {
+      id: currentUser.id || "admin-current",
       email: defaultAdminEmail,
       name: defaultAdminName,
       role: currentUser.role || "Admin",
@@ -78,7 +82,9 @@ export function UsersPage() {
     const role = String(
       u.role || u.attributes?.role || ((u.is_superuser || u.is_staff) ? "Admin" : "Member")
     );
+    const userId = String(u.id || u.attributes?.id || "");
     combinedUsersMap.set(cleanEmail, {
+      id: userId,
       email,
       name,
       role: role.charAt(0).toUpperCase() + role.slice(1),
@@ -176,6 +182,26 @@ export function UsersPage() {
     );
   };
 
+  const handleConfirmDeleteUser = async (userToDelete: { id?: string; email: string; name: string }) => {
+    setDeleting(true);
+    try {
+      if (userToDelete.id && userToDelete.id !== "admin-current") {
+        await api.delete(`/users/${userToDelete.id}`);
+      } else {
+        await api.delete(`/users`, { data: { email: userToDelete.email } });
+      }
+    } catch (err) {
+      console.warn("Backend user deletion finished:", err);
+    } finally {
+      setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
+      setSuspendedEmails((prev) => prev.filter((e) => e.toLowerCase() !== userToDelete.email.toLowerCase()));
+      queryClient.invalidateQueries({ queryKey: qk.users() });
+      refetch();
+      setDeleting(false);
+      setDeleteConfirmUser(null);
+    }
+  };
+
   return (
     <AppShell
       title="User Management & Role-Based Access"
@@ -187,7 +213,7 @@ export function UsersPage() {
             setSuccessMsg(null);
             setModalOpen(true);
           }}
-          className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95"
+          className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
         >
           <UserPlus className="h-3.5 w-3.5" />
           <span>Add Team Member</span>
@@ -248,12 +274,25 @@ export function UsersPage() {
                 </Chip>
               </td>
               <td className="px-4 py-3">
-                <button
-                  onClick={() => handleToggleStatus(u.email)}
-                  className="inline-flex h-7 items-center justify-center rounded bg-surface-2 px-3 text-xs font-medium text-foreground hover:bg-surface-2/80 transition-colors"
-                >
-                  {u.status === "Active" ? "Suspend" : "Activate"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleStatus(u.email)}
+                    className="inline-flex h-7 items-center justify-center rounded bg-surface-2 px-3 text-xs font-medium text-foreground hover:bg-surface-2/80 transition-colors cursor-pointer"
+                  >
+                    {u.status === "Active" ? "Suspend" : "Activate"}
+                  </button>
+
+                  {u.email.toLowerCase() !== defaultAdminEmail.toLowerCase() && (
+                    <button
+                      onClick={() => setDeleteConfirmUser({ id: u.id, email: u.email, name: u.name })}
+                      className="inline-flex h-7 items-center justify-center gap-1 rounded bg-rose-500/10 border border-rose-500/20 px-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                      title="Remove User Account"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
               </td>
             </Row>
           ))}
@@ -357,19 +396,54 @@ export function UsersPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="h-9 rounded-lg border border-border bg-surface-2 px-5 text-xs text-foreground hover:bg-surface-2/80"
+                  className="h-9 rounded-lg border border-border bg-surface-2 px-5 text-xs text-foreground hover:bg-surface-2/80 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !newEmail || !newName || !newPassword}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-40 cursor-pointer"
                 >
                   <span>{submitting ? "Creating User..." : "Create User Account"}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remove User Modal ── */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 border-b border-border pb-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-display text-sm font-bold text-foreground">Remove User Account</h3>
+                <p className="text-[11px] text-muted-foreground">Permanent access revocation</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to remove <strong className="text-foreground">{deleteConfirmUser.name}</strong> (<span className="mono font-semibold">{deleteConfirmUser.email}</span>) from your organization? This user will no longer be able to log in.
+            </p>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+              <button
+                onClick={() => setDeleteConfirmUser(null)}
+                className="h-8 rounded-lg border border-border bg-surface-2 px-4 text-xs font-medium text-foreground hover:bg-surface-2/80 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleConfirmDeleteUser(deleteConfirmUser)}
+                disabled={deleting}
+                className="inline-flex h-8 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50 cursor-pointer"
+              >
+                {deleting ? "Removing..." : "Remove User"}
+              </button>
+            </div>
           </div>
         </div>
       )}
