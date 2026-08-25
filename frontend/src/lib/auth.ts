@@ -110,6 +110,10 @@ export const authStore = {
           errDetail =
             errJson?.errors?.[0]?.detail ||
             errJson?.errors?.otp?.[0] ||
+            errJson?.non_field_errors?.[0] ||
+            (Array.isArray(errJson?.email) ? errJson.email[0] : null) ||
+            (Array.isArray(errJson?.password) ? errJson.password[0] : null) ||
+            (Array.isArray(errJson?.otp) ? errJson.otp[0] : null) ||
             errJson?.detail ||
             errJson?.message ||
             errDetail;
@@ -149,19 +153,21 @@ export const authStore = {
 
       const cleanName =
         providedName ||
-        (email.split("@")[0].charAt(0).toUpperCase() +
-          email.split("@")[0].slice(1));
+        tokenPayload?.name ||
+        email.split("@")[0].replace(/[^a-zA-Z0-9]/g, " ");
 
-      const loggedUser: User = {
-        id: tokenPayload?.user_id || data?.data?.id || "user",
-        email: email,
+      const user: User = {
+        id: tokenPayload?.user_id || "usr_dev_101",
         name: cleanName,
-        company_name: providedCompany || (email.endsWith("@eflight.aero") ? "Eflight Global Defense" : "Enterprise Security"),
-        role: "Administrator",
+        email: email,
+        company_name: providedCompany || tokenPayload?.company_name || "Enterprise Security Pod",
+        role: (tokenPayload?.roles && tokenPayload?.roles[0]) || "Security Administrator",
+        tenant_id: tokenPayload?.tenant_id || "3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47",
+        date_joined: new Date().toISOString(),
       };
 
-      this.setUser(loggedUser, accessToken);
-      return { user: loggedUser };
+      this.setUser(user, accessToken);
+      return { user };
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));
@@ -182,7 +188,7 @@ export const authStore = {
     this.logout();
 
     try {
-      // 1. Attempt user registration on Django backend
+      // 1. Create User in Backend API
       const payload = {
         data: {
           type: "users",
@@ -210,6 +216,10 @@ export const authStore = {
           const errJson = await res.json();
           errDetail =
             errJson?.errors?.[0]?.detail ||
+            errJson?.errors?.email?.[0] ||
+            errJson?.errors?.password?.[0] ||
+            (Array.isArray(errJson?.email) ? errJson.email[0] : null) ||
+            (Array.isArray(errJson?.password) ? errJson.password[0] : null) ||
             errJson?.detail ||
             errJson?.message ||
             errDetail;
