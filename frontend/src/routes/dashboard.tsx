@@ -659,25 +659,44 @@ function RiskPipelineView({ findings, providers }: { findings: any[]; providers:
       else if (sev === "low") low += 1;
       else info += 1;
 
-      // Deduce Provider Name
-      let provKey = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
-      if (!provKey || provKey === "UNKNOWN") {
-        const uid = String(f.uid || "").toLowerCase();
-        if (uid.includes("/subscriptions/")) provKey = "AZURE";
-        else if (uid.includes("oracle") || uid.includes("hcm") || uid.includes("fusion")) provKey = "ORACLE_SAAS";
-        else provKey = "AZURE";
+      // Deduce Provider Name & Canonical Label
+      let rawProv = String(f.provider || f.provider_type || f.check_metadata?.provider || "").toUpperCase();
+      const uid = String(f.uid || f.resource_uid || "").toLowerCase();
+
+      if (!rawProv || rawProv === "UNKNOWN") {
+        if (uid.includes("/subscriptions/")) rawProv = "AZURE";
+        else if (uid.includes("saas") || uid.includes("hcm") || uid.includes("fusion") || uid.includes("oracle_saas")) rawProv = "ORACLE_SAAS";
+        else if (uid.includes("ocid1.") || uid.includes("oraclecloud")) rawProv = "OCI";
+        else rawProv = "AZURE";
       }
 
-      let provLabel = provKey;
-      if (provKey.includes("SAAS") || provKey.includes("ORACLE")) provLabel = "Oracle SaaS (HCM/ERP)";
-      else if (provKey.includes("AZURE")) provLabel = "Microsoft Azure";
-      else if (provKey.includes("OCI")) provLabel = "Oracle Cloud Infrastructure";
-      else if (provKey.includes("AWS")) provLabel = "Amazon Web Services";
+      let provLabel = "Microsoft Azure";
+      let canonicalKey = "AZURE";
 
-      if (!providerMap.has(provKey)) {
-        providerMap.set(provKey, { name: provLabel, count: 0, fail: 0, critical: 0, high: 0, medium: 0, low: 0 });
+      if (rawProv.includes("SAAS") || rawProv.includes("FUSION") || rawProv.includes("HCM") || rawProv.includes("ERP")) {
+        provLabel = "Oracle SaaS (HCM/ERP)";
+        canonicalKey = "ORACLE_SAAS";
+      } else if (rawProv.includes("OCI") || rawProv.includes("ORACLECLOUD") || rawProv.includes("ORACLE_CLOUD")) {
+        provLabel = "Oracle Cloud (OCI)";
+        canonicalKey = "OCI";
+      } else if (rawProv.includes("AZURE")) {
+        provLabel = "Microsoft Azure";
+        canonicalKey = "AZURE";
+      } else if (rawProv.includes("AWS")) {
+        provLabel = "Amazon Web Services";
+        canonicalKey = "AWS";
+      } else if (rawProv.includes("GCP")) {
+        provLabel = "Google Cloud Platform";
+        canonicalKey = "GCP";
+      } else if (rawProv.includes("ORACLE")) {
+        provLabel = "Oracle SaaS (HCM/ERP)";
+        canonicalKey = "ORACLE_SAAS";
       }
-      const pEntry = providerMap.get(provKey)!;
+
+      if (!providerMap.has(canonicalKey)) {
+        providerMap.set(canonicalKey, { name: provLabel, count: 0, fail: 0, critical: 0, high: 0, medium: 0, low: 0 });
+      }
+      const pEntry = providerMap.get(canonicalKey)!;
       pEntry.count += 1;
       if (status === "FAIL") pEntry.fail += 1;
       if (sev === "critical") pEntry.critical += 1;
