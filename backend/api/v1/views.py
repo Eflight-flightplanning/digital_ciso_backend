@@ -815,9 +815,19 @@ class UserViewSet(BaseUserViewset):
             or "Member"
         )
 
-        if request.user.is_authenticated and getattr(request, "tenant_id", None):
+        request_tenant_id = (
+            getattr(request, "tenant_id", None)
+            or (request.auth.get("tenant_id") if isinstance(request.auth, dict) else None)
+            or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
+        )
+        if not request_tenant_id and request.user.is_authenticated:
+            admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
+            if admin_membership:
+                request_tenant_id = str(admin_membership.tenant_id)
+
+        if request.user.is_authenticated and request_tenant_id:
             try:
-                tenant = Tenant.objects.using(MainRouter.admin_db).get(id=request.tenant_id)
+                tenant = Tenant.objects.using(MainRouter.admin_db).get(id=request_tenant_id)
             except Tenant.DoesNotExist:
                 tenant = Tenant.objects.using(MainRouter.admin_db).create(
                     name=f"{user.email.split('@')[0]} default tenant"
