@@ -445,13 +445,16 @@ class UserIncludeSerializer(UserSerializer):
 class UserCreateSerializer(BaseWriteSerializer):
     password = serializers.CharField(write_only=True)
     company_name = serializers.CharField(required=False)
+    role = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
-        fields = ["name", "password", "email", "company_name"]
+        fields = ["name", "password", "email", "company_name", "role"]
 
     def validate_password(self, value):
-        user = User(**{k: v for k, v in self.initial_data.items() if k != "type"})
+        valid_fields = {f.name for f in User._meta.concrete_fields}
+        user_kwargs = {k: v for k, v in self.initial_data.items() if k in valid_fields and k != "password"}
+        user = User(**user_kwargs)
         validate_password(value, user=user)
         return value
 

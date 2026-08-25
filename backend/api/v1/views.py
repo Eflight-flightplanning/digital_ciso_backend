@@ -801,13 +801,16 @@ class UserViewSet(BaseUserViewset):
                 invitation_token, serializer.validated_data["email"]
             )
 
+        role_param = serializer.validated_data.pop("role", None)
+
         # Proceed with creating the user and membership
         user = User.objects.db_manager(MainRouter.admin_db).create_user(
             **serializer.validated_data
         )
 
         assigned_role_name = (
-            request.data.get("role")
+            role_param
+            or request.data.get("role")
             or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
             or "Member"
         )
