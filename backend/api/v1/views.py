@@ -1602,7 +1602,15 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
         )
 
     def destroy(self, request, *args, pk=None, **kwargs):
-        provider = Provider.all_objects.filter(pk=pk, tenant_id=self.request.tenant_id).first()
+        tenant_id = (
+            getattr(request, "tenant_id", None)
+            or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
+        )
+        provider = (
+            Provider.all_objects.filter(pk=pk, tenant_id=tenant_id).first()
+            if tenant_id
+            else Provider.all_objects.filter(pk=pk).first()
+        )
         if not provider:
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1630,16 +1638,17 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
             logger.warning("Direct provider deletion: %s", e)
 
         # Background thread for any remaining external cleanup
-        import threading
+        if tenant_id:
+            import threading
 
-        def _bg_cleanup():
-            try:
-                from tasks.jobs.deletion import delete_provider
-                delete_provider(self.request.tenant_id, str(pk))
-            except Exception:
-                pass
+            def _bg_cleanup():
+                try:
+                    from tasks.jobs.deletion import delete_provider
+                    delete_provider(tenant_id, str(pk))
+                except Exception:
+                    pass
 
-        threading.Thread(target=_bg_cleanup, daemon=True).start()
+            threading.Thread(target=_bg_cleanup, daemon=True).start()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
