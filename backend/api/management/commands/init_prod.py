@@ -6,7 +6,7 @@ Does NOT insert any dummy cloud providers, dummy scans, or dummy findings.
 """
 import uuid
 from django.core.management.base import BaseCommand
-from api.models import User, Membership
+from api.models import User, Membership, Provider, Role, UserRoleRelationship
 from api.rls import Tenant
 from api.db_router import MainRouter
 
@@ -17,17 +17,37 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("Initializing Production Digital CISO Platform...")
 
-        # 1. Tenant
-        tenant, created = Tenant.objects.using(MainRouter.admin_db).get_or_create(
-            name="Pravahya Enterprise",
-            defaults={"id": uuid.uuid4()}
-        )
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"  [OK] Created Tenant: {tenant.name} ({tenant.id})"))
+        # 1. Resolve Primary Enterprise Tenant
+        existing_provider = Provider.objects.using(MainRouter.admin_db).first() or Provider.objects.first()
+        if existing_provider and existing_provider.tenant_id:
+            tenant = existing_provider.tenant
+            self.stdout.write(self.style.SUCCESS(f"  [OK] Found Primary Tenant from Connected Cloud Provider: {tenant.name} ({tenant.id})"))
         else:
-            self.stdout.write(f"  [OK] Existing Tenant: {tenant.name} ({tenant.id})")
+            tenant = Tenant.objects.using(MainRouter.admin_db).filter(name="Pravahya Enterprise").first() or Tenant.objects.using(MainRouter.admin_db).first()
+            if not tenant:
+                tenant = Tenant.objects.using(MainRouter.admin_db).create(
+                    name="Pravahya Enterprise",
+                    id=uuid.uuid4()
+                )
+                self.stdout.write(self.style.SUCCESS(f"  [OK] Created Tenant: {tenant.name} ({tenant.id})"))
+            else:
+                self.stdout.write(f"  [OK] Existing Tenant: {tenant.name} ({tenant.id})")
 
-        # 2. Admin User
+        # 2. Ensure all connected providers belong to primary tenant
+        all_providers = list(Provider.objects.using(MainRouter.admin_db).all())
+        for p in all_providers:
+            if str(p.tenant_id) != str(tenant.id):
+                try:
+                    Provider.objects.using(MainRouter.admin_db).filter(id=p.id).update(tenant_id=tenant.id)
+                    self.stdout.write(self.style.SUCCESS(f"  [OK] Linked cloud provider '{p.alias or p.provider}' to primary tenant"))
+                except Exception:
+                    try:
+                        p.delete(using=MainRouter.admin_db)
+                    except Exception:
+                        pass
+                    self.stdout.write(f"  [OK] Removed duplicate provider '{p.alias or p.provider}'")
+
+        # 3. Admin User
         admin_users = [
             ("digitalciso@eflight.aero", "Digital CISO Admin"),
         ]
@@ -47,7 +67,7 @@ class Command(BaseCommand):
                 u.save()
                 self.stdout.write(f"  [OK] Updated Admin user password: {user_email} / Admin1234!")
 
-        # 3. Consolidate all users into the main enterprise tenant
+        # 4. Consolidate all users into the main enterprise tenant & grant RBAC permissions
         all_users = User.objects.using(MainRouter.admin_db).all()
         for user in all_users:
             memberships = list(Membership.objects.using(MainRouter.admin_db).filter(user=user))
@@ -72,5 +92,28 @@ class Command(BaseCommand):
                     role=Membership.RoleChoices.OWNER if user.email in [e for e, _ in admin_users] else Membership.RoleChoices.MEMBER
                 )
                 self.stdout.write(self.style.SUCCESS(f"  [OK] Created membership for: {user.email}"))
+
+            # Ensure RBAC Role & Relationship exist for tenant
+            role_rel = UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user, tenant_id=tenant.id).first()
+            if not role_rel:
+                role_name = "admin" if (getattr(user, "is_superuser", False) or user.email in [e for e, _ in admin_users]) else "member"
+                role = Role.objects.using(MainRouter.admin_db).filter(tenant_id=tenant.id, name=role_name).first()
+                if not role:
+                    role = Role.objects.using(MainRouter.admin_db).create(
+                        name=role_name,
+                        tenant_id=tenant.id,
+                        manage_users=True,
+                        manage_account=True,
+                        manage_billing=True,
+                        manage_providers=True,
+                        manage_integrations=True,
+                        manage_scans=True,
+                        unlimited_visibility=True,
+                    )
+                UserRoleRelationship.objects.using(MainRouter.admin_db).create(
+                    user=user,
+                    role=role,
+                    tenant_id=tenant.id,
+                )
 
         self.stdout.write(self.style.SUCCESS("[OK] Production initialization complete! All real telemetry and users assigned to main organization."))
