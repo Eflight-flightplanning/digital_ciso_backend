@@ -123,10 +123,55 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
         return False
 
 
+import tempfile
+
 _GLOBAL_OTP_STORE = {}
 
+
+def _get_otp_filepath() -> str:
+    return os.path.join(tempfile.gettempdir(), "ciso_mfa_otps.json")
+
+
+def _save_file_otp(clean_email: str, otp_code: str, expires_at: float):
+    try:
+        fp = _get_otp_filepath()
+        data = {}
+        if os.path.exists(fp):
+            try:
+                with open(fp, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        data[clean_email] = {"code": str(otp_code), "expires_at": expires_at}
+        with open(fp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning("Could not persist OTP to temp file: %s", e)
+
+
+def _verify_and_clear_file_otp(clean_email: str, submitted_otp: str) -> bool:
+    try:
+        fp = _get_otp_filepath()
+        if not os.path.exists(fp):
+            return False
+        with open(fp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        entry = data.get(clean_email)
+        if entry:
+            code = str(entry.get("code", "")).strip()
+            expires_at = float(entry.get("expires_at", 0))
+            if time.time() <= expires_at and code == submitted_otp:
+                data.pop(clean_email, None)
+                with open(fp, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                return True
+    except Exception as e:
+        logger.warning("Error reading OTP from temp file: %s", e)
+    return False
+
+
 def generate_and_store_otp(email: str) -> str:
-    """Generate a 6-digit random OTP and store it in Django cache and global store for 5 minutes."""
+    """Generate a 6-digit random OTP and store it in Django cache, global store, and file store for 5 minutes."""
     clean_email = email.strip().lower()
     otp_code = f"{random.randint(100000, 999999)}"
     cache_key = f"mfa_otp:{clean_email}"
@@ -134,6 +179,7 @@ def generate_and_store_otp(email: str) -> str:
 
     cache.set(cache_key, otp_code, timeout=OTP_TTL_SECONDS)
     _GLOBAL_OTP_STORE[clean_email] = (otp_code, expires_at)
+    _save_file_otp(clean_email, otp_code, expires_at)
 
     print(f"\n==============================================", flush=True)
     print(f"CISO MFA OTP CODE FOR [{clean_email}]: {otp_code}", flush=True)
@@ -146,7 +192,7 @@ def generate_and_store_otp(email: str) -> str:
 
 
 def verify_otp(email: str, submitted_otp: str) -> bool:
-    """Verify if the submitted OTP matches the cached value or global store."""
+    """Verify if the submitted OTP matches the cached value, global store, or file store."""
     if not submitted_otp:
         return False
 
@@ -167,5 +213,11 @@ def verify_otp(email: str, submitted_otp: str) -> bool:
             _GLOBAL_OTP_STORE.pop(clean_email, None)
             cache.delete(cache_key)
             return True
+
+    # Fallback to file-backed cross-process store
+    if _verify_and_clear_file_otp(clean_email, clean_otp):
+        cache.delete(cache_key)
+        _GLOBAL_OTP_STORE.pop(clean_email, None)
+        return True
 
     return False
