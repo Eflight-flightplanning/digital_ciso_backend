@@ -50,17 +50,27 @@ class Command(BaseCommand):
         # 3. Consolidate all users into the main enterprise tenant
         all_users = User.objects.using(MainRouter.admin_db).all()
         for user in all_users:
-            m = Membership.objects.using(MainRouter.admin_db).filter(user=user).first()
-            if not m:
+            memberships = list(Membership.objects.using(MainRouter.admin_db).filter(user=user))
+            target_mem = next((m for m in memberships if str(m.tenant_id) == str(tenant.id)), None)
+
+            if target_mem:
+                for m in memberships:
+                    if m.id != target_mem.id:
+                        m.delete(using=MainRouter.admin_db)
+                self.stdout.write(self.style.SUCCESS(f"  [OK] User {user.email} verified in primary tenant: {tenant.name}"))
+            elif memberships:
+                first_mem = memberships[0]
+                first_mem.tenant_id = tenant.id
+                first_mem.save(using=MainRouter.admin_db)
+                for m in memberships[1:]:
+                    m.delete(using=MainRouter.admin_db)
+                self.stdout.write(self.style.SUCCESS(f"  [OK] Migrated user {user.email} membership to primary tenant: {tenant.name}"))
+            else:
                 Membership.objects.using(MainRouter.admin_db).create(
                     tenant_id=tenant.id,
                     user=user,
                     role=Membership.RoleChoices.OWNER if user.email in [e for e, _ in admin_users] else Membership.RoleChoices.MEMBER
                 )
                 self.stdout.write(self.style.SUCCESS(f"  [OK] Created membership for: {user.email}"))
-            elif str(m.tenant_id) != str(tenant.id):
-                m.tenant_id = tenant.id
-                m.save(using=MainRouter.admin_db)
-                self.stdout.write(self.style.SUCCESS(f"  [OK] Migrated user {user.email} membership to primary tenant: {tenant.name}"))
 
         self.stdout.write(self.style.SUCCESS("[OK] Production initialization complete! All real telemetry and users assigned to main organization."))
