@@ -95,31 +95,49 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
         return False
 
 
+_GLOBAL_OTP_STORE = {}
+
 def generate_and_store_otp(email: str) -> str:
-    """Generate a 6-digit random OTP and store it in Django cache for 5 minutes."""
+    """Generate a 6-digit random OTP and store it in Django cache and global store for 5 minutes."""
     clean_email = email.strip().lower()
     otp_code = f"{random.randint(100000, 999999)}"
     cache_key = f"mfa_otp:{clean_email}"
+    expires_at = time.time() + OTP_TTL_SECONDS
+
     cache.set(cache_key, otp_code, timeout=OTP_TTL_SECONDS)
-    
+    _GLOBAL_OTP_STORE[clean_email] = (otp_code, expires_at)
+
     print(f"\n==============================================", flush=True)
     print(f"CISO MFA OTP CODE FOR [{clean_email}]: {otp_code}", flush=True)
     print(f"==============================================\n", flush=True)
     logger.info("Generated MFA OTP %s for %s", otp_code, clean_email)
-    
+
     # Send via SendGrid
     send_mfa_otp_email(clean_email, otp_code)
     return otp_code
 
 
 def verify_otp(email: str, submitted_otp: str) -> bool:
-    """Verify if the submitted OTP matches the cached value."""
+    """Verify if the submitted OTP matches the cached value or global store."""
+    if not submitted_otp:
+        return False
+
     clean_email = email.strip().lower()
     clean_otp = submitted_otp.strip()
     cache_key = f"mfa_otp:{clean_email}"
-    
+
     cached_code = cache.get(cache_key)
-    if cached_code and str(cached_code) == str(clean_otp):
+    if cached_code and str(cached_code).strip() == clean_otp:
         cache.delete(cache_key)
+        _GLOBAL_OTP_STORE.pop(clean_email, None)
         return True
+
+    # Fallback to global store if multi-worker cache mismatch occurs
+    if clean_email in _GLOBAL_OTP_STORE:
+        code, expires_at = _GLOBAL_OTP_STORE[clean_email]
+        if time.time() <= expires_at and str(code).strip() == clean_otp:
+            _GLOBAL_OTP_STORE.pop(clean_email, None)
+            cache.delete(cache_key)
+            return True
+
     return False

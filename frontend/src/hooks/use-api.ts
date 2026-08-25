@@ -11,6 +11,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, jsonApiBody, unwrapList, unwrapSingle, unwrapMeta } from "../lib/api-client";
 
+export { api };
+
 // ─── Query key factory ─────────────────────────────────────────────────────
 
 export const qk = {

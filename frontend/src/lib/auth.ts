@@ -218,7 +218,7 @@ export const authStore = {
       }
 
       // 2. Automatically log the newly registered user into their own isolated tenant
-      return await this.signIn(email, password, name, company_name);
+      return (await this.signIn(email, password, undefined, name, company_name)).user!;
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));

@@ -23,18 +23,18 @@ export default defineConfig({
       proxy: {
         // Proxy all /api/ requests to the Django backend in dev
         "/api": {
-          target: "http://localhost:8000",
+          target: "http://127.0.0.1:8000",
           changeOrigin: true,
           secure: false,
         },
         // Proxy health checks too
         "/health": {
-          target: "http://localhost:8000",
+          target: "http://127.0.0.1:8000",
           changeOrigin: true,
         },
         // Swagger docs
         "/swagger": {
-          target: "http://localhost:8000",
+          target: "http://127.0.0.1:8000",
           changeOrigin: true,
         },
       },

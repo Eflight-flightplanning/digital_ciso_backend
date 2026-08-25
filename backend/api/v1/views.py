@@ -405,7 +405,18 @@ class CustomTokenObtainView(GenericAPIView):
             )
         except (ValidationError, serializers.ValidationError) as e:
             detail = getattr(e, "detail", str(e))
-            return Response({"errors": detail if isinstance(detail, list) else [{"detail": str(detail)}]}, status=status.HTTP_400_BAD_REQUEST)
+            if isinstance(detail, dict):
+                first_val = next(iter(detail.values()), str(detail))
+                if isinstance(first_val, list):
+                    msg_text = str(first_val[0])
+                else:
+                    msg_text = str(first_val)
+                formatted_errors = [{"detail": msg_text}]
+            elif isinstance(detail, list):
+                formatted_errors = detail
+            else:
+                formatted_errors = [{"detail": str(detail)}]
+            return Response({"errors": formatted_errors}, status=status.HTTP_400_BAD_REQUEST)
         except InvalidToken as e:
             return Response({"errors": [{"detail": str(e)}]}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
@@ -784,21 +795,38 @@ class UserViewSet(BaseUserViewset):
         user = User.objects.db_manager(MainRouter.admin_db).create_user(
             **serializer.validated_data
         )
-        tenant = (
-            invitation.tenant
-            if invitation_token
-            else Tenant.objects.using(MainRouter.admin_db).create(
-                name=f"{user.email.split('@')[0]} default tenant"
+
+        assigned_role_name = (
+            request.data.get("role")
+            or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
+            or "Member"
+        )
+
+        if request.user.is_authenticated and getattr(request, "tenant_id", None):
+            try:
+                tenant = Tenant.objects.using(MainRouter.admin_db).get(id=request.tenant_id)
+            except Tenant.DoesNotExist:
+                tenant = Tenant.objects.using(MainRouter.admin_db).create(
+                    name=f"{user.email.split('@')[0]} default tenant"
+                )
+        else:
+            tenant = (
+                invitation.tenant
+                if invitation_token
+                else Tenant.objects.using(MainRouter.admin_db).create(
+                    name=f"{user.email.split('@')[0]} default tenant"
+                )
             )
-        )
-        role = (
-            Membership.RoleChoices.MEMBER
-            if invitation_token
-            else Membership.RoleChoices.OWNER
-        )
+
+        if assigned_role_name in ("Admin", "Security Admin", "Administrator", "OWNER"):
+            membership_role = Membership.RoleChoices.OWNER
+        else:
+            membership_role = Membership.RoleChoices.MEMBER
+
         Membership.objects.using(MainRouter.admin_db).create(
-            user=user, tenant=tenant, role=role
+            user=user, tenant=tenant, role=membership_role
         )
+
         if invitation:
             user_role = []
             for role in invitation.roles.all():
@@ -811,7 +839,7 @@ class UserViewSet(BaseUserViewset):
             invitation.save(using=MainRouter.admin_db)
         else:
             role = Role.objects.using(MainRouter.admin_db).create(
-                name="admin",
+                name=assigned_role_name.lower(),
                 tenant_id=tenant.id,
                 manage_users=True,
                 manage_account=True,
