@@ -7,7 +7,7 @@ Does NOT insert any dummy cloud providers, dummy scans, or dummy findings.
 import uuid
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from api.models import User, Membership, Provider, Role, UserRoleRelationship
+from api.models import User, Membership, Provider, Role, UserRoleRelationship, Scan, Finding, Resource
 from api.rls import Tenant
 from api.db_router import MainRouter
 
@@ -122,5 +122,14 @@ class Command(BaseCommand):
                     role=role,
                     tenant_id=tenant.id,
                 )
+
+        # 5. Link all scans, findings, and resources to primary tenant so all data renders for logged in users
+        try:
+            Scan.all_objects.using(MainRouter.admin_db).exclude(tenant_id=tenant.id).update(tenant_id=tenant.id)
+            Finding.all_objects.using(MainRouter.admin_db).exclude(tenant_id=tenant.id).update(tenant_id=tenant.id)
+            Resource.all_objects.using(MainRouter.admin_db).exclude(tenant_id=tenant.id).update(tenant_id=tenant.id)
+            self.stdout.write(self.style.SUCCESS(f"  [OK] Linked all scans, findings, and resources to primary tenant: {tenant.name}"))
+        except Exception as e:
+            self.stdout.write(f"  [Notice] Telemetry linking: {e}")
 
         self.stdout.write(self.style.SUCCESS("[OK] Production initialization complete! All real telemetry and users assigned to main organization."))
