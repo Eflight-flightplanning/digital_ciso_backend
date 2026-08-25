@@ -373,9 +373,10 @@ class CustomTokenObtainView(GenericAPIView):
     serializer_class = TokenSerializer
     http_method_names = ["post"]
     parser_classes = [JSONParser, JSONAPIParser]
+    filter_backends = []
 
     def get_queryset(self):
-        return None
+        return User.objects.none()
 
     def post(self, request):
         try:
@@ -438,9 +439,10 @@ class CustomTokenRefreshView(GenericAPIView):
     serializer_class = TokenRefreshSerializer
     http_method_names = ["post"]
     parser_classes = [JSONParser, JSONAPIParser]
+    filter_backends = []
 
     def get_queryset(self):
-        return None
+        return User.objects.none()
 
     def post(self, request):
         raw_data = request.data
@@ -472,9 +474,10 @@ class CustomTokenSwitchTenantView(GenericAPIView):
     resource_name = "tokens-switch-tenant"
     serializer_class = TokenSwitchTenantSerializer
     http_method_names = ["post"]
+    filter_backends = []
 
     def get_queryset(self):
-        return None
+        return User.objects.none()
 
     def post(self, request):
         serializer = TokenSwitchTenantSerializer(
