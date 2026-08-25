@@ -5,6 +5,7 @@ Creates only real tenant organizations and admin user accounts.
 Does NOT insert any dummy cloud providers, dummy scans, or dummy findings.
 """
 import uuid
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from api.models import User, Membership, Provider, Role, UserRoleRelationship
 from api.rls import Tenant
@@ -16,6 +17,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Initializing Production Digital CISO Platform...")
+
+        # 0. Clean dummy seed data
+        try:
+            call_command("clean_dummy_prod")
+        except Exception as e:
+            self.stdout.write(f"  [Notice] clean_dummy_prod notice: {e}")
 
         # 1. Resolve Primary Enterprise Tenant
         existing_provider = Provider.objects.using(MainRouter.admin_db).first() or Provider.objects.first()
