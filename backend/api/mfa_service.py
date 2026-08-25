@@ -9,13 +9,37 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "mails@eflight.aero")
 OTP_TTL_SECONDS = 300  # 5 minutes validity
+
+
+def get_sendgrid_config():
+    """Retrieve SendGrid API key and from email dynamically."""
+    api_key = os.environ.get("SENDGRID_API_KEY", "")
+    from_email = os.environ.get("DEFAULT_FROM_EMAIL", "")
+    
+    if not api_key or not from_email:
+        try:
+            from config.env import env
+            if not api_key:
+                api_key = env("SENDGRID_API_KEY", default="")
+            if not from_email:
+                from_email = env("DEFAULT_FROM_EMAIL", default="mails@eflight.aero")
+        except Exception:
+            pass
+
+    if not from_email:
+        from_email = "mails@eflight.aero"
+    return api_key, from_email
 
 
 def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
     """Send a 6-digit MFA OTP email via SendGrid API from mails@eflight.aero."""
+    api_key, from_email = get_sendgrid_config()
+    
+    if not api_key:
+        logger.error("SENDGRID_API_KEY is not configured in environment or .env file.")
+        return False
+
     url = "https://api.sendgrid.com/v3/mail/send"
     
     html_content = f"""
@@ -61,7 +85,7 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
     payload = {
         "personalizations": [{"to": [{"email": to_email}]}],
         "from": {
-            "email": DEFAULT_FROM_EMAIL,
+            "email": from_email,
             "name": "Digital CISO Security"
         },
         "subject": f"[{otp_code}] Your Digital CISO MFA Verification Code",
@@ -78,7 +102,7 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
             url,
             data=json.dumps(payload).encode("utf-8"),
             headers={
-                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             method="POST"
@@ -90,6 +114,10 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
             else:
                 logger.warning("SendGrid API returned status %s for %s", resp.status, to_email)
                 return False
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        logger.error("SendGrid HTTPError %s for %s: %s", e.code, to_email, err_body)
+        return False
     except Exception as e:
         logger.error("Failed to send SendGrid MFA email to %s: %s", to_email, e)
         return False
