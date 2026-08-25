@@ -412,18 +412,25 @@ class CustomTokenObtainView(GenericAPIView):
                     msg_text = str(first_val[0])
                 else:
                     msg_text = str(first_val)
-                formatted_errors = [{"detail": msg_text}]
             elif isinstance(detail, list):
-                formatted_errors = detail
+                msg_text = str(detail[0])
             else:
-                formatted_errors = [{"detail": str(detail)}]
-            return Response({"errors": formatted_errors}, status=status.HTTP_400_BAD_REQUEST)
+                msg_text = str(detail)
+
+            msg_str = str(detail)
+            status_code = (
+                status.HTTP_401_UNAUTHORIZED
+                if ("Invalid credentials" in msg_str or "Invalid or expired" in msg_str)
+                else status.HTTP_400_BAD_REQUEST
+            )
+            logger.warning("Authentication validation error (%s): %s", status_code, msg_text)
+            return Response({"detail": msg_text}, status=status_code)
         except InvalidToken as e:
-            return Response({"errors": [{"detail": str(e)}]}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.exception(f"Unexpected error in CustomTokenObtainView: {e}")
             return Response(
-                {"errors": [{"detail": f"Authentication failed: {str(e)}"}]},
+                {"detail": f"Authentication failed: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
