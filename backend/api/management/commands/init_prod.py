@@ -8,6 +8,7 @@ import uuid
 from django.core.management.base import BaseCommand
 from api.models import User, Membership
 from api.rls import Tenant
+from api.db_router import MainRouter
 
 
 class Command(BaseCommand):
@@ -17,7 +18,7 @@ class Command(BaseCommand):
         self.stdout.write("Initializing Production Digital CISO Platform...")
 
         # 1. Tenant
-        tenant, created = Tenant.objects.get_or_create(
+        tenant, created = Tenant.objects.using(MainRouter.admin_db).get_or_create(
             name="Pravahya Enterprise",
             defaults={"id": uuid.uuid4()}
         )
@@ -46,10 +47,20 @@ class Command(BaseCommand):
                 u.save()
                 self.stdout.write(f"  [OK] Updated Admin user password: {user_email} / Admin1234!")
 
-            Membership.objects.get_or_create(
-                tenant=tenant,
-                user=u,
-                defaults={"role": Membership.RoleChoices.OWNER}
-            )
+        # 3. Consolidate all users into the main enterprise tenant
+        all_users = User.objects.using(MainRouter.admin_db).all()
+        for user in all_users:
+            m = Membership.objects.using(MainRouter.admin_db).filter(user=user).first()
+            if not m:
+                Membership.objects.using(MainRouter.admin_db).create(
+                    tenant_id=tenant.id,
+                    user=user,
+                    role=Membership.RoleChoices.OWNER if user.email in [e for e, _ in admin_users] else Membership.RoleChoices.MEMBER
+                )
+                self.stdout.write(self.style.SUCCESS(f"  [OK] Created membership for: {user.email}"))
+            elif str(m.tenant_id) != str(tenant.id):
+                m.tenant_id = tenant.id
+                m.save(using=MainRouter.admin_db)
+                self.stdout.write(self.style.SUCCESS(f"  [OK] Migrated user {user.email} membership to primary tenant: {tenant.name}"))
 
-        self.stdout.write(self.style.SUCCESS("✓ Production initialization complete! All real telemetry ready."))
+        self.stdout.write(self.style.SUCCESS("[OK] Production initialization complete! All real telemetry and users assigned to main organization."))
