@@ -179,20 +179,28 @@ class BaseTokenSerializer(serializers.Serializer):
         otp = attrs.get("otp", "").strip()
         tenant_id = str(attrs.get("tenant_id", ""))
 
+        from api.db_router import MainRouter
+
         # Authenticate user (case-insensitive)
         if social:
-            user = User.objects.filter(email__iexact=email).first()
+            user = (
+                User.objects.using(MainRouter.admin_db).filter(email__iexact=email).first()
+                or User.objects.filter(email__iexact=email).first()
+            )
         else:
             user = authenticate(username=email, password=password)
             if user is None:
                 user = authenticate(username=raw_email, password=password)
             if user is None:
-                user_obj = User.objects.filter(email__iexact=email).first()
+                user_obj = (
+                    User.objects.using(MainRouter.admin_db).filter(email__iexact=email).first()
+                    or User.objects.filter(email__iexact=email).first()
+                )
                 if user_obj and user_obj.check_password(password):
                     user = user_obj
                     if not user.is_active:
                         user.is_active = True
-                        user.save()
+                        user.save(using=MainRouter.admin_db)
 
         if user is None:
             raise ValidationError("Invalid credentials")
@@ -221,22 +229,27 @@ class BaseTokenSerializer(serializers.Serializer):
         else:
             # 1. Resolve user's actual tenant strictly from their own memberships
             membership = (
-                Membership.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
+                Membership.objects.using(MainRouter.admin_db).filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
+                or Membership.objects.using(MainRouter.admin_db).filter(user=user).order_by("-date_joined").first()
+                or Membership.objects.filter(user=user, tenant_id="3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47").first()
                 or Membership.objects.filter(user=user).order_by("-date_joined").first()
             )
             if membership:
                 tenant_id = str(membership.tenant_id)
             else:
-                rel = UserRoleRelationship.objects.filter(user=user).first()
+                rel = (
+                    UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user).first()
+                    or UserRoleRelationship.objects.filter(user=user).first()
+                )
                 if rel:
                     tenant_id = str(rel.tenant_id)
                 else:
-                    tenant = Tenant.objects.first()
+                    tenant = Tenant.objects.using(MainRouter.admin_db).first() or Tenant.objects.first()
                     if not tenant:
-                        tenant = Tenant.objects.create(
+                        tenant = Tenant.objects.using(MainRouter.admin_db).create(
                             name=f"{user.email.split('@')[0]} default tenant"
                         )
-                    Membership.objects.get_or_create(
+                    Membership.objects.using(MainRouter.admin_db).get_or_create(
                         user=user, tenant=tenant, defaults={"role": Membership.RoleChoices.OWNER}
                     )
                     tenant_id = str(tenant.id)
