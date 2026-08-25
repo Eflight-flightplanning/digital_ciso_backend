@@ -1409,7 +1409,7 @@ export function DashboardPage() {
   // Posture Score calculation directly from live findings
   const postureScore = totalFindingsCount > 0
     ? Math.round((totalPassCount / totalFindingsCount) * 100)
-    : (providers.length > 0 ? 100 : 0);
+    : 0;
 
   // Dynamic Threat Score calculation directly from live exploitability & failed vulnerabilities
   const threatScore = totalFindingsCount > 0
@@ -1437,7 +1437,7 @@ export function DashboardPage() {
 
   // Radar chart data metrics derived from live compliance posture
   const radarData = useMemo(() => {
-    const scoreVal = totalFindingsCount > 0 ? Math.min(100, Math.max(10, postureScore)) : 100;
+    const scoreVal = totalFindingsCount > 0 ? Math.min(100, Math.max(0, postureScore)) : 0;
     return radarLabels.map((lbl) => ({ label: lbl, value: scoreVal }));
   }, [radarLabels, totalFindingsCount, postureScore]);
 
