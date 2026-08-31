@@ -437,6 +437,20 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-mgmt-authorization"
+version = "4.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-common" },
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9e/ab/e79874f166eed24f4456ce4d532b29a926fb4c798c2c609eefd916a3f73d/azure-mgmt-authorization-4.0.0.zip", hash = "sha256:69b85abc09ae64fc72975bd43431170d8c7eb5d166754b98aac5f3845de57dc4", size = 1134795, upload-time = "2023-07-25T04:47:46.033Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/b3/8ec1268082f4d20cc8bf723a1a8e6b9e330bcc338a4dbcee9c7737e9dc1c/azure_mgmt_authorization-4.0.0-py3-none-any.whl", hash = "sha256:d8feeb3842e6ddf1a370963ca4f61fb6edc124e8997b807dd025bc9b2379cd1a", size = 1072620, upload-time = "2023-07-25T04:47:49.26Z" },
+]
+
+[[package]]
 name = "azure-mgmt-compute"
 version = "38.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -519,6 +533,20 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-mgmt-keyvault"
+version = "14.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/dd/e74f82797ee3ff7001832427a218f3079e6174b9fa8b354b84434172d89d/azure_mgmt_keyvault-14.0.1.tar.gz", hash = "sha256:d141a8084ae4c7c5bd1cafeca49a8f3fbebc58dc5bc5290f322ea73d8b307ef7", size = 105496, upload-time = "2026-03-27T08:02:15.282Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/c3/29238b1ef3784c31722b900c9c187d7c23dd0d7e724e970f3a7c104ed7aa/azure_mgmt_keyvault-14.0.1-py3-none-any.whl", hash = "sha256:7710873c5b667e19d86109caf2898dddb902e5ed21013e01d7d85ebb496928d7", size = 104380, upload-time = "2026-03-27T08:02:16.726Z" },
+]
+
+[[package]]
 name = "azure-mgmt-loganalytics"
 version = "14.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -559,6 +587,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0e/12/25874f6b894e972646244f570a23298969b58f57cfb7a188e2740017b43a/azure_mgmt_monitor-7.0.0.tar.gz", hash = "sha256:b75f536441d430f69ff873a1646e5f5dbcb3080a10768a59d0adc01541623816", size = 195496, upload-time = "2025-07-28T07:46:17.031Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/d1/f6ea4731edfa02c14756770d7c3d5202b40c5c72744f15142c0d89b6d957/azure_mgmt_monitor-7.0.0-py3-none-any.whl", hash = "sha256:ad63b5d187e21d2d34366271ade6abbeea1fcf76e313ff0f83d394d9c124aa1b", size = 245243, upload-time = "2025-07-28T07:46:18.594Z" },
+]
+
+[[package]]
+name = "azure-mgmt-network"
+version = "32.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/6f/6cd4b1b7d1d6cff747ebafb8d08a260142a0f69698c74d7f567f7159f1e2/azure_mgmt_network-32.0.0.tar.gz", hash = "sha256:cd5707de7bac945c5407047cd764e64cc4b4ce8f51d1f4fe32bfc204d9229093", size = 1095872, upload-time = "2026-08-17T05:35:38.304Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/99/f28f77b1f4262639f2d57bb96e4b13390905183d6765d519e13e730504d1/azure_mgmt_network-32.0.0-py3-none-any.whl", hash = "sha256:915a6465edfb3b5c30a44027ed92851173d07054682682d0b362fbe9e5c78697", size = 892559, upload-time = "2026-08-17T05:35:40.471Z" },
 ]
 
 [[package]]
@@ -647,6 +689,20 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-mgmt-security"
+version = "7.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-common" },
+    { name = "azure-mgmt-core" },
+    { name = "isodate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/90/13186657355452bdce44f27db6b194b99f78f8c185301b47624fff6d9531/azure-mgmt-security-7.0.0.tar.gz", hash = "sha256:5912eed7e9d3758fdca8d26e1dc26b41943dc4703208a1184266e2c252e1ad66", size = 684730, upload-time = "2024-05-20T05:23:17.392Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/d3/9541d871294dbc7c1eba3ffc9d4eb54cb651005ddbb1513a17f2a795bdfe/azure_mgmt_security-7.0.0-py3-none-any.whl", hash = "sha256:85a6d8b7a5cd74884a548ed53fed034449f54a9989edd64e9020c5837db96933", size = 1397437, upload-time = "2024-05-20T05:23:19.991Z" },
+]
+
+[[package]]
 name = "azure-mgmt-sql"
 version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -672,6 +728,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/49/6c/b7a06a0e128bd1587ad48a0cd80a1d619ec63d34523f5cdd43950f2fa8d0/azure_mgmt_storage-25.1.0.tar.gz", hash = "sha256:cc4bd2158fd0dd80639142af06dc70c119bbfd6f79d53da4482e0b2c849af7ca", size = 234508, upload-time = "2026-07-20T06:13:18.8Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/c6/efd6ad6216ec63cf606032c3fb62f2d52f852906a68a32251e1127026949/azure_mgmt_storage-25.1.0-py3-none-any.whl", hash = "sha256:46b51cb0491f9aac303436c28bd18954d0c3aca39d4882e7d332e6ad0605b25e", size = 220873, upload-time = "2026-07-20T06:13:20.22Z" },
+]
+
+[[package]]
+name = "azure-mgmt-subscription"
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-common" },
+    { name = "azure-mgmt-core" },
+    { name = "msrest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/67/14b19a006e13d86f05ee59faf78c39dc443d4fd6967344e9c94f688949c1/azure-mgmt-subscription-3.1.1.zip", hash = "sha256:4e255b4ce9b924357bb8c5009b3c88a2014d3203b2495e2256fa027bf84e800e", size = 96018, upload-time = "2022-09-06T07:30:49.467Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/12/e6de2021c4689f857386670ba0b6d3c4025d4209e45df7dd7cdabe9a4ac1/azure_mgmt_subscription-3.1.1-py3-none-any.whl", hash = "sha256:38d4574a8d47fa17e3587d756e296cb63b82ad8fb21cd8543bcee443a502bf48", size = 79409, upload-time = "2022-09-06T07:30:47.247Z" },
 ]
 
 [[package]]
@@ -703,6 +773,21 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-storage-blob"
+version = "12.30.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "cryptography" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/48/84a820d898267f662b5c06f7cd76fdb8a9e272b44aa9376cef3ec0f6a294/azure_storage_blob-12.30.0.tar.gz", hash = "sha256:2cd74d4d5731e5eb6b8d5c5056ee115a5e88f8fdf22517b739836fda685018be", size = 618229, upload-time = "2026-06-08T11:45:35.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/0b/e106f0fd7fa785867d9ffcc47dc9e6237c0e58f51058473b777487a98edc/azure_storage_blob-12.30.0-py3-none-any.whl", hash = "sha256:d415ac50b67a8da6b3ae7e9f1014b1b55cd7aafa0b8d4ca9b380568dc7360423", size = 435610, upload-time = "2026-06-08T11:45:37.213Z" },
+]
+
+[[package]]
 name = "backend"
 version = "0.1.0"
 source = { virtual = "." }
@@ -710,23 +795,33 @@ dependencies = [
     { name = "aioboto3" },
     { name = "alive-progress" },
     { name = "anthropic" },
+    { name = "azure-identity" },
     { name = "azure-keyvault-keys" },
     { name = "azure-mgmt-apimanagement" },
     { name = "azure-mgmt-applicationinsights" },
+    { name = "azure-mgmt-authorization" },
+    { name = "azure-mgmt-compute" },
     { name = "azure-mgmt-containerregistry" },
     { name = "azure-mgmt-containerservice" },
     { name = "azure-mgmt-cosmosdb" },
     { name = "azure-mgmt-databricks" },
+    { name = "azure-mgmt-keyvault" },
     { name = "azure-mgmt-loganalytics" },
     { name = "azure-mgmt-monitor" },
+    { name = "azure-mgmt-network" },
     { name = "azure-mgmt-postgresqlflexibleservers" },
     { name = "azure-mgmt-rdbms" },
     { name = "azure-mgmt-recoveryservices" },
     { name = "azure-mgmt-recoveryservicesbackup" },
+    { name = "azure-mgmt-resource" },
     { name = "azure-mgmt-search" },
+    { name = "azure-mgmt-security" },
     { name = "azure-mgmt-sql" },
+    { name = "azure-mgmt-storage" },
+    { name = "azure-mgmt-subscription" },
     { name = "azure-mgmt-web" },
     { name = "azure-monitor-query" },
+    { name = "azure-storage-blob" },
     { name = "boto3" },
     { name = "cartography" },
     { name = "celery", extra = ["redis"] },
@@ -772,6 +867,7 @@ dependencies = [
     { name = "pygithub" },
     { name = "python-dateutil" },
     { name = "reportlab" },
+    { name = "requests" },
     { name = "sentry-sdk" },
     { name = "shodan" },
     { name = "uuid6" },
@@ -782,23 +878,33 @@ requires-dist = [
     { name = "aioboto3" },
     { name = "alive-progress", specifier = ">=3.3.0" },
     { name = "anthropic", specifier = ">=0.40.0" },
+    { name = "azure-identity", specifier = ">=1.15.0" },
     { name = "azure-keyvault-keys" },
     { name = "azure-mgmt-apimanagement" },
     { name = "azure-mgmt-applicationinsights" },
+    { name = "azure-mgmt-authorization" },
+    { name = "azure-mgmt-compute" },
     { name = "azure-mgmt-containerregistry" },
     { name = "azure-mgmt-containerservice" },
     { name = "azure-mgmt-cosmosdb" },
     { name = "azure-mgmt-databricks" },
+    { name = "azure-mgmt-keyvault" },
     { name = "azure-mgmt-loganalytics" },
     { name = "azure-mgmt-monitor" },
+    { name = "azure-mgmt-network" },
     { name = "azure-mgmt-postgresqlflexibleservers" },
     { name = "azure-mgmt-rdbms" },
     { name = "azure-mgmt-recoveryservices" },
     { name = "azure-mgmt-recoveryservicesbackup" },
+    { name = "azure-mgmt-resource" },
     { name = "azure-mgmt-search" },
+    { name = "azure-mgmt-security" },
     { name = "azure-mgmt-sql" },
+    { name = "azure-mgmt-storage" },
+    { name = "azure-mgmt-subscription" },
     { name = "azure-mgmt-web" },
     { name = "azure-monitor-query" },
+    { name = "azure-storage-blob" },
     { name = "boto3" },
     { name = "cartography", specifier = ">=0.115.0" },
     { name = "celery", extras = ["redis"], specifier = "==5.*" },
@@ -844,6 +950,7 @@ requires-dist = [
     { name = "pygithub" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "reportlab", specifier = ">=5.0.0" },
+    { name = "requests", specifier = ">=2.31.0" },
     { name = "sentry-sdk", specifier = "==2.*" },
     { name = "shodan" },
     { name = "uuid6", specifier = ">=2025.0.1" },

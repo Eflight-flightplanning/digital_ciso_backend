@@ -1,0 +1,184 @@
+{
+  "Framework": "SOC2",
+  "Name": "SOC 2 Type II (Trust Services Criteria) for Oracle Cloud (OCI)",
+  "Version": "2024",
+  "Provider": "oraclecloud",
+  "Description": "AICPA SOC 2 Type II evaluation covering Security, Availability, Processing Integrity, and Confidentiality controls across OCI Compartments, IAM, Networking, and Storage.",
+  "Requirements": [
+    {
+      "Id": "CC6.1",
+      "Name": "Logical Access and Identity Perimeter Controls",
+      "Description": "Ensure multi-factor authentication (MFA) is enforced for all IAM user accounts accessing OCI Console and privileged tenancy administration.",
+      "Attributes": [
+        {
+          "Section": "Logical and Physical Access Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_password_policy_minimum_length_14",
+        "identity_password_policy_expires_within_365_days"
+      ]
+    },
+    {
+      "Id": "CC6.2",
+      "Name": "Credential Lifecycle and API Key Rotation",
+      "Description": "Ensure IAM user API signing keys, customer secret keys, and auth tokens are rotated every 90 days or less.",
+      "Attributes": [
+        {
+          "Section": "Logical Access",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days",
+        "identity_user_customer_secret_keys_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "CC6.3",
+      "Name": "Principle of Least Privilege and Compartment Isolation",
+      "Description": "Ensure non-root compartments exist and tenancy administrative privileges are strictly scoped to specific compartments.",
+      "Attributes": [
+        {
+          "Section": "Access Authorization",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists",
+        "identity_tenancy_admin_permissions_limited",
+        "identity_service_level_admins_exist"
+      ]
+    },
+    {
+      "Id": "CC6.6",
+      "Name": "Network Boundary Protection & Ingress Filtering",
+      "Description": "Ensure Security Lists and Network Security Groups do not allow unrestricted ingress from 0.0.0.0/0 to administrative ports (SSH 22, RDP 3389).",
+      "Attributes": [
+        {
+          "Section": "Network Perimeter",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port"
+      ]
+    },
+    {
+      "Id": "CC6.7",
+      "Name": "Data Transmission Encryption & In-Transit Protection",
+      "Description": "Ensure in-transit encryption is enabled for OCI compute instances and secure boot is enforced.",
+      "Attributes": [
+        {
+          "Section": "Transmission Protection",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "compute_instance_in_transit_encryption_enabled",
+        "compute_instance_secure_boot_enabled"
+      ]
+    },
+    {
+      "Id": "CC6.8",
+      "Name": "Data-at-Rest Protection with Customer-Managed Keys (KMS)",
+      "Description": "Ensure Block Volumes, Boot Volumes, File Systems, and Object Storage Buckets are encrypted with Customer-Managed Keys (CMK) and KMS keys are rotated.",
+      "Attributes": [
+        {
+          "Section": "Encryption at Rest",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "filestorage_file_system_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "CC7.1",
+      "Name": "Cloud Threat Detection & Security Monitoring with Cloud Guard",
+      "Description": "Ensure Oracle Cloud Guard is enabled and actively monitoring the tenancy for configuration drift and security problems.",
+      "Attributes": [
+        {
+          "Section": "Security Monitoring",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "CC7.2",
+      "Name": "Audit Logging and Security Event Alerting",
+      "Description": "Ensure OCI Audit log retention is configured for 365 days and event rules are active for IAM policy, network, and security list modifications.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "events_rule_iam_policy_changes",
+        "events_rule_iam_group_changes",
+        "events_rule_network_gateway_changes",
+        "events_rule_security_list_changes",
+        "events_rule_vcn_changes"
+      ]
+    },
+    {
+      "Id": "CC7.3",
+      "Name": "Object Storage Public Access Restriction & Versioning",
+      "Description": "Ensure Object Storage buckets are not publicly accessible, logging is enabled, and object versioning is turned on for business resilience.",
+      "Attributes": [
+        {
+          "Section": "Storage Governance",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_logging_enabled",
+        "objectstorage_bucket_versioning_enabled"
+      ]
+    },
+    {
+      "Id": "CC7.4",
+      "Name": "Database & Analytics Instance Access Restriction",
+      "Description": "Ensure Autonomous Databases and Oracle Analytics Cloud instances are restricted to authorized VCNs or private IP ranges.",
+      "Attributes": [
+        {
+          "Section": "Database Security",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted",
+        "integration_instance_access_restricted"
+      ]
+    }
+  ]
+}

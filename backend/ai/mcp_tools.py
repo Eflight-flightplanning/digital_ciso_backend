@@ -325,22 +325,67 @@ class MCPToolExecutor:
 
     @staticmethod
     def _get_compliance(args: dict[str, Any], tenant_id) -> dict[str, Any]:
-        from api.models import ComplianceOverview
-        qs = ComplianceOverview.objects.filter(tenant_id=tenant_id) if tenant_id else ComplianceOverview.objects.all()
+        # Fail closed: the legacy ComplianceOverview model this used to read from
+        # fell back to ComplianceOverview.objects.all() (all tenants) when tenant_id
+        # was falsy — the same cross-tenant leak pattern fixed elsewhere in the AI
+        # Advisor this session. Never repeat that here.
+        if not tenant_id:
+            return {"status": "error", "total_frameworks": 0, "frameworks": [], "message": "No tenant context available."}
+
+        from django.db.models import Count, Q
+        from api.models import ComplianceRequirementOverview, Scan, StateChoices
+
+        latest_scan_ids = (
+            Scan.all_objects.filter(tenant_id=tenant_id, state=StateChoices.COMPLETED)
+            .order_by("provider_id", "-inserted_at")
+            .distinct("provider_id")
+            .values_list("id", flat=True)
+        )
+
+        # Dedup-safe aggregation by (compliance_id, requirement_id) — mirrors
+        # ComplianceOverviewViewSet._aggregate_compliance_overview so this tool can
+        # never report passed + failed > total the way the old model could.
+        requirement_rows = (
+            ComplianceRequirementOverview.objects.filter(
+                tenant_id=tenant_id, scan_id__in=latest_scan_ids
+            )
+            .values("compliance_id", "requirement_id", "framework", "version")
+            .annotate(
+                fail_count=Count("id", filter=Q(requirement_status="FAIL")),
+                pass_count=Count("id", filter=Q(requirement_status="PASS")),
+                total_count=Count("id"),
+            )
+        )
+
+        frameworks: dict[str, dict[str, Any]] = {}
+        for row in requirement_rows:
+            entry = frameworks.setdefault(
+                row["compliance_id"],
+                {
+                    "id": row["compliance_id"],
+                    "name": row["framework"] or row["compliance_id"],
+                    "version": row["version"] or "",
+                    "passed": 0,
+                    "failed": 0,
+                    "total": 0,
+                },
+            )
+            entry["total"] += 1
+            if row["fail_count"] > 0:
+                entry["failed"] += 1
+            elif row["pass_count"] == row["total_count"]:
+                entry["passed"] += 1
+
         frameworks_list = []
-        if qs.exists():
-            for c in qs:
-                pct = round((c.requirements_passed / max(1, c.total_requirements)) * 100, 1)
-                frameworks_list.append({
-                    "id": c.compliance_id or c.framework,
-                    "name": c.description or c.framework,
-                    "version": c.version or "v1.0",
-                    "readiness_score": pct,
-                    "passed": c.requirements_passed,
-                    "failed": c.requirements_failed,
-                    "total": c.total_requirements,
-                    "status": "COMPLIANT" if pct >= 80 else "AT_RISK"
-                })
+        for entry in frameworks.values():
+            evaluated = max(1, entry["passed"] + entry["failed"])
+            pct = round((entry["passed"] / evaluated) * 100, 1) if entry["total"] else 0.0
+            frameworks_list.append({
+                **entry,
+                "readiness_score": pct,
+                "status": "COMPLIANT" if pct >= 80 else "AT_RISK",
+            })
+
         return {
             "status": "success",
             "total_frameworks": len(frameworks_list),

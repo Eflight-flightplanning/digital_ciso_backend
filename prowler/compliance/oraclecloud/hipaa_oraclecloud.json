@@ -1,0 +1,78 @@
+{
+  "Framework": "HIPAA",
+  "Name": "HIPAA Security Rule & HITECH for OCI",
+  "Version": "2023",
+  "Provider": "oraclecloud",
+  "Description": "Health Insurance Portability and Accountability Act standards for safeguarding electronic protected health information (ePHI).",
+  "Requirements": [
+    {
+      "Id": "164.312(a)(1)",
+      "Name": "Access Control & Unique User Identification",
+      "Description": "Implement technical policies and procedures for electronic information systems that maintain electronic protected health information.",
+      "Attributes": [
+        {
+          "Section": "Technical Safeguards",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_tenancy_admin_permissions_limited"
+      ]
+    },
+    {
+      "Id": "164.312(a)(2)(iv)",
+      "Name": "Encryption and Decryption (Data at Rest)",
+      "Description": "Implement a mechanism to encrypt and decrypt electronic protected health information across volumes and buckets.",
+      "Attributes": [
+        {
+          "Section": "Technical Safeguards",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk",
+        "filestorage_file_system_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "164.312(b)",
+      "Name": "Audit Controls & Security Event Tracking",
+      "Description": "Implement hardware, software, and procedural mechanisms that record and examine activity in information systems.",
+      "Attributes": [
+        {
+          "Section": "Technical Safeguards",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "cloudguard_enabled",
+        "objectstorage_bucket_logging_enabled"
+      ]
+    },
+    {
+      "Id": "164.312(e)(1)",
+      "Name": "Transmission Security & Network Boundaries",
+      "Description": "Implement technical security measures to guard against unauthorized access to ePHI that is being transmitted over an electronic communications network.",
+      "Attributes": [
+        {
+          "Section": "Technical Safeguards",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "compute_instance_in_transit_encryption_enabled",
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port"
+      ]
+    }
+  ]
+}

@@ -1,273 +1,449 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   GitBranch,
-  Zap,
   Sparkles,
+  RefreshCw,
+  Boxes,
+  Waypoints,
+  ShieldAlert,
   Server,
-  Key,
+  FolderTree,
   Database,
   Globe,
-  Play,
-  RotateCcw,
-  ExternalLink,
+  Key,
+  Users,
+  Shield,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  AlertTriangle,
+  CheckCircle2,
+  Copy,
+  Check,
+  BrainCircuit,
   ArrowRight,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Chip } from "@/components/ui-kit/primitives";
+import { useAttackPaths, useAttackPathsQueries, useRunAttackPathsQuery } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/attack-paths")({
   component: AttackPathsPage,
 });
 
-interface AttackNode {
+interface GraphNode {
+  id: string;
+  labels: string[];
+  properties: Record<string, unknown>;
+}
+interface GraphRelationship {
   id: string;
   label: string;
-  sublabel: string;
-  kind: "entry" | "compute" | "identity" | "crown";
-  x: number;
-  y: number;
-  provider: "Azure" | "AWS" | "GCP" | "OCI" | "Oracle SaaS" | string;
-  region: string;
-  resourceName: string;
-  resourceType: string;
-  exposure: string;
-  findingId: string;
-  findingTitle: string;
-  stepNumber: number;
-  stepDescription: string;
-  mitreId: string;
-  mitreTactic: string;
-  cvss: number;
-  remediationStep: string;
+  source: string;
+  target: string;
+  properties: Record<string, unknown>;
+}
+interface GraphResult {
+  nodes: GraphNode[];
+  relationships: GraphRelationship[];
+  total_nodes: number;
+  truncated: boolean;
 }
 
-interface AttackPathScenario {
-  id: string;
-  name: string;
-  cloud: "Azure" | "AWS" | "GCP" | "OCI" | "Oracle SaaS" | string;
-  severity: "Critical" | "High" | "Medium";
-  hops: number;
-  blastRadius: number;
-  entryZone: string;
-  targetZone: string;
-  nodes: AttackNode[];
-  edges: { from: string; to: string; critical: boolean; label: string }[];
+// Unified Professional Security Palette
+const LABEL_DISPLAY_MAP: Record<string, { name: string; color: string; bg: string; icon: string }> = {
+  ProwlerFinding: { name: "Security Finding", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.15)", icon: "finding" },
+  Finding: { name: "Security Finding", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.15)", icon: "finding" },
+  OCITenancy: { name: "OCI Tenancy", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "tenancy" },
+  OCICompartment: { name: "OCI Compartment", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "compartment" },
+  OCIComputeInstance: { name: "Compute Instance", color: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)", icon: "compute" },
+  OCIInstance: { name: "Compute Instance", color: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)", icon: "compute" },
+  OCIObjectStorageBucket: { name: "Storage Bucket", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", icon: "storage" },
+  OCIBucket: { name: "Storage Bucket", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", icon: "storage" },
+  OCIPolicy: { name: "IAM Policy", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "key" },
+  OCIDynamicGroup: { name: "Dynamic Group", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "users" },
+  OCIVcn: { name: "Virtual Cloud Network", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "network" },
+  AzureSubscription: { name: "Azure Subscription", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "tenancy" },
+  AzureResourceGroup: { name: "Resource Group", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "compartment" },
+  AzureVirtualMachine: { name: "Virtual Machine", color: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)", icon: "compute" },
+  AzureStorageAccount: { name: "Storage Account", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", icon: "storage" },
+  AzureKeyVault: { name: "Key Vault", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "key" },
+  AzureAppService: { name: "App Service", color: "#22d3ee", bg: "rgba(34, 211, 238, 0.12)", icon: "compute" },
+  AzureSqlDatabase: { name: "SQL Database", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.12)", icon: "storage" },
+  AzureNetworkSecurityGroup: { name: "Network Security Group", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "network" },
+  AzureADUser: { name: "Entra ID User", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "users" },
+  AzureADRole: { name: "Entra ID Role", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "key" },
+  AzureADApplication: { name: "Entra App", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "network" },
+  AWSAccount: { name: "AWS Account", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "tenancy" },
+  OracleSaaSAccount: { name: "Oracle SaaS Account", color: "#38bdf8", bg: "rgba(56, 189, 248, 0.12)", icon: "tenancy" },
+  OracleSaaSUser: { name: "SaaS User", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "users" },
+  OracleSaaSRole: { name: "SaaS Role", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "key" },
+  OracleSaasPrivilege: { name: "SaaS Privilege", color: "#a78bfa", bg: "rgba(167, 139, 250, 0.12)", icon: "key" },
+  Internet: { name: "Public Internet", color: "#f43f5e", bg: "rgba(244, 63, 94, 0.15)", icon: "internet" },
+};
+
+function getCleanLabel(rawLabel: string): string {
+  if (!rawLabel) return "Resource";
+  if (LABEL_DISPLAY_MAP[rawLabel]) return LABEL_DISPLAY_MAP[rawLabel].name;
+  return rawLabel.replace(/^_+/, "").replace(/([A-Z])/g, " $1").trim();
 }
 
-import { useFindings } from "@/hooks/use-api";
-
-function matchesProvider(f: any, targetProvider: string): boolean {
-  const p = (f.provider || "").toLowerCase();
-  const checkId = (f.check_id || "").toLowerCase();
-
-  if (targetProvider === "Azure") {
-    return p === "azure" || p === "az" || p.startsWith("azure");
-  }
-  if (targetProvider === "AWS") {
-    return p === "aws" || p.startsWith("aws");
-  }
-  if (targetProvider === "OCI") {
-    return (p === "oci" || p === "oraclecloud" || p === "oracle_cloud" || p.includes("oraclecloud")) && !p.includes("saas") && !checkId.includes("oracle_saas");
-  }
-  if (targetProvider === "Oracle SaaS") {
-    return (p === "oracle_saas" || p === "oracle-saas" || p === "saas" || checkId.includes("oracle_saas") || checkId.includes("erp")) && !p.includes("oraclecloud");
-  }
-  return false;
+function getLabelMeta(rawLabel: string) {
+  return (
+    LABEL_DISPLAY_MAP[rawLabel] || {
+      name: getCleanLabel(rawLabel),
+      color: "#38bdf8",
+      bg: "rgba(56, 189, 248, 0.15)",
+      icon: "resource",
+    }
+  );
 }
 
-function buildScenariosFromFindings(findings: any[]): AttackPathScenario[] {
-  if (!findings || findings.length === 0) return [];
+function primaryLabel(node: GraphNode): string {
+  const meaningful = (node.labels || []).filter(
+    (l) =>
+      !l.startsWith("_Tenant_") &&
+      !l.startsWith("_Provider_") &&
+      !l.startsWith("_ProviderResource") &&
+      !l.startsWith("_OCIResource") &&
+      !l.startsWith("_AWSResource") &&
+      !l.startsWith("_AzureResource")
+  );
+  // Prefer specific typed labels over generic ones
+  const priority = meaningful.filter((l) => !l.startsWith("_"));
+  return priority[0] || meaningful[0] || node.labels?.[0] || "Resource";
+}
 
-  const providers = ["Azure", "AWS", "OCI", "Oracle SaaS"];
-  const scenariosList: AttackPathScenario[] = [];
+function nodeDisplayName(node: GraphNode): string {
+  const p = node.properties || {};
+  const isFinding = (node.labels || []).some((l) => l.toLowerCase().includes("finding"));
+  if (isFinding) {
+    const title = p.check_title ?? p.title ?? p.check_id ?? p.name;
+    if (typeof title === "string" && title.trim()) return title;
+    return "Security Finding";
+  }
+  const candidate = p.name ?? p.display_name ?? p.title ?? p.arn ?? p.ocid ?? p.id ?? p.bucket ?? p.instanceid;
+  if (typeof candidate === "string" && candidate.trim()) {
+    if (candidate.startsWith("ocid1.") || candidate.length > 36) {
+      const parts = candidate.split(".");
+      return parts[1] ? `OCI ${parts[1]}` : candidate.slice(-12);
+    }
+    return candidate;
+  }
+  return getCleanLabel(primaryLabel(node));
+}
 
-  providers.forEach((providerName) => {
-    const provKey = providerName.toLowerCase().replace(" ", "_");
-    const provFindings = findings.filter((f: any) => matchesProvider(f, providerName));
+// Smart graph limiting — show unique assets + one representative finding per asset
+function buildDisplayGraph(
+  nodes: GraphNode[],
+  relationships: GraphRelationship[]
+): { displayNodes: GraphNode[]; displayRels: GraphRelationship[] } {
+  const MAX_ASSET_NODES = 12;
+  const MAX_FINDINGS_PER_ASSET = 2;
 
-    if (provFindings.length === 0) return;
+  const isFindingNode = (n: GraphNode) =>
+    (n.labels || []).some((l) => l.toLowerCase().includes("finding"));
 
-    const failedFindings = provFindings.filter((f: any) => f.status === "FAIL" || f.status === "FAILING");
-    const targetFindings = failedFindings.length > 0 ? failedFindings : provFindings;
+  const assetNodes = nodes.filter((n) => !isFindingNode(n));
+  const findingNodes = nodes.filter((n) => isFindingNode(n));
 
-    const nodes: AttackNode[] = [
-      {
-        id: `${provKey}-node-1`,
-        label: "Public Perimeter",
-        sublabel: "Adversary Ingress Point",
-        kind: "entry",
-        x: 100,
-        y: 220,
-        provider: providerName as any,
-        region: targetFindings[0]?.region || "Global",
-        resourceName: targetFindings[0]?.resource || "Public Ingress Perimeter",
-        resourceType: "Network Gateway",
-        exposure: "Unrestricted Network Ingress",
-        findingId: targetFindings[0]?.id ? String(targetFindings[0].id).slice(0, 12) : "FINDING-001",
-        findingTitle: targetFindings[0]?.title || "Unrestricted Public Access",
-        stepNumber: 1,
-        stepDescription: "Adversary probes public IP range targeting exposed perimeter resources.",
-        mitreId: "T1190",
-        mitreTactic: "Initial Access",
-        cvss: 9.0,
-        remediationStep: "Enforce network access group restrictions & perimeter WAF rules.",
-      },
-      {
-        id: `${provKey}-node-2`,
-        label: targetFindings[1]?.service ? `${targetFindings[1].service.toUpperCase()} Compute` : `${providerName} Compute Resource`,
-        sublabel: "Pivot Instance",
-        kind: "compute",
-        x: 350,
-        y: 130,
-        provider: providerName as any,
-        region: targetFindings[1]?.region || "Primary Region",
-        resourceName: targetFindings[1]?.resource || "Compute Pivot Instance",
-        resourceType: targetFindings[1]?.service || "Virtual Machine",
-        exposure: "Unmanaged Execution Environment",
-        findingId: targetFindings[1]?.id ? String(targetFindings[1].id).slice(0, 12) : "FINDING-002",
-        findingTitle: targetFindings[1]?.title || "Insecure Host Configuration",
-        stepNumber: 2,
-        stepDescription: "Compromises execution environment and harvests local instance credentials.",
-        mitreId: "T1078",
-        mitreTactic: "Execution",
-        cvss: 8.5,
-        remediationStep: "Enable hardened boot attestation and isolate management plane.",
-      },
-      {
-        id: `${provKey}-node-3`,
-        label: "IAM Principal / Role",
-        sublabel: "Privilege Escalation",
-        kind: "identity",
-        x: 590,
-        y: 310,
-        provider: providerName as any,
-        region: "IAM Global",
-        resourceName: targetFindings[2]?.resource || "Identity Service Principal",
-        resourceType: "IAM Policy / Role",
-        exposure: "Excessive Administrative Privileges",
-        findingId: targetFindings[2]?.id ? String(targetFindings[2].id).slice(0, 12) : "FINDING-003",
-        findingTitle: targetFindings[2]?.title || "Excessive IAM Role Permissions",
-        stepNumber: 3,
-        stepDescription: "Escalates privileges using overprivileged IAM role assignment.",
-        mitreId: "T1552",
-        mitreTactic: "Privilege Escalation",
-        cvss: 9.3,
-        remediationStep: "Apply Least Privilege RBAC: scope permissions strictly to required resources.",
-      },
-      {
-        id: `${provKey}-node-4`,
-        label: "Target Storage & Database",
-        sublabel: "Crown Jewel Data Target",
-        kind: "crown",
-        x: 840,
-        y: 190,
-        provider: providerName as any,
-        region: targetFindings[3]?.region || "Primary Region",
-        resourceName: targetFindings[3]?.resource || "Crown Jewel Data Store",
-        resourceType: targetFindings[3]?.service || "Database / Object Store",
-        exposure: "Sensitive Data Storage",
-        findingId: targetFindings[3]?.id ? String(targetFindings[3].id).slice(0, 12) : "FINDING-004",
-        findingTitle: targetFindings[3]?.title || "Unencrypted Data Target",
-        stepNumber: 4,
-        stepDescription: "Direct administrative query access to production data store.",
-        mitreId: "T1530",
-        mitreTactic: "Exfiltration",
-        cvss: 9.8,
-        remediationStep: "Enable KMS customer-managed key encryption & threat detection monitoring.",
-      },
-    ];
+  // Pick top assets (prefer non-internal label ones)
+  const topAssets = assetNodes.slice(0, MAX_ASSET_NODES);
+  const topAssetIds = new Set(topAssets.map((n) => n.id));
 
-    scenariosList.push({
-      id: `${provKey}-live-path`,
-      name: `${providerName} Toxic Path: ${nodes[0].label} → ${nodes[1].label} → ${nodes[3].label}`,
-      cloud: providerName,
-      severity: "Critical",
-      hops: 3,
-      blastRadius: targetFindings.length * 8 + 12,
-      entryZone: `Public Perimeter (${nodes[0].region})`,
-      targetZone: `${nodes[3].label} (${nodes[3].resourceName})`,
-      nodes,
-      edges: [
-        { from: `${provKey}-node-1`, to: `${provKey}-node-2`, critical: true, label: "Ingress Infiltration" },
-        { from: `${provKey}-node-2`, to: `${provKey}-node-3`, critical: true, label: "Credential Harvest" },
-        { from: `${provKey}-node-3`, to: `${provKey}-node-4`, critical: true, label: "Privilege Abuse" },
-      ],
+  // For each asset, pick at most MAX_FINDINGS_PER_ASSET findings
+  const assetFindingCount: Record<string, number> = {};
+  const chosenFindings: GraphNode[] = [];
+  const chosenFindingIds = new Set<string>();
+
+  for (const rel of relationships) {
+    if (!rel.label.includes("FINDING")) continue;
+    if (!topAssetIds.has(rel.source)) continue;
+    const count = assetFindingCount[rel.source] || 0;
+    if (count >= MAX_FINDINGS_PER_ASSET) continue;
+    const fNode = findingNodes.find((n) => n.id === rel.target);
+    if (!fNode) continue;
+    if (chosenFindingIds.has(fNode.id)) {
+      // Still count the relationship
+      assetFindingCount[rel.source] = count + 1;
+      continue;
+    }
+    chosenFindings.push(fNode);
+    chosenFindingIds.add(fNode.id);
+    assetFindingCount[rel.source] = count + 1;
+  }
+
+  const displayNodes = [...topAssets, ...chosenFindings];
+  const displayNodeIds = new Set(displayNodes.map((n) => n.id));
+
+  const displayRels = relationships.filter(
+    (r) => displayNodeIds.has(r.source) && displayNodeIds.has(r.target)
+  );
+
+  return { displayNodes, displayRels };
+}
+
+// Clean Tiered DAG layout for attack kill-chain
+function layoutGraph(
+  nodes: GraphNode[],
+  relationships: GraphRelationship[]
+): Record<string, { x: number; y: number }> {
+  const n = nodes.length;
+  if (n === 0) return {};
+  const positions: Record<string, { x: number; y: number }> = {};
+
+  if (n === 1) {
+    positions[nodes[0].id] = { x: 470, y: 230 };
+    return positions;
+  }
+
+  // Assign tiers based on node type (left = ingress/root, right = data/findings)
+  const getTier = (node: GraphNode): number => {
+    const l = primaryLabel(node).toLowerCase();
+    if (l.includes("internet") || l.includes("attacker")) return 0;
+    if (l.includes("tenancy") || l.includes("subscription") || l.includes("account")) return 1;
+    if (l.includes("compartment") || l.includes("resourcegroup") || l.includes("network") || l.includes("vcn")) return 2;
+    if (
+      l.includes("compute") ||
+      l.includes("vm") ||
+      l.includes("appservice") ||
+      l.includes("instance") ||
+      l.includes("user")
+    )
+      return 3;
+    if (l.includes("policy") || l.includes("dynamicgroup") || l.includes("keyvault") || l.includes("role")) return 4;
+    if (
+      l.includes("bucket") ||
+      l.includes("storage") ||
+      l.includes("database") ||
+      l.includes("sqldb") ||
+      l.includes("privilege")
+    )
+      return 5;
+    if (l.includes("finding")) return 6;
+    return 3;
+  };
+
+  const tierBuckets: Record<number, GraphNode[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  nodes.forEach((node) => {
+    const tier = getTier(node);
+    tierBuckets[tier].push(node);
+  });
+
+  const activeTiers = Object.keys(tierBuckets)
+    .map(Number)
+    .filter((t) => tierBuckets[t].length > 0)
+    .sort((a, b) => a - b);
+
+  const canvasW = 900;
+  const canvasH = 440;
+  const numTiers = Math.max(activeTiers.length, 1);
+  const tierStepX = Math.min(180, (canvasW - 160) / Math.max(numTiers - 1, 1));
+  const startX = 80;
+
+  activeTiers.forEach((tier, tierIdx) => {
+    const tierNodes = tierBuckets[tier];
+    const x = startX + tierIdx * tierStepX;
+    const count = tierNodes.length;
+    const stepY = count > 1 ? (canvasH - 100) / (count - 1) : 0;
+
+    tierNodes.forEach((node, nodeIdx) => {
+      const y = count > 1 ? 50 + nodeIdx * stepY : canvasH / 2;
+      positions[node.id] = { x, y };
     });
   });
 
-  return scenariosList;
+  return positions;
 }
 
 function AttackPathsPage() {
-  const { data: findingsRaw, isLoading } = useFindings();
-  const findings = useMemo(() => {
-    if (!findingsRaw) return [];
-    if (Array.isArray(findingsRaw)) return findingsRaw;
-    if (Array.isArray((findingsRaw as any).items)) return (findingsRaw as any).items;
-    if (Array.isArray((findingsRaw as any).data)) return (findingsRaw as any).data;
-    return [];
-  }, [findingsRaw]);
+  const { data: scansData, isLoading: scansLoading } = useAttackPaths();
+  const scans = (scansData?.items as Array<Record<string, any>>) ?? [];
 
-  const liveScenarios = useMemo(() => buildScenariosFromFindings(findings), [findings]);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>("");
-
+  const [selectedScanId, setSelectedScanId] = useState<string>("");
   useEffect(() => {
-    if (liveScenarios.length > 0 && (!selectedScenarioId || !liveScenarios.some(s => s.id === selectedScenarioId))) {
-      setSelectedScenarioId(liveScenarios[0].id);
+    if (scans.length > 0 && (!selectedScanId || !scans.some((s) => s.id === selectedScanId))) {
+      setSelectedScanId(scans[0].id);
     }
-  }, [liveScenarios, selectedScenarioId]);
+  }, [scans, selectedScanId]);
 
-  const scenario = liveScenarios.find((s) => s.id === selectedScenarioId) || liveScenarios[0];
+  const selectedScan = scans.find((s) => s.id === selectedScanId);
+
+  const { data: queriesData, isLoading: queriesLoading } = useAttackPathsQueries(
+    selectedScan?.graph_data_ready ? selectedScan.id : undefined
+  );
+  const queries = (queriesData as Array<Record<string, any>>) ?? [];
+
+  const [selectedQueryId, setSelectedQueryId] = useState<string>("");
+  useEffect(() => {
+    if (queries.length > 0 && (!selectedQueryId || !queries.some((q) => q.id === selectedQueryId))) {
+      setSelectedQueryId(queries[0].id);
+    } else if (queries.length === 0) {
+      setSelectedQueryId("");
+    }
+  }, [queries, selectedQueryId]);
+
+  const runQuery = useRunAttackPathsQuery();
+  const [graph, setGraph] = useState<GraphResult | null>(null);
+  const [graphError, setGraphError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
-  const [remediated, setRemediated] = useState(false);
-  const [remediating, setRemediating] = useState(false);
-  const [simulating, setSimulating] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (scenario?.nodes && scenario.nodes.length > 1) {
-      setSelectedNodeId(scenario.nodes[1].id);
-      setRemediated(false);
-    }
-  }, [selectedScenarioId, scenario]);
+  // Pan + zoom state — SVG viewBox manipulation instead of CSS scale
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const isDragging = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
 
-  const activeNode = scenario?.nodes?.find((n) => n.id === selectedNodeId) || scenario?.nodes?.[0];
+  const VB_W = 940;
+  const VB_H = 460;
+  const viewBox = `${panX} ${panY} ${VB_W / zoom} ${VB_H / zoom}`;
 
-  // Simulation loop
-  useEffect(() => {
-    if (!simulating || !scenario?.nodes) return;
-    const interval = setInterval(() => {
-      setSelectedNodeId((prevId) => {
-        if (!scenario?.nodes || scenario.nodes.length === 0) return prevId;
-        const currentIndex = scenario.nodes.findIndex((n) => n.id === prevId);
-        const nextIndex = (currentIndex + 1) % scenario.nodes.length;
-        return scenario.nodes[nextIndex]?.id || prevId;
-      });
-    }, 2400);
-    return () => clearInterval(interval);
-  }, [simulating, scenario?.nodes]);
-
-  const handleBreakChain = () => {
-    setRemediating(true);
-    setSimulating(false);
-    setTimeout(() => {
-      setRemediating(false);
-      setRemediated(true);
-    }, 1600);
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((z) => Math.max(0.4, Math.min(3, z + delta)));
   };
 
-  const handleReset = () => {
-    setRemediated(false);
-    setSimulating(false);
-    if (scenario?.nodes?.[1]) {
-      setSelectedNodeId(scenario.nodes[1].id);
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isDragging.current = true;
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const dx = (e.clientX - lastMouse.current.x) / zoom;
+    const dy = (e.clientY - lastMouse.current.y) / zoom;
+    setPanX((p) => p - dx);
+    setPanY((p) => p - dy);
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseUp = () => { isDragging.current = false; };
+
+  const resetView = () => { setZoom(1); setPanX(0); setPanY(0); };
+
+  const executeQuery = () => {
+    if (!selectedScan?.id || !selectedQueryId) return;
+    setGraphError(null);
+    runQuery.mutate(
+      { scanId: selectedScan.id, queryId: selectedQueryId },
+      {
+        onSuccess: (result: any) => {
+          setGraph(result as GraphResult);
+          setSelectedNodeId(result?.nodes?.[0]?.id || "");
+        },
+        onError: (err: any) => {
+          setGraph({ nodes: [], relationships: [], total_nodes: 0, truncated: false });
+          setSelectedNodeId("");
+          const msg = String(err?.message || "");
+          setGraphError(msg.toLowerCase().includes("not found") ? null : msg || "Query failed");
+        },
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (selectedScan?.id && selectedQueryId) {
+      executeQuery();
+    } else {
+      setGraph(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScan?.id, selectedQueryId]);
+
+  const allNodes = graph?.nodes ?? [];
+  const allRelationships = graph?.relationships ?? [];
+
+  // Smart display graph — limit nodes for readability
+  const { displayNodes: nodes, displayRels: relationships } = useMemo(
+    () => buildDisplayGraph(allNodes, allRelationships),
+    [allNodes, allRelationships]
+  );
+
+  // Auto-select first node when graph loads
+  useEffect(() => {
+    if (nodes.length > 0 && !nodes.find((n) => n.id === selectedNodeId)) {
+      setSelectedNodeId(nodes[0].id);
+      setPanX(0);
+      setPanY(0);
+      setZoom(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
+
+  const positions = useMemo(() => layoutGraph(nodes, relationships), [nodes, relationships]);
+  const activeNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0];
+  const activeQuery = queries.find((q) => q.id === selectedQueryId);
+
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  // Counts for summary
+  const totalAssets = allNodes.filter((n) => !(n.labels || []).some((l) => l.toLowerCase().includes("finding"))).length;
+  const totalFindings = allNodes.filter((n) => (n.labels || []).some((l) => l.toLowerCase().includes("finding"))).length;
+
+  // Node Icon Picker
+  const renderNodeIcon = (label: string, isFinding: boolean) => {
+    if (isFinding) return <ShieldAlert className="h-5 w-5 text-rose-400" />;
+    const l = label.toLowerCase();
+    if (l.includes("tenancy") || l.includes("subscription") || l.includes("account")) return <Shield className="h-5 w-5 text-sky-400" />;
+    if (l.includes("compartment") || l.includes("resourcegroup")) return <FolderTree className="h-5 w-5 text-sky-400" />;
+    if (l.includes("compute") || l.includes("instance") || l.includes("vm") || l.includes("appservice")) return <Server className="h-5 w-5 text-cyan-400" />;
+    if (l.includes("storage") || l.includes("bucket") || l.includes("database")) return <Database className="h-5 w-5 text-amber-400" />;
+    if (l.includes("policy") || l.includes("role") || l.includes("key") || l.includes("vault")) return <Key className="h-5 w-5 text-violet-400" />;
+    if (l.includes("user") || l.includes("group")) return <Users className="h-5 w-5 text-violet-400" />;
+    if (l.includes("internet")) return <Globe className="h-5 w-5 text-rose-400" />;
+    return <Boxes className="h-5 w-5 text-sky-400" />;
+  };
+
+  // Build AI Spectre prompt for a selected node
+  const buildSpectrePrompt = (node: GraphNode) => {
+    const label = getLabelMeta(primaryLabel(node)).name;
+    const name = nodeDisplayName(node);
+    const isFinding = (node.labels || []).some((l) => l.toLowerCase().includes("finding"));
+    const checkId = node.properties?.check_id ?? node.properties?.uid ?? "";
+    const severity = node.properties?.severity ?? "unknown";
+    const provider = selectedScan?.provider_type ?? "cloud";
+
+    if (isFinding) {
+      return `Spectre, I need a real attack path analysis for a security finding from my ${provider} cloud scan.
+
+Finding: "${name}"
+Check ID: ${checkId}
+Severity: ${severity}
+
+Please provide:
+1. A clear, step-by-step explanation of how an attacker would exploit this specific finding
+2. The exact blast radius — what data or systems are at risk if this is exploited
+3. Concrete remediation steps with commands or console instructions
+4. How this finding fits into a broader kill chain in our ${provider} environment`;
+    }
+
+    return `Spectre, analyze this cloud resource from my ${provider} attack path graph and explain its security risk:
+
+Resource Type: ${label}
+Resource Name: "${name}"
+Cloud Provider: ${provider}
+
+Please provide:
+1. What role this resource plays in an attack kill chain
+2. Most common ways attackers target or abuse this type of resource
+3. What an attacker could do if they compromised this specific resource
+4. The top 3 security controls we should verify for this resource type`;
   };
 
   return (
     <AppShell>
       <div className="space-y-6 pb-12">
-        {/* ── Page Header ── */}
+        {/* ── Header ── */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2.5">
@@ -275,578 +451,780 @@ function AttackPathsPage() {
                 <GitBranch className="h-5 w-5" />
               </div>
               <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                Attack Paths & Toxic Combinations
+                Attack Paths & Topology Graph
               </h1>
             </div>
             <p className="mt-1.5 text-xs sm:text-sm text-muted-foreground">
-              Multi-cloud IAM trust exploitation, internet ingress mapping, and automated kill-chain severing
+              Interactive multi-cloud security topology — real discovered assets and live security findings
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSimulating(!simulating)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-xl border px-3.5 text-xs font-semibold transition-all cursor-pointer shadow-sm ${
-                simulating
-                  ? "bg-primary text-primary-foreground border-primary shadow-primary/20"
-                  : "bg-surface-2 border-border text-foreground hover:bg-surface-3"
-              }`}
-            >
-              <Play className={`h-3.5 w-3.5 ${simulating ? "animate-pulse fill-current" : ""}`} />
-              <span>{simulating ? "Pause Simulation" : "Simulate Attack"}</span>
-            </button>
-
-            <button
-              onClick={handleBreakChain}
-              disabled={remediating || remediated}
-              className={`inline-flex h-9 min-w-[190px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer ${
-                remediated
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default"
-                  : "bg-rose-600 text-white hover:bg-rose-500 shadow-rose-600/20"
-              }`}
-            >
-              <Zap className={`h-3.5 w-3.5 ${remediating ? "animate-spin" : ""}`} />
-              <span>
-                {remediating
-                  ? "Severing Kill Chain..."
-                  : remediated
-                  ? "Kill Chain Broken ✓"
-                  : "Break Kill Chain (Phantom)"}
-              </span>
-            </button>
-
-            {remediated && (
-              <button
-                onClick={handleReset}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
-                title="Reset scenario state"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+          <button
+            onClick={executeQuery}
+            disabled={!selectedScan?.id || !selectedQueryId || runQuery.isPending}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-4 text-xs font-semibold text-foreground hover:bg-surface-3 transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${runQuery.isPending ? "animate-spin" : ""}`} />
+            <span>Re-run Query</span>
+          </button>
         </div>
 
-        {/* ── Attack Path Selector Tabs ── */}
-        {isLoading ? (
+        {/* ── Provider Tabs ── */}
+        {scansLoading ? (
           <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4 text-xs text-muted-foreground animate-pulse flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary animate-spin" />
-            Analyzing real-time provider finding topologies & attack vectors...
+            Loading Attack Paths scans…
           </div>
-        ) : liveScenarios.length === 0 ? (
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-6 text-center shadow-sm">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+        ) : scans.length === 0 ? (
+          <div className="rounded-2xl border border-border/60 bg-surface/70 p-6 text-center shadow-sm">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2 text-muted-foreground border border-border mb-3">
               <GitBranch className="h-6 w-6" />
             </div>
-            <h3 className="font-display text-base font-bold text-foreground">
-              Zero Toxic Attack Paths Detected
-            </h3>
+            <h3 className="font-display text-base font-bold text-foreground">No Attack Paths Scans Found</h3>
             <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-              No exploitable multi-hop attack vectors or toxic combinations were identified across your active cloud provider accounts. Run an assessment rescan to update topology metrics.
+              Run a scan for your connected Oracle OCI, Azure, or AWS provider to build the resource graph.
             </p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
-            {liveScenarios.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedScenarioId(s.id)}
-                className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer border ${
-                  selectedScenarioId === s.id
-                    ? "bg-surface border-primary/50 text-foreground shadow-sm shadow-primary/10"
-                    : "bg-surface-2/40 border-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${
-                  s.severity === "Critical" ? "bg-rose-500" : "bg-amber-400"
-                }`} />
-                <span className="font-bold">{s.cloud} Attack Path:</span>
-                <span className="truncate max-w-[280px] font-normal">{s.name}</span>
-                <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-mono font-bold ${
-                  s.severity === "Critical" ? "bg-rose-500/10 text-rose-400" : "bg-amber-400/10 text-amber-400"
-                }`}>
-                  {s.hops} Hops
-                </span>
-              </button>
-            ))}
+            {scans
+              .filter((s) => s.provider_type !== "oracle_saas")
+              .map((s) => {
+              const isSelected = selectedScanId === s.id;
+              const providerLabel =
+                s.provider_type === "oraclecloud"
+                  ? "Oracle OCI"
+                  : s.provider_type === "azure"
+                    ? "Microsoft Azure"
+                    : s.provider_type === "aws"
+                      ? "Amazon AWS"
+                      : s.provider_type;
+
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedScanId(s.id)}
+                  className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all cursor-pointer border ${
+                    isSelected
+                      ? "bg-surface border-primary text-foreground shadow-md shadow-primary/10 ring-1 ring-primary/30"
+                      : "bg-surface-2/50 border-border/50 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  }`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${s.graph_data_ready ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-400 animate-pulse"}`} />
+                  <span className="font-bold">{providerLabel}</span>
+                  <span className="truncate max-w-[160px] font-normal text-[11px] text-muted-foreground">
+                    ({s.provider_alias || s.provider_uid})
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* ── Main Content Grid: Interactive Topology Graph + Detailed Inspector ── */}
-        {scenario && activeNode && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* ── Left Column (7 Cols): Topology Attack Graph Canvas ── */}
-          <div className="lg:col-span-7 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 sm:p-6 backdrop-blur-sm shadow-md">
-            <div>
-              {/* Canvas Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3.5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display text-sm font-bold text-foreground">
-                      {scenario.cloud} Attack Vector Topology
-                    </h3>
-                    <Chip tone={remediated ? "success" : "critical"}>
-                      {remediated ? "0 Active Paths · Severed" : `1 Critical Path (${scenario.nodes[1]?.region || "Global"})`}
-                    </Chip>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Click any node to inspect exposure surface, IAM permissions, and blast radius
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                    Critical Ingress
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-amber-400" />
-                    IAM Pivot
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-purple-400" />
-                    Crown Jewel
-                  </span>
-                </div>
-              </div>
-
-              {/* High-Resolution Interactive SVG Canvas */}
-              <div className="relative mt-4 w-full h-[400px] sm:h-[440px] rounded-xl border border-border/70 bg-surface-2/50 overflow-hidden select-none">
-                <svg
-                  viewBox="0 0 940 440"
-                  className="h-full w-full"
-                  preserveAspectRatio="xMidYMid meet"
-                >
-                  <defs>
-                    {/* Cyber Grid Pattern */}
-                    <pattern id="cyberGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                      <circle cx="20" cy="20" r="1" fill="currentColor" className="text-border/40" />
-                    </pattern>
-
-                    {/* Gradient for Attack Vector Path */}
-                    <linearGradient id="attackPathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#ef4444" />
-                      <stop offset="40%" stopColor="#f59e0b" />
-                      <stop offset="70%" stopColor="#06b6d4" />
-                      <stop offset="100%" stopColor="#a855f7" />
-                    </linearGradient>
-
-                    {/* Glow Filter */}
-                    <filter id="pathGlow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="3.5" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-
-                    <filter id="nodeGlow" x="-30%" y="-30%" width="160%" height="160%">
-                      <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#06b6d4" floodOpacity="0.4" />
-                    </filter>
-                  </defs>
-
-                  {/* Grid Background */}
-                  <rect width="100%" height="100%" fill="url(#cyberGrid)" />
-
-                  {/* Zone Backdrop Areas */}
-                  <rect x="30" y="30" width="220" height="380" rx="12" fill="currentColor" className="text-surface/30" stroke="currentColor" strokeDasharray="4 4" strokeWidth="0.8" opacity="0.3" />
-                  <text x="45" y="55" fill="currentColor" className="text-muted-foreground/60 text-[10px] font-mono uppercase tracking-wider">Perimeter Zone</text>
-
-                  <rect x="270" y="30" width="400" height="380" rx="12" fill="currentColor" className="text-surface/30" stroke="currentColor" strokeDasharray="4 4" strokeWidth="0.8" opacity="0.3" />
-                  <text x="285" y="55" fill="currentColor" className="text-muted-foreground/60 text-[10px] font-mono uppercase tracking-wider">Internal VNet & IAM Boundary</text>
-
-                  <rect x="690" y="30" width="220" height="380" rx="12" fill="currentColor" className="text-surface/30" stroke="currentColor" strokeDasharray="4 4" strokeWidth="0.8" opacity="0.3" />
-                  <text x="705" y="55" fill="currentColor" className="text-muted-foreground/60 text-[10px] font-mono uppercase tracking-wider">Crown Jewel Vault</text>
-
-                  {/* Draw Curved Attack Paths with Animated Flow */}
-                  {scenario.edges.map((edge, i) => {
-                    const fromNode = scenario.nodes.find((n) => n.id === edge.from)!;
-                    const toNode = scenario.nodes.find((n) => n.id === edge.to)!;
-                    const isSevered = remediated && i === 1; // Sever the link between VM and Managed Identity
-
-                    // Smooth Bezier Curve
-                    const dx = toNode.x - fromNode.x;
-                    const c1x = fromNode.x + dx * 0.45;
-                    const c1y = fromNode.y;
-                    const c2x = fromNode.x + dx * 0.55;
-                    const c2y = toNode.y;
-                    const pathData = `M ${fromNode.x} ${fromNode.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${toNode.x} ${toNode.y}`;
-
-                    return (
-                      <g key={i}>
-                        {/* Background Base Track */}
-                        <path
-                          d={pathData}
-                          fill="none"
-                          stroke={isSevered ? "#10b981" : "#ef4444"}
-                          strokeWidth={isSevered ? "2" : "3.5"}
-                          strokeOpacity={isSevered ? "0.2" : "0.3"}
-                        />
-
-                        {/* Animated Glowing Laser Vector */}
-                        {!isSevered && (
-                          <path
-                            d={pathData}
-                            fill="none"
-                            stroke="url(#attackPathGradient)"
-                            strokeWidth="2.5"
-                            strokeDasharray="8 6"
-                            className="animate-pulse"
-                            filter="url(#pathGlow)"
-                          />
-                        )}
-
-                        {/* Edge Hover Tag */}
-                        <rect
-                          x={(fromNode.x + toNode.x) / 2 - 45}
-                          y={(fromNode.y + toNode.y) / 2 - 10}
-                          width="90"
-                          height="18"
-                          rx="9"
-                          fill="currentColor"
-                          className="text-surface"
-                          stroke="currentColor"
-                          strokeWidth="0.8"
-                          opacity="0.85"
-                        />
-                        <text
-                          x={(fromNode.x + toNode.x) / 2}
-                          y={(fromNode.y + toNode.y) / 2 + 2.5}
-                          fill="currentColor"
-                          className={isSevered ? "text-emerald-400 font-mono text-[9px] font-bold" : "text-muted-foreground font-mono text-[9px] font-semibold"}
-                          textAnchor="middle"
-                        >
-                          {isSevered ? "SEVERED" : edge.label}
-                        </text>
-
-                        {/* Severed Barrier Shield Icon Badge */}
-                        {isSevered && (
-                          <g transform={`translate(${(fromNode.x + toNode.x) / 2 - 12}, ${(fromNode.y + toNode.y) / 2 - 28})`}>
-                            <circle cx="12" cy="12" r="14" fill="#10b981" fillOpacity="0.2" stroke="#10b981" strokeWidth="1.5" />
-                            <text x="12" y="16" textAnchor="middle" fill="#10b981" fontSize="11" fontWeight="bold">✓</text>
-                          </g>
-                        )}
-                      </g>
-                    );
-                  })}
-
-                  {/* Draw Nodes */}
-                  {scenario.nodes.map((node) => {
-                    const isSelected = selectedNodeId === node.id;
-                    const isCrown = node.kind === "crown";
-                    const isEntry = node.kind === "entry";
-                    const isIdentity = node.kind === "identity";
-
-                    return (
-                      <g
-                        key={node.id}
-                        onClick={() => {
-                          setSelectedNodeId(node.id);
-                        }}
-                        className="cursor-pointer transition-all duration-300"
-                        transform={`translate(${node.x}, ${node.y})`}
-                      >
-                        {/* Halo Pulse for Selected Node */}
-                        {isSelected && (
-                          <circle
-                            r="32"
-                            fill="none"
-                            stroke="#06b6d4"
-                            strokeWidth="1.5"
-                            strokeDasharray="4 4"
-                            className="animate-spin"
-                            style={{ animationDuration: "8s" }}
-                          />
-                        )}
-
-                        {/* Outer Glow Circle */}
-                        <circle
-                          r={isSelected ? "26" : "22"}
-                          fill="currentColor"
-                          className="text-surface"
-                          stroke={
-                            isSelected
-                              ? "#06b6d4"
-                              : isEntry
-                              ? "#ef4444"
-                              : isIdentity
-                              ? "#f59e0b"
-                              : isCrown
-                              ? "#a855f7"
-                              : "#38bdf8"
-                          }
-                          strokeWidth={isSelected ? "3" : "2"}
-                          filter={isSelected ? "url(#nodeGlow)" : undefined}
-                        />
-
-                        {/* Step Number Tag Pill */}
-                        <rect
-                          x="-14"
-                          y="-32"
-                          width="28"
-                          height="14"
-                          rx="7"
-                          fill={
-                            isEntry
-                              ? "#ef4444"
-                              : isIdentity
-                              ? "#f59e0b"
-                              : isCrown
-                              ? "#a855f7"
-                              : "#06b6d4"
-                          }
-                        />
-                        <text
-                          x="0"
-                          y="-22"
-                          textAnchor="middle"
-                          fill="#ffffff"
-                          fontSize="8.5"
-                          fontWeight="bold"
-                          fontFamily="sans-serif"
-                        >
-                          Step {node.stepNumber}
-                        </text>
-
-                        {/* Center Icon Shape Representation */}
-                        {isEntry && (
-                          <g transform="translate(-8, -8)">
-                            <circle cx="8" cy="8" r="6" fill="none" stroke="#ef4444" strokeWidth="1.5" />
-                            <path d="M 8 2 A 6 6 0 0 1 8 14" fill="none" stroke="#ef4444" strokeWidth="1.2" />
-                          </g>
-                        )}
-                        {node.kind === "compute" && (
-                          <g transform="translate(-8, -8)">
-                            <rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="#38bdf8" strokeWidth="1.5" />
-                            <circle cx="5" cy="8" r="1" fill="#38bdf8" />
-                          </g>
-                        )}
-                        {isIdentity && (
-                          <g transform="translate(-8, -8)">
-                            <circle cx="6" cy="6" r="4" fill="none" stroke="#f59e0b" strokeWidth="1.5" />
-                            <path d="M 9 9 L 14 14 M 12 12 L 14 10" stroke="#f59e0b" strokeWidth="1.5" />
-                          </g>
-                        )}
-                        {isCrown && (
-                          <g transform="translate(-8, -8)">
-                            <ellipse cx="8" cy="4" rx="6" ry="2.5" fill="none" stroke="#a855f7" strokeWidth="1.5" />
-                            <path d="M 2 4 V 12 A 6 2.5 0 0 0 14 12 V 4" fill="none" stroke="#a855f7" strokeWidth="1.5" />
-                          </g>
-                        )}
-
-                        {/* High-Legibility Title & Subtitle Badge */}
-                        <g transform="translate(0, 36)">
-                          <rect
-                            x="-85"
-                            y="-4"
-                            width="170"
-                            height="34"
-                            rx="8"
-                            fill="currentColor"
-                            className="text-surface/90"
-                            stroke="currentColor"
-                            strokeWidth="0.8"
-                            opacity="0.95"
-                          />
-                          <text
-                            x="0"
-                            y="10"
-                            textAnchor="middle"
-                            fill="currentColor"
-                            fontSize="11"
-                            fontWeight={isSelected ? "700" : "600"}
-                            className="text-foreground"
-                          >
-                            {node.label}
-                          </text>
-                          <text
-                            x="0"
-                            y="22"
-                            textAnchor="middle"
-                            fill="currentColor"
-                            fontSize="8.5"
-                            className="text-muted-foreground font-mono"
-                          >
-                            {node.sublabel}
-                          </text>
-                        </g>
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-            </div>
-
-            {/* Bottom Summary Telemetry */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground border-t border-border/60 pt-3.5">
-              <div className="flex items-center gap-2 font-mono text-[11px]">
-                <span className="text-foreground font-bold">Vector Chain:</span>
-                <span>{scenario.entryZone}</span>
-                <ArrowRight className="h-3 w-3 text-primary inline" />
-                <span>{scenario.nodes[1].label}</span>
-                <ArrowRight className="h-3 w-3 text-primary inline" />
-                <span className="text-purple-400 font-bold">{scenario.targetZone}</span>
-              </div>
-
-              <div className="flex items-center gap-4 font-mono text-[11px]">
-                <span>
-                  Blast Radius:{" "}
-                  <strong className={remediated ? "text-emerald-400" : "text-rose-400"}>
-                    {remediated ? "0 assets" : `${scenario.blastRadius} Cloud Assets`}
-                  </strong>
-                </span>
-                <span className="rounded-md bg-surface-2 px-2 py-0.5 text-foreground font-semibold border border-border">
-                  CVSS: {activeNode.cvss}
-                </span>
-              </div>
-            </div>
+        {selectedScan && !selectedScan.graph_data_ready && (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-950/10 p-6 text-center shadow-sm">
+            <h3 className="font-display text-base font-bold text-foreground">Graph Ingestion In Progress</h3>
+            <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+              This provider's Attack Paths graph is syncing (state: {selectedScan.state || "scheduled"}). Queries will activate once ingestion reaches 100%.
+            </p>
           </div>
+        )}
 
-          {/* ── Right Column (5 Cols): Selected Node Telemetry & Kill Chain Inspector ── */}
-          <div className="lg:col-span-5 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 sm:p-6 backdrop-blur-sm shadow-md">
-            <div className="space-y-4">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-border/60 pb-3.5">
-                <div>
-                  <h3 className="font-display text-sm font-bold text-foreground">
-                    Node Telemetry & Risk Inspector
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    Exploit mechanics and remediation for hop {activeNode.stepNumber} of {scenario.nodes?.length || 0}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-foreground">
-                    CVSS {activeNode.cvss}
-                  </span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold border ${
-                    activeNode.kind === "crown"
-                      ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                      : activeNode.kind === "entry"
-                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                      : activeNode.kind === "identity"
-                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                      : "bg-sky-500/10 text-sky-400 border-sky-500/20"
-                  }`}>
-                    {activeNode.kind.toUpperCase()}
-                  </span>
-                </div>
+        {selectedScan?.graph_data_ready && (
+          <>
+            {/* ── Query Selector Bar ── */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/80 bg-surface/80 p-3.5 shadow-sm">
+              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <Waypoints className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-xs font-bold text-muted-foreground shrink-0">Attack Vector:</span>
+                <select
+                  value={selectedQueryId}
+                  onChange={(e) => setSelectedQueryId(e.target.value)}
+                  disabled={queriesLoading || queries.length === 0}
+                  className="h-9 flex-1 min-w-0 rounded-lg border border-border bg-surface-2 px-3 text-xs font-semibold text-foreground outline-none hover:border-primary/40 focus:border-primary cursor-pointer disabled:opacity-50"
+                >
+                  {queries.length === 0 && <option value="">No queries available for this provider</option>}
+                  {queries.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+              {activeQuery?.short_description && (
+                <div className="text-[11px] text-muted-foreground sm:max-w-md sm:text-right bg-surface-2/60 px-3 py-1.5 rounded-lg border border-border/50">
+                  {activeQuery.short_description}
+                </div>
+              )}
+            </div>
 
-              {/* Minimal Step Progression Track */}
-              <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-border/70 bg-surface-2/40 p-1.5">
-                {scenario.nodes.map((node) => {
-                  const isCurrent = selectedNodeId === node.id;
-                  return (
-                    <button
-                      key={node.id}
-                      onClick={() => setSelectedNodeId(node.id)}
-                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-center transition-all cursor-pointer ${
-                        isCurrent
-                          ? "bg-surface border border-primary/50 text-foreground shadow-sm"
-                          : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                      }`}
+            {graphError && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-950/10 p-4 text-xs text-rose-400 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{graphError}</span>
+              </div>
+            )}
+
+            {/* ── Main Canvas & Inspector ── */}
+            {runQuery.isPending ? (
+              <div className="rounded-2xl border border-border/60 bg-surface-2/40 p-16 text-center text-xs text-muted-foreground animate-pulse flex flex-col items-center justify-center gap-3">
+                <Sparkles className="h-6 w-6 text-primary animate-spin" />
+                <span className="font-semibold text-foreground">Executing Cypher graph traversal…</span>
+                <span className="text-[11px]">Querying real nodes, relationships, and security controls</span>
+              </div>
+            ) : allNodes.length === 0 ? (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/10 p-8 text-center shadow-sm">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <h3 className="font-display text-base font-bold text-foreground">No Vulnerabilities Found for This Vector</h3>
+                <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  No matching attack pattern was discovered in your real cloud graph for this query. Select a different attack vector above to explore other resource paths.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Stats Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Cloud Assets", value: totalAssets, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+                    { label: "Security Findings", value: totalFindings, color: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
+                    { label: "Graph Edges", value: allRelationships.length, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20" },
+                    { label: "Graph Nodes (Total)", value: allNodes.length, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+                  ].map((stat) => (
+                    <div key={stat.label} className={`rounded-xl border p-3.5 ${stat.bg}`}>
+                      <p className={`text-2xl font-bold font-display ${stat.color}`}>{stat.value}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                  {/* ── Left: Interactive Graph Canvas ── */}
+                  <div className="lg:col-span-7 flex flex-col rounded-2xl border border-border/80 bg-surface/90 p-5 sm:p-6 backdrop-blur-md shadow-lg relative overflow-hidden">
+                    {/* Canvas Toolbar */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3.5 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display text-sm font-bold text-foreground">Kill-Chain Topology Canvas</h3>
+                          <Chip tone={allNodes.length > nodes.length ? "medium" : "success"}>
+                            {nodes.length} Nodes · {relationships.length} Edges
+                            {allNodes.length > nodes.length && ` (${allNodes.length} total)`}
+                          </Chip>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Click any node to inspect it and get AI threat analysis
+                        </p>
+                      </div>
+
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-lg border border-border/60">
+                        <button
+                          onClick={() => setZoom((z) => Math.max(0.5, z - 0.15))}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-surface transition-colors cursor-pointer"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-[10px] font-mono font-semibold px-1 text-muted-foreground">{Math.round(zoom * 100)}%</span>
+                        <button
+                          onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-surface transition-colors cursor-pointer"
+                          title="Zoom In"
+                        >
+                          <ZoomIn className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={resetView}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-surface transition-colors cursor-pointer"
+                          title="Reset View"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SVG Graph Canvas — pan by dragging, zoom by scroll wheel or buttons */}
+                    <div
+                      className="relative w-full h-[480px] sm:h-[520px] rounded-xl border border-border/70 overflow-hidden select-none shadow-inner"
+                      style={{ background: "var(--graph-bg, #f1f5f9)" }}
                     >
-                      <span className="text-[9px] font-mono font-bold opacity-70">Hop {node.stepNumber}</span>
-                      <span className="text-[11px] font-semibold truncate max-w-full">
-                        {node.kind === "entry" ? "Ingress" : node.kind === "compute" ? "Compute" : node.kind === "identity" ? "Identity" : "Storage"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                      {/* Pan hint */}
+                      <div className="absolute top-2 right-3 z-10 flex items-center gap-1.5 text-[10px] text-muted-foreground bg-surface/80 backdrop-blur-sm px-2 py-1 rounded-md border border-border/40 pointer-events-none">
+                        <span>Drag to pan · Scroll to zoom</span>
+                      </div>
 
-              {/* Active Node Overview */}
-              <div className="rounded-xl border border-border/70 bg-surface-2/40 p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface border border-border text-foreground shadow-sm">
-                    {activeNode.kind === "crown" ? (
-                      <Database className="h-5 w-5 text-purple-400" />
-                    ) : activeNode.kind === "entry" ? (
-                      <Globe className="h-5 w-5 text-rose-400" />
-                    ) : activeNode.kind === "identity" ? (
-                      <Key className="h-5 w-5 text-amber-400" />
+                      <svg
+                        ref={svgRef}
+                        viewBox={viewBox}
+                        className="h-full w-full"
+                        style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
+                        preserveAspectRatio="xMidYMid meet"
+                        onWheel={handleWheel}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                      >
+                        <defs>
+                          {/* Universal dot grid — works on both light and dark backgrounds */}
+                          <pattern id="graphDots" width="24" height="24" patternUnits="userSpaceOnUse">
+                            <circle cx="12" cy="12" r="1.2" fill="currentColor" opacity="0.18" />
+                          </pattern>
+
+                          {/* Arrowheads */}
+                          <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="24" refY="4" orient="auto">
+                            <polygon points="0 0, 8 4, 0 8" fill="#dc2626" />
+                          </marker>
+                          <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="24" refY="4" orient="auto">
+                            <polygon points="0 0, 8 4, 0 8" fill="#2563eb" />
+                          </marker>
+
+                          {/* Filters */}
+                          <filter id="findingGlow" x="-60%" y="-60%" width="220%" height="220%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#dc2626" floodOpacity="0.5" />
+                          </filter>
+                          <filter id="selectedGlow" x="-60%" y="-60%" width="220%" height="220%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="7" floodColor="#2563eb" floodOpacity="0.6" />
+                          </filter>
+                          <filter id="nodeShadow" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.15" />
+                          </filter>
+                        </defs>
+
+                        {/* Background */}
+                        <rect x={panX - 2000} y={panY - 2000} width="8000" height="8000" fill="#f8fafc" className="dark:hidden" />
+                        <rect x={panX - 2000} y={panY - 2000} width="8000" height="8000" fill="#0f172a" className="hidden dark:block" />
+                        <rect x={panX - 2000} y={panY - 2000} width="8000" height="8000" fill="url(#graphDots)" />
+
+                        {/* Edges */}
+                        {relationships.map((rel) => {
+                          const from = positions[rel.source];
+                          const to = positions[rel.target];
+                          if (!from || !to) return null;
+                          const isFindingRel = rel.label.includes("FINDING");
+                          const midX = (from.x + to.x) / 2;
+                          const midY = (from.y + to.y) / 2;
+                          const dx = to.x - from.x;
+                          const dy = to.y - from.y;
+                          const curveOffset = Math.min(Math.abs(dy) * 0.25 + 20, 50);
+                          const cpx = midX + (dy > 0 ? curveOffset * 0.4 : -curveOffset * 0.4);
+                          const cpy = midY - curveOffset;
+
+                          return (
+                            <g key={rel.id}>
+                              {/* Wider invisible hit area for hover */}
+                              <path
+                                d={`M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`}
+                                fill="none" stroke="transparent" strokeWidth="12"
+                              />
+                              <path
+                                d={`M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`}
+                                fill="none"
+                                stroke={isFindingRel ? "#dc2626" : "#2563eb"}
+                                strokeWidth={isFindingRel ? "2.5" : "2"}
+                                strokeDasharray={isFindingRel ? "7 4" : undefined}
+                                strokeOpacity="0.85"
+                                markerEnd={isFindingRel ? "url(#arrowRed)" : "url(#arrowBlue)"}
+                              />
+                              {/* Edge label only for longer edges */}
+                              {(Math.abs(dx) + Math.abs(dy)) > 100 && (
+                                <g transform={`translate(${cpx}, ${cpy - 4})`}>
+                                  <rect x="-34" y="-9" width="68" height="18" rx="9"
+                                    fill={isFindingRel ? "#fef2f2" : "#eff6ff"}
+                                    stroke={isFindingRel ? "#fca5a5" : "#93c5fd"}
+                                    strokeWidth="1"
+                                  />
+                                  <text x="0" y="4" textAnchor="middle"
+                                    fill={isFindingRel ? "#991b1b" : "#1d4ed8"}
+                                    fontFamily="ui-monospace,monospace" fontSize="7" fontWeight="700"
+                                  >
+                                    {rel.label.replace(/_/g, " ").slice(0, 13)}
+                                  </text>
+                                </g>
+                              )}
+                            </g>
+                          );
+                        })}
+
+                        {/* Nodes */}
+                        {nodes.map((node) => {
+                          const pos = positions[node.id];
+                          if (!pos) return null;
+                          const rawLabel = primaryLabel(node);
+                          const meta = getLabelMeta(rawLabel);
+                          const isFinding = (node.labels || []).some((l) => l.toLowerCase().includes("finding"));
+                          const isSelected = selectedNodeId === node.id;
+                          const name = nodeDisplayName(node);
+                          const r = isFinding ? 20 : 24;
+
+                          // Use darker stroke colors for better visibility on light bg
+                          const strokeColor = isFinding ? "#dc2626" : meta.color;
+
+                          return (
+                            <g
+                              key={node.id}
+                              onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
+                              style={{ cursor: "pointer" }}
+                              transform={`translate(${pos.x}, ${pos.y})`}
+                            >
+                              {/* Selection pulse ring */}
+                              {isSelected && (
+                                <circle r={r + 10} fill="none"
+                                  stroke="#2563eb" strokeWidth="2"
+                                  strokeDasharray="6 4" opacity="0.7"
+                                />
+                              )}
+
+                              {/* Node body — high-contrast dark fill with vivid colored border */}
+                              <circle r={r}
+                                fill="#090d16"
+                                stroke={isSelected ? "#00e5ff" : strokeColor}
+                                strokeWidth={isSelected ? "3.5" : "2.5"}
+                                filter={isFinding ? "url(#findingGlow)" : isSelected ? "url(#selectedGlow)" : "url(#nodeShadow)"}
+                              />
+
+                              {/* Inner accent ring */}
+                              <circle r={r - 6}
+                                fill={meta.bg}
+                                stroke={strokeColor}
+                                strokeWidth="1"
+                                opacity="0.6"
+                              />
+
+                              {/* Finding exclamation badge */}
+                              {isFinding && (
+                                <g transform={`translate(${r - 4}, ${-(r - 4)})`}>
+                                  <circle r="7" fill="#dc2626" />
+                                  <text y="4" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900">!</text>
+                                </g>
+                              )}
+
+                              {/* Label card */}
+                              <g transform={`translate(0, ${r + 14})`}>
+                                {/* Card background */}
+                                <rect x="-72" y="-7" width="144" height="38" rx="8"
+                                  fill="#090d16"
+                                  stroke={isSelected ? "#00e5ff" : strokeColor}
+                                  strokeWidth={isSelected ? "2" : "1.2"}
+                                  filter="url(#nodeShadow)"
+                                />
+                                {/* Resource name — High Visibility White */}
+                                <text x="0" y="8" textAnchor="middle"
+                                  fill="#ffffff"
+                                  fontSize="10" fontWeight={isSelected ? "800" : "700"}
+                                  fontFamily="ui-sans-serif, system-ui, sans-serif"
+                                >
+                                  {name.length > 19 ? `${name.slice(0, 17)}…` : name}
+                                </text>
+                                {/* Type label — Bright vivid colored subtitle */}
+                                <text x="0" y="23" textAnchor="middle"
+                                  fill={meta.color || "#38bdf8"}
+                                  fontSize="8.5" fontWeight="700"
+                                  fontFamily="ui-sans-serif, system-ui, sans-serif"
+                                >
+                                  {meta.name}
+                                </text>
+                              </g>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground bg-surface-2/50 p-2.5 rounded-xl border border-border/50">
+                      <span className="font-bold text-foreground">Legend:</span>
+                      <span className="flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400">
+                        <span className="h-3 w-3 rounded-full bg-blue-600 dark:bg-blue-400" /> Infrastructure
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-violet-600 dark:text-violet-400">
+                        <span className="h-3 w-3 rounded-full bg-violet-600 dark:bg-violet-400" /> Identity
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                        <span className="h-3 w-3 rounded-full bg-amber-500" /> Data / Storage
+                      </span>
+                      <span className="flex items-center gap-1.5 font-semibold text-red-600 dark:text-red-400">
+                        <span className="h-3 w-3 rounded-full bg-red-600" /> Security Finding
+                      </span>
+                      <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
+                        <span className="inline-block w-5 border-t-2 border-blue-500" /> Structural
+                      </span>
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <span className="inline-block w-5 border-t-2 border-dashed border-red-500" /> Violation
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ── Right: Node Inspector ── */}
+                  <div className="lg:col-span-5 flex flex-col gap-4 rounded-2xl border border-border/80 bg-surface/90 p-5 sm:p-6 backdrop-blur-md shadow-lg">
+                    {activeNode ? (
+                      <>
+                        {/* Inspector Header */}
+                        <div className="flex items-center justify-between border-b border-border/60 pb-3.5">
+                          <div>
+                            <h3 className="font-display text-sm font-bold text-foreground">Node Inspector</h3>
+                            <p className="text-[11px] text-muted-foreground">Resource details & security context</p>
+                          </div>
+                          <span
+                            className="rounded-full px-3 py-1 text-[11px] font-semibold border flex items-center gap-1.5"
+                            style={{
+                              color: getLabelMeta(primaryLabel(activeNode)).color,
+                              borderColor: `${getLabelMeta(primaryLabel(activeNode)).color}40`,
+                              backgroundColor: getLabelMeta(primaryLabel(activeNode)).bg,
+                            }}
+                          >
+                            {renderNodeIcon(
+                              primaryLabel(activeNode),
+                              (activeNode.labels || []).some((l) => l.toLowerCase().includes("finding"))
+                            )}
+                            <span>{getLabelMeta(primaryLabel(activeNode)).name}</span>
+                          </span>
+                        </div>
+
+                        {/* Resource Name + ID */}
+                        <div className="rounded-xl border border-border/80 bg-surface-2/60 p-4 space-y-2.5 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-display text-base font-bold text-foreground break-words">
+                                {nodeDisplayName(activeNode)}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="font-mono text-[10px] text-muted-foreground truncate">
+                                  ID: {activeNode.id}
+                                </span>
+                                <button
+                                  onClick={() => handleCopy(activeNode.id, "nodeId")}
+                                  className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5"
+                                  title="Copy Node ID"
+                                >
+                                  {copiedKey === "nodeId" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Properties */}
+                          <div className="pt-2 border-t border-border/60 space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                            {Object.entries(activeNode.properties || {})
+                              .filter(([k]) => !k.startsWith("_") && k !== "lastupdated")
+                              .slice(0, 10)
+                              .map(([k, v]) => {
+                                const strVal = typeof v === "object" ? JSON.stringify(v) : String(v);
+                                const isFail = k.toLowerCase() === "status" && strVal.toUpperCase() === "FAIL";
+                                const isPass = k.toLowerCase() === "status" && strVal.toUpperCase() === "PASS";
+                                const isHigh =
+                                  k.toLowerCase() === "severity" &&
+                                  ["critical", "high"].includes(strVal.toLowerCase());
+
+                                return (
+                                  <div
+                                    key={k}
+                                    className="flex items-start justify-between gap-3 text-xs bg-surface/60 px-2.5 py-1.5 rounded-lg border border-border/40"
+                                  >
+                                    <span className="text-muted-foreground font-semibold shrink-0 capitalize">
+                                      {k.replace(/_/g, " ")}:
+                                    </span>
+                                    {isFail ? (
+                                      <span className="rounded bg-rose-500/20 text-rose-400 font-bold px-2 py-0.5 text-[10px]">FAILED</span>
+                                    ) : isPass ? (
+                                      <span className="rounded bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 text-[10px]">PASSED</span>
+                                    ) : isHigh ? (
+                                      <span className="rounded bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 text-[10px] uppercase">
+                                        {strVal}
+                                      </span>
+                                    ) : (
+                                      <span className="font-mono text-foreground text-right break-all text-[11px] font-medium">
+                                        {strVal.length > 60 ? `${strVal.slice(0, 58)}…` : strVal}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+
+                        {/* ── How An Attacker Targets This Node (Attack Kill-Chain Narrative) ── */}
+                        <div className="rounded-xl border border-rose-500/30 bg-gradient-to-b from-rose-950/20 via-surface to-surface-2 p-4 space-y-3 shadow-sm">
+                          <div className="flex items-center gap-2 border-b border-border/60 pb-2.5">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400">
+                              <ShieldAlert className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-foreground block">How An Attacker Targets This Node</span>
+                              <span className="text-[10px] text-muted-foreground">Real-world attack scenario & kill-chain trajectory</span>
+                            </div>
+                          </div>
+
+                          {(() => {
+                            const lbl = primaryLabel(activeNode).toLowerCase();
+                            const isFinding = (activeNode.labels || []).some((l) => l.toLowerCase().includes("finding"));
+                            const name = nodeDisplayName(activeNode);
+                            const provider = selectedScan?.provider_type ?? "cloud";
+
+                            if (isFinding) {
+                              return (
+                                <div className="space-y-2 text-xs">
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-rose-400">Step 1 — Reconnaissance:</span> Automated scanners or attackers identify this security check failure (<strong className="text-foreground">{name}</strong>) as an active defense gap.
+                                  </p>
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-amber-400">Step 2 — Exploitation:</span> The misconfiguration allows the attacker to bypass access controls, tamper with audit trails, or gain unauthorized visibility into downstream data stores.
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("tenancy") || lbl.includes("subscription") || lbl.includes("account")) {
+                              return (
+                                <div className="space-y-2 text-xs">
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-rose-400">Step 1 — Ingress Compromise:</span> An adversary targets root credentials or leaked service principal keys governing <strong className="text-foreground">{name}</strong>.
+                                  </p>
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-amber-400">Step 2 — Full Tenant Blast Radius:</span> Root-level compromise grants direct visibility and administrative control over all nested compartments, virtual networks, compute fleets, and databases.
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("compartment") || lbl.includes("resourcegroup")) {
+                              return (
+                                <div className="space-y-2 text-xs">
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-rose-400">Step 1 — Boundary Entry:</span> An attacker exploits a workload inside <strong className="text-foreground">{name}</strong> via a vulnerable application, API key, or container.
+                                  </p>
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-amber-400">Step 2 — Lateral Movement:</span> Connected <code className="bg-surface-3 px-1 py-0.5 rounded font-mono text-[10.5px] text-rose-400">HAS_FINDING</code> edges represent vulnerabilities that can be chained to escalate privileges to neighbor resources.
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("compute") || lbl.includes("vm") || lbl.includes("appservice") || lbl.includes("instance")) {
+                              return (
+                                <div className="space-y-2 text-xs">
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-rose-400">Step 1 — Foothold:</span> Attacker scans for open ports or unpatched vulnerabilities on <strong className="text-foreground">{name}</strong> to execute remote code.
+                                  </p>
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-amber-400">Step 2 — Credential Theft:</span> From within the host, the attacker queries instance metadata endpoints (<code className="font-mono bg-surface-3 px-1 rounded text-[10.5px]">169.254.169.254</code>) to steal cloud managed identity tokens.
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("storage") || lbl.includes("bucket") || lbl.includes("database")) {
+                              return (
+                                <div className="space-y-2 text-xs">
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-rose-400">Step 1 — Exposure:</span> Attacker identifies public read/write permissions or missing customer-managed encryption on <strong className="text-foreground">{name}</strong>.
+                                  </p>
+                                  <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <span className="font-bold text-amber-400">Step 2 — Exfiltration:</span> Sensitive datasets, backups, and credentials are exfiltrated directly across public endpoints.
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <p className="text-xs text-muted-foreground text-[11.5px] leading-relaxed">
+                                This {provider} resource forms a critical junction in your cloud topology. Red edges indicate active control failures that an attacker can chain together for lateral traversal.
+                              </p>
+                            );
+                          })()}
+                        </div>
+
+                        {/* ── Remediation & Fix Guide ── */}
+                        <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/20 via-surface to-surface-2 p-4 space-y-3 shadow-sm">
+                          <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <span className="text-xs font-bold text-foreground block">Actionable Remediation</span>
+                                <span className="text-[10px] text-muted-foreground">Fix guide & least-privilege security controls</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              RECOMMENDED FIX
+                            </span>
+                          </div>
+
+                          {(() => {
+                            const lbl = primaryLabel(activeNode).toLowerCase();
+                            const isFinding = (activeNode.labels || []).some((l) => l.toLowerCase().includes("finding"));
+                            const checkId = String(activeNode.properties?.check_id || "");
+                            const name = nodeDisplayName(activeNode);
+                            const provider = selectedScan?.provider_type ?? "cloud";
+
+                            if (isFinding || checkId) {
+                              return (
+                                <div className="space-y-2.5 text-xs">
+                                  <div className="rounded-lg bg-surface-2/80 p-2.5 border border-border/60 font-mono text-[11px] text-emerald-400 flex items-center justify-between">
+                                    <span className="truncate">Check ID: {checkId || "Security Finding"}</span>
+                                    <button
+                                      onClick={() => handleCopy(checkId || name, "remCheckId")}
+                                      className="text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                                      title="Copy ID"
+                                    >
+                                      {copiedKey === "remCheckId" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                                    </button>
+                                  </div>
+                                  <div className="space-y-1.5 text-muted-foreground text-[11.5px] leading-relaxed">
+                                    <p><strong>1. Immediate Action:</strong> Apply strict least-privilege role assignment and disable unauthenticated network access.</p>
+                                    <p><strong>2. IaC / Terraform:</strong> Audit your Terraform/Bicep manifests to set <code className="bg-surface-3 px-1 py-0.5 rounded font-mono text-[10.5px]">enable_https_traffic_only = true</code> and restrict firewall CIDRs.</p>
+                                    <p><strong>3. Verification:</strong> Re-run the security scan to verify the check changes to PASSED.</p>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("tenancy") || lbl.includes("subscription")) {
+                              return (
+                                <div className="space-y-2 text-xs text-muted-foreground text-[11.5px] leading-relaxed">
+                                  <p><strong>Root Boundary Protection:</strong></p>
+                                  <ul className="list-disc pl-4 space-y-1">
+                                    <li>Enforce Multi-Factor Authentication (MFA) on all Root/Tenant administrators.</li>
+                                    <li>Rotate credential keys and decommission unmanaged service principals.</li>
+                                    <li>Enable continuous audit logging (Azure Activity Log / OCI Audit) with export to SIEM.</li>
+                                  </ul>
+                                </div>
+                              );
+                            }
+
+                            if (lbl.includes("compartment") || lbl.includes("resourcegroup")) {
+                              return (
+                                <div className="space-y-2 text-xs text-muted-foreground text-[11.5px] leading-relaxed">
+                                  <p><strong>Compartment / Resource Group Hardening:</strong></p>
+                                  <ul className="list-disc pl-4 space-y-1">
+                                    <li>Isolate production workloads into dedicated compartments with restrictive dynamic group policies.</li>
+                                    <li>Audit IAM policy statements granting <code className="bg-surface-3 px-1 py-0.5 rounded font-mono text-[10.5px]">manage all-resources</code>.</li>
+                                    <li>Resolve active red findings inside this compartment to eliminate lateral movement vectors.</li>
+                                  </ul>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="space-y-2 text-xs text-muted-foreground text-[11.5px] leading-relaxed">
+                                <p><strong>Resource Hardening:</strong></p>
+                                <ul className="list-disc pl-4 space-y-1">
+                                  <li>Ensure encryption at rest with customer-managed keys (KMS/Vault).</li>
+                                  <li>Place resources inside private subnets behind application gateways or load balancers.</li>
+                                  <li>Disable unnecessary ports and verify TLS 1.2+ configuration.</li>
+                                </ul>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Spectre AI Threat Analysis CTA */}
+                        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-950/20 via-surface to-surface-2 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 text-violet-400">
+                              <BrainCircuit className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-foreground block">Ask Spectre AI Copilot</span>
+                              <span className="text-[10px] text-muted-foreground">Deep threat modeling, blast radius & CLI scripts</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Spectre will analyze <strong className="text-foreground">{nodeDisplayName(activeNode)}</strong> in real time and generate exact remediation commands for your cloud environment.
+                          </p>
+                          <Link
+                            to="/ai/advisor"
+                            search={{
+                              prompt: buildSpectrePrompt(activeNode),
+                              provider: String(selectedScan?.provider_type || ""),
+                            }}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs py-2.5 shadow-md transition-all cursor-pointer"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>Ask Spectre for Remediation Commands →</span>
+                          </Link>
+                        </div>
+                      </>
                     ) : (
-                      <Server className="h-5 w-5 text-sky-400" />
+                      <p className="text-xs text-muted-foreground">Select a node to inspect its attributes.</p>
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-display text-sm font-bold text-foreground truncate">
-                      {activeNode.label}
-                    </h4>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {activeNode.provider} · {activeNode.region} · {activeNode.resourceType}
-                    </span>
-                  </div>
                 </div>
 
-                {/* 2x2 Telemetry Grid */}
-                <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-border/50 text-xs">
-                  <div className="rounded-lg bg-surface/60 border border-border/40 p-2.5">
-                    <span className="text-[10px] text-muted-foreground block font-medium">Resource Target</span>
-                    <span className="font-mono text-[11px] font-semibold text-foreground truncate block mt-0.5">
-                      {activeNode.resourceName}
-                    </span>
-                  </div>
+                {/* ── Attack Path Narrative from Query ── */}
+                {activeQuery && (
+                  <div className="rounded-2xl border border-border/80 bg-surface/90 p-6 backdrop-blur-md shadow-lg space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
+                          <Waypoints className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display text-base font-bold text-foreground">{activeQuery.name}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {totalAssets} cloud assets · {totalFindings} active security findings
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/ai/advisor"
+                        search={{
+                          prompt: `Spectre, I'm looking at the "${activeQuery.name}" attack path query in my ${selectedScan?.provider_type || "cloud"} environment. We found ${totalAssets} cloud assets and ${totalFindings} security findings. The query description says: "${activeQuery.description}"\n\nPlease:\n1. Explain in plain English what this attack path means for our environment\n2. Walk through the most likely attack scenario step by step\n3. Give us the top 3 immediate actions to reduce our risk for this specific attack vector`,
+                          provider: String(selectedScan?.provider_type || ""),
+                        }}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-violet-500/40 bg-violet-500/10 text-violet-400 font-semibold text-xs px-4 py-2 hover:bg-violet-500/20 transition-all"
+                      >
+                        <BrainCircuit className="h-3.5 w-3.5" />
+                        <span>Get Full AI Analysis</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
 
-                  <div className="rounded-lg bg-surface/60 border border-border/40 p-2.5">
-                    <span className="text-[10px] text-muted-foreground block font-medium">Exposure Surface</span>
-                    <span className="font-mono text-[11px] font-semibold text-rose-400 truncate block mt-0.5">
-                      {activeNode.exposure}
-                    </span>
-                  </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      {/* What this path shows */}
+                      <div className="rounded-xl border border-sky-500/20 bg-sky-950/10 p-4 space-y-2.5">
+                        <div className="flex items-center gap-2 text-sky-400 font-bold text-xs">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/20 text-[11px] font-bold">1</span>
+                          <span>What This Path Shows</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {activeQuery.description ||
+                            "This graph illustrates the structural relationship between cloud container boundaries (Tenancies, Compartments, Resource Groups) and the resources inside them."}
+                        </p>
+                      </div>
 
-                  <div className="rounded-lg bg-surface/60 border border-border/40 p-2.5">
-                    <span className="text-[10px] text-muted-foreground block font-medium">Associated Finding</span>
-                    <Link
-                      to="/findings"
-                      className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-primary hover:underline mt-0.5"
-                    >
-                      <span>{activeNode.findingId}</span>
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </Link>
-                  </div>
+                      {/* Blast Radius */}
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-950/10 p-4 space-y-2.5">
+                        <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-[11px] font-bold">2</span>
+                          <span>Blast Radius & Risk</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          <strong className="text-rose-400">{totalFindings} active violations</strong> detected across{" "}
+                          <strong className="text-foreground">{totalAssets} cloud assets</strong>. Each red{" "}
+                          <code className="text-[10px] bg-surface-2 px-1 rounded font-mono">HAS_FINDING</code> edge represents
+                          a real security control failure that could be chained into a lateral movement or privilege escalation path.
+                        </p>
+                      </div>
 
-                  <div className="rounded-lg bg-surface/60 border border-border/40 p-2.5">
-                    <span className="text-[10px] text-muted-foreground block font-medium">MITRE ATT&CK TTP</span>
-                    <span className="font-mono text-[11px] font-semibold text-foreground truncate block mt-0.5">
-                      {activeNode.mitreId} ({activeNode.mitreTactic})
-                    </span>
+                      {/* Ask Spectre for full analysis */}
+                      <div className="rounded-xl border border-violet-500/20 bg-violet-950/10 p-4 space-y-2.5">
+                        <div className="flex items-center gap-2 text-violet-400 font-bold text-xs">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-[11px] font-bold">3</span>
+                          <span>Spectre AI Guidance</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Click <strong className="text-violet-400">"Get Full AI Analysis"</strong> above or click any node to ask Spectre for a real-time, dynamic threat narrative — attack scenario, blast radius, and exact remediation steps tailored to your environment.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                {/* Exploit Mechanism Description */}
-                <div className="pt-2 border-t border-border/50">
-                  <span className="text-[10px] text-muted-foreground block font-medium mb-1">Exploit Path Details</span>
-                  <p className="text-[11px] text-foreground/90 leading-relaxed">
-                    {activeNode.stepDescription}
-                  </p>
-                </div>
+                )}
               </div>
-            </div>
-
-            {/* Bottom Spectra Remediation Action */}
-            <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-xs font-bold text-foreground">Spectra Autonomous Playbook</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                {activeNode.remediationStep}
-              </p>
-              <Link
-                to="/ai/advisor"
-                search={{
-                  prompt: `Analyze toxic attack path involving ${activeNode.label} (${activeNode.resourceName}). What is the blast radius and exact remediation playbook?`,
-                  provider: scenario.cloud.toLowerCase(),
-                }}
-                className="mt-1.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs py-2 shadow-sm hover:opacity-90 transition-opacity"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Execute Automated Spectra Playbook →</span>
-              </Link>
-            </div>
-          </div>
-        </div>
+            )}
+          </>
         )}
       </div>
     </AppShell>

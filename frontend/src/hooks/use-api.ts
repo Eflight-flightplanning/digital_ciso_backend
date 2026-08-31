@@ -25,6 +25,9 @@ export const qk = {
   users: () => ["users"] as const,
   roles: () => ["roles"] as const,
   overviews: () => ["overviews"] as const,
+  overview: (endpoint: string, params?: Record<string, string>) => ["overview", endpoint, params ?? {}] as const,
+  complianceRequirements: (params?: Record<string, string>) => ["compliance-requirements", params ?? {}] as const,
+  attackPathsQueries: (scanId?: string) => ["attack-paths-scans", scanId, "queries"] as const,
   tenants: () => ["tenants"] as const,
   decisionLogs: (params?: Record<string, string>) => ["decision-logs", params ?? {}] as const,
   securityDecisions: (params?: Record<string, string>) => ["ai-security-decisions", params ?? {}] as const,
@@ -68,10 +71,46 @@ export function useCurrentUser() {
 
 // ─── Overviews (Dashboard KPIs) ───────────────────────────────────────────
 
-export function useOverview() {
+// `GET /overviews` itself returns 405 (base list is disabled server-side) — real data
+// lives on its sub-actions below. Each is a genuine tenant-scoped, latest-scan-per-provider
+// aggregation computed in the database (OverviewViewSet, backend/api/v1/views.py:5417).
+
+export function useOverviewProviders() {
   return useQuery({
-    queryKey: qk.overviews(),
-    queryFn: () => api.get("/overviews").then(unwrapList),
+    queryKey: qk.overview("providers"),
+    queryFn: async () => unwrapList(await api.get("/overviews/providers")),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOverviewProvidersCount() {
+  return useQuery({
+    queryKey: qk.overview("providers-count"),
+    queryFn: async () => unwrapList(await api.get("/overviews/providers/count")),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOverviewFindings(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.overview("findings", params),
+    queryFn: async () => unwrapSingle(await api.get(`/overviews/findings${buildQuery(params)}`)),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOverviewFindingsSeverity(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.overview("findings_severity", params),
+    queryFn: async () => unwrapSingle(await api.get(`/overviews/findings_severity${buildQuery(params)}`)),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOverviewServices(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.overview("services", params),
+    queryFn: async () => unwrapList(await api.get(`/overviews/services${buildQuery(params)}`)),
     staleTime: 60 * 1000,
   });
 }
@@ -85,7 +124,18 @@ export function useCompliance(params?: Record<string, string>) {
       const res = await api.get(`/compliance-overviews${buildQuery(params)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
+    enabled: !!params && Object.keys(params).length > 0,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+// Per-requirement drilldown for one framework (`filter[compliance_id]` required).
+export function useComplianceRequirements(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: qk.complianceRequirements(params),
+    queryFn: async () => unwrapList(await api.get(`/compliance-overviews/requirements${buildQuery(params)}`)),
+    enabled: !!params?.["filter[compliance_id]"],
+    staleTime: 60 * 1000,
   });
 }
 
@@ -95,13 +145,10 @@ export function useFindings(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.findings(params),
     queryFn: async () => {
-      const now = new Date();
-      const lteDate = now.toISOString().split("T")[0];
-      const gteDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "500",
         "filter[inserted_at.gte]": gteDate,
-        "filter[inserted_at.lte]": lteDate,
         ...(params || {}),
       };
       const res = await api.get(`/findings${buildQuery(finalParams)}`);
@@ -125,13 +172,10 @@ export function useResources(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.resources(params),
     queryFn: async () => {
-      const now = new Date();
-      const lteDate = now.toISOString().split("T")[0];
-      const gteDate = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "500",
         "filter[updated_at.gte]": gteDate,
-        "filter[updated_at.lte]": lteDate,
         ...(params || {}),
       };
       const res = await api.get(`/resources${buildQuery(finalParams)}`);
@@ -380,8 +424,8 @@ export function useScans(params?: Record<string, string>) {
       const res = await api.get(`/scans${buildQuery(params)}`);
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
-    staleTime: 2 * 1000,
-    refetchInterval: 4 * 1000, // fast live refresh for running scans
+    staleTime: 1000,
+    refetchInterval: 1500, // fast real-time 1.5s refresh for running scans
   });
 }
 
@@ -481,6 +525,35 @@ export function useAttackPaths() {
       return { items: unwrapList(res), meta: unwrapMeta(res) };
     },
     staleTime: 60 * 1000,
+  });
+}
+
+// Real graph query catalog for a given attack-paths scan's provider.
+export function useAttackPathsQueries(scanId?: string) {
+  return useQuery({
+    queryKey: qk.attackPathsQueries(scanId),
+    queryFn: async () => unwrapList(await api.get(`/attack-paths-scans/${scanId}/queries`)),
+    enabled: !!scanId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Runs one named Cypher query against the tenant's real Neo4j graph and returns
+// { nodes, relationships, total_nodes, truncated }.
+export function useRunAttackPathsQuery() {
+  return useMutation({
+    mutationFn: ({
+      scanId,
+      queryId,
+      parameters,
+    }: {
+      scanId: string;
+      queryId: string;
+      parameters?: Record<string, unknown>;
+    }) =>
+      api
+        .post(`/attack-paths-scans/${scanId}/queries/run`, { id: queryId, parameters: parameters ?? {} })
+        .then(unwrapSingle),
   });
 }
 

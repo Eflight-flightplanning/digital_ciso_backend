@@ -1,0 +1,80 @@
+{
+  "Framework": "PCI-DSS",
+  "Name": "PCI-DSS v4.0 (Payment Card Industry) for OCI",
+  "Version": "4.0",
+  "Provider": "oraclecloud",
+  "Description": "Security standards for organizations handling branded credit cards across Oracle Cloud Infrastructure workloads.",
+  "Requirements": [
+    {
+      "Id": "PCI-1.2",
+      "Name": "Network Security Controls & Boundary Protection",
+      "Description": "Network security controls are configured and maintained to restrict connections to and from the cardholder data environment (CDE).",
+      "Attributes": [
+        {
+          "Section": "Build and Maintain a Secure Network",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
+        "network_default_security_list_restricts_traffic"
+      ]
+    },
+    {
+      "Id": "PCI-3.4",
+      "Name": "Protect Cardholder Data at Rest with Strong Cryptography",
+      "Description": "Render primary account numbers (PAN) unreadable anywhere it is stored with customer-managed encryption keys and automated rotation.",
+      "Attributes": [
+        {
+          "Section": "Protect Account Data",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "filestorage_file_system_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "PCI-8.2",
+      "Name": "Identification and Authentication Management (MFA & Passwords)",
+      "Description": "Enforce MFA for all administrative access and configure strict password complexity, history, and expiration policies.",
+      "Attributes": [
+        {
+          "Section": "Identify Users and Authenticate Access",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_password_policy_minimum_length_14",
+        "identity_password_policy_expires_within_365_days",
+        "identity_password_policy_prevents_reuse"
+      ]
+    },
+    {
+      "Id": "PCI-10.2",
+      "Name": "Log and Monitor All Access to System Components",
+      "Description": "Audit logging is enabled for all system components, retained for 1 year, and alerted on critical security events.",
+      "Attributes": [
+        {
+          "Section": "Log and Monitor",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "cloudguard_enabled",
+        "events_rule_iam_policy_changes",
+        "events_rule_security_list_changes"
+      ]
+    }
+  ]
+}

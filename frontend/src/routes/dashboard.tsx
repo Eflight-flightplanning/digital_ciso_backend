@@ -23,7 +23,17 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useFindings, useProviders, useResources, useScans, useRemediationMetrics, useRemediationExecutions } from "@/hooks/use-api";
+import { WorldThreatMap } from "@/components/dashboard/WorldThreatMap";
+import {
+  useFindings,
+  useProviders,
+  useResources,
+  useScans,
+  useRemediationMetrics,
+  useRemediationExecutions,
+  useCompliance,
+  useAttackPaths,
+} from "@/hooks/use-api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -113,70 +123,19 @@ function RadarChart({
     { name: data[4]?.label || "PCI-DSS", x: 90, y: 120, anchor: "end" },
   ];
 
-  const standardDetails = [
-    {
-      name: "CIS Benchmark",
-      fullname: "Center for Internet Security",
-      category: "Foundational Cloud Hardening",
-      desc: "Baseline controls for IAM role privileges, virtual network boundaries, disk encryption, and audit logs.",
-      controls: "142 / 168 Controls Compliant",
-      delta: "+3.1% 7d",
-      status: "Optimal",
-    },
-    {
-      name: "SOC 2 Type II",
-      fullname: "AICPA Trust Services Criteria",
-      category: "Trust & Data Confidentiality",
-      desc: "Automated continuous verification of tenant isolation, encryption in transit, and least-privilege RBAC.",
-      controls: "86 / 94 Controls Compliant",
-      delta: "+1.4% 7d",
-      status: "Audited",
-    },
-    {
-      name: "ISO/IEC 27001",
-      fullname: "Information Security Management",
-      category: "ISMS Risk Governance",
-      desc: "Global governance framework for cryptographic secrets, key rotation policies, and continuous telemetry.",
-      controls: "93 / 114 Controls Compliant",
-      delta: "-0.8% 7d",
-      status: "Guarded",
-    },
-    {
-      name: "NIST SP 800-53",
-      fullname: "Federal Security Standards",
-      category: "Defense-in-Depth Catalog",
-      desc: "Comprehensive catalog of perimeter defenses, continuous monitoring, and automated incident triage.",
-      controls: "178 / 230 Controls Compliant",
-      delta: "+2.2% 7d",
-      status: "Elevated",
-    },
-    {
-      name: "PCI-DSS v4.0",
-      fullname: "Payment Card Industry Standard",
-      category: "Cardholder Perimeter Protection",
-      desc: "Zero-trust network segmentation, egress security filtering, and cryptographic token safeguards.",
-      controls: "58 / 64 Controls Compliant",
-      delta: "+4.6% 7d",
-      status: "Optimal",
-    },
-  ];
-
   return (
     <div className="relative flex items-center justify-center w-full">
-      {/* Simple Clean Translucent Hover Tooltip */}
-      {activeHover !== null && activeHover !== undefined && standardDetails[activeHover] && (
+      {/* Simple Clean Translucent Hover Tooltip — shows only the real posture value, no invented per-framework copy */}
+      {activeHover !== null && activeHover !== undefined && data[activeHover] && (
         <div className="absolute top-0 right-0 z-20 max-w-[240px] rounded-xl border border-border/80 bg-surface/90 backdrop-blur-md p-2.5 shadow-lg pointer-events-none">
-          <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1 mb-1">
+          <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-xs text-foreground">
-              {standardDetails[activeHover].name}
+              {data[activeHover].label}
             </span>
             <span className="font-mono font-bold text-xs text-primary">
-              {data[activeHover]?.value ?? 80}%
+              {data[activeHover]?.value ?? 0}%
             </span>
           </div>
-          <p className="text-[10px] text-muted-foreground leading-normal">
-            {standardDetails[activeHover].desc}
-          </p>
         </div>
       )}
 
@@ -306,71 +265,25 @@ function RadarChart({
   );
 }
 
-/* ── Neo4j Multi-Cloud Attack Path Graph Visualizer ── */
+/* ── Neo4j Multi-Cloud Attack Path Graph Status ── */
+// Renders real scan state from `/attack-paths-scans` — no fabricated topology or node data.
+// Full graph exploration (real Cypher queries, real nodes/relationships) lives on /attack-paths.
 function Neo4jAttackGraphCard({
-  selectedProviderId,
+  scans,
+  scansLoading,
   selectedProviderObj,
-  findings,
 }: {
-  selectedProviderId?: string;
+  scans: Array<Record<string, any>>;
+  scansLoading: boolean;
   selectedProviderObj?: any;
-  findings?: any[];
 }) {
-  const [hoverNode, setHoverNode] = useState<string | null>(null);
-
-  const attackNodes = useMemo(() => {
-    const provType = String(
-      selectedProviderObj?.provider ||
-      selectedProviderObj?.provider_type ||
-      selectedProviderObj?.alias ||
-      selectedProviderId ||
-      "ALL"
-    ).toUpperCase();
-
-    const isSaas = provType.includes("SAAS") || provType.includes("FUSION");
-    const isOci = (provType.includes("OCI") || provType.includes("ORACLE")) && !isSaas;
-    const isAws = provType.includes("AWS");
-    const isAzure = provType.includes("AZURE");
-
-    if (isSaas) {
-      return [
-        { id: "internet", name: "Internet Perimeter", sub: "Public IDCS Console Access", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
-        { id: "erp", name: "Oracle Fusion ERP", sub: "Superuser ORA_APPS_SUPER_USER", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
-        { id: "sod", name: "Separation of Duties", sub: "AP Manager + Payment Disburser", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
-        { id: "treasury", name: "Financial Treasury", sub: "Vendor Payment & Bank Vault", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
-      ];
-    }
-
-    if (isOci) {
-      return [
-        { id: "ingress", name: "Public Ingress", sub: "OCID Gateway 0.0.0.0/0", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
-        { id: "compute", name: "OCI Compute Instance", sub: "Over-granted IAM Policies", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
-        { id: "adb", name: "Autonomous Database", sub: "Customer Data Compartment", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
-        { id: "storage", name: "Storage Bucket", sub: "Object Storage Secret Keys", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
-      ];
-    }
-
-    if (isAws) {
-      return [
-        { id: "ingress", name: "Internet Ingress", sub: "Port 22/80 Public SG", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
-        { id: "ec2", name: "EC2 Instance", sub: "IMDSv1 Metadata Exposure", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
-        { id: "iam", name: "IAM Admin Role", sub: "AdministratorAccess Policy", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
-        { id: "s3", name: "S3 Data Lake", sub: "Financial Records Bucket", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
-      ];
-    }
-
-    // Default / Azure / Multi-Cloud
-    return [
-      { id: "internet", name: "Internet Perimeter", sub: "Public Port 3389 / 443 Exposure", icon: Globe, color: "border-rose-500/80 bg-slate-900 text-rose-300" },
-      { id: "vm", name: "Virtual Machine", sub: "Digital-CISO-LLM · Unpatched Image", icon: Server, color: "border-amber-500/80 bg-slate-900 text-amber-300" },
-      { id: "identity", name: "Managed Identity", sub: "Contributor Privilege Escalation", icon: Lock, color: "border-purple-500/80 bg-slate-900 text-purple-300" },
-      { id: "db", name: "Enterprise Database", sub: "PostgreSQL & KeyVault Secrets", icon: Database, color: "border-cyan-500/80 bg-slate-900 text-cyan-300" },
-    ];
-  }, [selectedProviderObj, selectedProviderId]);
+  const relevantScan = selectedProviderObj
+    ? scans.find((s) => String(s.provider) === String(selectedProviderObj.id))
+    : undefined;
+  const readyCount = scans.filter((s) => s.graph_data_ready).length;
 
   return (
     <div className="rounded-2xl border border-border/80 bg-surface/80 p-6 backdrop-blur-sm shadow-md h-full flex flex-col justify-between space-y-4">
-      {/* Card Header - Simple Clean Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3.5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -379,87 +292,50 @@ function Neo4jAttackGraphCard({
           <div>
             <h3 className="font-display text-base font-bold text-foreground flex items-center gap-2">
               Attack Graph
-              <span className="mono text-[10px] text-cyan-400 font-semibold bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                Cypher Active
+              <span
+                className={`mono text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                  readyCount > 0
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    : "text-muted-foreground bg-surface-2 border-border"
+                }`}
+              >
+                {readyCount} of {scans.length} graphs ready
               </span>
             </h3>
-            <p className="text-[11px] text-muted-foreground">
-              Live attack path topology mapping privilege escalation & exploit chains
-            </p>
+            <p className="text-[11px] text-muted-foreground">Real Neo4j resource graph, built from your latest scans</p>
           </div>
         </div>
 
-        <Link
-          to="/attack-paths"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline shrink-0"
-        >
+        <Link to="/attack-paths" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline shrink-0">
           <span>Explore Graph →</span>
         </Link>
       </div>
 
-      {/* SVG Interactive Attack Path Topology Map */}
-      <div className="relative w-full h-[155px] rounded-xl border border-cyan-900/40 bg-[#060b16] p-3 overflow-hidden flex items-center justify-center shadow-inner">
-        <svg viewBox="0 0 760 120" className="w-full h-full select-none">
-          {/* Animated Connecting Vector Attack Lines */}
-          <line x1="100" y1="60" x2="220" y2="60" stroke="#f43f5e" strokeWidth="2.5" strokeDasharray="6 4" className="animate-pulse" />
-          <polygon points="216,55 226,60 216,65" fill="#f43f5e" />
-
-          <line x1="300" y1="60" x2="420" y2="60" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="6 4" />
-          <polygon points="416,55 426,60 416,65" fill="#fbbf24" />
-
-          <line x1="500" y1="60" x2="620" y2="60" stroke="#c084fc" strokeWidth="2.5" strokeDasharray="6 4" />
-          <polygon points="616,55 626,60 616,65" fill="#c084fc" />
-
-          {/* Hop Badges */}
-          <rect x="145" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#f43f5e" strokeWidth="1.5" />
-          <text x="163" y="56" fill="#f43f5e" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 1</text>
-
-          <rect x="345" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#fbbf24" strokeWidth="1.5" />
-          <text x="363" y="56" fill="#fbbf24" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 2</text>
-
-          <rect x="545" y="44" width="36" height="18" rx="4" fill="#0f172a" stroke="#c084fc" strokeWidth="1.5" />
-          <text x="563" y="56" fill="#c084fc" fontSize="9" fontWeight="bold" textAnchor="middle" className="mono">Hop 3</text>
-        </svg>
-
-        {/* Overlay Node Cards - High Contrast, Super Crisp & Readable White Text */}
-        <div className="absolute inset-0 flex items-center justify-between px-3 sm:px-5">
-          {attackNodes.map((node) => {
-            const Icon = node.icon;
-            const isHov = hoverNode === node.id;
-            return (
-              <div
-                key={node.id}
-                onMouseEnter={() => setHoverNode(node.id)}
-                onMouseLeave={() => setHoverNode(null)}
-                className={`flex flex-col items-center justify-center rounded-xl border-2 p-2.5 transition-all duration-300 cursor-pointer w-32 sm:w-40 text-center shadow-lg ${node.color} ${
-                  isHov ? "scale-105 border-cyan-400 shadow-cyan-500/30" : "shadow-black/60"
-                }`}
-              >
-                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-800/90 mb-1 border border-slate-700">
-                  <Icon className="h-3.5 w-3.5" />
+      <div className="rounded-xl border border-border/70 bg-surface-2/40 p-4 min-h-[140px] flex flex-col justify-center">
+        {scansLoading ? (
+          <p className="text-xs text-muted-foreground text-center">Loading scan status…</p>
+        ) : scans.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center">
+            No Attack Paths scans yet — run one from a provider to build its resource graph.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {(relevantScan ? [relevantScan] : scans).slice(0, 4).map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-surface/60 px-3 py-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${s.graph_data_ready ? "bg-emerald-400" : "bg-amber-400"}`} />
+                  <span className="font-semibold text-foreground uppercase shrink-0">{s.provider_type}</span>
+                  <span className="text-muted-foreground truncate">{s.provider_alias || s.provider_uid}</span>
                 </div>
-                <span className="font-bold text-[11px] text-white tracking-wide truncate w-full drop-shadow-sm">
-                  {node.name}
-                </span>
-                <span className="text-[9.5px] font-medium text-slate-300 truncate w-full mt-0.5">
-                  {node.sub}
-                </span>
+                <span className="font-mono text-[10px] text-muted-foreground shrink-0">{s.state}</span>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Neo4j Database Footer Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 font-mono text-[11px] text-slate-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            Neo4j Bolt: 127.0.0.1:7687 Connected
-          </span>
-          <span className="text-muted-foreground/60">&bull;</span>
-          <span className="mono text-[11px] text-slate-300">4 Graph Nodes &bull; 3 Toxic Hops</span>
-        </div>
+      <div className="flex items-center justify-between border-t border-border/40 pt-3 text-xs text-muted-foreground">
+        <span className="font-mono text-[11px]">{readyCount} provider{readyCount === 1 ? "" : "s"} queryable</span>
         <Link to="/attack-paths" className="text-primary font-semibold hover:underline text-[11px]">
           Launch Cypher Graph Analysis &rarr;
         </Link>
@@ -495,16 +371,7 @@ function AssetVolumeView({
 
   const services = useMemo(() => {
     if (!resources || resources.length === 0) {
-      return [
-        { name: "Defender for Cloud & Security Posture", icon: ShieldCheck, count: 15, provider: "Microsoft Defender", health: "Audited" },
-        { name: "Entra ID & Identity Role Assignments", icon: Lock, count: 10, provider: "Azure IAM", health: "Audited" },
-        { name: "Network Security Groups & VNets", icon: Globe, count: 5, provider: "Azure Virtual Network", health: "Monitoring" },
-        { name: "Oracle Fusion ERP & Identity Roles", icon: Lock, count: 8, provider: "Oracle SaaS IAM", health: "Audited" },
-        { name: "Key Vaults & Cryptographic Secrets", icon: Lock, count: 4, provider: "Azure Key Vault", health: "Secure" },
-        { name: "App Services & Cloud Workloads", icon: Server, count: 2, provider: "Azure App Service", health: "Secure" },
-        { name: "Virtual Machines & Disks", icon: Server, count: 2, provider: "Azure Compute", health: "Audited" },
-        { name: "OCI Tenancy IAM Policies", icon: Lock, count: 1, provider: "Oracle Cloud IAM", health: "Audited" },
-      ];
+      return [];
     }
 
     const map = new Map<string, { name: string; icon: any; count: number; provider: string; health: string }>();
@@ -604,6 +471,11 @@ function AssetVolumeView({
       </div>
 
       {/* Services Grid */}
+      {services.length === 0 && (
+        <div className="rounded-xl border border-border/60 bg-surface-2/30 p-6 text-center text-xs text-muted-foreground">
+          No resources discovered yet for this selection. Run a scan to populate the asset inventory.
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {services.map((svc, i) => {
           const Icon = svc.icon;
@@ -1226,16 +1098,11 @@ function FindingsDonutChart({
     return () => clearTimeout(t);
   }, []);
 
-  // Graceful fallback to initial standard telemetry if DB findings are 0
   const isZero = passCount === 0 && failCount === 0 && mutedCount === 0;
-  const effPass = isZero ? 142 : passCount;
-  const effFail = isZero ? 28 : failCount;
-  const effMuted = isZero ? 4 : mutedCount;
-
-  const total = Math.max(1, effPass + effFail + effMuted);
-  const passPct = (effPass / total) * 100;
-  const failPct = (effFail / total) * 100;
-  const mutedPct = (effMuted / total) * 100;
+  const total = Math.max(1, passCount + failCount + mutedCount);
+  const passPct = (passCount / total) * 100;
+  const failPct = (failCount / total) * 100;
+  const mutedPct = (mutedCount / total) * 100;
 
   const animatedPct = useCountUp(Math.round(passPct), 4500, mounted);
 
@@ -1303,9 +1170,9 @@ function FindingsDonutChart({
       </svg>
       <div className="absolute text-center">
         <div className="font-mono text-xs font-bold text-foreground">
-          {animatedPct}%
+          {isZero ? "—" : `${animatedPct}%`}
         </div>
-        <div className="text-[8px] font-bold text-muted-foreground uppercase">Passing</div>
+        <div className="text-[8px] font-bold text-muted-foreground uppercase">{isZero ? "No Data" : "Passing"}</div>
       </div>
     </div>
   );
@@ -1319,6 +1186,7 @@ export function DashboardPage() {
   const { data: remediationMetrics } = useRemediationMetrics();
   const { data: executionsRaw } = useRemediationExecutions();
   const { data: scansData, refetch: refetchScans } = useScans();
+  const { data: attackPathsData, isLoading: attackPathsLoading } = useAttackPaths();
 
   const [selectedProviderId, setSelectedProviderId] = useState<string>("ALL");
   const [activeTab, setActiveTab] = useState<"risk" | "radar" | "asset">("risk");
@@ -1390,7 +1258,13 @@ export function DashboardPage() {
   }, [providers, selectedProviderId]);
 
   const providersCount = providers.length;
-  const onlineCount = providers.filter((p: any) => p.status === "connected" || !p.status || p.status === "active").length;
+  const onlineCount = providers.filter((p: any) => p.connection?.connected === true).length;
+  const connectedProviderTypes = useMemo(
+    () => Array.from(new Set(providers.map((p: any) => String(p.provider || "").toLowerCase()).filter(Boolean))),
+    [providers]
+  );
+  const attackPathsScans = (attackPathsData?.items as Array<Record<string, any>>) ?? [];
+  const readyAttackPathsCount = attackPathsScans.filter((s: any) => s.graph_data_ready).length;
 
   // Real live numbers from database findings
   const realPass = filteredFindings.filter((f: any) => f.status === "PASS").length;
@@ -1489,7 +1363,22 @@ export function DashboardPage() {
     return p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || String(r.uid || "").includes(".identity.oraclecloud.com");
   }).length;
 
-  const totalDiscoveredAssets = filteredResources.length > 0 ? filteredResources.length : totalFindingsCount;
+  const totalDiscoveredAssets = filteredResources.length;
+
+  // Real evaluated-framework count from the compliance backend (same endpoint /compliance uses),
+  // instead of a findings-count stand-in.
+  const complianceOverviewParams = useMemo(() => {
+    if (connectedProviderTypes.length === 0) return undefined;
+    const params: Record<string, string> = {};
+    if (selectedProviderObj) {
+      params["filter[provider_type]"] = String(selectedProviderObj.provider || "").toLowerCase();
+    } else {
+      params["filter[provider_type__in]"] = connectedProviderTypes.join(",");
+    }
+    return params;
+  }, [connectedProviderTypes, selectedProviderObj]);
+  const { data: dashboardComplianceData } = useCompliance(complianceOverviewParams);
+  const evaluatedFrameworkCount = (dashboardComplianceData?.items as Array<unknown> | undefined)?.length ?? 0;
 
   // Startup Animation Trigger
   const [dashboardReady, setDashboardReady] = useState(false);
@@ -1501,7 +1390,7 @@ export function DashboardPage() {
   // Animated KPI numbers
   const animPosture = useCountUp(postureScore, 4200, dashboardReady);
   const animClouds = useCountUp(providersCount, 3200, dashboardReady);
-  const animCompliance = useCountUp(totalFindingsCount > 0 ? Math.min(22, totalFindingsCount) : 0, 3600, dashboardReady);
+  const animCompliance = useCountUp(evaluatedFrameworkCount, 3600, dashboardReady);
   const animOpenFail = useCountUp(totalOpenFail, 4500, dashboardReady);
 
   // Animated Radar Breakdown Scores
@@ -1611,9 +1500,6 @@ export function DashboardPage() {
               <span className="font-mono text-3xl font-black text-foreground">
                 {animPosture}%
               </span>
-              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
-                +4.2% 7d
-              </span>
             </div>
             <div className="text-xs text-muted-foreground">
               {providersCount} cloud accounts actively guarded
@@ -1633,13 +1519,15 @@ export function DashboardPage() {
                 {animClouds}
               </span>
               <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold">
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-foreground/80">AWS</span>
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-sky-500 dark:text-sky-300">Azure</span>
-                <span className="rounded bg-surface-2 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-300">GCP</span>
+                {connectedProviderTypes.slice(0, 3).map((t) => (
+                  <span key={t} className="rounded bg-surface-2 px-1.5 py-0.5 text-foreground/80 uppercase">
+                    {t}
+                  </span>
+                ))}
               </div>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{onlineCount} online · 1 sync</span>
+              <span>{onlineCount} of {providersCount} online</span>
               <Link to="/providers" className="text-primary font-semibold hover:underline">
                 Manage →
               </Link>
@@ -1669,7 +1557,7 @@ export function DashboardPage() {
               </svg>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>22 Active · NCA ECC & CSCC</span>
+              <span>{evaluatedFrameworkCount === 1 ? "1 framework evaluated" : `${evaluatedFrameworkCount} frameworks evaluated`}</span>
               <Link to="/compliance" className="text-primary font-semibold hover:underline">
                 Audit →
               </Link>
@@ -1689,14 +1577,14 @@ export function DashboardPage() {
                 {animOpenFail.toLocaleString()}
               </span>
               <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-400 border border-rose-500/20">
-                {realCritical > 0 ? `${realCritical} Critical` : `${realHigh || 6} High Risk`}
+                {realCritical > 0 ? `${realCritical} Critical` : realHigh > 0 ? `${realHigh} High Risk` : "0 Open"}
               </span>
             </div>
-            {/* Multi-color Stacked Severity Bar with 3x Slower Animated Expand */}
+            {/* Multi-color Stacked Severity Bar — real percentages, 0% stays 0% instead of a fake minimum width */}
             <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
               <div
                 style={{
-                  width: dashboardReady ? `${realCritical > 0 ? (realCritical / totalOpenFail) * 100 : 25}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(realCritical / totalOpenFail) * 100}%` : "0%",
                   transition: "width 3.8s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
                 className="bg-rose-500"
@@ -1704,7 +1592,7 @@ export function DashboardPage() {
               />
               <div
                 style={{
-                  width: dashboardReady ? `${(realHigh / totalOpenFail) * 100 || 50}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(realHigh / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s",
                 }}
                 className="bg-orange-400"
@@ -1712,7 +1600,7 @@ export function DashboardPage() {
               />
               <div
                 style={{
-                  width: dashboardReady ? `${(realMedium / totalOpenFail) * 100 || 20}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(realMedium / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.4s cubic-bezier(0.16, 1, 0.3, 1) 0.4s",
                 }}
                 className="bg-amber-400"
@@ -1720,7 +1608,7 @@ export function DashboardPage() {
               />
               <div
                 style={{
-                  width: dashboardReady ? `${(realLow / totalOpenFail) * 100 || 5}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(realLow / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s",
                 }}
                 className="bg-sky-400"
@@ -1813,7 +1701,6 @@ export function DashboardPage() {
                       >
                         <div className="text-muted-foreground text-[11px] truncate">{d.label}</div>
                         <div className="font-mono text-sm font-bold text-foreground mt-0.5">{d.value}%</div>
-                        <div className="font-mono text-[10px] text-emerald-400 font-semibold">+2.4%</div>
                       </div>
                     ))}
                   </div>
@@ -1933,16 +1820,16 @@ export function DashboardPage() {
                 </div>
                 <div>
                   <h4 className="font-display text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                    Toxic Attack Path Detected
+                    {readyAttackPathsCount > 0 ? "Explore Attack Graph" : "Attack Graph Not Ready"}
                   </h4>
                   <p className="text-[10px] text-muted-foreground">
-                    Critical Risk Surface
+                    {readyAttackPathsCount > 0 ? "Real resource graph available" : "Run a scan to build the graph"}
                   </p>
                 </div>
               </div>
 
               <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-muted-foreground border border-border">
-                3 Hops
+                {readyAttackPathsCount} ready
               </span>
             </Link>
           </div>
@@ -1950,12 +1837,12 @@ export function DashboardPage() {
 
         {/* ── Main Content Section 2: Neo4j Attack Path Graph & AI Decision Core ── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Neo4j Multi-Cloud Attack Path Graph Visualizer (2 Columns) */}
+          {/* Neo4j Multi-Cloud Attack Path Graph Status (2 Columns) */}
           <div className="lg:col-span-2">
             <Neo4jAttackGraphCard
-              selectedProviderId={selectedProviderId}
+              scans={attackPathsScans}
+              scansLoading={attackPathsLoading}
               selectedProviderObj={selectedProviderObj}
-              findings={filteredFindings}
             />
           </div>
 
@@ -1977,24 +1864,20 @@ export function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Active
-                  </span>
                 </div>
 
                 <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
-                  Real-time neural agent continuously correlating cloud telemetry, analyzing attack surfaces, and proposing automated remediation playbooks.
+                  Ask the AI advisor for remediation guidance grounded in your real findings and scan history.
                 </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-mono">
                   <div className="rounded-xl border border-border/60 bg-surface-2/40 p-2.5 text-center">
-                    <div className="text-[10px] text-muted-foreground">Correlation Latency</div>
-                    <div className="font-bold text-foreground mt-0.5">240ms</div>
+                    <div className="text-[10px] text-muted-foreground">Open Findings</div>
+                    <div className="font-bold text-foreground mt-0.5">{totalOpenFail.toLocaleString()}</div>
                   </div>
                   <div className="rounded-xl border border-border/60 bg-surface-2/40 p-2.5 text-center">
-                    <div className="text-[10px] text-muted-foreground">Policy Engines</div>
-                    <div className="font-bold text-primary mt-0.5">5 Active</div>
+                    <div className="text-[10px] text-muted-foreground">Cloud Accounts</div>
+                    <div className="font-bold text-primary mt-0.5">{providersCount}</div>
                   </div>
                 </div>
               </div>

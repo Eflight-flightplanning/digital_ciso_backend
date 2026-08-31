@@ -19,6 +19,28 @@ class iam_dormant_privileged_account(Check):
         tenant_id = provider.identity.tenant_id
         erp_type = provider.session.erp_type
 
+        if not service.identity_detail_available:
+            class _TenantResource(BaseModel):
+                id: str = tenant_id
+                username: str = "all-admins"
+                display_name: str = "All Privileged ERP Accounts"
+
+            report = CheckReportOracleSaas(
+                metadata=self.metadata(),
+                resource=_TenantResource(),
+                tenant_id=tenant_id,
+                erp_type=erp_type,
+            )
+            report.status = "MANUAL"
+            report.status_extended = (
+                "Last-login activity could not be determined automatically: this "
+                "provider's credentials do not grant access to Oracle IDCS, the only "
+                "source of per-user last-login data. Review privileged account "
+                "activity manually, or connect this provider with OAuth2/IDCS "
+                "credentials to enable automated evaluation."
+            )
+            return [report]
+
         for user in service.dormant_privileged_users:
             last_login_str = (
                 user.last_login.strftime("%Y-%m-%d") if user.last_login else "Never"

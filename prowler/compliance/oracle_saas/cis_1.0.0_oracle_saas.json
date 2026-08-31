@@ -1,0 +1,317 @@
+{
+  "Framework": "CIS-ORACLE-SAAS",
+  "Name": "CIS Oracle SaaS Cloud Applications Benchmark",
+  "Version": "1.0.0",
+  "Provider": "oracle_saas",
+  "Description": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0, published by the Center for Internet Security (CIS) on 2025-11-14, covering Oracle Fusion and EPM SaaS applications. Sourced directly from the official CIS PDF (five sections, 35 recommendations, all assessed as Manual in the source document). Per CIS's Terms of Use (cisecurity.org/cis-securesuite/cis-securesuite-membership-terms-of-use), the detailed step-by-step Audit/Remediation procedures are CIS's own copyrighted content and are not reproduced verbatim here — each requirement's Description below is this platform's own paraphrase of the real control intent, not a quotation. Consult the licensed CIS PDF for the official Audit Procedure and Remediation Procedure text. Only a handful of these 35 controls currently have a matching automated Prowler check (see Checks per requirement) — this matches the source document itself, which marks every recommendation Manual.",
+  "Requirements": [
+    {
+      "Id": "1.1",
+      "Name": "Ensure Password Policy Enforces Length and Rotation",
+      "Description": "Configure Oracle Fusion/EPM password policy (Security Console pre-upgrade, or OCI IAM Identity Domain post-upgrade) to require a minimum length, periodic rotation, reuse prevention, and lockout after repeated failed attempts.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/password-policy.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.2",
+      "Name": "Ensure MFA is Enforced for All SaaS Users",
+      "Description": "Enforce multi-factor authentication for all Oracle SaaS users, natively via OCI IAM Identity Domain sign-on policies once upgraded, or via an external identity provider prior to upgrade.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/applications-common/25d/faser/enable-multifactor-authentication.html" }],
+      "Checks": ["iam_mfa_not_enforced_admin"]
+    },
+    {
+      "Id": "1.3",
+      "Name": "Ensure Phishing-Resistant MFA Is Enforced for SaaS Administrators and Privileged Accounts",
+      "Description": "Require SaaS administrators and other privileged accounts to authenticate with phishing-resistant MFA factors (FIDO2/WebAuthn, passkeys) rather than SMS or email OTP.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/usingmfa.htm" }],
+      "Checks": ["iam_mfa_not_enforced_admin"]
+    },
+    {
+      "Id": "1.4",
+      "Name": "Ensure Fusion Applications Administrators Have Access Only to Fusion Applications Resources",
+      "Description": "Scope Fusion Applications Administrator IAM policies exclusively to the fusion-applications-family resource type, so administrators cannot also manage unrelated OCI infrastructure services.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 2", "Service": "iam", "References": "https://docs.oracle.com/en-us/iaas/Content/fusion-applications/managing-access.htm#iam-resource-type" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.5",
+      "Name": "Ensure OCI Console Access Is Restricted to Administrative Accounts",
+      "Description": "Disable the Console password capability for non-administrative users and restrict OCI Console login via sign-on policy to designated administrative groups only.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en-us/iaas/Content/Identity/users/edit-users-capabilities.htm" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.6",
+      "Name": "Ensure Privileged and Administrative Roles Are Restricted to Known IP Addresses",
+      "Description": "With Location-Based Access Control enabled, ensure privileged Fusion roles (e.g. IT Security Manager) do not have \"Enable Role for Access from All IP Addresses\" selected, so they remain restricted to approved network ranges.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "network", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/overview-of-location-based-access.html" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "1.7",
+      "Name": "Ensure Privileged Access is Certified Periodically",
+      "Description": "Review privileged users' role assignments on a recurring cadence (monthly for IT administrators, quarterly for others) to catch accumulated or unintended elevated access.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://community.oracle.com/customerconnect/discussion/551382/digitize-access-certification-workflows" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.8",
+      "Name": "Ensure Oracle Break Glass for Fusion Cloud Service Is Enabled",
+      "Description": "Enable Oracle Break Glass so Oracle support personnel cannot access customer Fusion data without explicit, per-instance, time-bound approval from designated administrators.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 2", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/get-started/subscriptions-cloud/mmocs/oracle-break-glass-fusion-cloud-service.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.9",
+      "Name": "Ensure Basic Authentication Is Blocked for SOAP and REST API Integrations",
+      "Description": "Disable Basic Authentication for SOAP/REST integrations with Oracle SaaS and monitor authentication logs to detect and alert on any remaining Basic Auth attempts.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 2", "Service": "network", "References": "https://blogs.oracle.com/cloud-infrastructure/post/secure-api-access-in-oracle-fusion-applications" }],
+      "Checks": ["network_oauth_app_excessive_scopes"]
+    },
+    {
+      "Id": "1.10",
+      "Name": "Ensure All API Based Integrations Use OAuth Authentication",
+      "Description": "Register all API integrations as OAuth 2.0 clients in the Fusion Identity Domain and remove any remaining long-lived static credentials, so token-based auth with scoping/expiration/revocation is used exclusively.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "network", "References": "https://docs.oracle.com/en/cloud/saas/applications-common/25d/oaext/configure-oauth.html" }],
+      "Checks": ["network_oauth_app_excessive_scopes"]
+    },
+    {
+      "Id": "1.11",
+      "Name": "Ensure Integration Account Secrets Are Rotated on a Regular Schedule",
+      "Description": "Inventory OAuth clients, JWT signing keys, and certificates used by integrations, and rotate each on a defined schedule (e.g. every 90-180 days) rather than leaving them long-lived.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/applications-common/25c/oaext/configure-oauth.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.12",
+      "Name": "Ensure EPM Automate Credentials Are Protected via Secure Storage",
+      "Description": "Store EPM Automate credentials using Oracle's encrypted password file (the `encrypt` command) or an enterprise credential vault, never as plaintext in scripts or configuration files.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/enterprise-performance-management-common/cgsad/3_info_security_secure_cred_storage.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "1.13",
+      "Name": "Ensure Dormant Accounts and Orphaned Identities Are Automatically Detected and Disabled",
+      "Description": "Configure identity governance policies in OCI Identity Domains to automatically flag and disable accounts inactive beyond a defined threshold or lacking role/ownership assignment.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 2", "Service": "iam", "References": "https://docs.oracle.com/en-us/iaas/Content/identity/domains/managing.htm" }],
+      "Checks": ["iam_dormant_privileged_account"]
+    },
+    {
+      "Id": "1.14",
+      "Name": "Ensure Dormant Accounts and Orphaned Identities Are Reviewed and Disabled",
+      "Description": "Conduct quarterly manual reviews of Fusion/OCI account activity to identify and disable accounts with no sign-in activity for an extended period or with no owner/role assignment.",
+      "Attributes": [{ "Section": "1 Identity and Access Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/manage-hcm-user-accounts.html" }],
+      "Checks": ["iam_dormant_privileged_account"]
+    },
+    {
+      "Id": "2.1",
+      "Name": "Ensure Network Perimeters are Configured in IAM or the Identity Provider",
+      "Description": "Define a Network Perimeter of approved IP ranges in OCI Identity Domains (or equivalent conditional-access rules in an external IdP pre-upgrade) and attach it to sign-on policies.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 2", "Service": "network", "References": "https://docs.oracle.com/en-us/iaas/Content/Identity/networkperimeters/overview.htm" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "2.2",
+      "Name": "Ensure OCI Console Access Is Restricted to Trusted Networks",
+      "Description": "Define an IAM Network Source of trusted IP ranges/VCN subnets and require OCI Console sign-on policy to match it, denying console access from all other networks.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 1", "Service": "network", "References": "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/managingnetworksources.htm" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "2.3",
+      "Name": "Ensure Access to Fusion is restricted via Access Control List (ACL)",
+      "Description": "Enable an Access Control List for the Fusion SaaS environment limiting connections to approved public IPs, CIDR ranges, or OCI VCNs, excluding overly broad ranges such as 0.0.0.0/0.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 1", "Service": "network", "References": "https://docs.oracle.com/en-us/iaas/Content/fusion-applications/network-setup.htm" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "2.4",
+      "Name": "Ensure Location-Based Access Control (LBAC) is enabled",
+      "Description": "Enable Location-Based Access Control in the Fusion Security Console with a maintained IP allowlist, restricting UI and API sign-in to registered networks.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 1", "Service": "network", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/overview-of-location-based-access.html" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "2.5",
+      "Name": "Ensure Geolocation Filtering with WAF for SaaS is enforced",
+      "Description": "Request Oracle SaaS Operations enable WAF geolocation filtering so traffic is limited to the countries/regions where the organization actually operates.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 2", "Service": "network", "References": "https://blogs.oracle.com/cloud-infrastructure/post/expand-fusion-cloud-security-ipbased-filtering-2" }],
+      "Checks": []
+    },
+    {
+      "Id": "2.6",
+      "Name": "Ensure IP-Based Filtering with WAF for SaaS is Enforced",
+      "Description": "Request Oracle SaaS Operations enable WAF IP-based filtering restricted to trusted enterprise/VPN CIDR ranges, excluding overly broad ranges.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 2", "Service": "network", "References": "https://blogs.oracle.com/cloud-infrastructure/post/expand-fusion-cloud-security-ipbased-filtering-2" }],
+      "Checks": ["network_ip_allowlist_not_configured"]
+    },
+    {
+      "Id": "2.7",
+      "Name": "Ensure Qualified Target Filtering with WAF for SaaS is Enforced",
+      "Description": "Request Oracle SaaS Operations configure per-module WAF filtering so externally-facing modules (Supplier Portal, Candidate Experience) get different network policy than internal corporate modules.",
+      "Attributes": [{ "Section": "2 Networking", "Profile": "Level 2", "Service": "network", "References": "https://blogs.oracle.com/cloud-infrastructure/post/waf-saas-supports-fusion-supplier-portal-security" }],
+      "Checks": []
+    },
+    {
+      "Id": "3.1",
+      "Name": "Ensure Fusion Applications Login, Logout and Session Events are Captured, Exported, and Forwarded to Central Logging",
+      "Description": "Export Fusion authentication lifecycle events (logins, logouts, session creation/termination, token refresh) to OCI Logging and forward them to a central SIEM for retention, correlation, and alerting.",
+      "Attributes": [{ "Section": "3 Logging and Monitoring", "Profile": "Level 2", "Service": "audit", "References": "https://www.ateam-oracle.com/post/methods-and-ways-to-extract-session-information-using-oci-audit-and-integrate-into-external-systems" }],
+      "Checks": ["audit_trail_disabled"]
+    },
+    {
+      "Id": "3.2",
+      "Name": "Ensure EPM Audit Data is Exported and Centrally Stored",
+      "Description": "Schedule regular export of EPM audit data (sign-ins, admin actions, configuration changes) to a durable external store such as Object Storage, rather than relying solely on EPM's internal retention.",
+      "Attributes": [{ "Section": "3 Logging and Monitoring", "Profile": "Level 2", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/enterprise-performance-management-common/cgsad/integration_with_custom_siem_tools.html" }],
+      "Checks": ["audit_trail_disabled"]
+    },
+    {
+      "Id": "3.3",
+      "Name": "Ensure to enable Audit on BI Publisher and OTBI Activity (Execution, Modification, and Usage Analytics)",
+      "Description": "Enable auditing of BI Publisher and OTBI report execution, catalog changes, and access-control changes, and centralize that data for anomaly detection and compliance reporting.",
+      "Attributes": [{ "Section": "3 Logging and Monitoring", "Profile": "Level 2", "Service": "audit", "References": "https://docs.oracle.com/" }],
+      "Checks": ["audit_trail_incomplete_coverage"]
+    },
+    {
+      "Id": "3.4",
+      "Name": "Ensure BPM Approval Rule and Workflow Configuration Changes Are Audited",
+      "Description": "Enable auditing of BPM/SOA workflow and approval-rule configuration changes, since these define authorization paths for financial and operational transactions.",
+      "Attributes": [{ "Section": "3 Logging and Monitoring", "Profile": "Level 2", "Service": "audit", "References": "https://www.ateam-oracle.com/post/methods-to-extract-audit-monitoring-data-from-fusion-applications" }],
+      "Checks": ["audit_trail_incomplete_coverage"]
+    },
+    {
+      "Id": "3.5",
+      "Name": "Ensure Logging Pipelines are Monitored for Failures to Prevent Silent Loss of Audit Events",
+      "Description": "Configure monitoring/alarms on the log export and ingestion pipeline (e.g. OCI Service Connector Hub) so a pipeline failure is detected rather than silently dropping audit events.",
+      "Attributes": [{ "Section": "3 Logging and Monitoring", "Profile": "Level 2", "Service": "audit", "References": "https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm" }],
+      "Checks": ["audit_trail_disabled"]
+    },
+    {
+      "Id": "4.1.1",
+      "Name": "Ensure Changes to Audit Policy Settings Are Monitored",
+      "Description": "Confirm audit policies for Fusion configuration settings remain enabled, and review the Audit History report or automated controls to detect if a policy is ever disabled.",
+      "Attributes": [{ "Section": "4.1 Security Configuration Changes", "Profile": "Level 1", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/applications-common/25c/facia/audit-policies.html" }],
+      "Checks": ["audit_trail_disabled"]
+    },
+    {
+      "Id": "4.1.2",
+      "Name": "Ensure Configuration Changes to HCM Security Profile Setups Are Monitored",
+      "Description": "Enable and monitor auditing of changes to HCM security profiles, since a profile change takes immediate effect for every user assigned that profile.",
+      "Attributes": [{ "Section": "4.1 Security Configuration Changes", "Profile": "Level 1", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/faqbs/security-profiles.html" }],
+      "Checks": ["audit_trail_incomplete_coverage"]
+    },
+    {
+      "Id": "4.1.3",
+      "Name": "Ensure Unused Custom Roles Are Disabled or Monitored",
+      "Description": "Identify custom roles with no user assignments and either disable them or monitor for when they become assigned, to prevent an unused role being exploited later.",
+      "Attributes": [{ "Section": "4.1 Security Configuration Changes", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/en/cloud/saas/human-resources/faqas/what-s-the-security-console.html" }],
+      "Checks": ["iam_dormant_privileged_account"]
+    },
+    {
+      "Id": "4.2.1",
+      "Name": "Ensure Changes to Payment Setups Are Monitored",
+      "Description": "Enable and monitor auditing of payment configuration changes (payment methods, bank account details), since an erroneous or malicious change can misdirect payments.",
+      "Attributes": [{ "Section": "4.2 High Risk Business Transactions & User Actions", "Profile": "Level 1", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/financials/25d/facsf/how-you-implement-payables-and-payments.html" }],
+      "Checks": ["audit_trail_incomplete_coverage"]
+    },
+    {
+      "Id": "4.2.2",
+      "Name": "Ensure Unused Business Setups Are Disabled",
+      "Description": "Identify business setups (ledgers, suppliers, customers) with no transaction activity and disable or monitor them to prevent misuse of dormant configuration.",
+      "Attributes": [{ "Section": "4.2 High Risk Business Transactions & User Actions", "Profile": "Level 1", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/financials/25d/facsf/implement-general-ledger.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "4.3",
+      "Name": "Ensure Configuration Changes to Roles Built for IT Superusers Are Monitored",
+      "Description": "Monitor assignment of IT superuser-class roles (e.g. Application Implementation Consultant), since these roles carry pervasive ability to change application behavior.",
+      "Attributes": [{ "Section": "4 Application Configuration Management", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_superuser_role_assigned"]
+    },
+    {
+      "Id": "4.4",
+      "Name": "Ensure Uploaded Files Are Scanned for Viruses and Restricted by Extension Policy",
+      "Description": "Enable EPM's pre-upload virus scanning (`setVirusScanOnFileUploads`) and enforce a file-extension allow/deny policy to block risky file types before they reach the environment.",
+      "Attributes": [{ "Section": "4 Application Configuration Management", "Profile": "Level 1", "Service": "audit", "References": "https://docs.oracle.com/en/cloud/saas/enterprise-performance-management-common/cepma/epm_auto_set_virus_scan_onfile_uploads.html" }],
+      "Checks": []
+    },
+    {
+      "Id": "5.1.1",
+      "Name": "Ensure Transactions Created/Updated by Fusion Administrators Are Monitored",
+      "Description": "Monitor transactions created, updated, or approved by IT superusers/administrators, since these carry substantial operational, financial, and compliance risk if erroneous or malicious.",
+      "Attributes": [{ "Section": "5.1 IT Administrator Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_superuser_role_assigned"]
+    },
+    {
+      "Id": "5.1.2",
+      "Name": "Ensure Assignments of Substantial Access to Fusion Users Are Monitored",
+      "Description": "Monitor assignment of privileges that let users fundamentally change Fusion behavior, create/approve transactions, or view sensitive data outside normal separation-of-duties oversight.",
+      "Attributes": [{ "Section": "5.1 IT Administrator Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.1.3",
+      "Name": "Ensure Assignments of Substantial Access to EPM Administrators Are Monitored",
+      "Description": "Monitor assignment of EPM privileges that grant broad visibility into sensitive account/financial data outside normal oversight.",
+      "Attributes": [{ "Section": "5.1 IT Administrator Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_superuser_role_assigned"]
+    },
+    {
+      "Id": "5.2.1",
+      "Name": "Ensure Assignments of Substantial Access to Business Users Are Monitored",
+      "Description": "Monitor assignment of privileges that let business users view sensitive data (employee/payroll, supplier, customer, bank account) outside normal oversight.",
+      "Attributes": [{ "Section": "5.2 Application Superuser Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.1",
+      "Name": "Ensure SoD Within Fusion Is Monitored",
+      "Description": "Monitor for toxic combinations of Fusion privileges held by a single user (e.g. create and approve the same payables invoice).",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.2",
+      "Name": "Ensure SoD Across Fusion and EPM Is Monitored",
+      "Description": "Monitor for toxic combinations spanning Fusion and EPM privileges held by the same user (e.g. EPM reconciliation superuser plus Fusion payment creation).",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.3",
+      "Name": "Ensure SoD Across Fusion and OCI Is Monitored",
+      "Description": "Monitor for toxic combinations spanning Fusion and OCI infrastructure privileges held by the same user (e.g. OCI database administrator plus Fusion BI administrator).",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.4",
+      "Name": "Ensure Fusion ERP Transactions Allowed by SoD Violations Are Monitored",
+      "Description": "Monitor for individual ERP transactions that were only possible because of a separation-of-duties violation (e.g. the same user created and approved a payables invoice).",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.5",
+      "Name": "Ensure Fusion HCM Transactions Allowed by SoD Violations Are Monitored",
+      "Description": "Monitor for individual HCM/payroll transactions that were only possible because of a separation-of-duties violation (e.g. the same user managed payroll and personal payment methods).",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": ["iam_sod_conflict_detected"]
+    },
+    {
+      "Id": "5.3.6",
+      "Name": "Ensure Shared EPM Accounts Are Monitored",
+      "Description": "Identify EPM accounts used by more than one person, since shared accounts make it impossible to attribute an erroneous or malicious action to an individual.",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": []
+    },
+    {
+      "Id": "5.3.7",
+      "Name": "Ensure Potential Ghost Employees Are Monitored",
+      "Description": "Identify payroll entries lacking corresponding time entries or other evidence of work, to catch employees paid without working.",
+      "Attributes": [{ "Section": "5.3 Application Business User Separation of Duties (SoD)", "Profile": "Level 1", "Service": "iam", "References": "https://docs.oracle.com/" }],
+      "Checks": []
+    }
+  ]
+}

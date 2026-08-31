@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Radar,
   Play,
@@ -11,6 +12,7 @@ import {
   ShieldCheck,
   X,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -27,7 +29,8 @@ export const Route = createFileRoute("/scans")({
 });
 
 function ScansPage() {
-  const { data: apiScans, isLoading } = useScans();
+  const queryClient = useQueryClient();
+  const { data: apiScans, isLoading, refetch } = useScans();
   const { data: apiProviders } = useProviders();
   const launchScanMutation = useLaunchScan();
 
@@ -50,7 +53,18 @@ function ScansPage() {
 
   const scanList = useMemo(() => {
     if (!apiScans?.items || apiScans.items.length === 0) return [];
-    return (apiScans.items as Array<Record<string, any>>).map((s) => {
+    const items = apiScans.items as Array<Record<string, any>>;
+
+    // A scan with no dispatched work yet ("available") sitting behind another scan that's
+    // actively executing for the same provider is queued, not stuck — surface that instead
+    // of the generic "Available" label, which previously fell through to a red/critical chip.
+    const executingProviderIds = new Set(
+      items
+        .filter((s) => String(s.state || "").toLowerCase() === "executing")
+        .map((s) => String(s.provider_id || s.provider || ""))
+    );
+
+    return items.map((s) => {
       const pId = String(s.provider_id || s.provider || "");
       const resolvedProvider = providerMap.get(pId);
 
@@ -72,9 +86,11 @@ function ScansPage() {
                 ? "Scheduled"
                 : stateStr === "cancelled"
                   ? "Cancelled"
-                  : stateStr === "available"
-                    ? "Available"
-                    : "Completed";
+                  : stateStr === "available" && executingProviderIds.has(pId)
+                    ? "Queued"
+                    : stateStr === "available"
+                      ? "Available"
+                      : "Completed";
 
       const timeLabel = s.inserted_at
         ? new Date(String(s.inserted_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -87,13 +103,13 @@ function ScansPage() {
           : rawDuration
             ? `${rawDuration}s`
             : stateStr === "completed"
-              ? "59s"
+              ? "—"
               : "Active";
 
       return {
         id: String(s.id || "SCN-00000"),
         provider: providerLabel,
-        status: statusLabel as "Completed" | "Running" | "Scheduled" | "Failed",
+        status: statusLabel as "Completed" | "Running" | "Scheduled" | "Failed" | "Queued" | "Cancelled" | "Available",
         progress: progress,
         start: timeLabel,
         duration: durationLabel,
@@ -143,85 +159,32 @@ function ScansPage() {
     }
   };
 
-  const deltaItems = useMemo(() => {
-    if (!compareScan) return [];
-    const provStr = String(compareScan.provider || "").toUpperCase();
-    
-    if (provStr.includes("AZURE")) {
-      return [
-        {
-          title: "Azure Storage Account Anonymous Public Access",
-          sub: "Azure Storage • Blob Containers Protected & Anonymous Read Restricted",
-        },
-        {
-          title: "Entra ID Privileged User MFA Policy Enforcement",
-          sub: "Entra ID / AAD • Global Administrator & Privileged Role Protection",
-        },
-        {
-          title: "Network Security Group RDP (Port 3389) Inbound Rule",
-          sub: "Virtual Machines • Restricted NSG Subnet Access",
-        },
-      ];
-    } else if (provStr.includes("SAAS") || provStr.includes("FUSION") || provStr.includes("ERP")) {
-      return [
-        {
-          title: "AseInactiveUsersDataLoadJob ESS Pipeline",
-          sub: "Oracle SaaS HCM • 2,509 Dormant Users Ingested",
-        },
-        {
-          title: "BIP / FSM Data Export Allowlist Policy",
-          sub: "Oracle SaaS Financials • Bulk Export Privileges",
-        },
-        {
-          title: "Application Administrator MFA Enforcement",
-          sub: "Oracle SaaS ERP • Privileged Account Protection",
-        },
-      ];
-    } else if (provStr.includes("OCI") || provStr.includes("ORACLE")) {
-      return [
-        {
-          title: "OCI Security List Public Inbound Rule",
-          sub: "OCI Networking • Inbound Access Restricted to VNet",
-        },
-        {
-          title: "IAM User Console MFA Policy Enforcement",
-          sub: "OCI Identity • Multi-Factor Auth Mandate",
-        },
-        {
-          title: "Object Storage Bucket Public Access Policy",
-          sub: "OCI Storage • Pre-Authenticated Request Restrictions",
-        },
-      ];
-    } else {
-      return [
-        {
-          title: "Cloud Identity Privileged Account MFA Protection",
-          sub: "IAM Security • Privileged Role Enforcement",
-        },
-        {
-          title: "Public Storage Bucket Access Policy",
-          sub: "Cloud Storage • Anonymous Access Restricted",
-        },
-        {
-          title: "Cloud Inbound Firewall Perimeter Rule",
-          sub: "Networking • Inbound Subnet Protection",
-        },
-      ];
-    }
-  }, [compareScan]);
 
   return (
     <AppShell
       title="Security Scans & Telemetry Ingestion"
       subtitle="Automated cloud security scans, scheduled cadences, and continuous asset discovery"
       actions={
-        <button
-          onClick={() => setModalOpen(true)}
-          className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
-        >
-          <Zap className="h-3.5 w-3.5" />
-          <span>Launch Assessment</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ["scans"] });
+              refetch();
+            }}
+            title="Refresh scan history"
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border/80 bg-surface-2 px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-surface-3 active:scale-95 transition-all cursor-pointer"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            <span>Launch Assessment</span>
+          </button>
+        </div>
       }
     >
       {/* ── Active Scan Live Progress Card ── */}
@@ -247,21 +210,36 @@ function ScansPage() {
                 {activeRunningScan.progress}%
               </span>
               <span className="text-xs text-muted-foreground font-mono">
-                ({activeRunningScan.progress === 100 ? "Completed" : "Executing..."})
+                ({activeRunningScan.progress >= 100
+                  ? "Completed"
+                  : activeRunningScan.progress >= 95
+                    ? "Finalizing & Scoring..."
+                    : activeRunningScan.progress >= 10
+                      ? "Executing Checks..."
+                      : "Initializing & Authenticating..."})
               </span>
             </div>
           </div>
 
           {/* Animated Status Bar */}
-          <div className="h-3 w-full rounded-full bg-slate-900 border border-cyan-500/30 p-0.5 overflow-hidden shadow-inner">
+          <div className="h-3.5 w-full rounded-full bg-slate-900 border border-cyan-500/30 p-0.5 overflow-hidden shadow-inner relative">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 shadow-[0_0_12px_rgba(6,182,212,0.6)] transition-all duration-500 ease-out"
-              style={{ width: `${Math.max(activeRunningScan.progress, 4)}%` }}
-            />
+              className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500 shadow-[0_0_12px_rgba(6,182,212,0.6)] transition-all duration-700 ease-out relative overflow-hidden"
+              style={{ width: `${Math.max(activeRunningScan.progress, 5)}%` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+            </div>
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
-            <span>Evaluating CIS Benchmarks, SOC 2 & Attack Surface rules...</span>
-            <span>Started {activeRunningScan.start}</span>
+          <div className="mt-2 flex justify-between text-[11.5px]">
+            <span className="text-cyan-300 font-medium flex items-center gap-1.5">
+              <RefreshCw className="h-3 w-3 animate-spin text-cyan-400" />
+              {activeRunningScan.progress < 10
+                ? "Connecting to Cloud API & discovering infrastructure resources..."
+                : activeRunningScan.progress >= 95
+                  ? "Finalizing compliance scoring & attack graph delta..."
+                  : `Evaluating CIS Benchmarks & security controls (${activeRunningScan.progress}% complete)...`}
+            </span>
+            <span className="text-muted-foreground font-mono text-[11px]">Started {activeRunningScan.start}</span>
           </div>
         </div>
       )}
@@ -314,7 +292,11 @@ function ScansPage() {
                         ? "primary"
                         : s.status === "Scheduled"
                           ? "info"
-                          : "critical"
+                          : s.status === "Queued"
+                            ? "medium"
+                            : s.status === "Cancelled" || s.status === "Available"
+                              ? "neutral"
+                              : "critical"
                   }
                 >
                   {s.status === "Running" && <Dot tone="primary" pulse />}
@@ -336,7 +318,7 @@ function ScansPage() {
                     />
                   </div>
                   <span className="mono text-xs font-bold text-foreground">
-                    {s.status === "Completed" ? "100%" : s.status === "Failed" ? "0%" : `${s.progress}%`}
+                    {s.status === "Completed" ? "100%" : s.status === "Failed" ? "Failed" : `${s.progress}%`}
                   </span>
                 </div>
               </td>
@@ -349,7 +331,9 @@ function ScansPage() {
               <td className="px-4 py-3 flex items-center gap-2">
                 <button
                   onClick={() => setCompareScan(s)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                  disabled={s.status !== "Completed"}
+                  title={s.status !== "Completed" ? "Delta comparison is available once this scan completes" : undefined}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-cyan-500/10"
                 >
                   <GitCompare className="h-3.5 w-3.5" />
                   <span>Compare Delta</span>
@@ -406,7 +390,7 @@ function ScansPage() {
                     Resolved / Fixed
                   </div>
                   <div className="mt-1 text-2xl font-black text-emerald-300 font-mono">
-                    +{liveDelta?.remediated_count ?? 15}
+                    +{liveDelta?.remediated_count ?? 0}
                   </div>
                   <span className="text-[10px] text-emerald-400/80 font-medium">Verified fixed in this run</span>
                 </div>
@@ -428,9 +412,9 @@ function ScansPage() {
                     Compliance Gain
                   </div>
                   <div className="mt-1 text-2xl font-black text-cyan-300 font-mono">
-                    {liveDelta?.compliance_gain ?? "+7%"}
+                    {liveDelta?.compliance_gain ?? "0%"}
                   </div>
-                  <span className="text-[10px] text-cyan-400/80 font-medium">{liveDelta?.compliance_score ?? 41}% Framework Score</span>
+                  <span className="text-[10px] text-cyan-400/80 font-medium">{liveDelta?.compliance_score ?? 0}% Framework Score</span>
                 </div>
               </div>
 
@@ -445,20 +429,25 @@ function ScansPage() {
                     <span>Remediated Security Control</span>
                     <span>State Transition</span>
                   </div>
-                  {(liveDelta?.resolved_findings && liveDelta.resolved_findings.length > 0
-                    ? liveDelta.resolved_findings
-                    : deltaItems
-                  ).map((item: any, idx: number) => (
-                    <div key={idx} className="p-3 flex items-center justify-between">
-                      <div>
-                        <span className="font-semibold text-foreground block">{item.title}</span>
-                        <span className="text-[11px] text-muted-foreground">{item.sub || item.check_id}</span>
+                  {deltaLoading ? (
+                    <div className="p-6 text-center text-muted-foreground">Loading real delta…</div>
+                  ) : liveDelta?.resolved_findings && liveDelta.resolved_findings.length > 0 ? (
+                    liveDelta.resolved_findings.map((item: any, idx: number) => (
+                      <div key={idx} className="p-3 flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-foreground block">{item.title}</span>
+                          <span className="text-[11px] text-muted-foreground">{item.sub || item.check_id}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-md">
+                          {item.status_transition || "FAIL -> REMEDIATED"}
+                        </span>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-1 rounded-md">
-                        {item.status_transition || "FAIL -> REMEDIATED"}
-                      </span>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-muted-foreground">
+                      No controls were remediated between this run and the previous completed scan for this provider.
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>

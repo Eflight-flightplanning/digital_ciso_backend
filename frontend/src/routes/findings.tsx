@@ -685,37 +685,98 @@ function FindingsPage() {
 
                           <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                             {/* Remediation Guide */}
-                            <div>
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                                <Terminal className="h-3.5 w-3.5 text-primary" />
-                                <span>Remediation Procedure</span>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                                  <Terminal className="h-3.5 w-3.5 text-primary" />
+                                  <span>Native Cloud CLI & Remediation Command</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-muted-foreground uppercase bg-surface-2 px-2 py-0.5 rounded border border-border/50">
+                                  {f.provider}
+                                </span>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                {f.remediation}
+                              <p className="text-xs text-muted-foreground leading-relaxed">
+                                {f.remediation || "Apply the recommended security controls via your native cloud CLI or run automated Infrastructure-as-Code (IaC) remediation."}
                               </p>
-                              <div className="mt-2 rounded bg-surface-2 p-2 font-mono text-[11px] text-foreground">
-                                $ dciso remediate --finding {f.id} --apply-iac
+                              
+                              {/* Native Cloud CLI Command */}
+                              <div className="space-y-1.5">
+                                <div className="rounded-lg bg-surface-2 p-2 font-mono text-[11px] text-foreground border border-border/50 flex items-center justify-between gap-2 overflow-x-auto">
+                                  <span className="truncate">
+                                    {(() => {
+                                      const p = f.provider.toLowerCase();
+                                      const check = (f.check_id || f.id).toLowerCase();
+                                      const res = f.resource;
+                                      if (p === "oraclecloud" || p === "oci") {
+                                        if (check.includes("log") || check.includes("audit")) {
+                                          return `oci logging log-group update --log-group-id "${res}" --retention-duration 365`;
+                                        }
+                                        if (check.includes("bucket") || check.includes("storage")) {
+                                          return `oci os bucket update --name "${res}" --public-access-type "NoPublicAccess"`;
+                                        }
+                                        if (check.includes("policy") || check.includes("iam")) {
+                                          return `oci iam policy update --policy-id "${res}" --statements '["Allow group SecOps to read all-resources in tenancy"]'`;
+                                        }
+                                        return `oci ${f.service?.toLowerCase().replace(/\s+/g, "-") || "resource"} update --id "${res}" --enable-secure-mode`;
+                                      }
+                                      if (p === "azure") {
+                                        if (check.includes("storage") || check.includes("blob")) {
+                                          return `az storage account update --name "${res}" --allow-blob-public-access false --min-tls-version TLS1_2`;
+                                        }
+                                        if (check.includes("nsg") || check.includes("network")) {
+                                          return `az network nsg rule create --nsg-name "${res}" --name "DenyInternetInbound" --access Deny --priority 100`;
+                                        }
+                                        return `az resource update --name "${res}" --resource-type "${f.service}" --set properties.securityPolicy=enforced`;
+                                      }
+                                      return `dciso remediate --finding ${formatFindingId(f.id)} --apply-iac`;
+                                    })()}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      const p = f.provider.toLowerCase();
+                                      const check = (f.check_id || f.id).toLowerCase();
+                                      const res = f.resource;
+                                      let cmd = `dciso remediate --finding ${formatFindingId(f.id)} --apply-iac`;
+                                      if (p === "oraclecloud" || p === "oci") {
+                                        if (check.includes("log") || check.includes("audit")) cmd = `oci logging log-group update --log-group-id "${res}" --retention-duration 365`;
+                                        else if (check.includes("bucket") || check.includes("storage")) cmd = `oci os bucket update --name "${res}" --public-access-type "NoPublicAccess"`;
+                                        else if (check.includes("policy") || check.includes("iam")) cmd = `oci iam policy update --policy-id "${res}" --statements '["Allow group SecOps to read all-resources in tenancy"]'`;
+                                        else cmd = `oci ${f.service?.toLowerCase().replace(/\s+/g, "-") || "resource"} update --id "${res}" --enable-secure-mode`;
+                                      } else if (p === "azure") {
+                                        if (check.includes("storage") || check.includes("blob")) cmd = `az storage account update --name "${res}" --allow-blob-public-access false --min-tls-version TLS1_2`;
+                                        else if (check.includes("nsg") || check.includes("network")) cmd = `az network nsg rule create --nsg-name "${res}" --name "DenyInternetInbound" --access Deny --priority 100`;
+                                        else cmd = `az resource update --name "${res}" --resource-type "${f.service}" --set properties.securityPolicy=enforced`;
+                                      }
+                                      handleCopy(cmd, f.id + "-cmd");
+                                    }}
+                                    className="text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                                    title="Copy Command"
+                                  >
+                                    {copiedId === f.id + "-cmd" ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Threat Correlation */}
-                            <div className="rounded border border-border/80 bg-surface-2/40 p-3">
+                            {/* Dynamic Threat Insight */}
+                            <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3.5 space-y-2">
                               <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
                                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                                <span>Spectra Threat Insight</span>
+                                <span>Spectra Threat & Blast Radius Insight</span>
                               </div>
-                              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                Correlated with active internet ingress point. Automated risk factor: 88/100.
+                              <p className="text-xs text-muted-foreground leading-relaxed">
+                                {f.status_extended ||
+                                  `Identified non-compliant security posture on ${f.service || "service"} in region ${f.region || "cloud"}. Potential exposure point for lateral privilege movement.`}
                               </p>
-                              <div className="mt-2 flex items-center justify-between text-[11px]">
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/50 text-[11px]">
                                 <span className="text-muted-foreground font-medium">
-                                  Attack Path: 2 hops to S3 Crown Jewel
+                                  Target: <strong className="text-foreground">{f.resource}</strong> ({f.provider.toUpperCase()})
                                 </span>
                                 <Link
                                   to="/attack-paths"
-                                  className="text-primary hover:underline font-medium"
+                                  className="text-primary hover:underline font-semibold flex items-center gap-1"
                                 >
-                                  View Graph →
+                                  <span>View in Attack Graph →</span>
                                 </Link>
                               </div>
                             </div>

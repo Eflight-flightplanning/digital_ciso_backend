@@ -28,9 +28,6 @@ class HasPermissions(BasePermission):
         if not required_permissions:
             return True
 
-        if request.user and (request.user.is_superuser or request.user.is_staff):
-            return True
-
         tenant_id = getattr(request, "tenant_id", None)
         if not tenant_id and request.auth and hasattr(request.auth, "get"):
             tenant_id = request.auth.get("tenant_id")

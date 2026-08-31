@@ -12,6 +12,33 @@ class network_oauth_app_excessive_scopes(Check):
         tenant_id = provider.identity.tenant_id
         erp_type = provider.session.erp_type
 
+        if not service.oauth_apps_available:
+            class _TenantResource(BaseModel):
+                id: str
+                name: str
+                display_name: str
+
+            res = _TenantResource(
+                id=tenant_id,
+                name="OAuth Applications",
+                display_name="All Oracle IDCS OAuth Apps"
+            )
+            report = CheckReportOracleSaas(
+                metadata=self.metadata(),
+                resource=res,
+                tenant_id=tenant_id,
+                erp_type=erp_type,
+            )
+            report.status = "MANUAL"
+            report.status_extended = (
+                "OAuth application scopes could not be determined automatically: this "
+                "provider's credentials do not grant access to Oracle IDCS, the only "
+                "source of registered OAuth app scopes. Review OAuth Confidential "
+                "Application scopes manually, or connect this provider with OAuth2/IDCS "
+                "credentials to enable automated evaluation."
+            )
+            return [report]
+
         for app in service.excessive_scope_apps:
             excessive = HIGH_RISK_SCOPES.intersection(set(app.scopes))
             report = CheckReportOracleSaas(

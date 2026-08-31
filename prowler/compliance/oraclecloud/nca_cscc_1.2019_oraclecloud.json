@@ -1,109 +1,75 @@
 {
   "Framework": "NCA-CSCC",
-  "Name": "NCA Cloud Cybersecurity Controls (CSCC-1:2019)",
+  "Name": "NCA Cloud Cybersecurity Controls (CSCC) for OCI",
   "Version": "1:2019",
-  "Provider": "OracleCloud",
-  "Description": "The Cloud Cybersecurity Controls (CSCC-1:2019) framework issued by the National Cybersecurity Authority (NCA) of Saudi Arabia for Oracle Cloud Infrastructure (OCI).",
+  "Provider": "oraclecloud",
+  "Description": "National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CSCC-1:2019) for Cloud Service Customers (CSC) on OCI.",
   "Requirements": [
     {
-      "Id": "CSCC-1.1",
-      "Name": "CCG-1 Cloud Cybersecurity Governance",
-      "Description": "Cloud security policies and administrative least-privilege boundaries must be enforced.",
+      "Id": "CSCC-1-1",
+      "Name": "Cloud Tenancy Access & MFA Enforcement",
+      "Description": "Enforce mandatory multi-factor authentication for all cloud console administrators and service users.",
       "Attributes": [
         {
-          "Section": "1. Cloud Cybersecurity Governance",
-          "SubSection": "1.1 Governance and Compliance",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_tenancy_admin_permissions_limited",
-        "identity_service_level_admins_exist"
-      ]
-    },
-    {
-      "Id": "CSCC-2.1",
-      "Name": "CCD-1 Cloud Identity and Access Management",
-      "Description": "Enforce Multi-Factor Authentication (MFA), password complexity, and API key management.",
-      "Attributes": [
-        {
-          "Section": "2. Cloud Cybersecurity Defense",
-          "SubSection": "2.1 Identity and Access Management",
-          "Service": "identity"
+          "Section": "Cloud Identity & Access",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
         }
       ],
       "Checks": [
         "identity_user_mfa_enabled_console_access",
-        "identity_password_policy_strong",
-        "identity_user_api_key_rotate_90_days"
+        "identity_password_policy_minimum_length_14"
       ]
     },
     {
-      "Id": "CSCC-2.2",
-      "Name": "CCD-2 Cloud Data & Storage Protection",
-      "Description": "Protect Object Storage and Block Volumes using OCI Vault encryption and private access.",
+      "Id": "CSCC-2-1",
+      "Name": "Cloud Network Boundary & Perimeter Protection",
+      "Description": "Ensure internet ingress is prohibited to internal management interfaces and database services.",
       "Attributes": [
         {
-          "Section": "2. Cloud Cybersecurity Defense",
-          "SubSection": "2.2 Data Protection & Encryption",
-          "Service": "objectstorage"
+          "Section": "Cloud Network Security",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
         }
       ],
       "Checks": [
-        "objectstorage_bucket_public_access_type_disabled",
-        "objectstorage_bucket_cmk_encryption_enabled",
-        "core_boot_volume_kms_cmk_encryption_enabled",
-        "core_block_volume_kms_cmk_encryption_enabled"
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted"
       ]
     },
     {
-      "Id": "CSCC-2.3",
-      "Name": "CCD-3 Cloud Network & Perimeter Defense",
-      "Description": "VCNs, Subnets, and Security Lists must prohibit open internet access on management ports.",
+      "Id": "CSCC-3-1",
+      "Name": "Cloud Data Protection & Storage Isolation",
+      "Description": "Ensure object storage buckets are private and all stored assets are encrypted with dedicated keys.",
       "Attributes": [
         {
-          "Section": "2. Cloud Cybersecurity Defense",
-          "SubSection": "2.3 Network & Perimeter Security",
-          "Service": "core"
+          "Section": "Cloud Data Security",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
         }
       ],
       "Checks": [
-        "core_security_list_allow_ingress_from_internet_to_any_port",
-        "core_security_list_allow_ingress_from_internet_to_tcp_port_22",
-        "core_security_list_allow_ingress_from_internet_to_tcp_port_3389",
-        "core_default_security_list_closed",
-        "core_subnet_flow_logs_enabled"
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
       ]
     },
     {
-      "Id": "CSCC-2.5",
-      "Name": "CCD-5 Cloud Threat Detection & Vulnerability Management",
-      "Description": "Enable Cloud Guard and vulnerability detection across OCI compartments.",
+      "Id": "CSCC-4-1",
+      "Name": "Continuous Cloud Monitoring & Threat Intelligence",
+      "Description": "Deploy Oracle Cloud Guard to continuously monitor tenancy security posture and alert on anomalous activities.",
       "Attributes": [
         {
-          "Section": "2. Cloud Cybersecurity Defense",
-          "SubSection": "2.5 Threat Detection & Vulnerability Mgmt",
-          "Service": "cloudguard"
+          "Section": "Cloud Operations & Monitoring",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
         }
       ],
       "Checks": [
-        "cloudguard_is_enabled"
-      ]
-    },
-    {
-      "Id": "CSCC-2.6",
-      "Name": "CCD-6 Cloud Logging, Auditing & SIEM Ingestion",
-      "Description": "OCI Audit logs must be retained for at least 365 days and event rules monitored.",
-      "Attributes": [
-        {
-          "Section": "2. Cloud Cybersecurity Defense",
-          "SubSection": "2.6 Logging & Auditing",
-          "Service": "audit"
-        }
-      ],
-      "Checks": [
-        "audit_retention_period_365_days",
-        "events_rule_create_update_security_list_exists"
+        "cloudguard_enabled",
+        "audit_log_retention_period_365_days",
+        "events_rule_cloudguard_problems"
       ]
     }
   ]

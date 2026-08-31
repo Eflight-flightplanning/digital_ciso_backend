@@ -1,45 +1,45 @@
 {
   "Framework": "ITGC-SOX",
-  "Name": "IT General Controls (ITGC) for Oracle ERP Systems",
-  "Version": "SOX-404-COSO",
+  "Name": "IT General Controls (ITGC) for Oracle Fusion ERP & HCM",
+  "Version": "SOX-404 / COSO-aligned",
   "Provider": "oracle_saas",
-  "Description": "IT General Controls (ITGC) framework aligned with Sarbanes-Oxley Act (SOX) Section 404 and COSO Internal Control Framework for Oracle Fusion Cloud ERP, HCM, and NetSuite.",
+  "Description": "Exhaustive IT General Controls (ITGC) framework aligned with Sarbanes-Oxley Act (SOX) Section 404, PCAOB AS 2201, and the COSO Internal Control Integrated Framework for Oracle Fusion Cloud ERP, HCM, and SCM. This is a platform-defined control set aligned with the named real regulatory framework's known objectives, not a verbatim transcription of an official published checklist \u2014 organizations achieve SOX 404 / SOC 1 / SoD compliance through their own internal controls program, not a single external document.",
   "Requirements": [
     {
-      "Id": "ITGC-AC-1.1",
-      "Name": "Privileged User Access Governance & Implementation Roles",
-      "Description": "Implementation consultant and superuser roles must not remain active in production Oracle ERP environments post-go-live.",
+      "Id": "SOX-AC-01",
+      "Name": "Privileged Superuser & Implementation Role Governance",
+      "Description": "Implementation consultant roles (Application Implementation Consultant) and superuser roles must be revoked from all operational accounts post-go-live.",
       "Attributes": [
         {
           "Section": "Access Control (AC)",
-          "SubSection": "Privileged Access Management",
+          "SubSection": "Privileged Identity Management",
           "Service": "iam"
         }
       ],
       "Checks": [
-        "erp_iam_implementation_role_active",
-        "erp_iam_superuser_role_assigned"
+        "iam_implementation_role_active",
+        "iam_superuser_role_assigned"
       ]
     },
     {
-      "Id": "ITGC-AC-1.2",
-      "Name": "Multi-Factor Authentication on Administrator and Finance Accounts",
-      "Description": "Multi-factor authentication (MFA) must be enforced for all users holding elevated, administrative, or financial transaction privileges.",
+      "Id": "SOX-AC-02",
+      "Name": "Multi-Factor Authentication (MFA) on Administrative Accounts",
+      "Description": "MFA is strictly enforced on all administrative, privileged, and financial execution accounts accessing Oracle Security Console or IDCS.",
       "Attributes": [
         {
           "Section": "Access Control (AC)",
-          "SubSection": "Identification & Authentication",
+          "SubSection": "Authentication Controls",
           "Service": "iam"
         }
       ],
       "Checks": [
-        "erp_iam_mfa_not_enforced_admin"
+        "iam_mfa_not_enforced_admin"
       ]
     },
     {
-      "Id": "ITGC-AC-1.3",
-      "Name": "User Access Reviews and Dormant Account Cleanup",
-      "Description": "Privileged accounts with no login activity for over 90 days must be reviewed, deactivated, or revoked to minimize attack surface.",
+      "Id": "SOX-AC-03",
+      "Name": "Periodic User Access Reviews & Inactive Account Cleanup (>90 Days)",
+      "Description": "User accounts and privileged role assignments are periodically reviewed; dormant accounts with no activity for >90 days are deactivated.",
       "Attributes": [
         {
           "Section": "Access Control (AC)",
@@ -48,38 +48,267 @@
         }
       ],
       "Checks": [
-        "erp_iam_dormant_privileged_account"
+        "iam_dormant_privileged_account"
       ]
     },
     {
-      "Id": "ITGC-AL-2.1",
-      "Name": "Audit Trail Configuration and Sensitive Transaction Logging",
-      "Description": "Oracle Fusion ERP audit policies must be enabled and actively recording changes to financial objects, user permissions, and security configurations.",
+      "Id": "SOX-AC-04",
+      "Name": "Segregation of Incompatible Duties (SoD) Enforcement",
+      "Description": "Business and administrative duty roles are segregated across financial cycles to prevent single-point execution of fraud.",
       "Attributes": [
         {
-          "Section": "Audit Logging (AL)",
-          "SubSection": "Audit Policies & Forensics",
+          "Section": "Access Control (AC)",
+          "SubSection": "Segregation of Duties",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOX-AC-05",
+      "Name": "Least Privilege Role-Based Access Control (RBAC)",
+      "Description": "Users are assigned only the minimum job roles and duty privileges required for their documented business function.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Role-Based Access",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_superuser_role_assigned"
+      ]
+    },
+    {
+      "Id": "SOX-AC-06",
+      "Name": "Password Complexity, Expiration, and Lockout Parameters",
+      "Description": "Oracle Identity Domain password policies enforce minimum length, rotation cycles, and lockout on repeated failed attempts.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Password Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_mfa_not_enforced_admin"
+      ]
+    },
+    {
+      "Id": "SOX-AC-07",
+      "Name": "Emergency Break-Glass Account Governance & Monitoring",
+      "Description": "Emergency break-glass accounts are maintained in a vaulted state, require dual authorization to check out, and alert immediately on login.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Emergency Access",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_superuser_role_assigned",
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-AC-08",
+      "Name": "User Termination & Immediate Access Revocation",
+      "Description": "Terminated employee access is revoked from Oracle Fusion Applications and IDCS within 24 hours of notification from HR.",
+      "Attributes": [
+        {
+          "Section": "Access Control (AC)",
+          "SubSection": "Deprovisioning",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_dormant_privileged_account"
+      ]
+    },
+    {
+      "Id": "SOX-CM-01",
+      "Name": "Sandbox Publication and Page Customization Approval",
+      "Description": "Changes to user interfaces, descriptive flexfields, and page layouts via Oracle Sandboxes require formal review and approval prior to publication.",
+      "Attributes": [
+        {
+          "Section": "Change Management (CM)",
+          "SubSection": "Customization Controls",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_implementation_role_active",
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-CM-02",
+      "Name": "FastFormula and Business Rules Change Management",
+      "Description": "Calculations and business logic implemented via FastFormula in Payroll, Compensation, and Benefits are subject to formal change control and testing.",
+      "Attributes": [
+        {
+          "Section": "Change Management (CM)",
+          "SubSection": "Business Logic Changes",
           "Service": "audit"
         }
       ],
       "Checks": [
-        "erp_audit_trail_disabled"
+        "audit_trail_disabled",
+        "audit_trail_incomplete_coverage"
       ]
     },
     {
-      "Id": "ITGC-NS-3.1",
-      "Name": "Network Perimeters and OAuth Integration Governance",
-      "Description": "ERP access must be restricted through corporate IP allowlists and OAuth Confidential Application scopes must adhere to least privilege.",
+      "Id": "SOX-CM-03",
+      "Name": "Environment Separation & Migration Controls",
+      "Description": "Development and Test environments are segregated from Production; direct configuration changes in Production are strictly restricted.",
+      "Attributes": [
+        {
+          "Section": "Change Management (CM)",
+          "SubSection": "Environment Segregation",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_implementation_role_active",
+        "iam_superuser_role_assigned"
+      ]
+    },
+    {
+      "Id": "SOX-CO-01",
+      "Name": "Enterprise Scheduler Service (ESS) Job Monitoring",
+      "Description": "Scheduled batch jobs for financial close, payment file generation, and GL posting are monitored for failures, exceptions, and restarts.",
+      "Attributes": [
+        {
+          "Section": "Computer Operations (CO)",
+          "SubSection": "Batch Processing",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-CO-02",
+      "Name": "Data Backup, Disaster Recovery & High Availability",
+      "Description": "Oracle Cloud infrastructure automated backups and disaster recovery RTO/RPO metrics are validated and tested periodically.",
+      "Attributes": [
+        {
+          "Section": "Computer Operations (CO)",
+          "SubSection": "Resilience & DR",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-AL-01",
+      "Name": "Audit Trail Configuration for Financial Objects",
+      "Description": "Oracle Fusion object-level audit policies are actively enabled for General Ledger, Accounts Payable, Receivables, and Supplier records.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging (AL)",
+          "SubSection": "Audit Configuration",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-AL-02",
+      "Name": "Complete Financial Audit Trail Coverage & Attributes",
+      "Description": "Audit policies capture both insert, update, and delete actions with before-and-after values for key SOX-relevant financial attributes.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging (AL)",
+          "SubSection": "Audit Granularity",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_incomplete_coverage"
+      ]
+    },
+    {
+      "Id": "SOX-AL-03",
+      "Name": "Security Console Audit Trail & Role Modification Tracking",
+      "Description": "Changes to role hierarchies, duty privilege assignments, and security profiles within the Security Console are recorded in the audit trail.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging (AL)",
+          "SubSection": "Security Audit",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled",
+        "iam_superuser_role_assigned"
+      ]
+    },
+    {
+      "Id": "SOX-AL-04",
+      "Name": "Audit Trail Tamper-Resistance & 365-Day Retention",
+      "Description": "Audit logs are retained for at least 365 days and protected from unauthorized modification or truncation.",
+      "Attributes": [
+        {
+          "Section": "Audit Logging (AL)",
+          "SubSection": "Audit Retention",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled"
+      ]
+    },
+    {
+      "Id": "SOX-NS-01",
+      "Name": "Corporate Network Perimeter & IP Allowlisting",
+      "Description": "Access to administrative interfaces and ERP applications is restricted to approved corporate networks and VPN egress points.",
       "Attributes": [
         {
           "Section": "Network Security (NS)",
-          "SubSection": "Perimeter & Integration Controls",
+          "SubSection": "Perimeter Controls",
           "Service": "network"
         }
       ],
       "Checks": [
-        "erp_network_ip_allowlist_not_configured",
-        "erp_oauth_app_excessive_scopes"
+        "network_ip_allowlist_not_configured"
+      ]
+    },
+    {
+      "Id": "SOX-NS-02",
+      "Name": "OAuth Integration Security & Scoped API Least Privilege",
+      "Description": "OAuth Confidential Applications and REST API clients are granted only the minimum required scopes and audited regularly.",
+      "Attributes": [
+        {
+          "Section": "Network Security (NS)",
+          "SubSection": "API Security",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_oauth_app_excessive_scopes"
+      ]
+    },
+    {
+      "Id": "SOX-NS-03",
+      "Name": "Inbound / Outbound ERP Data Transmission Encryption",
+      "Description": "All financial data transmissions via B2B gateways, payment gateways, and banking SFTP interfaces use TLS 1.2+ or PGP encryption.",
+      "Attributes": [
+        {
+          "Section": "Network Security (NS)",
+          "SubSection": "Data in Transit",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_oauth_app_excessive_scopes"
       ]
     }
   ]

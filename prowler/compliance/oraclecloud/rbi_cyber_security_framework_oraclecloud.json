@@ -1,0 +1,77 @@
+{
+  "Framework": "RBI",
+  "Name": "RBI Cyber Security Framework for OCI Banking Workloads",
+  "Version": "2024",
+  "Provider": "oraclecloud",
+  "Description": "Reserve Bank of India baseline cyber security and governance controls for cloud banking, payment systems, and financial entities on OCI.",
+  "Requirements": [
+    {
+      "Id": "RBI-IAM-01",
+      "Name": "Privileged Access Management & Mandatory MFA",
+      "Description": "Mandate two-factor authentication and quarterly credential rotation for all banking administrators on OCI.",
+      "Attributes": [
+        {
+          "Section": "Identity & Access Control",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "RBI-NET-01",
+      "Name": "Perimeter Defense & Direct Internet Access Restriction",
+      "Description": "Ensure database and analytics clusters are isolated in private subnets with no public internet ingress.",
+      "Attributes": [
+        {
+          "Section": "Network Security",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted",
+        "network_default_security_list_restricts_traffic"
+      ]
+    },
+    {
+      "Id": "RBI-DAT-01",
+      "Name": "Customer-Managed Data Encryption & Key Custody",
+      "Description": "Financial records and card transaction stores must be encrypted using dedicated KMS customer keys with annual rotation.",
+      "Attributes": [
+        {
+          "Section": "Data Protection",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "RBI-AUD-01",
+      "Name": "Comprehensive Audit Trail & 365-Day Retention",
+      "Description": "Maintain tamper-evident audit logs of all configuration and transactional events for a minimum of 1 year.",
+      "Attributes": [
+        {
+          "Section": "Audit & Compliance",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems"
+      ]
+    }
+  ]
+}

@@ -1,15 +1,4 @@
-"""
-Oracle SaaS / ERP Provider
-==========================
-Authenticates against Oracle Fusion Cloud ERP, HCM, NetSuite, or SCM using
-OAuth 2.0 Client Credentials (Confidential Application).
 
-The scanner performs read-only security audit REST API calls against:
-  - Oracle Identity Domain (IDCS) — user roles, MFA policies, OAuth apps
-  - Oracle Fusion ERP REST APIs — audit trail, access policies, SoD matrix
-
-No write operations are ever performed.
-"""
 from __future__ import annotations
 
 import json
@@ -28,20 +17,6 @@ from prowler.providers.oracle_saas.models import (
 
 
 class OracleSaasProvider(Provider):
-    """Oracle SaaS / ERP Security Provider.
-
-    Supports:
-      - Oracle Fusion Cloud ERP (Financials & Procurement)
-      - Oracle Fusion Cloud HCM (Human Capital Management)
-      - Oracle NetSuite ERP
-      - Oracle Fusion Cloud SCM (Supply Chain Management)
-
-    Authentication:
-      OAuth 2.0 Client Credentials (Confidential Application in Oracle IDCS).
-      Required scopes: urn:opc:idm:__myscopes__ (read:users, read:roles,
-      read:audit_events, read:policies)
-    """
-
     _type: str = "oracle_saas"
     _session: OracleSaasSession
     _identity: OracleSaasIdentityInfo
@@ -342,9 +317,30 @@ class OracleSaasProvider(Provider):
     def get_json(self, url: str) -> dict:
         """Perform an authenticated GET request to an Oracle SaaS REST API.
 
-        Supports Basic Auth and OAuth 2.0.
+        Supports Basic Auth and OAuth 2.0 with fast in-memory caching.
         Returns parsed JSON dict or empty dict on failure.
         """
+        data, _ok = self.get_json_with_status(url)
+        return data
+
+    def get_json_with_status(self, url: str) -> tuple[dict, bool]:
+        """Same as `get_json`, but also reports whether the call actually succeeded.
+
+        Checks that rely on data only obtainable from a specific endpoint (e.g. IDCS
+        SCIM APIs, which are unreachable when a provider only has Basic Auth
+        credentials against the Fusion ERP REST API) need this distinction: an empty
+        `{}` from a failed/unauthenticated call is not the same fact as a real API
+        response that legitimately contains no resources, and treating them the same
+        produces a confidently wrong PASS or FAIL instead of an honest "can't tell".
+        """
+        if not hasattr(self, "_api_cache"):
+            self._api_cache = {}
+        if not hasattr(self, "_api_cache_ok"):
+            self._api_cache_ok = {}
+
+        if url in self._api_cache:
+            return self._api_cache[url], self._api_cache_ok.get(url, True)
+
         import base64
         import ssl
         ctx = ssl.create_default_context()
@@ -363,15 +359,24 @@ class OracleSaasProvider(Provider):
             headers["Authorization"] = f"Bearer {self._session.access_token}"
         else:
             logger.warning(f"Oracle SaaS: No active credentials — skipping GET {url}")
-            return {}
+            self._api_cache[url] = {}
+            self._api_cache_ok[url] = False
+            return {}, False
 
-        req = urllib.request.Request(url, headers=headers)
+        import urllib.parse
+        clean_url = urllib.parse.quote(url, safe=":/?&=#+%,@")
+        req = urllib.request.Request(clean_url, headers=headers)
         try:
-            with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+            with urllib.request.urlopen(req, context=ctx, timeout=8) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                self._api_cache[url] = data
+                self._api_cache_ok[url] = True
+                return data, True
         except Exception as e:
             logger.warning(f"Oracle SaaS GET {url} failed: {e}")
-            return {}
+            self._api_cache[url] = {}
+            self._api_cache_ok[url] = False
+            return {}, False
 
     def get_idcs_url(self, path: str) -> str:
         """Build a full Oracle Identity Domain API URL."""
@@ -380,6 +385,23 @@ class OracleSaasProvider(Provider):
     def get_erp_url(self, path: str) -> str:
         """Build a full Oracle Fusion ERP REST API URL."""
         return f"{self._session.erp_base_url.rstrip('/')}/{path.lstrip('/')}"
+
+    def get_html_assessment_summary(self) -> str:
+        """Return HTML assessment summary for Oracle SaaS reports."""
+        tenant = getattr(self.identity, "tenant_id", "Oracle SaaS")
+        erp_type = getattr(self.session, "erp_type", "FUSION_ERP")
+        pod_url = getattr(self, "erp_base_url", "")
+        return f"""
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">Oracle SaaS Assessment Summary</div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><b>Tenant:</b> {tenant}</li>
+                        <li class="list-group-item"><b>Type:</b> {erp_type}</li>
+                        <li class="list-group-item"><b>Pod URL:</b> {pod_url}</li>
+                    </ul>
+                </div>
+            </div>"""
 
     def get_finding_output_data(self, check_output) -> dict:
         """Return standardized output data dictionary for finding transformation."""

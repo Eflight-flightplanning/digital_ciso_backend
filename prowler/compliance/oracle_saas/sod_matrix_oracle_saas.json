@@ -3,12 +3,12 @@
   "Name": "Oracle Fusion ERP Separation of Duties (SoD) Matrix",
   "Version": "2024.1",
   "Provider": "oracle_saas",
-  "Description": "Automated Separation of Duties (SoD) matrix for detecting conflicting business role combinations across Oracle Fusion Cloud ERP (Financials, Payables, Receivables, Procurement, General Ledger).",
+  "Description": "Comprehensive 27-control Separation of Duties (SoD) matrix detecting toxic and conflicting role combinations across Procure-to-Pay (P2P), Record-to-Report (R2R), Order-to-Cash (O2C), Fixed Assets, Inventory, Payroll/HCM, and Security Administration in Oracle Fusion Cloud ERP. This is a platform-defined control set aligned with the named real regulatory framework's known objectives, not a verbatim transcription of an official published checklist \u2014 organizations achieve SOX 404 / SOC 1 / SoD compliance through their own internal controls program, not a single external document.",
   "Requirements": [
     {
-      "Id": "SOD-AP-01",
-      "Name": "Accounts Payable Creation vs Payment Processing Segregation",
-      "Description": "Prevents users from holding both AP Invoice creation/management and Payment disbursement roles to mitigate fraud risk.",
+      "Id": "SOD-P2P-01",
+      "Name": "AP Invoice Creation vs Payment Disbursement Segregation",
+      "Description": "Prevents a single user from creating/modifying vendor invoices and executing electronic payment disbursements or printing checks (Fraud Risk: Unauthorized vendor payments).",
       "Attributes": [
         {
           "Section": "Procure-to-Pay (P2P)",
@@ -17,28 +17,13 @@
         }
       ],
       "Checks": [
-        "erp_iam_sod_conflict_detected"
+        "iam_sod_conflict_detected"
       ]
     },
     {
-      "Id": "SOD-GL-02",
-      "Name": "General Ledger Entry vs Journal Approval Segregation",
-      "Description": "Ensures manual journal entries cannot be created and approved by the same accountant without independent review.",
-      "Attributes": [
-        {
-          "Section": "Record-to-Report (R2R)",
-          "SubSection": "General Ledger & Journals",
-          "Service": "iam"
-        }
-      ],
-      "Checks": [
-        "erp_iam_sod_conflict_detected"
-      ]
-    },
-    {
-      "Id": "SOD-PO-03",
-      "Name": "Purchase Order Creation vs AP Specialist Segregation",
-      "Description": "Ensures purchase orders and vendor invoices cannot be raised and matched by the same employee.",
+      "Id": "SOD-P2P-02",
+      "Name": "Purchase Order Generation vs AP Invoice Matching Segregation",
+      "Description": "Ensures purchasing agents cannot approve invoices against the purchase orders they generated (Fraud Risk: Fictitious PO-to-Invoice matching).",
       "Attributes": [
         {
           "Section": "Procure-to-Pay (P2P)",
@@ -47,24 +32,374 @@
         }
       ],
       "Checks": [
-        "erp_iam_sod_conflict_detected"
+        "iam_sod_conflict_detected"
       ]
     },
     {
-      "Id": "SOD-SEC-04",
-      "Name": "Security Configuration vs User Administration Segregation",
-      "Description": "Ensures application implementation roles are not combined with IT security management privileges in live operations.",
+      "Id": "SOD-P2P-03",
+      "Name": "Vendor Master Maintenance vs Payment Processing Segregation",
+      "Description": "Ensures users with authority to create or update vendor bank details cannot disburse payments to those vendors (Fraud Risk: Fictitious vendor creation & bank routing fraud).",
       "Attributes": [
         {
-          "Section": "Security Administration",
-          "SubSection": "Security Console Governance",
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Supplier Master & Disbursements",
           "Service": "iam"
         }
       ],
       "Checks": [
-        "erp_iam_sod_conflict_detected",
-        "erp_iam_implementation_role_active",
-        "erp_iam_superuser_role_assigned"
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-P2P-04",
+      "Name": "Purchase Requisition Creation vs Purchase Order Approval",
+      "Description": "Ensures employees requesting goods/services cannot independently approve and execute the corresponding purchase orders without managerial authorization.",
+      "Attributes": [
+        {
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Requisitioning & Purchasing",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-P2P-05",
+      "Name": "Goods Receipt Entry vs AP Invoice Processing",
+      "Description": "Ensures warehouse receiving personnel entering goods receipts cannot also process or match accounts payable supplier invoices.",
+      "Attributes": [
+        {
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Receiving & Invoicing",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-P2P-06",
+      "Name": "Supplier Bank Account Modification vs Payment Approval",
+      "Description": "Prevents users modifying supplier remittance bank accounts from approving electronic funds transfer (EFT) payment batches.",
+      "Attributes": [
+        {
+          "Section": "Procure-to-Pay (P2P)",
+          "SubSection": "Banking & Payment Approval",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-R2R-01",
+      "Name": "Manual Journal Entry vs Journal Approval & Posting Segregation",
+      "Description": "Ensures accountants creating manual journal entries cannot approve or post their own journals to the General Ledger without independent peer review.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "General Ledger & Journals",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-R2R-02",
+      "Name": "Chart of Accounts Maintenance vs General Ledger Posting",
+      "Description": "Ensures users maintaining account structures, segment values, and accounting rules cannot also post transactional journals to those accounts.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "Chart of Accounts Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-R2R-03",
+      "Name": "Accounting Period Close vs Journal Entry Creation",
+      "Description": "Ensures users with privileges to open and close accounting periods cannot enter post-dated or back-dated financial journals.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "Period Close Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-R2R-04",
+      "Name": "Intercompany Transaction Initiation vs Intercompany Approval",
+      "Description": "Ensures intercompany balancing entries cannot be initiated and approved by the same accountant across operating units.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "Intercompany Accounting",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-R2R-05",
+      "Name": "Financial Statement Generation vs General Ledger Configuration",
+      "Description": "Ensures financial report designers cannot modify posting rules or general ledger journal source definitions.",
+      "Attributes": [
+        {
+          "Section": "Record-to-Report (R2R)",
+          "SubSection": "Financial Reporting",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-O2C-01",
+      "Name": "Billing / Invoicing vs Cash Application & Reconciliation",
+      "Description": "Ensures billing specialists generating customer invoices cannot apply cash receipts or process unallocated payments (Fraud Risk: Lapping and fictitious revenue).",
+      "Attributes": [
+        {
+          "Section": "Order-to-Cash (O2C)",
+          "SubSection": "Accounts Receivable & Billing",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-O2C-02",
+      "Name": "Customer Master File Maintenance vs Credit Limit Approval",
+      "Description": "Ensures sales personnel creating customer accounts cannot unilaterally override or approve credit limits without risk management sign-off.",
+      "Attributes": [
+        {
+          "Section": "Order-to-Cash (O2C)",
+          "SubSection": "Customer Master & Credit Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-O2C-03",
+      "Name": "Credit Memo Creation vs AR Balance Write-Off Segregation",
+      "Description": "Ensures employees issuing customer credit memos cannot write off customer receivable balances without dual authorization.",
+      "Attributes": [
+        {
+          "Section": "Order-to-Cash (O2C)",
+          "SubSection": "Credit Memos & Bad Debt Write-Offs",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-O2C-04",
+      "Name": "Sales Order Entry vs Order Release / Shipment Confirmation",
+      "Description": "Ensures sales order entry staff cannot confirm inventory release or dispatch shipments without warehouse fulfillment sign-off.",
+      "Attributes": [
+        {
+          "Section": "Order-to-Cash (O2C)",
+          "SubSection": "Sales Orders & Fulfillment",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-O2C-05",
+      "Name": "Customer Bank Account Setup vs Direct Debit Receipt Processing",
+      "Description": "Prevents staff entering customer bank direct-debit mandates from executing automatic fund collection batches.",
+      "Attributes": [
+        {
+          "Section": "Order-to-Cash (O2C)",
+          "SubSection": "Direct Debit Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-FA-01",
+      "Name": "Asset Capitalization / Creation vs Asset Depreciation / Retirement",
+      "Description": "Ensures users adding new capital assets cannot process asset retirement, write-downs, or disposal transactions.",
+      "Attributes": [
+        {
+          "Section": "Fixed Assets (FA)",
+          "SubSection": "Asset Lifecycle Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-FA-02",
+      "Name": "Physical Inventory Count Entry vs Inventory Adjustment Approval",
+      "Description": "Ensures staff recording physical inventory stock counts cannot approve inventory cost adjustments or stock write-offs.",
+      "Attributes": [
+        {
+          "Section": "Supply Chain & Inventory",
+          "SubSection": "Physical Inventory & Adjustments",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-SCM-01",
+      "Name": "Standard Cost Definition vs Cost Adjustment Posting",
+      "Description": "Ensures cost accountants defining standard item costs cannot post inventory revaluation journals.",
+      "Attributes": [
+        {
+          "Section": "Supply Chain & Inventory",
+          "SubSection": "Cost Accounting",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-HCM-01",
+      "Name": "Employee Master Setup vs Payroll Calculation & Disbursement",
+      "Description": "Ensures HR personnel entering new employee records or modifying compensation cannot execute payroll disbursements (Fraud Risk: Ghost employees).",
+      "Attributes": [
+        {
+          "Section": "Hire-to-Retire (H2R)",
+          "SubSection": "Human Resources & Payroll",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-HCM-02",
+      "Name": "Time & Labor Entry Approval vs Payroll Execution",
+      "Description": "Ensures managers approving contractor or employee timesheets cannot execute payroll batch processing.",
+      "Attributes": [
+        {
+          "Section": "Hire-to-Retire (H2R)",
+          "SubSection": "Time & Attendance Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-HCM-03",
+      "Name": "Employee Bank Account Setup vs Payroll Electronic Payment",
+      "Description": "Ensures HR administrators maintaining employee direct deposit banking details cannot execute automated payroll payment files.",
+      "Attributes": [
+        {
+          "Section": "Hire-to-Retire (H2R)",
+          "SubSection": "Payroll Direct Deposit",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-SEC-01",
+      "Name": "Application Implementation Consultant vs Security Management",
+      "Description": "Ensures implementation consultant super-privileges (Application Implementation Consultant) are not combined with ongoing IT Security Manager duties post-go-live.",
+      "Attributes": [
+        {
+          "Section": "Security Administration",
+          "SubSection": "Implementation Role Governance",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_implementation_role_active",
+        "iam_superuser_role_assigned",
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-SEC-02",
+      "Name": "Security Console User Admin vs Business Transaction Execution",
+      "Description": "Ensures IT administrators with user provisioning and role assignment privileges do not hold functional transaction roles in production.",
+      "Attributes": [
+        {
+          "Section": "Security Administration",
+          "SubSection": "User Administration & Role Assignment",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_superuser_role_assigned",
+        "iam_sod_conflict_detected"
+      ]
+    },
+    {
+      "Id": "SOD-SEC-03",
+      "Name": "Audit Configuration Management vs User Privilege Assignment",
+      "Description": "Ensures users configuring audit policies cannot assign or modify user accounts, preventing audit trail suppression.",
+      "Attributes": [
+        {
+          "Section": "Security Administration",
+          "SubSection": "Audit Policy & Privilege Governance",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_disabled",
+        "audit_trail_incomplete_coverage",
+        "iam_superuser_role_assigned"
+      ]
+    },
+    {
+      "Id": "SOD-SEC-04",
+      "Name": "Database Administrator / Integration Lead vs Functional Accounting",
+      "Description": "Ensures technical integration developers and database administrators cannot hold business transaction posting privileges.",
+      "Attributes": [
+        {
+          "Section": "Security Administration",
+          "SubSection": "Technical vs Functional Separation",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_superuser_role_assigned",
+        "network_oauth_app_excessive_scopes",
+        "iam_sod_conflict_detected"
       ]
     }
   ]

@@ -147,6 +147,9 @@ COMPLIANCE_CLASS_MAP = {
     "oraclecloud": [
         (lambda name: name.startswith("cis_"), OracleCloudCIS),
     ],
+    "oracle_saas": [
+        (lambda name: name.startswith("cis_"), OracleCloudCIS),
+    ],
     "alibabacloud": [
         (lambda name: name.startswith("cis_"), AlibabaCloudCIS),
         (
@@ -250,7 +253,9 @@ def _upload_to_s3(
     Raises:
         botocore.exceptions.ClientError: If the upload attempt to S3 fails for any reason.
     """
-    bucket = base.DJANGO_OUTPUT_S3_AWS_OUTPUT_BUCKET
+    bucket = getattr(base, "DJANGO_OUTPUT_S3_AWS_OUTPUT_BUCKET", "") or env.str(
+        "DJANGO_OUTPUT_S3_AWS_OUTPUT_BUCKET", default=""
+    )
     if not bucket:
         return
 
@@ -266,7 +271,7 @@ def _upload_to_s3(
         s3_key = f"{tenant_id}/{scan_id}/{relative_key}"
         s3.upload_file(Filename=local_path, Bucket=bucket, Key=s3_key)
 
-        return f"s3://{base.DJANGO_OUTPUT_S3_AWS_OUTPUT_BUCKET}/{s3_key}"
+        return f"s3://{bucket}/{s3_key}"
     except (ClientError, NoCredentialsError, ParamValidationError, ValueError) as e:
         logger.error(f"S3 upload failed: {str(e)}")
 

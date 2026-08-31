@@ -13,6 +13,19 @@ default_db_port = env("POSTGRES_PORT", default="5432")
 postgres_sslmode = env.str("POSTGRES_SSLMODE", default="")
 db_options = {"sslmode": postgres_sslmode} if postgres_sslmode else {}
 
+import socket
+
+
+def _get_neo4j_host() -> str:
+    host = env.str("NEO4J_HOST", "neo4j")
+    if host == "neo4j":
+        try:
+            socket.gethostbyname("neo4j")
+        except socket.gaierror:
+            return "127.0.0.1"
+    return host
+
+
 DATABASES = {
     "prowler_user": {
         "ENGINE": "psqlextra.backend",
@@ -51,7 +64,7 @@ DATABASES = {
         "OPTIONS": db_options,
     },
     "neo4j": {
-        "HOST": env.str("NEO4J_HOST", "neo4j"),
+        "HOST": _get_neo4j_host(),
         "PORT": env.str("NEO4J_PORT", "7687"),
         "USER": env.str("NEO4J_USER", "neo4j"),
         "PASSWORD": env.str("NEO4J_PASSWORD", "neo4j_password"),

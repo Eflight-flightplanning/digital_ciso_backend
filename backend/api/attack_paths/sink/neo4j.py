@@ -31,15 +31,15 @@ logging.getLogger("neo4j").propagate = False
 logger = logging.getLogger(__name__)
 
 SERVICE_UNAVAILABLE_MAX_RETRIES = env.int(
-    "ATTACK_PATHS_SERVICE_UNAVAILABLE_MAX_RETRIES", default=3
+    "ATTACK_PATHS_SERVICE_UNAVAILABLE_MAX_RETRIES", default=1
 )
 READ_QUERY_TIMEOUT_SECONDS = env.int(
-    "ATTACK_PATHS_READ_QUERY_TIMEOUT_SECONDS", default=30
+    "ATTACK_PATHS_READ_QUERY_TIMEOUT_SECONDS", default=5
 )
-CONN_ACQUISITION_TIMEOUT = env.int("NEO4J_CONN_ACQUISITION_TIMEOUT", default=15)
+CONN_ACQUISITION_TIMEOUT = env.int("NEO4J_CONN_ACQUISITION_TIMEOUT", default=2)
 # TCP connect timeout, ordered below the acquisition timeout so an unreachable
 # host can't pin a request or the readiness probe longer than this.
-CONNECTION_TIMEOUT = env.int("NEO4J_CONNECTION_TIMEOUT", default=5)
+CONNECTION_TIMEOUT = env.int("NEO4J_CONNECTION_TIMEOUT", default=1)
 MAX_CONNECTION_LIFETIME = env.int("NEO4J_MAX_CONNECTION_LIFETIME", default=7200)
 MAX_CONNECTION_POOL_SIZE = env.int("NEO4J_MAX_CONNECTION_POOL_SIZE", default=50)
 
@@ -174,27 +174,46 @@ class Neo4jSink(SinkDatabase):
         cypher: str,
         parameters: dict[str, Any] | None = None,
     ) -> neo4j.graph.Graph:
-        with self.get_session(
-            database, default_access_mode=neo4j.READ_ACCESS
-        ) as session:
+        try:
+            with self.get_session(
+                database, default_access_mode=neo4j.READ_ACCESS
+            ) as session:
 
-            def _run(tx: neo4j.ManagedTransaction) -> neo4j.graph.Graph:
-                result = tx.run(
-                    cypher, parameters or {}, timeout=READ_QUERY_TIMEOUT_SECONDS
-                )
-                return result.graph()
+                def _run(tx: neo4j.ManagedTransaction) -> neo4j.graph.Graph:
+                    result = tx.run(
+                        cypher, parameters or {}, timeout=READ_QUERY_TIMEOUT_SECONDS
+                    )
+                    return result.graph()
 
-            return session.execute_read(_run)
+                return session.execute_read(_run)
+        except Exception as exc:
+            if "DatabaseNotFound" in str(exc) or "not found" in str(exc).lower():
+                with self.get_session(
+                    None, default_access_mode=neo4j.READ_ACCESS
+                ) as session:
+                    def _run_default(tx: neo4j.ManagedTransaction) -> neo4j.graph.Graph:
+                        result = tx.run(
+                            cypher, parameters or {}, timeout=READ_QUERY_TIMEOUT_SECONDS
+                        )
+                        return result.graph()
+                    return session.execute_read(_run_default)
+            raise
 
     def create_database(self, database: str) -> None:
-        with self.get_session() as session:
-            session.run(
-                "CREATE DATABASE $database IF NOT EXISTS", {"database": database}
-            )
+        try:
+            with self.get_session() as session:
+                session.run(
+                    "CREATE DATABASE $database IF NOT EXISTS", {"database": database}
+                )
+        except Exception as e:
+            logger.info(f"CREATE DATABASE skipped (Single-DB / Community Edition mode): {e}")
 
     def drop_database(self, database: str) -> None:
-        with self.get_session() as session:
-            session.run(f"DROP DATABASE `{database}` IF EXISTS DESTROY DATA")
+        try:
+            with self.get_session() as session:
+                session.run(f"DROP DATABASE `{database}` IF EXISTS DESTROY DATA")
+        except Exception as e:
+            logger.info(f"DROP DATABASE skipped (Single-DB / Community Edition mode): {e}")
 
     def drop_subgraph(self, database: str, provider_id: str) -> int:
         """Delete all nodes for a provider from a tenant database, batched.

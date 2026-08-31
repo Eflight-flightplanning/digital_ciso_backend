@@ -135,7 +135,9 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   useEffect(() => {
     setUser(authStore.getState().user);
     const unsub = authStore.subscribe((s) => setUser(s.user));
-    return unsub;
+    return () => {
+      unsub();
+    };
   }, []);
 
   return (

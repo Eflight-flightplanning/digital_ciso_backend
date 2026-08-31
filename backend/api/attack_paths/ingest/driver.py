@@ -125,10 +125,18 @@ def get_session(
 
     session_wrapper: RetryableSession | None = None
     try:
+        def _session_factory():
+            try:
+                return get_driver().session(
+                    database=database, default_access_mode=default_access_mode
+                )
+            except Exception:
+                return get_driver().session(
+                    default_access_mode=default_access_mode
+                )
+
         session_wrapper = RetryableSession(
-            session_factory=lambda: get_driver().session(
-                database=database, default_access_mode=default_access_mode
-            ),
+            session_factory=_session_factory,
             max_retries=SERVICE_UNAVAILABLE_MAX_RETRIES,
         )
         yield session_wrapper
@@ -155,14 +163,20 @@ def get_session(
 
 def create_database(database: str) -> None:
     """Create a database on the Neo4j cluster. Used for temp scan DBs."""
-    with get_session() as session:
-        session.run("CREATE DATABASE $database IF NOT EXISTS", {"database": database})
+    try:
+        with get_session() as session:
+            session.run("CREATE DATABASE $database IF NOT EXISTS", {"database": database})
+    except Exception as e:
+        logging.info(f"CREATE DATABASE skipped (Single-DB / Community Edition mode): {e}")
 
 
 def drop_database(database: str) -> None:
     """Drop a database on the Neo4j cluster. Used for temp scan DBs."""
-    with get_session() as session:
-        session.run(f"DROP DATABASE `{database}` IF EXISTS DESTROY DATA")
+    try:
+        with get_session() as session:
+            session.run(f"DROP DATABASE `{database}` IF EXISTS DESTROY DATA")
+    except Exception as e:
+        logging.info(f"DROP DATABASE skipped (Single-DB / Community Edition mode): {e}")
 
 
 def clear_cache(database: str) -> None:

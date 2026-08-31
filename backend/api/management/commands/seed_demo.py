@@ -3,7 +3,8 @@ Seed demo data command for Digital CISO Platform
 """
 import uuid
 from datetime import datetime, timezone, timedelta
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from api.rls import Tenant
@@ -26,7 +27,28 @@ from api.models import (
 class Command(BaseCommand):
     help = "Seed demo data for Digital CISO (Tenant, User, Providers, Scans, Findings, Decisions)"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--i-understand-this-writes-fake-data",
+            action="store_true",
+            dest="confirmed",
+            help="Required outside DEBUG environments — confirms you intend to insert fabricated "
+            "findings/compliance data into this database.",
+        )
+
     def handle(self, *args, **options):
+        # This command writes fabricated findings, resources, and compliance scores into the
+        # SAME tables real Prowler scans write to — indistinguishable from real data once
+        # inserted, and previously the source of a real mis-attributed-compliance-data bug.
+        # Refuse to run against a non-DEBUG (i.e. production) settings module without an
+        # explicit, deliberate confirmation flag.
+        if not settings.DEBUG and not options.get("confirmed"):
+            raise CommandError(
+                "Refusing to seed fabricated demo data: DEBUG is off, which usually means this "
+                "is a production or demo-facing environment. If you really intend to insert "
+                "demo data here, re-run with --i-understand-this-writes-fake-data."
+            )
+
         self.stdout.write("Seeding Digital CISO demo data...")
 
         # 1. Tenant
@@ -84,7 +106,19 @@ class Command(BaseCommand):
                 provider="gcp",
                 defaults={"alias": "acme-core", "connected": True}
             )
-            self.stdout.write("  [OK] Cloud Providers seeded: AWS (acme-prod), Azure (acme-emea), GCP (acme-core)")
+            oracle_saas_prov, _ = Provider.objects.get_or_create(
+                tenant=tenant,
+                uid="acme-fusion-saas",
+                provider="oracle_saas",
+                defaults={"alias": "acme-fusion-saas", "connected": True}
+            )
+            oci_prov, _ = Provider.objects.get_or_create(
+                tenant=tenant,
+                uid="ocid1.tenancy.oc1..aaaaaaaademoocitenancyuid12345",
+                provider="oraclecloud",
+                defaults={"alias": "acme-core-oci", "connected": True}
+            )
+            self.stdout.write("  [OK] Cloud Providers seeded: AWS (acme-prod), Azure (acme-emea), GCP (acme-core), Oracle SaaS (acme-fusion-saas), OCI (acme-core-oci)")
 
             # LLM Config (Private vLLM Qwen 3.5)
             TenantLLMConfig.objects.get_or_create(
@@ -96,7 +130,8 @@ class Command(BaseCommand):
                 }
             )
 
-            # Scans
+            # Scans — one per provider, so each framework's demo ComplianceOverview row is
+            # attached to the scan of the provider it actually claims to assess.
             now = datetime.now(timezone.utc)
             scan, _ = Scan.objects.get_or_create(
                 tenant=tenant,
@@ -109,43 +144,133 @@ class Command(BaseCommand):
                     "unique_resource_count": 3120,
                 }
             )
+            azure_scan, _ = Scan.objects.get_or_create(
+                tenant=tenant,
+                provider=azure_prov,
+                defaults={
+                    "trigger": "manual",
+                    "state": "completed",
+                    "started_at": now - timedelta(hours=1),
+                    "completed_at": now - timedelta(minutes=52),
+                    "unique_resource_count": 1420,
+                }
+            )
+            gcp_scan, _ = Scan.objects.get_or_create(
+                tenant=tenant,
+                provider=gcp_prov,
+                defaults={
+                    "trigger": "manual",
+                    "state": "completed",
+                    "started_at": now - timedelta(hours=1),
+                    "completed_at": now - timedelta(minutes=52),
+                    "unique_resource_count": 980,
+                }
+            )
+            oracle_saas_scan, _ = Scan.objects.get_or_create(
+                tenant=tenant,
+                provider=oracle_saas_prov,
+                defaults={
+                    "trigger": "manual",
+                    "state": "completed",
+                    "started_at": now - timedelta(hours=1),
+                    "completed_at": now - timedelta(minutes=52),
+                    "unique_resource_count": 2509,
+                }
+            )
+            oci_scan, _ = Scan.objects.get_or_create(
+                tenant=tenant,
+                provider=oci_prov,
+                defaults={
+                    "trigger": "manual",
+                    "state": "completed",
+                    "started_at": now - timedelta(hours=1),
+                    "completed_at": now - timedelta(minutes=52),
+                    "unique_resource_count": 1840,
+                }
+            )
 
-            # Compliance Frameworks
+            # Materialize full per-requirement compliance tables from Prowler templates
+            from tasks.jobs.scan import create_compliance_requirements
+            for demo_scan in [scan, azure_scan, gcp_scan, oracle_saas_scan, oci_scan]:
+                try:
+                    create_compliance_requirements(str(tenant.id), str(demo_scan.id))
+                except Exception as exc:
+                    self.stdout.write(f"  [WARN] Compliance requirement materialization note for {demo_scan.provider.provider}: {exc}")
+
+            # Attack Paths Scans — Seed completed attack path graph state for all tenant providers
+            from api.models import AttackPathsScan
+            for p in Provider.objects.filter(tenant=tenant):
+                AttackPathsScan.objects.update_or_create(
+                    tenant=tenant,
+                    provider=p,
+                    defaults={
+                        "state": "completed",
+                        "started_at": now - timedelta(hours=1),
+                        "completed_at": now - timedelta(minutes=50),
+                        "duration": 600,
+                        "sink_backend": "neo4j",
+                        "is_migrated": True,
+                    }
+                )
+            self.stdout.write("  [OK] Attack Paths Scans seeded: Completed graph state enabled for all providers")
+
+            # Compliance Frameworks — Exact requirement counts from Prowler's official JSON definitions
             frameworks_data = [
+                # OCI (Oracle Cloud Infrastructure) Benchmarks
+                ("cis_3.1_oraclecloud", "CIS Oracle Cloud Infrastructure Foundations Benchmark", "3.1.0", 0.74, 40, 14, 54),
+                ("cis_3.0_oraclecloud", "CIS Oracle Cloud Infrastructure Foundations Benchmark", "3.0.0", 0.72, 39, 15, 54),
+                ("secnumcloud_3.2_oraclecloud", "SecNumCloud Oracle Cloud", "3.2", 0.85, 78, 14, 92),
+                ("nca_cscc_1.2019_oraclecloud", "NCA Cloud Cybersecurity Controls (CSCC)", "1:2019", 1.00, 6, 0, 6),
+                ("nca_ecc_1.2018_oraclecloud", "NCA Essential Cybersecurity Controls (ECC)", "1:2018", 1.00, 7, 0, 7),
+                # Oracle SaaS Benchmarks
+                ("cis_1.0.0_oracle_saas", "CIS Oracle SaaS Foundations Benchmark", "1.0.0", 0.92, 40, 4, 44),
+                ("oracle_saas_security_baseline_oracle_saas", "Oracle Cloud SaaS Security Baseline", "1.0", 0.86, 6, 1, 7),
+                ("itgc_sox_oracle_saas", "ITGC SOX 404 Financial Governance", "SOX-404", 0.85, 17, 3, 20),
+                ("soc1_type2_oracle_saas", "SOC 1 Type II (Financial Reporting & ICFR)", "2024", 0.95, 18, 1, 19),
+                ("sod_matrix_oracle_saas", "Oracle SaaS Separation of Duties (SoD)", "2024.1", 0.88, 23, 3, 26),
+                # Azure Frameworks
+                ("cis_3.0_azure", "CIS Microsoft Azure Benchmark", "3.0.0", 0.86, 118, 19, 137),
+                ("cis_2.0_azure", "CIS Microsoft Azure Benchmark", "2.0.0", 0.87, 104, 16, 120),
+                ("soc2_azure", "SOC 2 Type II (Trust Services Criteria)", "2023", 0.92, 24, 2, 26),
+                ("iso27001_2022_azure", "ISO/IEC 27001:2022 (ISMS)", "2022", 0.89, 82, 10, 92),
+                ("hipaa_azure", "HIPAA Security Rule & HITECH", "2023", 0.91, 31, 3, 34),
+                ("nca_ecc_1.2018_azure", "NCA Essential Cybersecurity Controls (ECC)", "1.2018", 0.93, 13, 1, 14),
+                ("nca_cscc_1.2019_azure", "NCA Cloud Cybersecurity Controls (CSCC)", "1.2019", 0.89, 8, 1, 9),
+                # AWS & GCP Frameworks
                 ("cis_3.0_aws", "CIS AWS Foundations Benchmark", "3.0.0", 0.91, 156, 15, 171),
                 ("cis_2.0_aws", "CIS AWS Foundations Benchmark", "2.0.0", 0.89, 142, 17, 159),
-                ("cis_3.0_azure", "CIS Microsoft Azure Benchmark", "3.0.0", 0.87, 134, 20, 154),
-                ("cis_3.0_gcp", "CIS Google Cloud Platform Benchmark", "3.0.0", 0.88, 112, 15, 127),
-                ("cis_1.8_k8s", "CIS Kubernetes Benchmark", "1.8.0", 0.84, 98, 18, 116),
+                ("cis_3.0_gcp", "CIS Google Cloud Platform Benchmark", "3.0.0", 0.88, 74, 10, 84),
+                ("cis_1.8_k8s", "CIS Kubernetes Benchmark", "1.8.0", 0.84, 110, 20, 130),
                 ("soc2_aws", "SOC 2 Type II (Trust Services Criteria)", "2023", 0.94, 98, 6, 104),
                 ("iso27001_2022_aws", "ISO/IEC 27001:2022 (ISMS)", "2022", 0.90, 118, 13, 131),
-                ("iso27001_2013_aws", "ISO/IEC 27001:2013", "2013", 0.92, 114, 9, 123),
                 ("pci_4.0_aws", "PCI-DSS (Payment Card Industry)", "4.0.0", 0.95, 145, 7, 152),
-                ("pci_3.2.1_aws", "PCI-DSS", "3.2.1", 0.96, 138, 5, 143),
                 ("nist_csf_2.0_aws", "NIST Cybersecurity Framework (CSF)", "2.0", 0.88, 108, 14, 122),
-                ("nist_csf_1.1_aws", "NIST Cybersecurity Framework (CSF)", "1.1", 0.90, 95, 11, 106),
                 ("nist_800_53_revision_5_aws", "NIST SP 800-53 Security Controls", "Rev. 5", 0.82, 215, 46, 261),
-                ("nist_800_171_revision_2_aws", "NIST SP 800-171 Protecting CUI", "Rev. 2", 0.86, 110, 17, 127),
                 ("hipaa_aws", "HIPAA Security Rule & HITECH", "2023", 0.94, 72, 4, 76),
                 ("aws_foundational_security_best_practices_aws", "AWS Foundational Security Best Practices (FSBP)", "1.0", 0.89, 220, 27, 247),
-                ("aws_well_architected_framework_security_pillar_aws", "AWS Well-Architected Security Pillar", "2024", 0.91, 165, 15, 180),
-                ("mitre_attack_aws", "MITRE ATT&CK Cloud Matrix", "14.1", 0.85, 140, 24, 164),
-                ("gdpr_aws", "EU General Data Protection Regulation (GDPR)", "2018", 0.93, 58, 4, 62),
-                ("fedramp_moderate_revision_4_aws", "FedRAMP Moderate Baseline", "Rev. 4", 0.81, 180, 42, 222),
-                ("fedramp_low_revision_4_aws", "FedRAMP Low Baseline", "Rev. 4", 0.92, 85, 7, 92),
                 ("dora_2022_2554", "Digital Operational Resilience Act (DORA)", "EU 2022/2554", 0.89, 64, 8, 72),
                 ("nis2_aws", "NIS2 Cybersecurity Directive", "EU 2022/2555", 0.88, 76, 10, 86),
                 ("csa_ccm_4.0", "Cloud Security Alliance CCM", "4.0.0", 0.91, 195, 19, 214),
-                ("cisa_aws", "CISA Cloud Security Technical Reference Architecture", "2.0", 0.92, 88, 7, 95),
-                ("ens_rd2022_aws", "Esquema Nacional de Seguridad (ENS)", "RD 311/2022", 0.87, 120, 17, 137),
-                ("ffiec_aws", "FFIEC Cybersecurity Assessment Tool", "2023", 0.90, 78, 8, 86),
-                ("rbi_cyber_security_framework_aws", "RBI Cyber Security Framework", "2023", 0.93, 52, 4, 56),
             ]
             for fid, fname, fver, prate, passed, failed, total in frameworks_data:
+                if fid.endswith("_k8s"):
+                    # No Kubernetes provider is seeded in this demo dataset — skip rather
+                    # than attach a Kubernetes framework to a cloud provider's scan.
+                    continue
+                if fid.endswith("_azure"):
+                    target_scan = azure_scan
+                elif fid.endswith("_gcp"):
+                    target_scan = gcp_scan
+                elif fid.endswith("_oracle_saas"):
+                    target_scan = oracle_saas_scan
+                elif fid.endswith("_oraclecloud"):
+                    target_scan = oci_scan
+                else:
+                    target_scan = scan
                 ComplianceOverview.objects.update_or_create(
                     tenant=tenant,
                     compliance_id=fid,
-                    scan=scan,
+                    scan=target_scan,
                     defaults={
                         "framework": fid,
                         "description": fname,

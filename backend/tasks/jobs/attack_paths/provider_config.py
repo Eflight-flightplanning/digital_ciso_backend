@@ -12,7 +12,7 @@ write the same shape and queries are portable across them.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tasks.jobs.attack_paths import aws, azure
+from tasks.jobs.attack_paths import aws, azure, oci
 
 
 @dataclass(frozen=True)
@@ -446,8 +446,8 @@ OCI_CONFIG = ProviderConfig(
     root_node_label="OCICompartment",
     uid_field="ocid",
     resource_label="_OCIResource",
-    ingestion_function=passthrough_provider_ingestion,
-    short_uid_extractor=extract_provider_uid,
+    ingestion_function=oci.start_oci_ingestion,
+    short_uid_extractor=oci.extract_short_uid,
     normalized_lists=[],
 )
 
@@ -465,6 +465,7 @@ PROVIDER_CONFIGS: dict[str, ProviderConfig] = {
     "aws": AWS_CONFIG,
     "azure": AZURE_CONFIG,
     "oci": OCI_CONFIG,
+    "oraclecloud": OCI_CONFIG,
     "oracle_fusion_saas": ORACLE_SAAS_CONFIG,
     "oracle_saas": ORACLE_SAAS_CONFIG,
 }

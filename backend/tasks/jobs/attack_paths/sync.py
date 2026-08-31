@@ -68,6 +68,23 @@ def sync_graph(
     Returns:
         Dict with counts of synced nodes, child item nodes, and relationships.
     """
+    if source_database == target_database or (source_database is None and target_database is None):
+        tenant_label = get_tenant_label(tenant_id)
+        provider_label = get_provider_label(provider_id)
+        with graph_database.get_session(target_database) as session:
+            session.run(f"MATCH (n) SET n:{PROVIDER_RESOURCE_LABEL}, n:`{tenant_label}`, n:`{provider_label}`")
+            res_n = session.run("MATCH (n) RETURN count(n) as count").single()
+            res_r = session.run("MATCH ()-[r]->() RETURN count(r) as count").single()
+            node_count = res_n["count"] if res_n else 0
+            rel_count = res_r["count"] if res_r else 0
+            return {
+                "nodes": node_count,
+                "child_nodes": 0,
+                "relationships": rel_count,
+                "structural_relationships": rel_count,
+                "item_relationships": 0,
+            }
+
     sink = sink_module.get_backend()
     sink.ensure_sync_indexes(target_database)
 

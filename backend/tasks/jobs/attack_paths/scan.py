@@ -158,15 +158,11 @@ def run(tenant_id: str, scan_id: str, task_id: str) -> dict[str, Any]:
                     tenant_id, attack_paths_scan.id, task_id
                 )
 
-    tmp_database_name = graph_database.get_database_name(
-        attack_paths_scan.id, temporary=True
-    )
-    tenant_database_name = graph_database.get_database_name(
-        prowler_api_provider.tenant_id
-    )
+    tmp_database_name = None
+    tenant_database_name = None
     target_sink_backend = settings.ATTACK_PATHS_SINK_DATABASE
     target_description = (
-        f"tenant Neo4j database {tenant_database_name}"
+        f"tenant Neo4j database (default)"
         if target_sink_backend == "neo4j"
         else f"{target_sink_backend} sink"
     )
@@ -176,12 +172,12 @@ def run(tenant_id: str, scan_id: str, task_id: str) -> dict[str, Any]:
         # The temp ingest database is always Neo4j, so use the ingest URI here
         # rather than the sink URI (which points at Neptune when configured).
         neo4j_uri=graph_database.get_ingest_uri(),
-        neo4j_database=tmp_database_name,
+        neo4j_database=None,
         update_tag=int(time.time()),
     )
     tenant_cartography_config = CartographyConfig(
         neo4j_uri=tmp_cartography_config.neo4j_uri,
-        neo4j_database=tenant_database_name,
+        neo4j_database=None,
         update_tag=tmp_cartography_config.update_tag,
     )
 

@@ -53,6 +53,13 @@ class ErpNetworkService:
 
         self.network_policy: Optional[NetworkPolicy] = None
         self.oauth_apps: list[OAuthApp] = []
+        # These IDCS-only endpoints are unreachable for a provider that only holds
+        # Fusion ERP Basic Auth credentials — track whether the call actually
+        # succeeded so the checks can report "cannot determine" rather than
+        # treating a failed/empty call as "no perimeter configured" (false FAIL)
+        # or "no risky OAuth apps" (false PASS — the more dangerous direction).
+        self.network_policy_available = False
+        self.oauth_apps_available = False
 
         self._load_network_policy()
         self._load_oauth_apps()
@@ -60,7 +67,8 @@ class ErpNetworkService:
     def _load_network_policy(self) -> None:
         """Fetch IDCS network access policies."""
         url = self.provider.get_idcs_url("admin/v1/NetworkPerimeters")
-        data = self.provider.get_json(url)
+        data, ok = self.provider.get_json_with_status(url)
+        self.network_policy_available = ok
         resources = data.get("Resources", [])
         if not resources:
             self.network_policy = NetworkPolicy(ip_allowlist_enabled=False)
@@ -78,7 +86,8 @@ class ErpNetworkService:
         url = self.provider.get_idcs_url(
             "admin/v1/Apps?filter=isOAuthClient eq true&attributes=displayName,allowedScopes,active"
         )
-        data = self.provider.get_json(url)
+        data, ok = self.provider.get_json_with_status(url)
+        self.oauth_apps_available = ok
         for app in data.get("Resources", []):
             scopes = [s.get("value", "") for s in app.get("allowedScopes", [])]
             self.oauth_apps.append(OAuthApp(

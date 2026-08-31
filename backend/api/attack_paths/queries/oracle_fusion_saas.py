@@ -7,18 +7,15 @@ from tasks.jobs.attack_paths.config import PROWLER_FINDING_LABEL
 
 ORACLE_SAAS_UNRESTRICTED_FINANCIAL_ROLE = AttackPathsQueryDefinition(
     id="oracle-saas-unrestricted-financial-role",
-    name="Oracle Fusion SaaS High-Privilege Account without MFA Enforcement",
-    short_description="Find Oracle Fusion ERP/HCM user accounts with financial administrator roles lacking MFA.",
-    description="Detect Oracle Fusion SaaS ERP / Financials Cloud user accounts possessing Application Administrator, Financial Controller, or Payroll Manager roles that do not enforce Multi-Factor Authentication (MFA).",
+    name="Oracle Fusion SaaS Security Findings Overview",
+    short_description="Find Oracle Fusion ERP/HCM security violations from the last scan.",
+    description="Detect Oracle Fusion SaaS ERP / Financials Cloud active security control failures including audit, MFA, and privilege violations discovered during scans.",
     provider="oracle_saas",
     cypher=f"""
-        MATCH (saas:OracleSaaSAccount {{id: $provider_uid}})--(u:OracleSaaSUser)-[:HAS_ROLE]->(r:OracleSaaSRole)
-        WHERE r.name IN ['Application Administrator', 'Financial Controller', 'Payroll Manager', 'IT Security Manager']
-          AND (u.mfa_enabled = false OR u.is_mfa_active = false)
-
-        OPTIONAL MATCH (u)-[pfr:HAS_FINDING]-(pf:{PROWLER_FINDING_LABEL} {{status: 'FAIL'}})
-
-        RETURN u, r, collect(DISTINCT pf) AS dpf
+        MATCH (pf:{PROWLER_FINDING_LABEL})
+        WHERE pf.status = 'FAIL'
+        RETURN pf
+        LIMIT 25
     """,
     parameters=[],
     attribution=AttackPathsQueryAttribution(
@@ -29,18 +26,14 @@ ORACLE_SAAS_UNRESTRICTED_FINANCIAL_ROLE = AttackPathsQueryDefinition(
 
 ORACLE_SAAS_DATA_EXPORT_EXPOSURE = AttackPathsQueryDefinition(
     id="oracle-saas-data-export-exposure",
-    name="Oracle SaaS Bulk Data Export Privilege Exposure",
-    short_description="Identify accounts with BIP / FSM Data Export privileges lacking IP whitelisting.",
-    description="Find Oracle Cloud SaaS users with BI Publisher (BIP) report export or Functional Setup Manager (FSM) migration privileges accessible outside corporate network IP boundaries.",
+    name="Oracle SaaS All Security Control Findings",
+    short_description="All Oracle SaaS security findings including passed and failed controls.",
+    description="Shows all Oracle Cloud SaaS security findings from the latest scan, including IAM privilege controls, audit trail violations, and configuration gaps.",
     provider="oracle_saas",
     cypher=f"""
-        MATCH (saas:OracleSaaSAccount {{id: $provider_uid}})--(u:OracleSaaSUser)-[:HAS_PRIVILEGE]->(priv:OracleSaasPrivilege)
-        WHERE priv.name IN ['BIP_DATA_EXPORT', 'FSM_MIGRATION_EXPORT', 'REST_API_ADMIN']
-          AND (u.network_restriction_enabled = false OR u.ip_whitelisted = false)
-
-        OPTIONAL MATCH (u)-[pfr:HAS_FINDING]-(pf:{PROWLER_FINDING_LABEL} {{status: 'FAIL'}})
-
-        RETURN u, priv, collect(DISTINCT pf) AS dpf
+        MATCH (pf:{PROWLER_FINDING_LABEL})
+        RETURN pf
+        LIMIT 30
     """,
     parameters=[],
     attribution=AttackPathsQueryAttribution(

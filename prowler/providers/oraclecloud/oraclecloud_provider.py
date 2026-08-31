@@ -325,12 +325,17 @@ class OraclecloudProvider(Provider):
                 else:
                     region_str = region
 
-                # Create config dict from provided credentials
+                # Create config dict from provided credentials (safely stripped of leading/trailing whitespace)
+                clean_user = user.strip() if isinstance(user, str) else user
+                clean_fingerprint = fingerprint.strip() if isinstance(fingerprint, str) else fingerprint
+                clean_tenancy = tenancy.strip() if isinstance(tenancy, str) else tenancy
+                clean_region = (region_str.strip() if isinstance(region_str, str) else region_str) or OraclecloudProvider._bootstrap_region
+
                 config = {
-                    "user": user,
-                    "fingerprint": fingerprint,
-                    "tenancy": tenancy,
-                    "region": region_str or OraclecloudProvider._bootstrap_region,
+                    "user": clean_user,
+                    "fingerprint": clean_fingerprint,
+                    "tenancy": clean_tenancy,
+                    "region": clean_region,
                 }
 
                 # Handle private key
@@ -1102,14 +1107,21 @@ class OraclecloudProvider(Provider):
 
     @staticmethod
     def get_regions() -> set:
-        """
-        Get the available OCI regions.
-
-        Returns:
-            set: A set of region names.
-
-        Example:
-            >>> OraclecloudProvider.get_regions()
-            {"us-ashburn-1", "us-phoenix-1", ...}
-        """
+        """Get the available OCI regions."""
         return set(OCI_REGIONS.keys())
+
+    def get_html_assessment_summary(self) -> str:
+        """Return executive HTML assessment summary for OCI reports."""
+        tenancy_name = getattr(self.identity, "tenancy_name", "") or getattr(self.identity, "tenancy_id", "") or "OCI Tenancy"
+        user_name = getattr(self.identity, "user_name", "") or getattr(self.identity, "user_id", "") or "OCI User"
+        regions_list = list(getattr(self, "regions", []))
+        home_region = getattr(self.identity, "region", None) or (regions_list[0] if regions_list else "Default")
+        return f"""
+        <div class="assessment-summary">
+            <h3>Oracle Cloud Infrastructure (OCI) Assessment Summary</h3>
+            <p><strong>Tenancy:</strong> {tenancy_name}</p>
+            <p><strong>Principal User:</strong> {user_name}</p>
+            <p><strong>Home Region:</strong> {home_region}</p>
+            <p><strong>Subscribed Regions:</strong> {len(regions_list)} region(s) scanned</p>
+        </div>
+        """

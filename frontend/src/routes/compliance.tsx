@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Download,
@@ -8,13 +8,10 @@ import {
   XCircle,
   FileText,
   X,
-  Sparkles,
-  ShieldCheck,
-  Filter,
   Check,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useFindings, useProviders, useResources } from "@/hooks/use-api";
+import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/compliance")({
   component: CompliancePage,
@@ -22,445 +19,69 @@ export const Route = createFileRoute("/compliance")({
 
 interface FrameworkCardData {
   id: string;
+  complianceId: string;
   name: string;
   version: string;
   category: "Industry" | "Government" | "Cloud" | "Privacy";
-  providerTarget?: "AZURE" | "OCI" | "AWS" | "GCP" | "ORACLE_SAAS" | "ALL";
+  providerTarget: string;
   totalControls: number;
   score: number;
   passed: number;
   failed: number;
   manual: number;
-  color: string;
   textColor: string;
   strokeColor: string;
 }
 
-const ALL_COMPLIANCE_FRAMEWORKS: FrameworkCardData[] = [
-  // ── Oracle SaaS / Fusion ERP Compliance Frameworks (Exclusively for ORACLE_SAAS) ──
-  {
-    id: "sod-matrix-oracle-saas",
-    name: "Oracle Fusion ERP Separation of Duties (SoD) Matrix",
-    version: "v2024 · 48 Toxic Rule Pairs",
-    category: "Industry",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 48,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "itgc-sox-oracle-saas",
-    name: "SOX 404 ITGC (Oracle Fusion ERP & Financials)",
-    version: "SOX 404 · 86 Controls",
-    category: "Government",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 86,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "soc1-type2-oracle-saas",
-    name: "SOC 1 Type II (Oracle Fusion Cloud Financials)",
-    version: "SSAE 18 / ISAE 3402 · 124 Controls",
-    category: "Industry",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 124,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "oracle-saas-security-baseline",
-    name: "Oracle Fusion SaaS Security Architecture Baseline",
-    version: "v1.2 · 64 Controls",
-    category: "Cloud",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 64,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
+// Framework category/provider labels aren't returned by the API (it only knows
+// requirement counts) — inferred from the real compliance_id/framework name that
+// Prowler assigns, purely for grouping/display.
+function classifyCategory(name: string): FrameworkCardData["category"] {
+  const n = name.toUpperCase();
+  if (n.includes("GDPR") || n.includes("PRIVACY")) return "Privacy";
+  if (n.includes("NIST") || n.includes("FEDRAMP") || n.includes("ECC") || n.includes("CSCC")) return "Government";
+  if (n.includes("CIS") || n.includes("CLOUD") || n.includes("MITRE")) return "Cloud";
+  return "Industry";
+}
 
-  {
-    id: "cis-oci-2.0",
-    name: "CIS Oracle Cloud Infrastructure (OCI) Benchmark",
-    version: "v2.0.0 · 112 Controls",
-    category: "Cloud",
-    providerTarget: "OCI",
-    totalControls: 112,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "cis-oci-3.0",
-    name: "CIS Oracle Cloud Infrastructure (OCI) Benchmark",
-    version: "v3.0.0 · 130 Controls",
-    category: "Cloud",
-    providerTarget: "OCI",
-    totalControls: 130,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "cis-azure-2.0",
-    name: "CIS Microsoft Azure Foundations Benchmark",
-    version: "v2.0.0 · 154 Controls",
-    category: "Cloud",
-    providerTarget: "AZURE",
-    totalControls: 154,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "cis-azure-3.0",
-    name: "CIS Microsoft Azure Foundations Benchmark",
-    version: "v3.0.0 · 172 Controls",
-    category: "Cloud",
-    providerTarget: "AZURE",
-    totalControls: 172,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "cis-aws-3.0",
-    name: "CIS Amazon Web Services (AWS) Foundations Benchmark",
-    version: "v3.0.0 · 168 Controls",
-    category: "Cloud",
-    providerTarget: "AWS",
-    totalControls: 168,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "cis-gcp-2.0",
-    name: "CIS Google Cloud Platform (GCP) Foundations Benchmark",
-    version: "v2.0.0 · 126 Controls",
-    category: "Cloud",
-    providerTarget: "GCP",
-    totalControls: 126,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "nca-ecc-1.2018",
-    name: "NCA Essential Cybersecurity Controls (ECC)",
-    version: "ECC-1:2018 · 114 Controls",
-    category: "Government",
-    providerTarget: "ALL",
-    totalControls: 114,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "nca-cscc-1.2019",
-    name: "NCA Cloud Cybersecurity Controls (CSCC)",
-    version: "CSCC-1:2019 · 152 Controls",
-    category: "Cloud",
-    providerTarget: "ALL",
-    totalControls: 152,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "soc2",
-    name: "SOC 2 Type II (Trust Services Criteria)",
-    version: "2023 · 748 Controls",
-    category: "Industry",
-    providerTarget: "ALL",
-    totalControls: 748,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "iso27001-2022",
-    name: "ISO/IEC 27001:2022 (ISMS)",
-    version: "2022 · 815 Controls",
-    category: "Industry",
-    providerTarget: "ALL",
-    totalControls: 815,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "nist80053",
-    name: "NIST SP 800-53 Security Controls",
-    version: "Rev. 5 · 829 Controls",
-    category: "Government",
-    providerTarget: "ALL",
-    totalControls: 829,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "nist-csf-2.0",
-    name: "NIST Cybersecurity Framework (CSF)",
-    version: "v2.0 · 186 Controls",
-    category: "Government",
-    providerTarget: "ALL",
-    totalControls: 186,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "pci-dss-4.0",
-    name: "PCI-DSS (Payment Card Industry)",
-    version: "v4.0 · 546 Controls",
-    category: "Industry",
-    providerTarget: "ALL",
-    totalControls: 546,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "hipaa",
-    name: "HIPAA Security & Privacy Rule (HITECH)",
-    version: "2023 · 450 Controls",
-    category: "Industry",
-    providerTarget: "ALL",
-    totalControls: 450,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "gdpr",
-    name: "EU General Data Protection Regulation (GDPR)",
-    version: "2016/679 · 373 Controls",
-    category: "Privacy",
-    providerTarget: "ALL",
-    totalControls: 373,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "mitre-attack",
-    name: "MITRE ATT&CK Cloud Matrix",
-    version: "v14.1 · 309 Controls",
-    category: "Cloud",
-    providerTarget: "ALL",
-    totalControls: 309,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "fedramp-moderate",
-    name: "FedRAMP Moderate Baseline",
-    version: "Rev. 5 · 759 Controls",
-    category: "Government",
-    providerTarget: "ALL",
-    totalControls: 759,
-    score: 0,
-    passed: 0,
-    failed: 0,
-    manual: 0,
-    color: "text-muted-foreground",
-    textColor: "text-muted-foreground",
-    strokeColor: "#64748b",
-  },
-  {
-    id: "csa-ccm-4.0",
-    name: "Cloud Security Alliance (CSA CCM)",
-    version: "v4.0 · 214 Controls",
-    category: "Cloud",
-    providerTarget: "ALL",
-    totalControls: 214,
-    score: 79,
-    passed: 170,
-    failed: 36,
-    manual: 8,
-    color: "text-emerald-400",
-    textColor: "text-emerald-400",
-    strokeColor: "#34d399",
-  },
-  {
-    id: "dora-2022",
-    name: "Digital Operational Resilience Act (DORA)",
-    version: "EU 2022/2554 · 160 Controls",
-    category: "Industry",
-    providerTarget: "ALL",
-    totalControls: 160,
-    score: 77,
-    passed: 124,
-    failed: 28,
-    manual: 8,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
-  },
-  {
-    id: "nis2-directive",
-    name: "NIS2 Cybersecurity Directive",
-    version: "EU 2022/2555 · 180 Controls",
-    category: "Government",
-    providerTarget: "ALL",
-    totalControls: 180,
-    score: 75,
-    passed: 135,
-    failed: 35,
-    manual: 10,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
-  },
-  // ── Oracle SaaS / ERP Frameworks ──────────────────────────────────────────
-  {
-    id: "oracle-saas-security-baseline",
-    name: "Oracle Cloud SaaS Security Baseline",
-    version: "v1.0 · 42 Controls",
-    category: "Cloud",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 42,
-    score: 61,
-    passed: 18,
-    failed: 20,
-    manual: 4,
-    color: "text-rose-400",
-    textColor: "text-rose-400",
-    strokeColor: "#fb7185",
-  },
-  {
-    id: "oracle-erp-sod-matrix",
-    name: "Oracle Fusion ERP Separation of Duties (SoD) Matrix",
-    version: "v2024.1 · 28 Controls",
-    category: "Industry",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 28,
-    score: 54,
-    passed: 10,
-    failed: 16,
-    manual: 2,
-    color: "text-rose-400",
-    textColor: "text-rose-400",
-    strokeColor: "#fb7185",
-  },
-  {
-    id: "itgc-erp-controls",
-    name: "IT General Controls (ITGC) for ERP Systems",
-    version: "SOX / COSO · 55 Controls",
-    category: "Industry",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 55,
-    score: 67,
-    passed: 30,
-    failed: 21,
-    manual: 4,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
-  },
-  {
-    id: "soc1-erp-icfr",
-    name: "SOC 1 Type II (Financial Reporting & ICFR)",
-    version: "SSAE 18 / ISAE 3402 · 64 Controls",
-    category: "Industry",
-    providerTarget: "ORACLE_SAAS",
-    totalControls: 64,
-    score: 63,
-    passed: 38,
-    failed: 22,
-    manual: 4,
-    color: "text-amber-400",
-    textColor: "text-amber-400",
-    strokeColor: "#fbbf24",
-  },
-];
+function classifyProviderLabel(complianceId: string): string {
+  const id = complianceId.toLowerCase();
+  if (id.includes("azure")) return "AZURE";
+  if (id.includes("aws")) return "AWS";
+  if (id.includes("gcp")) return "GCP";
+  if (id.includes("oraclecloud") || /(^|_)oci(_|$)/.test(id)) return "OCI";
+  if (id.includes("oracle_saas")) return "ORACLE SAAS";
+  if (id.includes("kubernetes") || /(^|_)k8s(_|$)/.test(id)) return "KUBERNETES";
+  return "Multi-Cloud";
+}
+
+// The underlying real compliance_id/scan-engine name is never shown to users — this
+// product is not branded as Prowler in the UI. Everything else (real check data, real
+// framework identity) stays untouched; only the display label changes.
+function rebrandFrameworkName(name: string): string {
+  return name.replace(/\bProwler\s*/gi, "Digital CISO ").replace(/\s+/g, " ").trim();
+}
+
+function providerDisplayName(value: string): string {
+  const map: Record<string, string> = {
+    aws: "AWS",
+    azure: "Azure",
+    gcp: "GCP",
+    oraclecloud: "OCI",
+    oracle_saas: "Oracle SaaS",
+    kubernetes: "Kubernetes",
+    m365: "M365",
+    github: "GitHub",
+  };
+  return map[value] || value.toUpperCase();
+}
+
+function scoreColors(score: number, total: number): { text: string; stroke: string } {
+  if (total === 0) return { text: "text-muted-foreground", stroke: "#64748b" };
+  if (score >= 75) return { text: "text-emerald-400", stroke: "#34d399" };
+  if (score >= 60) return { text: "text-amber-400", stroke: "#fbbf24" };
+  return { text: "text-rose-400", stroke: "#fb7185" };
+}
 
 function CircularScoreRing({ score, strokeColor }: { score: number; strokeColor: string }) {
   const radius = 22;
@@ -470,14 +91,7 @@ function CircularScoreRing({ score, strokeColor }: { score: number; strokeColor:
   return (
     <div className="relative flex items-center justify-center h-14 w-14">
       <svg className="h-14 w-14 -rotate-90" viewBox="0 0 52 52">
-        <circle
-          cx="26"
-          cy="26"
-          r={radius}
-          fill="transparent"
-          stroke="#1e293b"
-          strokeWidth="4"
-        />
+        <circle cx="26" cy="26" r={radius} fill="transparent" stroke="#1e293b" strokeWidth="4" />
         <circle
           cx="26"
           cy="26"
@@ -491,9 +105,7 @@ function CircularScoreRing({ score, strokeColor }: { score: number; strokeColor:
           className="transition-all duration-700 ease-out"
         />
       </svg>
-      <span className="absolute font-mono text-xs font-bold text-foreground">
-        {score}%
-      </span>
+      <span className="absolute font-mono text-xs font-bold text-foreground">{score}%</span>
     </div>
   );
 }
@@ -506,14 +118,7 @@ function FleetCircularGauge({ score }: { score: number }) {
   return (
     <div className="relative flex items-center justify-center h-16 w-16 shrink-0">
       <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
-        <circle
-          cx="32"
-          cy="32"
-          r={radius}
-          fill="transparent"
-          stroke="#1e293b"
-          strokeWidth="5"
-        />
+        <circle cx="32" cy="32" r={radius} fill="transparent" stroke="#1e293b" strokeWidth="5" />
         <circle
           cx="32"
           cy="32"
@@ -527,53 +132,12 @@ function FleetCircularGauge({ score }: { score: number }) {
           className="transition-all duration-700 ease-out"
         />
       </svg>
-      <span className="absolute font-mono text-sm font-black text-emerald-400">
-        {score}%
-      </span>
+      <span className="absolute font-mono text-sm font-black text-emerald-400">{score}%</span>
     </div>
   );
 }
 
-function getProviderOfFinding(f: any): "AZURE" | "OCI" | "AWS" | "GCP" | "KUBERNETES" | "ORACLE_SAAS" | "OTHER" {
-  const meta = f.check_metadata || f.raw_result || {};
-  let p = "";
-  if (typeof meta.provider === "string" && meta.provider) p = meta.provider.toUpperCase();
-  else if (typeof f.provider === "string" && f.provider && f.provider !== "[object Object]") p = f.provider.toUpperCase();
-  else if (f.provider && typeof f.provider === "object" && typeof f.provider.provider === "string") p = f.provider.provider.toUpperCase();
-  else if (f.scan?.provider && typeof f.scan.provider === "object" && typeof f.scan.provider.provider === "string") p = f.scan.provider.provider.toUpperCase();
-  else if (typeof f.provider_type === "string" && f.provider_type) p = f.provider_type.toUpperCase();
-
-  // 1. Explicit Provider string check (highest precedence)
-  if (p === "ORACLE_SAAS" || p === "ORACLE-SAAS" || p === "SAAS") return "ORACLE_SAAS";
-  if (p === "OCI" || p === "ORACLECLOUD" || p === "ORACLE_CLOUD") return "OCI";
-  if (p === "AZURE" || p === "AZ") return "AZURE";
-  if (p === "AWS") return "AWS";
-  if (p === "GCP") return "GCP";
-  if (p === "KUBERNETES" || p === "K8S") return "KUBERNETES";
-
-  // 2. Explicit Check ID prefix check
-  const checkId = String(f.check_id || meta.checkid || meta.check_id || "").toLowerCase();
-  if (checkId.startsWith("oracle_saas_") || checkId.startsWith("erp_")) return "ORACLE_SAAS";
-  if (checkId.startsWith("oci_") || checkId.startsWith("oraclecloud_")) return "OCI";
-  if (checkId.startsWith("azure_") || checkId.startsWith("entra_") || checkId.startsWith("defender_")) return "AZURE";
-  if (checkId.startsWith("aws_")) return "AWS";
-  if (checkId.startsWith("gcp_")) return "GCP";
-  if (checkId.startsWith("k8s_")) return "KUBERNETES";
-
-  // 3. Resource UID / ID fallback check
-  const uid = String(f.uid || f.id || f.prowler_uid || f.resources?.[0]?.uid || f.resource_uid || "").toLowerCase();
-  if (uid.includes("oracle-saas://") || uid.includes("fusion") || uid.includes("saas")) return "ORACLE_SAAS";
-  if (uid.includes("ocid1.") || uid.includes("oraclecloud") || uid.includes("oci")) return "OCI";
-  if (uid.includes("/subscriptions/") || uid.includes("azure") || uid.includes("prowler-azure")) return "AZURE";
-  if (uid.includes("arn:aws:") || uid.includes("aws")) return "AWS";
-  if (uid.includes("projects/") || uid.includes("gcp")) return "GCP";
-  if (uid.includes("k8s") || uid.includes("kube")) return "KUBERNETES";
-
-  return "AZURE";
-}
-
 function CompliancePage() {
-  const { data: findingsData } = useFindings();
   const { data: providersData } = useProviders();
   const { data: resourcesData } = useResources();
 
@@ -583,200 +147,155 @@ function CompliancePage() {
   const [viewMode, setViewMode] = useState<"cards" | "matrix">("cards");
   const [selectedFramework, setSelectedFramework] = useState<FrameworkCardData | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
-
-  // Derive real statistics from database findings
-  const rawFindings = findingsData?.items ?? [];
-  const realResources = resourcesData?.items ?? [];
-
-  // Connected providers from database
-  const connectedProviders = useMemo(() => {
-    const list = (providersData?.items as Array<Record<string, unknown>>) || [];
-    return list.map((p) => {
-      const provStr = String(p.provider || "").toUpperCase();
-      const provType = provStr === "ORACLECLOUD" ? "OCI" : provStr;
-      return {
-        id: String(p.id),
-        alias: String(p.alias || p.name || provType),
-        providerUpper: provType,
-      };
-    });
-  }, [providersData]);
-
-  // Set of upper-case connected provider names
-  const connectedProviderSet = useMemo(() => {
-    const set = new Set(connectedProviders.map((p) => p.providerUpper));
-    if (set.size === 0) set.add("AZURE"); // Default fallback
-    return set;
-  }, [connectedProviders]);
-
-  // Categorize real findings by provider
-  const findingsByProvider = useMemo(() => {
-    const azure: any[] = [];
-    const oci: any[] = [];
-    const aws: any[] = [];
-    const gcp: any[] = [];
-    const kubernetes: any[] = [];
-    const oracle_saas: any[] = [];
-    const all: any[] = rawFindings;
-
-    rawFindings.forEach((f: any) => {
-      const p = getProviderOfFinding(f);
-      if (p === "AZURE") azure.push(f);
-      else if (p === "OCI") oci.push(f);
-      else if (p === "AWS") aws.push(f);
-      else if (p === "GCP") gcp.push(f);
-      else if (p === "KUBERNETES") kubernetes.push(f);
-      else if (p === "ORACLE_SAAS") oracle_saas.push(f);
-    });
-
-    return { azure, oci, aws, gcp, kubernetes, oracle_saas, all };
-  }, [rawFindings]);
-
-  const realFindings = useMemo(() => {
-    if (selectedProvider === "AZURE") return findingsByProvider.azure;
-    if (selectedProvider === "OCI") return findingsByProvider.oci;
-    if (selectedProvider === "AWS") return findingsByProvider.aws;
-    if (selectedProvider === "GCP") return findingsByProvider.gcp;
-    if (selectedProvider === "KUBERNETES") return findingsByProvider.kubernetes;
-    if (selectedProvider === "ORACLE_SAAS") return findingsByProvider.oracle_saas;
-    return findingsByProvider.all;
-  }, [findingsByProvider, selectedProvider]);
-
-  const realPassCount = realFindings.filter((f: any) => f.status === "PASS").length;
-  const realTotal = realFindings.length || 1;
-
-  // Fleet Compliance dynamic computation
-  const fleetScore = realFindings.length > 0
-    ? Math.round((realPassCount / realTotal) * 100)
-    : 0;
-
-  const totalAssetsCount = realResources.length;
-
   const [modalSearchTerm, setModalSearchTerm] = useState("");
   const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL">("ALL");
 
-  // Dynamically compute framework metrics strictly based on their target provider's live findings
-  const dynamicFrameworks = useMemo(() => {
-    return ALL_COMPLIANCE_FRAMEWORKS
-      // Filter out frameworks for un-added cloud providers (keep ALL/universal + connected)
-      .filter((fw) => {
-        if (!fw.providerTarget || fw.providerTarget === "ALL") return true;
-        return connectedProviderSet.has(fw.providerTarget);
-      })
-      .map((fw) => {
-        let targetList: any[] = [];
-        if (fw.providerTarget === "AZURE") targetList = findingsByProvider.azure;
-        else if (fw.providerTarget === "OCI") targetList = findingsByProvider.oci;
-        else if (fw.providerTarget === "AWS") targetList = findingsByProvider.aws;
-        else if (fw.providerTarget === "GCP") targetList = findingsByProvider.gcp;
-        else if (fw.providerTarget === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
-        else {
-          if (selectedProvider === "AZURE") targetList = findingsByProvider.azure;
-          else if (selectedProvider === "OCI") targetList = findingsByProvider.oci;
-          else if (selectedProvider === "AWS") targetList = findingsByProvider.aws;
-          else if (selectedProvider === "GCP") targetList = findingsByProvider.gcp;
-          else if (selectedProvider === "ORACLE_SAAS") targetList = findingsByProvider.oracle_saas;
-          else targetList = rawFindings;
-        }
+  const realResources = resourcesData?.items ?? [];
+  const totalAssetsCount = realResources.length;
 
-        const fwPass = targetList.filter((f: any) => f.status === "PASS").length;
-        const fwFail = targetList.filter((f: any) => f.status === "FAIL" || f.status === "FAILING").length;
-        const fwManual = targetList.filter((f: any) => f.status === "MANUAL").length;
-        const fwTotal = targetList.length;
+  // Connected providers, deduped by provider type (one dropdown entry per cloud, not per account).
+  const connectedProviders = useMemo(() => {
+    const list = (providersData?.items as Array<Record<string, unknown>>) || [];
+    const seen = new Map<string, { value: string; alias: string }>();
+    list.forEach((p) => {
+      const value = String(p.provider || "").toLowerCase();
+      if (!value || seen.has(value)) return;
+      seen.set(value, { value, alias: String(p.alias || p.name || providerDisplayName(value)) });
+    });
+    return Array.from(seen.values());
+  }, [providersData]);
 
-        let passed = 0;
-        let failed = 0;
-        let manual = 0;
-        let score = 0;
+  // Real backend requires either a scan_id or a provider filter — no "give me everything" mode.
+  const complianceParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (selectedProvider === "ALL") {
+      if (connectedProviders.length === 0) return undefined;
+      params["filter[provider_type__in]"] = connectedProviders.map((p) => p.value).join(",");
+    } else {
+      params["filter[provider_type]"] = selectedProvider;
+    }
+    return params;
+  }, [selectedProvider, connectedProviders]);
 
-        if (fwTotal > 0) {
-          passed = fwPass;
-          failed = fwFail;
-          manual = fwManual;
-          const evaluatedTotal = Math.max(1, passed + failed);
-          score = Math.round((passed / evaluatedTotal) * 100);
-        }
+  const { data: complianceData, isLoading: complianceLoading, isFetching: complianceFetching } =
+    useCompliance(complianceParams);
 
-        return {
-          ...fw,
-          passed,
-          failed,
-          manual,
-          totalControls: fwTotal > 0 ? fwTotal : fw.totalControls,
-          score,
-          strokeColor: score >= 75 ? "#34d399" : score >= 60 ? "#fbbf24" : fwTotal > 0 ? "#fb7185" : "#64748b",
-          textColor: score >= 75 ? "text-emerald-400" : score >= 60 ? "text-amber-400" : fwTotal > 0 ? "text-rose-400" : "text-muted-foreground",
-        };
-      });
-  }, [findingsByProvider, rawFindings, connectedProviderSet, selectedProvider]);
+  // Real per-framework requirement counts from ComplianceOverviewViewSet — dedup-safe by
+  // requirement_id server-side, so passed + failed can never exceed total here.
+  const dynamicFrameworks: FrameworkCardData[] = useMemo(() => {
+    const items = (complianceData?.items as Array<Record<string, any>>) ?? [];
+    return items.map((item) => {
+      const passed = Number(item.requirements_passed) || 0;
+      const failed = Number(item.requirements_failed) || 0;
+      const manual = Number(item.requirements_manual) || 0;
+      const total = Number(item.total_requirements) || 0;
+      const evaluated = Math.max(1, passed + failed);
+      const score = total > 0 ? Math.round((passed / evaluated) * 100) : 0;
+      const colors = scoreColors(score, total);
+function formatFrameworkDisplayName(framework: string, complianceId: string): string {
+  const idLower = (complianceId || "").toLowerCase();
+  const fwUpper = (framework || "").toUpperCase();
+  if (fwUpper === "CIS" || fwUpper === "CIS BENCHMARK" || fwUpper.startsWith("CIS_")) {
+    if (idLower.includes("oraclecloud") || idLower.includes("oci")) {
+      return "CIS Oracle Cloud Infrastructure (OCI) Benchmark";
+    }
+    if (idLower.includes("oracle_saas") || idLower.includes("saas")) {
+      return "CIS Oracle SaaS Foundations Benchmark";
+    }
+    if (idLower.includes("azure")) {
+      return "CIS Microsoft Azure Foundations Benchmark";
+    }
+    if (idLower.includes("aws")) {
+      return "CIS AWS Foundations Benchmark";
+    }
+    if (idLower.includes("gcp")) {
+      return "CIS Google Cloud Platform Benchmark";
+    }
+    if (idLower.includes("k8s") || idLower.includes("kubernetes")) {
+      return "CIS Kubernetes Benchmark";
+    }
+    return "CIS Foundations Benchmark";
+  }
+  return framework;
+}
+
+      const complianceId = String(item.id ?? "");
+      const rawFramework = String(item.framework || complianceId || "");
+      const displayName = rebrandFrameworkName(formatFrameworkDisplayName(rawFramework, complianceId));
+
+      return {
+        id: complianceId,
+        complianceId,
+        name: displayName,
+        version: String(item.version || ""),
+        category: classifyCategory(displayName),
+        providerTarget: classifyProviderLabel(complianceId),
+        totalControls: total,
+        score,
+        passed,
+        failed,
+        manual,
+        textColor: colors.text,
+        strokeColor: colors.stroke,
+      };
+    });
+  }, [complianceData]);
+
+  const fleetScore = useMemo(() => {
+    const totals = dynamicFrameworks.reduce(
+      (acc, f) => ({ passed: acc.passed + f.passed, failed: acc.failed + f.failed }),
+      { passed: 0, failed: 0 }
+    );
+    const evaluated = totals.passed + totals.failed;
+    return evaluated > 0 ? Math.round((totals.passed / evaluated) * 100) : 0;
+  }, [dynamicFrameworks]);
 
   const filteredFrameworks = useMemo(() => {
     return dynamicFrameworks.filter((f) => {
       if (selectedCategory !== "All" && f.category !== selectedCategory) return false;
-
-      // Oracle SaaS ERP frameworks are strictly displayed when ORACLE_SAAS is selected
-      if (f.providerTarget === "ORACLE_SAAS" && selectedProvider !== "ORACLE_SAAS") {
-        return false;
-      }
-
-      if (selectedProvider !== "ALL") {
-        if (f.providerTarget && f.providerTarget !== "ALL" && f.providerTarget !== selectedProvider) {
-          return false;
-        }
-      }
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         return f.name.toLowerCase().includes(q) || f.version.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [dynamicFrameworks, selectedCategory, selectedProvider, searchTerm]);
+  }, [dynamicFrameworks, selectedCategory, searchTerm]);
 
-  // Specific findings to display inside the selected framework modal
-  const modalFindings = useMemo(() => {
-    if (!selectedFramework) return [];
-    let list: any[] = [];
-    if (selectedFramework.providerTarget === "AZURE") list = findingsByProvider.azure;
-    else if (selectedFramework.providerTarget === "OCI") list = findingsByProvider.oci;
-    else if (selectedFramework.providerTarget === "AWS") list = findingsByProvider.aws;
-    else if (selectedFramework.providerTarget === "GCP") list = findingsByProvider.gcp;
-    else if (selectedFramework.providerTarget === "ORACLE_SAAS") list = findingsByProvider.oracle_saas;
-    else list = rawFindings;
+  // Real per-requirement drilldown for the framework open in the modal.
+  const requirementsParams = useMemo(() => {
+    if (!selectedFramework || !complianceParams) return undefined;
+    return { "filter[compliance_id]": selectedFramework.complianceId, ...complianceParams };
+  }, [selectedFramework, complianceParams]);
 
-    if (selectedProvider !== "ALL") {
-      list = list.filter((f: any) => getProviderOfFinding(f) === selectedProvider);
-    }
+  const { data: modalRequirements, isLoading: requirementsLoading } = useComplianceRequirements(requirementsParams);
 
-    return list;
-  }, [selectedFramework, rawFindings, findingsByProvider, selectedProvider]);
-
-  const filteredModalFindings = useMemo(() => {
-    return modalFindings.filter((f: any) => {
-      if (modalStatusFilter !== "ALL" && f.status !== modalStatusFilter) return false;
+  const filteredModalRequirements = useMemo(() => {
+    const list = (modalRequirements as Array<Record<string, any>>) ?? [];
+    return list.filter((r) => {
+      if (modalStatusFilter !== "ALL" && r.status !== modalStatusFilter) return false;
       if (modalSearchTerm.trim()) {
         const q = modalSearchTerm.toLowerCase();
-        const checkId = (f.check_id || "").toLowerCase();
-        const title = (f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || "").toLowerCase();
-        const res = (f.resource_name || f.resource?.name || f.resource_id || "").toLowerCase();
-        return checkId.includes(q) || title.includes(q) || res.includes(q);
+        return String(r.id || "").toLowerCase().includes(q) || String(r.description || "").toLowerCase().includes(q);
       }
       return true;
     });
-  }, [modalFindings, modalStatusFilter, modalSearchTerm]);
+  }, [modalRequirements, modalStatusFilter, modalSearchTerm]);
 
   const handleExportEvidence = () => {
     setExportSuccess(true);
     const content = JSON.stringify(
       {
-        tenant: "Enterprise Managed Security Tenant",
         generated_at: new Date().toISOString(),
         fleet_compliance_score: `${fleetScore}%`,
         frameworks: dynamicFrameworks.map((f) => ({
           framework: f.name,
           version: f.version,
+          compliance_id: f.complianceId,
+          total_controls: f.totalControls,
           score: `${f.score}%`,
           passed: f.passed,
           failed: f.failed,
+          manual: f.manual,
         })),
       },
       null,
@@ -791,14 +310,17 @@ function CompliancePage() {
     setTimeout(() => setExportSuccess(false), 3000);
   };
 
+  const noFrameworksYet = !complianceLoading && !complianceFetching && dynamicFrameworks.length === 0;
+
   return (
     <AppShell
       title="Compliance & Governance"
-      subtitle="Multi-framework regulatory alignment and automated audit evidence mapping"
+      subtitle="Multi-framework regulatory alignment computed from real scan results"
       actions={
         <button
           onClick={handleExportEvidence}
-          className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95"
+          disabled={dynamicFrameworks.length === 0}
+          className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Download className="h-3.5 w-3.5 text-primary" />
           <span>{exportSuccess ? "Exported Evidence Pack!" : "Export Audit Evidence"}</span>
@@ -811,63 +333,51 @@ function CompliancePage() {
           <div className="flex items-center gap-5">
             <FleetCircularGauge score={fleetScore} />
             <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="font-display text-base sm:text-lg font-bold text-foreground">
-                  Fleet Compliance: {fleetScore}%
-                </h2>
-                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
-                  +3.4% 30d
-                </span>
-              </div>
+              <h2 className="font-display text-base sm:text-lg font-bold text-foreground">
+                Fleet Compliance: {fleetScore}%
+              </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {dynamicFrameworks.length} frameworks continuously evaluated across {totalAssetsCount} discovered cloud assets
+                {dynamicFrameworks.length} framework{dynamicFrameworks.length === 1 ? "" : "s"} evaluated from real scan data across {totalAssetsCount} discovered cloud assets
               </p>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Dynamic Provider Filter Dropdown (Only configured providers) */}
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="h-9 rounded-xl border border-border bg-surface-2/60 px-3 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
             >
-              <option value="ALL">All Connected Environments ({connectedProviders.length || 1})</option>
+              <option value="ALL">All Connected Environments ({connectedProviders.length})</option>
               {connectedProviders.map((p) => (
-                <option key={p.id} value={p.providerUpper}>
-                  {p.alias} ({p.providerUpper})
+                <option key={p.value} value={p.value}>
+                  {p.alias} ({providerDisplayName(p.value)})
                 </option>
               ))}
             </select>
 
-            {/* Search Input */}
             <div className="relative min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search 24+ frameworks..."
+                placeholder="Search evaluated frameworks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-xl border border-border bg-surface-2/60 pl-9 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"
               />
             </div>
 
-            {/* View Mode Toggle */}
             <div className="flex items-center rounded-xl border border-border bg-surface-2/60 p-0.5">
               <button
                 onClick={() => setViewMode("cards")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "cards"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "cards" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 Cards
               </button>
               <button
                 onClick={() => setViewMode("matrix")}
-                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "matrix"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${viewMode === "matrix" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 Matrix
@@ -892,8 +402,20 @@ function CompliancePage() {
           ))}
         </div>
 
-        {/* ── Frameworks Cards Grid ── */}
-        {viewMode === "cards" ? (
+        {complianceLoading || complianceFetching ? (
+          <div className="rounded-2xl border border-border/80 bg-surface/90 p-12 text-center text-sm text-muted-foreground">
+            Loading real framework results…
+          </div>
+        ) : noFrameworksYet ? (
+          <div className="rounded-2xl border border-border/80 bg-surface/90 p-12 text-center space-y-1">
+            <p className="text-sm font-semibold text-foreground">No compliance data for this selection yet</p>
+            <p className="text-xs text-muted-foreground">
+              {connectedProviders.length === 0
+                ? "Connect a cloud provider and run a scan to populate compliance frameworks."
+                : "This provider hasn't completed a scan yet, or its compliance overview is still being computed. Try again shortly."}
+            </p>
+          </div>
+        ) : viewMode === "cards" ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredFrameworks.map((fw) => (
               <div
@@ -905,19 +427,17 @@ function CompliancePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span className="inline-block rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-border">
-                        {fw.category} {fw.providerTarget && fw.providerTarget !== "ALL" ? `· ${fw.providerTarget}` : ""}
+                        {fw.category} · {fw.providerTarget}
                       </span>
                       <h3 className="mt-2 text-sm font-bold text-foreground leading-snug group-hover:text-primary transition-colors">
                         {fw.name}
                       </h3>
                       <p className="mt-0.5 text-[11px] text-muted-foreground font-mono">
-                        {fw.version}
+                        {fw.version ? `${fw.version} · ` : ""}
+                        {fw.totalControls} Controls
                       </p>
                     </div>
-                    <CircularScoreRing
-                      score={fw.score}
-                      strokeColor={fw.strokeColor}
-                    />
+                    <CircularScoreRing score={fw.score} strokeColor={fw.strokeColor} />
                   </div>
                 </div>
 
@@ -966,7 +486,7 @@ function CompliancePage() {
                       <td className="px-4 py-3 font-semibold text-foreground">
                         {fw.name}
                         <span className="block text-[10px] text-muted-foreground font-mono font-normal">
-                          {fw.version}
+                          {fw.version} · {fw.totalControls} controls
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -974,30 +494,13 @@ function CompliancePage() {
                           {fw.category}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
-                        {fw.providerTarget ?? "Multi-Cloud"}
-                      </td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">{fw.providerTarget}</td>
                       <td className="px-4 py-3 text-center">
-                        <span
-                          className={`font-mono font-bold ${fw.score >= 75
-                              ? "text-emerald-400"
-                              : fw.score >= 60
-                                ? "text-amber-400"
-                                : "text-rose-400"
-                            }`}
-                        >
-                          {fw.score}%
-                        </span>
+                        <span className={`font-mono font-bold ${fw.textColor}`}>{fw.score}%</span>
                       </td>
-                      <td className="px-4 py-3 text-center font-mono text-emerald-400">
-                        {fw.passed}
-                      </td>
-                      <td className="px-4 py-3 text-center font-mono text-rose-400">
-                        {fw.failed}
-                      </td>
-                      <td className="px-4 py-3 text-center font-mono text-indigo-400">
-                        {fw.manual}
-                      </td>
+                      <td className="px-4 py-3 text-center font-mono text-emerald-400">{fw.passed}</td>
+                      <td className="px-4 py-3 text-center font-mono text-rose-400">{fw.failed}</td>
+                      <td className="px-4 py-3 text-center font-mono text-indigo-400">{fw.manual}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={(e) => {
@@ -1026,12 +529,8 @@ function CompliancePage() {
                   <span className="inline-block rounded-full bg-surface-2 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary border border-primary/20">
                     {selectedFramework.category} Compliance Standard
                   </span>
-                  <h3 className="mt-2 text-lg font-bold text-foreground">
-                    {selectedFramework.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {selectedFramework.version}
-                  </p>
+                  <h3 className="mt-2 text-lg font-bold text-foreground">{selectedFramework.name}</h3>
+                  <p className="text-xs text-muted-foreground font-mono">{selectedFramework.version}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -1047,27 +546,19 @@ function CompliancePage() {
 
               <div className="mt-6 grid grid-cols-4 gap-3 rounded-xl border border-border bg-surface-2/40 p-4 text-center">
                 <div>
-                  <div className="font-mono text-base font-bold text-foreground">
-                    {selectedFramework.score}%
-                  </div>
+                  <div className="font-mono text-base font-bold text-foreground">{selectedFramework.score}%</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Control Score</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-emerald-400">
-                    {selectedFramework.passed}
-                  </div>
+                  <div className="font-mono text-base font-bold text-emerald-400">{selectedFramework.passed}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Controls Passed</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-rose-400">
-                    {selectedFramework.failed}
-                  </div>
+                  <div className="font-mono text-base font-bold text-rose-400">{selectedFramework.failed}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Violations / Failed</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-indigo-400">
-                    {selectedFramework.manual}
-                  </div>
+                  <div className="font-mono text-base font-bold text-indigo-400">{selectedFramework.manual}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Manual Audits</div>
                 </div>
               </div>
@@ -1075,16 +566,14 @@ function CompliancePage() {
               <div className="mt-6 space-y-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Audit Telemetry Controls Evaluated ({modalFindings.length} Live Checks)
+                    Requirements Evaluated ({(modalRequirements ?? []).length})
                   </h4>
                   <div className="flex items-center gap-1.5">
                     {(["ALL", "FAIL", "PASS", "MANUAL"] as const).map((st) => (
                       <button
                         key={st}
                         onClick={() => setModalStatusFilter(st)}
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${modalStatusFilter === st
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-surface-2 text-muted-foreground hover:text-foreground"
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${modalStatusFilter === st ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
                           }`}
                       >
                         {st}
@@ -1093,12 +582,12 @@ function CompliancePage() {
                   </div>
                 </div>
 
-                {modalFindings.length > 5 && (
+                {(modalRequirements ?? []).length > 5 && (
                   <div className="relative">
                     <Search className="absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder="Search check ID, title, or resource..."
+                      placeholder="Search requirement ID or description..."
                       value={modalSearchTerm}
                       onChange={(e) => setModalSearchTerm(e.target.value)}
                       className="w-full rounded-lg border border-border bg-surface-2/60 pl-8.5 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
@@ -1107,30 +596,29 @@ function CompliancePage() {
                 )}
 
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {modalFindings.length === 0 ? (
+                  {requirementsLoading ? (
+                    <div className="rounded-xl border border-border/60 bg-surface-2/30 p-8 text-center text-xs text-muted-foreground">
+                      Loading requirement telemetry…
+                    </div>
+                  ) : (modalRequirements ?? []).length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-surface-2/30 p-8 text-center text-xs text-muted-foreground space-y-1">
                       <p className="font-semibold text-foreground">No Live Scan Telemetry for {selectedFramework.name}</p>
                       <p className="text-muted-foreground">
-                        No continuous posture audit has been executed for this cloud architecture yet. Configure credentials and run a scan to evaluate live rules.
+                        No continuous posture audit has produced requirement-level data for this framework yet.
                       </p>
                     </div>
-                  ) : filteredModalFindings.length === 0 ? (
+                  ) : filteredModalRequirements.length === 0 ? (
                     <div className="rounded-lg border border-border/60 bg-surface-2/30 p-6 text-center text-xs text-muted-foreground">
-                      No checks match your current filter.
+                      No requirements match your current filter.
                     </div>
                   ) : (
-                    filteredModalFindings.map((f: any, i: number) => {
-                      const checkId = f.check_id || `check_${i + 1}`;
-                      const title = f.check_metadata?.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
-                      const resName = f.resource_name || f.resource?.name || f.resource_id || "Cloud Resource";
-                      const isPass = f.status === "PASS";
-                      const isManual = f.status === "MANUAL";
-                      const provider = f.provider || f.provider_type || "Cloud";
-                      const region = f.region || "global";
+                    filteredModalRequirements.map((r: any, i: number) => {
+                      const isPass = r.status === "PASS";
+                      const isManual = r.status === "MANUAL";
 
                       return (
                         <div
-                          key={`${f.id || "finding"}-${i}`}
+                          key={`${r.id || "req"}-${i}`}
                           className="flex items-start justify-between rounded-lg border border-border bg-surface-2/60 p-3 text-xs gap-3"
                         >
                           <div className="space-y-1">
@@ -1142,13 +630,9 @@ function CompliancePage() {
                               ) : (
                                 <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
                               )}
-                              <span className="font-semibold text-foreground">
-                                {title}
-                              </span>
+                              <span className="font-semibold text-foreground font-mono">{r.id}</span>
                             </div>
-                            <p className="text-[11px] text-muted-foreground font-mono pl-6">
-                              Target: {resName} · {String(provider).toUpperCase()} ({region})
-                            </p>
+                            <p className="text-[11px] text-muted-foreground pl-6">{r.description}</p>
                           </div>
                           <span
                             className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase shrink-0 ${isPass
@@ -1158,7 +642,7 @@ function CompliancePage() {
                                   : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                               }`}
                           >
-                            {f.status || "FAIL"}
+                            {r.status || "FAIL"}
                           </span>
                         </div>
                       );
@@ -1168,10 +652,7 @@ function CompliancePage() {
               </div>
 
               <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs">
-                <Link
-                  to="/findings"
-                  className="font-semibold text-primary hover:underline"
-                >
+                <Link to="/findings" className="font-semibold text-primary hover:underline">
                   Open Findings Telemetry →
                 </Link>
                 <button

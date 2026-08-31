@@ -1117,10 +1117,11 @@ def perform_prowler_scan(
             return None
         scan_instance.state = StateChoices.EXECUTING
         scan_instance.started_at = datetime.now(tz=UTC)
+        scan_instance.progress = 5
         _save_scan_instance(
             scan_instance,
             provider_id,
-            ["state", "started_at", "updated_at"],
+            ["state", "started_at", "progress", "updated_at"],
         )
 
     # Find the mutelist processor if it exists
@@ -1178,6 +1179,15 @@ def perform_prowler_scan(
         if exc:
             raise exc
 
+        # Update progress to indicate provider authentication & discovery is complete
+        with rls_transaction(tenant_id):
+            scan_instance.progress = 10
+            _save_scan_instance(
+                scan_instance,
+                provider_id,
+                ["progress", "updated_at"],
+            )
+
         prowler_scan = ProwlerScan(provider=prowler_provider, checks=checks_to_execute)
 
         resource_cache = {}
@@ -1185,14 +1195,10 @@ def perform_prowler_scan(
         last_status_cache = {}
         resource_failed_findings_cache = defaultdict(int)
 
-        # Throttle scan_instance progress writes to avoid hammering the writer:
-        # only persist when progress moves by at least `PROGRESS_THROTTLE_DELTA`
-        # OR `PROGRESS_THROTTLE_SECONDS` have elapsed. The final progress (100)
-        # always persists in the `finally` block below.
-        last_persisted_progress = -1.0
-        last_persisted_progress_at = 0.0
+        last_persisted_progress = 10
+        last_persisted_progress_at = time.time()
 
-        for progress, findings in prowler_scan.scan():
+        for raw_progress, findings in prowler_scan.scan():
             # Process findings in micro-batches
             findings_list = list(findings)
             total_findings = len(findings_list)
@@ -1218,23 +1224,21 @@ def perform_prowler_scan(
                     group_resources_cache=group_resources_cache,
                 )
 
-            # Throttled progress save (the final save in the `finally` block
-            # below always runs regardless of throttle).
+            # Scale raw check execution progress (0-100) into 10-95% of overall job
+            current_progress = max(10, min(95, int(round(10 + (raw_progress * 0.85)))))
             now = time.time()
-            progress_delta = progress - last_persisted_progress
-            elapsed = now - last_persisted_progress_at
             if (
-                progress_delta >= PROGRESS_THROTTLE_DELTA
-                or elapsed >= PROGRESS_THROTTLE_SECONDS
+                current_progress > last_persisted_progress
+                or (now - last_persisted_progress_at) >= 2.0
             ):
                 with rls_transaction(tenant_id):
-                    scan_instance.progress = progress
+                    scan_instance.progress = current_progress
                     _save_scan_instance(
                         scan_instance,
                         provider_id,
                         ["progress", "updated_at"],
                     )
-                last_persisted_progress = progress
+                last_persisted_progress = current_progress
                 last_persisted_progress_at = now
 
         scan_instance.state = StateChoices.COMPLETED

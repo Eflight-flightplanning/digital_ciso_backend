@@ -1,4 +1,15 @@
+import os
+import sys
 import warnings
+
+# Ensure backend and repository root (containing prowler/) are in sys.path
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+repo_root = os.path.dirname(backend_dir)
+for path in (backend_dir, repo_root):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.django.devel")
 
 from celery import Celery, Task
 from config.env import env
@@ -11,6 +22,7 @@ warnings.filterwarnings(
 BROKER_VISIBILITY_TIMEOUT = env.int("DJANGO_BROKER_VISIBILITY_TIMEOUT", default=86400)
 
 celery_app = Celery("tasks")
+
 
 celery_app.config_from_object("django.conf:settings", namespace="CELERY")
 celery_app.conf.update(result_extended=True, result_expires=None)

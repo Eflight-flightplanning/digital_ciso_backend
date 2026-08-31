@@ -18,11 +18,18 @@ This document contains the complete, step-by-step production deployment guide fo
   Node.js (Port 3000)                                 Gunicorn (Port 8000)
   systemd: digital_ciso_frontend                       systemd: digital_ciso
                                                              │
-         ┌───────────────────────────────────────────────────┼────────────────────────┬──────────────────────┐
-         ▼                                                   ▼                        ▼                      ▼
-[ Azure PostgreSQL Flexible ]                      [ Azure Private vLLM ]    [ Oracle Fusion SaaS ]   [ Neo4j Enterprise ]
-  Private DNS / SSL Required                         Private VNet (Port 8000)   SCIM 2.0 REST API       Attack Paths graph
-  Multi-Tenant / 279 Findings                        Qwen 2.5 Security Model    Dormant PAM Remediation  Bolt (7687) / systemd: neo4j
+         ┌───────────────────┬───────────────────────────────┼────────────────────────┬──────────────────────┐
+         ▼                   ▼                               ▼                        ▼                      ▼
+[ Celery Worker + Beat ]  [ Valkey / Redis ]      [ Azure Private vLLM ]    [ Oracle Fusion SaaS ]   [ Neo4j Enterprise ]
+  systemd: digital_ciso_    Broker (6379)           Private VNet (Port 8000)   SCIM 2.0 REST API       Attack Paths graph
+  worker / _beat            Required — compliance/   Qwen 2.5 Security Model    Dormant PAM Remediation  Bolt (7687) / systemd: neo4j
+  Computes compliance,      dashboard/report data
+  dashboard & report data   depend on this
+         │
+         ▼
+[ Azure PostgreSQL Flexible ]
+  Private DNS / SSL Required
+  Multi-Tenant
 ```
 
 ---
@@ -113,7 +120,7 @@ JIRA_USER_EMAIL=alex.ciso@eflight.aero
 JIRA_API_TOKEN=<JIRA_API_TOKEN>
 JIRA_DEFAULT_PROJECT=SEC
 
-# Neo4j (Attack Paths graph — see Section 8.5 for install)
+# Neo4j (Attack Paths graph — see Section 10.1 for install)
 NEO4J_HOST=127.0.0.1
 NEO4J_PORT=7687
 NEO4J_USER=neo4j
@@ -160,9 +167,103 @@ sudo systemctl status digital_ciso
 
 ---
 
-## ⚛️ 5. Frontend Node.js Systemd Service (`digital_ciso_frontend.service`)
+## 🥕 5. Celery Worker & Beat (`digital_ciso_worker.service`, `digital_ciso_beat.service`)
 
-### 5.1 Build TanStack Start for Standalone Node.js:
+**This is not optional.** Manual scans execute without Celery (they run on a background thread inside Gunicorn), but every real result the platform shows *after* a scan — compliance overview scores, the main dashboard's KPI cards, attack-surface aggregation, compliance/scan reports, and scheduled scans — is computed by Celery tasks dispatched via `.apply_async()`. Without a running worker, those tasks queue in Redis/Valkey and never execute: scans complete, but Compliance and the Dashboard stay empty. This was confirmed directly against this environment's database — 9 completed scans, 0 compliance overview rows — before a worker was started.
+
+### 5.1 Broker (Redis / Valkey)
+
+Celery needs a running Redis-compatible broker at `VALKEY_HOST:VALKEY_PORT` (see Section 3 env vars; defaults to `127.0.0.1:6379`, db `0`). Install Valkey (or Redis) natively — no Docker:
+
+```bash
+sudo apt-get install -y valkey-server   # or: redis-server
+sudo systemctl enable --now valkey-server
+```
+
+### 5.2 Worker Service
+
+The worker must listen on **every** queue the codebase dispatches to, not just the default `celery` queue — a worker started without `-Q` only consumes the default queue and silently ignores `scans`, `compliance`, `overview`, `attack-paths-scans`, `backfill`, `deletion`, `integrations`, and `scan-reports`. Confirm the current queue list before deploying:
+
+```bash
+grep -rhn 'queue="' tasks/*.py | sed -n 's/.*queue="\([^"]*\)".*/\1/p' | sort -u
+```
+
+Create `/etc/systemd/system/digital_ciso_worker.service`:
+
+```ini
+[Unit]
+Description=Digital CISO Celery Worker
+After=network.target valkey-server.service
+
+[Service]
+User=azureuser
+Group=azureuser
+WorkingDirectory=/opt/security_platform/backend
+Environment="PATH=/opt/security_platform/backend/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.django.production"
+EnvironmentFile=/opt/security_platform/backend/.env
+ExecStart=/opt/security_platform/backend/.venv/bin/python -m celery -A config worker \
+    -l INFO \
+    --concurrency=4 \
+    -Q celery,scans,compliance,overview,attack-paths-scans,backfill,deletion,integrations,scan-reports
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 5.3 Beat Service (scheduled scans + periodic maintenance)
+
+Scheduled scans and periodic housekeeping tasks (`attack-paths-cleanup-stale-scans`, `reconcile-orphan-tasks`) are stored as `django_celery_beat` `PeriodicTask` rows and only fire if a beat scheduler is running. Create `/etc/systemd/system/digital_ciso_beat.service`:
+
+```ini
+[Unit]
+Description=Digital CISO Celery Beat Scheduler
+After=network.target valkey-server.service
+
+[Service]
+User=azureuser
+Group=azureuser
+WorkingDirectory=/opt/security_platform/backend
+Environment="PATH=/opt/security_platform/backend/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.django.production"
+EnvironmentFile=/opt/security_platform/backend/.env
+ExecStart=/opt/security_platform/backend/.venv/bin/python -m celery -A config beat \
+    -l INFO \
+    --scheduler django_celery_beat.schedulers:DatabaseScheduler
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 5.4 Enable & Start
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable digital_ciso_worker digital_ciso_beat
+sudo systemctl start digital_ciso_worker digital_ciso_beat
+sudo systemctl status digital_ciso_worker digital_ciso_beat
+```
+
+### 5.5 Verify it's actually consuming tasks
+
+Run a scan, then check that real data landed — not just that the service is "active":
+
+```bash
+sudo journalctl -u digital_ciso_worker -f              # watch tasks being received/succeeding
+python manage.py shell -c "from api.models import ComplianceRequirementOverview as C; print(C.objects.count())"
+```
+
+If the worker service is running but this count stays at 0 after a completed scan, the worker is not actually consuming — check `-Q` covers every queue in 5.2 and that `VALKEY_HOST`/`VALKEY_PORT` in `.env` point at the same broker the web process uses.
+
+---
+
+## ⚛️ 6. Frontend Node.js Systemd Service (`digital_ciso_frontend.service`)
+
+### 6.1 Build TanStack Start for Standalone Node.js:
 ```bash
 cd /opt/security_platform/frontend
 export NITRO_PRESET=node-server
@@ -170,7 +271,7 @@ npm install
 npm run build
 ```
 
-### 5.2 Create Systemd Unit at `/etc/systemd/system/digital_ciso_frontend.service`:
+### 6.2 Create Systemd Unit at `/etc/systemd/system/digital_ciso_frontend.service`:
 ```ini
 [Unit]
 Description=Digital CISO Frontend TanStack Start SSR Server
@@ -202,7 +303,7 @@ sudo systemctl status digital_ciso_frontend
 
 ---
 
-## 🌐 6. Nginx Reverse Proxy Configuration
+## 🌐 7. Nginx Reverse Proxy Configuration
 
 Create or update `/etc/nginx/sites-available/digital_ciso`:
 
@@ -292,7 +393,7 @@ sudo systemctl restart nginx
 
 ---
 
-## 🤖 7. Spectra AI Copilot & Private vLLM Setup
+## 🤖 8. Spectra AI Copilot & Private vLLM Setup
 
 1. **Inference Architecture**:
    - vLLM runs inside an Azure Private Virtual Network listening on `http://<VLLM_PRIVATE_IP>:8000/v1`.
@@ -303,7 +404,7 @@ sudo systemctl restart nginx
 
 ---
 
-## ☁️ 8. Oracle Fusion SaaS SCIM Direct Remediation
+## ☁️ 9. Oracle Fusion SaaS SCIM Direct Remediation
 
 1. **Discovery**:
    - Ingests accounts from scheduled ESS job reports or `GET /hcmRestApi/scim/Users`.
@@ -325,7 +426,7 @@ sudo systemctl restart nginx
 
 ---
 
-## 🕸️ 9. Neo4j Enterprise Installation (Attack Paths Graph)
+## 🕸️ 10. Neo4j Enterprise Installation (Attack Paths Graph)
 
 Attack Paths requires **Neo4j Enterprise** specifically — Community Edition does not
 support `CREATE DATABASE` (multi-database), which this platform relies on for
@@ -334,7 +435,7 @@ free to run under Neo4j's license for this kind of use; no purchased license is
 required to start it, only accepting the license agreement via an environment
 variable at install/start time.
 
-### 9.1 Install via apt (Ubuntu/Debian)
+### 10.1 Install via apt (Ubuntu/Debian)
 
 ```bash
 # 1. Add Neo4j's package signing key and repository
@@ -354,7 +455,7 @@ sudo systemctl start neo4j
 sudo systemctl status neo4j
 ```
 
-### 9.2 Network configuration
+### 10.2 Network configuration
 
 By default Neo4j only binds to `localhost`. Since this platform's backend runs on
 the same host (per the topology above), the default is correct and no public
@@ -362,7 +463,7 @@ exposure of Bolt (7687) or HTTP (7474) is needed — do **not** open these ports
 the VM's network security group. If the backend and Neo4j ever run on separate
 hosts, use a private VNet connection, not a public listener.
 
-### 9.3 Verify
+### 10.3 Verify
 
 ```bash
 cypher-shell -u neo4j -p '<YOUR_COMPLEX_PASSWORD_IN_QUOTES>' "CREATE DATABASE verify_install; SHOW DATABASES; DROP DATABASE verify_install;"
@@ -372,7 +473,7 @@ If `CREATE DATABASE` fails with `Unsupported administration command`, the
 `neo4j-enterprise` package didn't install correctly (Community was installed
 instead) — check `apt list --installed | grep neo4j`.
 
-### 9.4 Required post-install patch — do not skip
+### 10.4 Required post-install patch — do not skip
 
 The pip-installed `cartography` library (which drives the real graph ingestion for
 AWS/Azure/OCI) has two real bugs against the exact dependency versions this
@@ -404,7 +505,7 @@ check `python -c "import cartography; print(cartography.__file__)"` resolves int
 
 ---
 
-## 🛠️ 10. Day-2 Operations & Maintenance Runbook
+## 🛠️ 11. Day-2 Operations & Maintenance Runbook
 
 ### Updating Code from Git:
 ```bash
@@ -415,11 +516,14 @@ git pull origin main
 cd /opt/security_platform/backend
 source .venv/bin/activate
 uv sync
-python manage.py patch_cartography  # required every time uv sync runs — see Section 9.4
+python manage.py patch_cartography  # required every time uv sync runs — see Section 10.4
 python manage.py migrate
 
 # Restart Backend
 sudo systemctl restart digital_ciso
+
+# Restart Celery worker + beat (Section 5) — task signatures/queues can change with code updates
+sudo systemctl restart digital_ciso_worker digital_ciso_beat
 
 # Rebuild Frontend
 cd /opt/security_platform/frontend
@@ -431,6 +535,10 @@ sudo systemctl restart digital_ciso_frontend
 ```bash
 # Backend Django / Gunicorn logs
 sudo journalctl -u digital_ciso -f -n 100
+
+# Celery worker / beat logs — check here first if Compliance or Dashboard data isn't updating
+sudo journalctl -u digital_ciso_worker -f -n 100
+sudo journalctl -u digital_ciso_beat -f -n 100
 
 # Frontend Node.js logs
 sudo journalctl -u digital_ciso_frontend -f -n 100

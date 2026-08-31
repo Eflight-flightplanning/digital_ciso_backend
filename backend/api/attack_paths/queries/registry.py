@@ -12,6 +12,7 @@ _QUERY_DEFINITIONS: dict[str, list[AttackPathsQueryDefinition]] = {
     "aws": AWS_QUERIES,
     "azure": AZURE_QUERIES,
     "oci": OCI_QUERIES,
+    "oraclecloud": OCI_QUERIES,
     "oracle_fusion_saas": ORACLE_FUSION_SAAS_QUERIES,
     "oracle_saas": ORACLE_FUSION_SAAS_QUERIES,
 }
@@ -33,6 +34,7 @@ _DEPRECATED_QUERY_DEFINITIONS: dict[str, list[AttackPathsQueryDefinition]] = {
     "aws": AWS_DEPRECATED_QUERIES,
     "azure": AZURE_QUERIES,
     "oci": OCI_QUERIES,
+    "oraclecloud": OCI_QUERIES,
     "oracle_fusion_saas": ORACLE_FUSION_SAAS_QUERIES,
     "oracle_saas": ORACLE_FUSION_SAAS_QUERIES,
 }

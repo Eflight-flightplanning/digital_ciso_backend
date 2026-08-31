@@ -10,6 +10,8 @@ export interface User {
   name?: string;
   company_name?: string;
   role?: string;
+  tenant_id?: string;
+  date_joined?: string;
 }
 
 export interface AuthState {

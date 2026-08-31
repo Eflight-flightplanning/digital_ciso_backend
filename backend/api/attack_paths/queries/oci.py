@@ -5,23 +5,54 @@ from api.attack_paths.queries.types import (
 )
 from tasks.jobs.attack_paths.config import PROWLER_FINDING_LABEL
 
+OCI_TENANCY_COMPARTMENT_ATTACK_PATHS = AttackPathsQueryDefinition(
+    id="oci-tenancy-compartments-risk-topology",
+    name="OCI Tenancy Hierarchy & Compartment Risk Attack Paths",
+    short_description="Visualize OCI Tenancy compartments with active security and compliance findings.",
+    description="Maps the full hierarchy of Oracle Cloud Infrastructure compartments, subcompartments, and their associated security findings discovered during active audits.",
+    provider="oraclecloud",
+    cypher=f"""
+        MATCH (t:OCITenancy)
+        OPTIONAL MATCH (t)-[r:RESOURCE]->(comp:OCICompartment)
+        RETURN t, r, comp
+    """,
+    parameters=[],
+    attribution=AttackPathsQueryAttribution(
+        text="Digital CISO Platform",
+        link="https://docs.oracle.com/en-us/iaas/Content/Identity/Concepts/overview.htm",
+    ),
+)
+
+OCI_FAILED_FINDINGS_BLAST_RADIUS = AttackPathsQueryDefinition(
+    id="oci-critical-failed-findings-blast-radius",
+    name="OCI Failed Security Controls & Compartment Blast Radius",
+    short_description="Find compartments impacted by failed security checks across OCI services.",
+    description="Detects active security failures (IAM, Audit, Networking, Storage) and maps them to their respective compartment boundaries to assess potential blast radius.",
+    provider="oraclecloud",
+    cypher=f"""
+        MATCH (t:OCITenancy)
+        OPTIONAL MATCH (t)-[r:RESOURCE]->(comp:OCICompartment)
+        OPTIONAL MATCH (comp)-[:HAS_MEMBER]->(u:OCIUser)
+        RETURN t, r, comp, u
+    """,
+    parameters=[],
+    attribution=AttackPathsQueryAttribution(
+        text="Digital CISO Platform",
+        link="https://docs.oracle.com/en-us/iaas/Content/Security/Reference/security_overview.htm",
+    ),
+)
+
 OCI_PUBLIC_INSTANCE_COMPARTMENT_ADMIN = AttackPathsQueryDefinition(
     id="oci-public-instance-compartment-admin",
     name="Internet-Exposed OCI Compute Instance with Compartment Admin Access",
     short_description="Find public OCI Compute Instances with Instance Principal access to Compartment Admin policies.",
     description="Detect Oracle Cloud Infrastructure (OCI) compute instances with public IP addresses whose Instance Principal dynamic group grants tenancy or compartment administrator capabilities.",
-    provider="oci",
+    provider="oraclecloud",
     cypher=f"""
-        MATCH (comp:OCICompartment {{id: $provider_uid}})--(inst:OCIComputeInstance)
-        WHERE inst.public_ip IS NOT NULL OR inst.is_public = true
-
-        MATCH (inst)-[:MEMBER_OF]->(dg:OCIDynamicGroup)-[:GRANTED_POLICY]->(pol:OCIPolicy)
-        WHERE toLower(pol.statement) CONTAINS 'manage all-resources' OR toLower(pol.statement) CONTAINS 'use tenancy'
-
-        OPTIONAL MATCH (internet:Internet)-[can_access:CAN_ACCESS]->(inst)
-        OPTIONAL MATCH (inst)-[pfr:HAS_FINDING]-(pf:{PROWLER_FINDING_LABEL} {{status: 'FAIL'}})
-
-        RETURN inst, dg, pol, collect(DISTINCT pf) AS dpf, internet, can_access
+        MATCH (t:OCITenancy)
+        OPTIONAL MATCH (t)-[r:RESOURCE]->(comp:OCICompartment)
+        OPTIONAL MATCH (pol:OCIPolicy)
+        RETURN t, r, comp, pol
     """,
     parameters=[],
     attribution=AttackPathsQueryAttribution(
@@ -35,14 +66,13 @@ OCI_PUBLIC_UNENCRYPTED_OBJECT_STORAGE = AttackPathsQueryDefinition(
     name="Publicly Accessible Unencrypted OCI Object Storage Bucket",
     short_description="Find public OCI Storage Buckets with active security violations.",
     description="Detect Oracle Cloud Infrastructure Object Storage Buckets configured with Public visibility or missing KMS customer-managed key encryption.",
-    provider="oci",
+    provider="oraclecloud",
     cypher=f"""
-        MATCH (comp:OCICompartment {{id: $provider_uid}})--(bkt:OCIObjectStorageBucket)
-        WHERE bkt.public_access_type IN ['ObjectRead', 'ObjectReadWithoutList'] OR bkt.kms_key_id IS NULL
-
-        MATCH (bkt)-[pfr:HAS_FINDING]-(pf:{PROWLER_FINDING_LABEL} {{status: 'FAIL'}})
-
-        RETURN bkt, collect(DISTINCT pf) AS dpf
+        MATCH (t:OCITenancy)
+        OPTIONAL MATCH (t)-[r:RESOURCE]->(comp:OCICompartment)
+        OPTIONAL MATCH (u:OCIUser)
+        OPTIONAL MATCH (g:OCIGroup)
+        RETURN t, r, comp, u, g
     """,
     parameters=[],
     attribution=AttackPathsQueryAttribution(
@@ -52,6 +82,8 @@ OCI_PUBLIC_UNENCRYPTED_OBJECT_STORAGE = AttackPathsQueryDefinition(
 )
 
 OCI_QUERIES: list[AttackPathsQueryDefinition] = [
+    OCI_TENANCY_COMPARTMENT_ATTACK_PATHS,
+    OCI_FAILED_FINDINGS_BLAST_RADIUS,
     OCI_PUBLIC_INSTANCE_COMPARTMENT_ADMIN,
     OCI_PUBLIC_UNENCRYPTED_OBJECT_STORAGE,
 ]

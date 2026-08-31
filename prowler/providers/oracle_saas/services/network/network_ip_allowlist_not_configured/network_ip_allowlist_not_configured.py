@@ -30,7 +30,16 @@ class network_ip_allowlist_not_configured(Check):
             erp_type=erp_type,
         )
 
-        if service.network_policy and service.network_policy.ip_allowlist_enabled:
+        if not service.network_policy_available:
+            report.status = "MANUAL"
+            report.status_extended = (
+                "Network perimeter configuration could not be determined automatically: "
+                "this provider's credentials do not grant access to Oracle IDCS, the only "
+                "source of this setting. Verify network perimeter configuration manually "
+                "in Identity & Security > Network Perimeters, or connect this provider "
+                "with OAuth2/IDCS credentials to enable automated evaluation."
+            )
+        elif service.network_policy and service.network_policy.ip_allowlist_enabled:
             report.status = "PASS"
             report.status_extended = (
                 f"Oracle Identity Domain network perimeter is active. "

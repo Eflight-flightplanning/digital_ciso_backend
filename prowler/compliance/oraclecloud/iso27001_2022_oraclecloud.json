@@ -1,0 +1,115 @@
+{
+  "Framework": "ISO27001-2022",
+  "Name": "ISO/IEC 27001:2022 Information Security Management for OCI",
+  "Version": "2022",
+  "Provider": "oraclecloud",
+  "Description": "International standard for Information Security Management Systems (ISMS) across OCI cloud governance domains.",
+  "Requirements": [
+    {
+      "Id": "A.5.15",
+      "Name": "Access Control & IAM Governance",
+      "Description": "Access to OCI resources must be restricted in accordance with the established topic-specific policy on access control.",
+      "Attributes": [
+        {
+          "Section": "Organizational Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_no_resources_in_root_compartment",
+        "identity_tenancy_admin_permissions_limited"
+      ]
+    },
+    {
+      "Id": "A.5.17",
+      "Name": "Authentication Information and Password Policies",
+      "Description": "Enforce minimum length of 14 characters, password expiration within 365 days, and prevent password reuse in OCI IAM.",
+      "Attributes": [
+        {
+          "Section": "Organizational Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_password_policy_expires_within_365_days",
+        "identity_password_policy_prevents_reuse"
+      ]
+    },
+    {
+      "Id": "A.8.1",
+      "Name": "User Endpoint and Instance Security",
+      "Description": "Ensure compute instances enforce secure boot, disable legacy metadata endpoints (IMDSv1), and enable in-transit encryption.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "compute_instance_secure_boot_enabled",
+        "compute_instance_legacy_metadata_endpoint_disabled",
+        "compute_instance_in_transit_encryption_enabled"
+      ]
+    },
+    {
+      "Id": "A.8.20",
+      "Name": "Network Security & Segregation",
+      "Description": "Network security controls must protect information in networks and its supporting information processing facilities.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
+        "network_default_security_list_restricts_traffic",
+        "network_vcn_subnet_flow_logs_enabled"
+      ]
+    },
+    {
+      "Id": "A.8.24",
+      "Name": "Use of Cryptography & Key Management",
+      "Description": "Cryptographic controls and KMS key rotation must be utilized to protect sensitive data at rest and in transit.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "kms_key_rotation_enabled",
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "filestorage_file_system_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
+    },
+    {
+      "Id": "A.8.15",
+      "Name": "Logging & Monitoring",
+      "Description": "Audit logs recording user activities, exceptions, faults and information security events must be retained for 365 days.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "cloudguard_enabled",
+        "objectstorage_bucket_logging_enabled",
+        "events_notification_topic_and_subscription_exists"
+      ]
+    }
+  ]
+}

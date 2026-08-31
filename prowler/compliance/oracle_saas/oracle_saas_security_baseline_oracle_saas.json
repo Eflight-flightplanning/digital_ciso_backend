@@ -17,7 +17,7 @@
         }
       ],
       "Checks": [
-        "erp_iam_mfa_not_enforced_admin"
+        "iam_mfa_not_enforced_admin"
       ]
     },
     {
@@ -32,7 +32,8 @@
         }
       ],
       "Checks": [
-        "erp_iam_implementation_role_active"
+        "iam_implementation_role_active",
+        "iam_superuser_role_assigned"
       ]
     },
     {
@@ -47,13 +48,44 @@
         }
       ],
       "Checks": [
-        "erp_iam_sod_conflict_detected"
+        "iam_sod_conflict_detected",
+        "iam_dormant_privileged_account"
       ]
     },
     {
-      "Id": "SAAS-LOG-04",
-      "Name": "Enable Oracle Fusion ERP Audit Trail",
-      "Description": "Audit policies must be active for all sensitive business objects with tamper-proofing enabled.",
+      "Id": "SAAS-IAM-04",
+      "Name": "Password Policy Hardening & Session Timeout",
+      "Description": "Enforce 12+ character password policy complexity, lockout rules, and 15-minute idle session timeouts in IDCS.",
+      "Attributes": [
+        {
+          "Section": "Identity and Access Management",
+          "SubSection": "Credential & Session Policy",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_mfa_not_enforced_admin"
+      ]
+    },
+    {
+      "Id": "SAAS-DATA-05",
+      "Name": "PII Masking & BIP Export Restrictions",
+      "Description": "Mask sensitive employee PII and restrict unencrypted BI Publisher report exports.",
+      "Attributes": [
+        {
+          "Section": "Data Protection",
+          "SubSection": "PII & Data Export",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_trail_incomplete_coverage"
+      ]
+    },
+    {
+      "Id": "SAAS-LOG-06",
+      "Name": "Enable Oracle Fusion ERP Audit Trail & Retention",
+      "Description": "Audit policies must be active for all sensitive business objects with 365-day retention.",
       "Attributes": [
         {
           "Section": "Logging and Auditing",
@@ -62,11 +94,12 @@
         }
       ],
       "Checks": [
-        "erp_audit_trail_disabled"
+        "audit_trail_disabled",
+        "audit_trail_incomplete_coverage"
       ]
     },
     {
-      "Id": "SAAS-NET-05",
+      "Id": "SAAS-NET-07",
       "Name": "IDCS Network Perimeters and API Scope Hardening",
       "Description": "Configure IP allowlisting on IDCS sign-on policies and limit OAuth application scopes to least privilege.",
       "Attributes": [
@@ -77,8 +110,8 @@
         }
       ],
       "Checks": [
-        "erp_network_ip_allowlist_not_configured",
-        "erp_oauth_app_excessive_scopes"
+        "network_ip_allowlist_not_configured",
+        "network_oauth_app_excessive_scopes"
       ]
     }
   ]

@@ -1,0 +1,78 @@
+{
+  "Framework": "MITRE-ATT&CK",
+  "Name": "MITRE ATT&CK Cloud Matrix for Oracle Cloud (OCI)",
+  "Version": "v14.1",
+  "Provider": "oraclecloud",
+  "Description": "Adversarial tactics and techniques mapping for OCI cloud infrastructure defenses and threat hunting.",
+  "Requirements": [
+    {
+      "Id": "T1078.004",
+      "Name": "Valid Accounts: Cloud Accounts",
+      "Description": "Detect and prevent compromise of valid cloud accounts through MFA enforcement and credential rotation.",
+      "Attributes": [
+        {
+          "Section": "Initial Access",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_password_policy_minimum_length_14"
+      ]
+    },
+    {
+      "Id": "T1530",
+      "Name": "Data from Cloud Storage Object Exposure",
+      "Description": "Prevent unauthorized exfiltration of sensitive data through public object storage buckets.",
+      "Attributes": [
+        {
+          "Section": "Collection",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_logging_enabled",
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
+    },
+    {
+      "Id": "T1562.001",
+      "Name": "Impair Defenses: Disable Cloud Guard and Logging",
+      "Description": "Detect adversary attempts to disable security monitoring, modify audit rules, or tamper with security lists.",
+      "Attributes": [
+        {
+          "Section": "Defense Evasion",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems",
+        "events_rule_security_list_changes",
+        "events_rule_iam_policy_changes"
+      ]
+    },
+    {
+      "Id": "T1021.004",
+      "Name": "Remote Services: SSH / RDP Exposure",
+      "Description": "Prevent adversaries from gaining lateral movement or initial foothold via exposed management ports.",
+      "Attributes": [
+        {
+          "Section": "Lateral Movement",
+          "Profile": "Level 1",
+          "AssessmentStatus": "Automated"
+        }
+      ],
+      "Checks": [
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
+        "network_security_list_ingress_from_internet_to_ssh_port"
+      ]
+    }
+  ]
+}

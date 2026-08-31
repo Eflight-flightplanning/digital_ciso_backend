@@ -53,13 +53,18 @@ export function UsersPage() {
   const [localUsers, setLocalUsers] = useState<Array<Record<string, any>>>([]);
 
   // Parse fetched users from API cleanly (no dummy data)
-  const fetchedItems = Array.isArray(apiUsers?.items)
+  const fetchedItems: Array<Record<string, any>> = Array.isArray(apiUsers?.items)
     ? (apiUsers.items as Array<Record<string, any>>)
-    : Array.isArray(apiUsers?.data)
-      ? (apiUsers.data as Array<Record<string, any>>)
-      : [];
+    : [];
 
-  const combinedUsersMap = new Map<string, Record<string, any>>();
+  const combinedUsersMap = new Map<string, {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    lastLogin: string;
+    status: string;
+  }>();
 
   // Include current logged in user first if available
   if (defaultAdminEmail) {
@@ -95,7 +100,16 @@ export function UsersPage() {
 
   // Add newly created local users
   localUsers.forEach((u) => {
-    combinedUsersMap.set(u.email.toLowerCase(), u);
+    if (u.email) {
+      combinedUsersMap.set(String(u.email).toLowerCase(), {
+        id: String(u.id || ""),
+        email: String(u.email),
+        name: String(u.name || ""),
+        role: String(u.role || "Member"),
+        lastLogin: String(u.lastLogin || "Active Now"),
+        status: String(u.status || "Active"),
+      });
+    }
   });
 
   const userList = Array.from(combinedUsersMap.values()).map((u) => ({

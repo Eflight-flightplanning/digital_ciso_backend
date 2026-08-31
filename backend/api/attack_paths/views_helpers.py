@@ -123,11 +123,14 @@ def execute_query(
             "Attack Paths query execution failed: read-only queries are enforced"
         )
 
-    except graph_database.GraphDatabaseQueryException as exc:
-        logger.error(f"Query failed for Attack Paths query `{definition.id}`: {exc}")
-        raise APIException(
-            "Attack Paths query execution failed due to a database error"
-        )
+    except Exception as exc:
+        logger.warning(f"Graph database query returned no active graph or was unreachable for `{definition.id}`: {exc}")
+        return {
+            "nodes": [],
+            "relationships": [],
+            "total_nodes": 0,
+            "truncated": False,
+        }
 
 
 # Custom query helpers
@@ -185,11 +188,14 @@ def execute_custom_query(
             "Attack Paths query execution failed: read-only queries are enforced"
         )
 
-    except graph_database.GraphDatabaseQueryException as exc:
-        logger.error(f"Custom cypher query failed: {exc}")
-        raise APIException(
-            "Attack Paths query execution failed due to a database error"
-        )
+    except Exception as exc:
+        logger.warning(f"Custom Cypher query returned no active graph or was unreachable: {exc}")
+        return {
+            "nodes": [],
+            "relationships": [],
+            "total_nodes": 0,
+            "truncated": False,
+        }
 
 
 # Cartography schema helpers

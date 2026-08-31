@@ -98,8 +98,9 @@ interface DispatchedJiraTask {
 }
 
 const SOD_MATRICES: SodMatrix[] = [
+  // 1. Procure-to-Pay (P2P)
   {
-    code: "SOD-AP-01",
+    code: "SOD-P2P-01",
     name: "AP Manager + Payment Disbursement Processor",
     role_a: "ORA_AP_ACCOUNTS_PAYABLE_MANAGER_JOB",
     role_b: "ORA_AP_PAYMENT_PROCESSING_JOB",
@@ -108,16 +109,7 @@ const SOD_MATRICES: SodMatrix[] = [
     severity: "CRITICAL",
   },
   {
-    code: "SOD-GL-01",
-    name: "General Ledger Accountant + Journal Entry Manager",
-    role_a: "ORA_GL_GENERAL_LEDGER_ACCOUNTANT_JOB",
-    role_b: "ORA_GL_JOURNAL_ENTRY_MANAGEMENT_JOB",
-    risk: "Can author, post, and reconcile general ledger journal entries without peer approval.",
-    framework: "SOX 404 ITGC - Financial Record Tampering",
-    severity: "CRITICAL",
-  },
-  {
-    code: "SOD-PO-01",
+    code: "SOD-P2P-02",
     name: "Procurement Buyer + AP Specialist",
     role_a: "ORA_PO_BUYER_JOB",
     role_b: "ORA_AP_ACCOUNTS_PAYABLE_SPECIALIST_JOB",
@@ -126,29 +118,237 @@ const SOD_MATRICES: SodMatrix[] = [
     severity: "HIGH",
   },
   {
-    code: "SOD-AR-01",
+    code: "SOD-P2P-03",
+    name: "Supplier Administrator + Payment Processor",
+    role_a: "ORA_PO_SUPPLIER_ADMINISTRATOR_JOB",
+    role_b: "ORA_AP_PAYMENT_PROCESSING_JOB",
+    risk: "Can modify vendor bank remittance details and execute payment disbursements to fraudulent accounts.",
+    framework: "Vendor Fraud & Banking Governance",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-P2P-04",
+    name: "Requisition Specialist + PO Approver",
+    role_a: "ORA_POR_PURCHASE_REQUISITION_SPECIALIST",
+    role_b: "ORA_PO_PURCHASE_ORDER_APPROVER",
+    risk: "Can request goods and self-approve purchase orders without managerial authorization.",
+    framework: "Purchasing Approval Hierarchy Control",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-P2P-05",
+    name: "Warehouse Receiving Specialist + AP Specialist",
+    role_a: "ORA_INV_WAREHOUSE_RECEIVING_SPECIALIST",
+    role_b: "ORA_AP_ACCOUNTS_PAYABLE_SPECIALIST_JOB",
+    risk: "Can enter fictitious goods receipts and process 3-way matching supplier invoices.",
+    framework: "Inventory & Invoicing Segregation",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-P2P-06",
+    name: "Supplier Administrator + Disbursement Approver",
+    role_a: "ORA_PO_SUPPLIER_ADMINISTRATOR_JOB",
+    role_b: "ORA_AP_DISBURSEMENT_APPROVER_JOB",
+    risk: "Can alter vendor master banking details and approve electronic funds transfer batches.",
+    framework: "Treasury & Disbursement Governance",
+    severity: "CRITICAL",
+  },
+
+  // 2. Record-to-Report (R2R)
+  {
+    code: "SOD-R2R-01",
+    name: "General Ledger Accountant + Journal Entry Manager",
+    role_a: "ORA_GL_GENERAL_LEDGER_ACCOUNTANT_JOB",
+    role_b: "ORA_GL_JOURNAL_ENTRY_MANAGEMENT_JOB",
+    risk: "Can author, post, and reconcile general ledger journal entries without peer approval.",
+    framework: "SOX 404 ITGC - Financial Record Tampering",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-R2R-02",
+    name: "Chart of Accounts Admin + General Ledger Accountant",
+    role_a: "ORA_GL_CHART_OF_ACCOUNTS_ADMINISTRATOR",
+    role_b: "ORA_GL_GENERAL_LEDGER_ACCOUNTANT_JOB",
+    risk: "Can create ledger accounts and post unauthorized financial transactions.",
+    framework: "COA Governance & Financial Integrity",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-R2R-03",
+    name: "Period Close Administrator + Journal Creator",
+    role_a: "ORA_GL_PERIOD_CLOSE_ADMINISTRATOR",
+    role_b: "ORA_GL_JOURNAL_ENTRY_MANAGEMENT_JOB",
+    risk: "Can open closed financial periods and insert unapproved back-dated journal adjustments.",
+    framework: "Financial Period Close Integrity",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-R2R-04",
+    name: "Intercompany Accountant + Intercompany Approver",
+    role_a: "ORA_FUN_INTERCOMPANY_ACCOUNTANT",
+    role_b: "ORA_FUN_INTERCOMPANY_APPROVER",
+    risk: "Can initiate and approve intercompany balancing transactions without dual control.",
+    framework: "Intercompany Transaction Governance",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-R2R-05",
+    name: "Financial Report Designer + Posting Administrator",
+    role_a: "ORA_GL_FINANCIAL_REPORT_DESIGNER",
+    role_b: "ORA_GL_POSTING_RULE_ADMINISTRATOR",
+    risk: "Can alter posting rules and suppress discrepancies in statutory financial reports.",
+    framework: "Financial Reporting Transparency",
+    severity: "HIGH",
+  },
+
+  // 3. Order-to-Cash (O2C)
+  {
+    code: "SOD-O2C-01",
     name: "Billing Specialist + Cash Application Specialist",
     role_a: "ORA_AR_BILLING_SPECIALIST_JOB",
     role_b: "ORA_AR_CASH_APPLICATION_SPECIALIST_JOB",
-    risk: "Can generate invoices and apply incoming cash receipts — enables fictitious revenue creation and revenue recognition manipulation.",
-    framework: "Revenue Recognition Control",
+    risk: "Can generate invoices and apply incoming cash receipts — enables fictitious revenue creation and lapping.",
+    framework: "Revenue Recognition & Cash Control",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-O2C-02",
+    name: "Customer Administrator + Credit Risk Manager",
+    role_a: "ORA_AR_CUSTOMER_ADMINISTRATOR",
+    role_b: "ORA_AR_CREDIT_RISK_MANAGER",
+    risk: "Can create customer accounts and unilaterally grant unauthorized credit limits.",
+    framework: "Customer Credit Governance",
     severity: "HIGH",
   },
+  {
+    code: "SOD-O2C-03",
+    name: "Credit Memo Creator + Receivables Manager",
+    role_a: "ORA_AR_CREDIT_MEMO_SPECIALIST",
+    role_b: "ORA_AR_RECEIVABLES_MANAGER_JOB",
+    risk: "Can generate credit memos and write off customer receivable balances without dual sign-off.",
+    framework: "Bad Debt & AR Write-Off Control",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-O2C-04",
+    name: "Sales Order Entry + Shipping Fulfillment Specialist",
+    role_a: "ORA_FOM_SALES_ORDER_ENTRY_SPECIALIST",
+    role_b: "ORA_WSH_SHIPPING_FULFILLMENT_SPECIALIST",
+    risk: "Can create orders and confirm physical inventory dispatch without warehouse fulfillment review.",
+    framework: "Order Fulfillment & Asset Protection",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-O2C-05",
+    name: "Direct Debit Setup + Automatic Receipts Processor",
+    role_a: "ORA_AR_DIRECT_DEBIT_MANDATE_SPECIALIST",
+    role_b: "ORA_AR_AUTOMATIC_RECEIPTS_PROCESSOR",
+    risk: "Can enter customer banking mandates and execute unauthorized direct debit fund collections.",
+    framework: "Electronic Direct Debit Governance",
+    severity: "CRITICAL",
+  },
+
+  // 4. Fixed Assets & SCM
+  {
+    code: "SOD-FA-01",
+    name: "Fixed Asset Accountant + Asset Retirement Specialist",
+    role_a: "ORA_FA_FIXED_ASSET_ACCOUNTANT_JOB",
+    role_b: "ORA_FA_ASSET_RETIREMENT_SPECIALIST",
+    risk: "Can capitalize assets and execute asset disposals or write-downs without independent inspection.",
+    framework: "Fixed Asset Lifecycle Control",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-FA-02",
+    name: "Stock Count Recorder + Inventory Adjustment Approver",
+    role_a: "ORA_INV_STOCK_COUNT_RECORDING_SPECIALIST",
+    role_b: "ORA_INV_STOCK_ADJUSTMENT_APPROVER",
+    risk: "Can record inventory counts and approve stock write-downs (Inventory Shrinkage Risk).",
+    framework: "Inventory Custody & Reconciliation",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-SCM-01",
+    name: "Cost Accountant + Inventory Revaluation Specialist",
+    role_a: "ORA_CST_COST_ACCOUNTANT_JOB",
+    role_b: "ORA_CST_INVENTORY_REVALUATION_SPECIALIST",
+    risk: "Can define item standard costs and execute unapproved inventory revaluations.",
+    framework: "Cost Accounting & Valuation Integrity",
+    severity: "HIGH",
+  },
+
+  // 5. Hire-to-Retire (H2R / HCM)
+  {
+    code: "SOD-HCM-01",
+    name: "HR Specialist + Payroll Manager",
+    role_a: "ORA_HR_HUMAN_RESOURCE_SPECIALIST_JOB",
+    role_b: "ORA_PAY_PAYROLL_MANAGER_JOB",
+    risk: "Can create fictitious employees and disburse payroll compensation (Ghost Employee Risk).",
+    framework: "HR & Payroll Fraud Prevention",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-HCM-02",
+    name: "Time & Labor Approver + Payroll Operator",
+    role_a: "ORA_HXT_TIME_AND_LABOR_APPROVER",
+    role_b: "ORA_PAY_PAYROLL_EXECUTION_SPECIALIST",
+    risk: "Can approve contractor/employee hours and execute automated payroll disbursements.",
+    framework: "Time & Attendance Governance",
+    severity: "HIGH",
+  },
+  {
+    code: "SOD-HCM-03",
+    name: "Employee Bank Admin + Payment File Processor",
+    role_a: "ORA_PER_EMPLOYEE_BANK_ACCOUNT_SPECIALIST",
+    role_b: "ORA_PAY_PAYROLL_PAYMENT_FILE_PROCESSOR",
+    risk: "Can alter employee direct deposit banking details and disburse salary payment batches.",
+    framework: "Payroll Direct Deposit Integrity",
+    severity: "CRITICAL",
+  },
+
+  // 6. Security Administration (SEC)
   {
     code: "SOD-SEC-01",
     name: "Security Manager + Implementation Consultant",
     role_a: "ORA_IT_SECURITY_MANAGER",
     role_b: "ORA_FND_APPLICATION_IMPLEMENTATION_CONSULTANT",
-    risk: "Holds unrestricted system configuration and security role management privileges simultaneously.",
+    risk: "Holds unrestricted system configuration and security role management privileges simultaneously post-go-live.",
     framework: "Privileged Access Management (PAM)",
     severity: "CRITICAL",
+  },
+  {
+    code: "SOD-SEC-02",
+    name: "System Administrator + AP Manager",
+    role_a: "ORA_FND_SYSTEM_ADMIN_JOB",
+    role_b: "ORA_AP_ACCOUNTS_PAYABLE_MANAGER_JOB",
+    risk: "Combines IT user provisioning and role assignment privileges with financial execution duties.",
+    framework: "IT vs Functional Accounting Separation",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-SEC-03",
+    name: "Audit Policy Admin + Security Manager",
+    role_a: "ORA_FND_AUDIT_ADMINISTRATOR",
+    role_b: "ORA_IT_SECURITY_MANAGER",
+    risk: "Can alter audit tracking policies while modifying user security contexts to evade detection.",
+    framework: "Audit Trail Suppression Prevention",
+    severity: "CRITICAL",
+  },
+  {
+    code: "SOD-SEC-04",
+    name: "Integration Developer + Journal Manager",
+    role_a: "ORA_FND_INTEGRATION_DEVELOPER",
+    role_b: "ORA_GL_JOURNAL_ENTRY_MANAGEMENT_JOB",
+    risk: "Can construct automated REST connectors and execute unvetted financial postings.",
+    framework: "Developer vs Operations Segregation",
+    severity: "HIGH",
   },
 ];
 
 export function OracleSaasPage() {
   const [activeTab, setActiveTab] = useState<"dormant" | "sod" | "superusers" | "settings">("dormant");
   const [inactivityFilter, setInactivityFilter] = useState<number>(0);
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE" | "SUSPENDED">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);

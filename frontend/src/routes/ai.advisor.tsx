@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Sparkles,
   Send,
@@ -16,6 +18,8 @@ import {
   ChevronRight,
   Cpu,
   Layers,
+  Copy,
+  Check,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Chip } from "@/components/ui-kit/primitives";
@@ -57,6 +61,142 @@ const initialMessages: ChatMessage[] = [
     confidence: 1.0,
   },
 ];
+
+// ── Markdown Code Block with Copy Button ──
+function CodeBlock({ children, className }: { children?: React.ReactNode; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const code = String(children ?? "").replace(/\n$/, "");
+  const language = /language-(\w+)/.exec(className || "")?.[1] ?? "";
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [code]);
+
+  return (
+    <div className="relative group my-2.5 rounded-xl overflow-hidden border border-border/70 bg-[hsl(220,15%,9%)] shadow-inner">
+      {/* Language badge + copy button */}
+      <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/50 bg-surface-2/60">
+        <span className="font-mono text-[9.5px] font-bold uppercase tracking-widest text-primary/70">
+          {language || "code"}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all cursor-pointer"
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <><Check className="h-3 w-3 text-emerald-400" /><span className="text-emerald-400">Copied!</span></>
+          ) : (
+            <><Copy className="h-3 w-3" /><span>Copy</span></>
+          )}
+        </button>
+      </div>
+      <pre className="overflow-x-auto px-4 py-3 text-[12px] leading-relaxed font-mono text-foreground/90">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+// ── Markdown Renderer for Chat Messages ──
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // Headings
+        h1: ({ children }) => (
+          <h1 className="font-display text-base font-bold text-foreground mt-3 mb-1.5 first:mt-0">{children}</h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="font-display text-sm font-bold text-foreground mt-2.5 mb-1.5 first:mt-0 border-b border-border/40 pb-1">{children}</h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="font-display text-[13px] font-bold text-foreground mt-2 mb-1 first:mt-0">{children}</h3>
+        ),
+        h4: ({ children }) => (
+          <h4 className="text-xs font-bold text-primary/90 mt-2 mb-0.5">{children}</h4>
+        ),
+        // Paragraphs
+        p: ({ children }) => (
+          <p className="text-sm leading-relaxed text-foreground/90 mb-2 last:mb-0">{children}</p>
+        ),
+        // Lists
+        ul: ({ children }) => (
+          <ul className="list-none space-y-0.5 mb-2 pl-0">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal list-inside space-y-0.5 mb-2 pl-1 text-sm text-foreground/90">{children}</ol>
+        ),
+        li: ({ children }) => (
+          <li className="flex items-start gap-1.5 text-sm text-foreground/90">
+            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary/60 shrink-0" />
+            <span>{children}</span>
+          </li>
+        ),
+        // Inline code
+        code: ({ children, className }) => {
+          const isBlock = className?.startsWith("language-");
+          if (isBlock) return <CodeBlock className={className}>{children}</CodeBlock>;
+          return (
+            <code className="rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 font-mono text-[11.5px] text-primary">
+              {children}
+            </code>
+          );
+        },
+        // Fenced code blocks via pre
+        pre: ({ children }) => <>{children}</>,
+        // Blockquotes
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-2 border-primary/50 pl-3 my-2 text-muted-foreground text-sm italic">
+            {children}
+          </blockquote>
+        ),
+        // Bold / strong
+        strong: ({ children }) => (
+          <strong className="font-semibold text-foreground">{children}</strong>
+        ),
+        // Links
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+          >
+            {children}
+          </a>
+        ),
+        // Tables (GFM)
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-2 rounded-xl border border-border/60">
+            <table className="min-w-full text-xs">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead className="bg-surface-2/80 text-muted-foreground font-bold">{children}</thead>
+        ),
+        tbody: ({ children }) => (
+          <tbody className="divide-y divide-border/40">{children}</tbody>
+        ),
+        tr: ({ children }) => <tr className="hover:bg-surface-2/40 transition-colors">{children}</tr>,
+        th: ({ children }) => (
+          <th className="px-3 py-1.5 text-left text-[10px] uppercase tracking-wider">{children}</th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-1.5 text-foreground/80">{children}</td>
+        ),
+        // Horizontal rule
+        hr: () => <hr className="border-border/40 my-3" />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 function AIAdvisorPage() {
   const searchParams = Route.useSearch();
@@ -461,7 +601,11 @@ function AIAdvisorPage() {
                         : "border border-border/80 bg-surface-2/60 text-foreground rounded-bl-none"
                       }`}
                   >
-                    <p className="whitespace-pre-wrap leading-relaxed text-sm">{m.content}</p>
+                    {m.sender === "assistant" ? (
+                      <MarkdownMessage content={m.content} />
+                    ) : (
+                      <p className="whitespace-pre-wrap leading-relaxed text-sm">{m.content}</p>
+                    )}
 
                     {/* Spectra Threat Evaluation Block */}
                     {m.spectra && (
