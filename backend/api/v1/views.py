@@ -3204,8 +3204,7 @@ class ResourceViewSet(PaginateByPkMixin, BaseRLSViewSet):
         fields_param = self.request.query_params.get("fields[resources]", "")
         include_param = self.request.query_params.get("include", "")
         return (
-            fields_param == ""
-            or "findings" in fields_param.split(",")
+            "findings" in fields_param.split(",")
             or "findings" in include_param.split(",")
         )
 

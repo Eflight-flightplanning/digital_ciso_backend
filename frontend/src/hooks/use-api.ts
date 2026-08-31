@@ -174,7 +174,7 @@ export function useResources(params?: Record<string, string>) {
     queryFn: async () => {
       const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
-        "page[size]": "500",
+        "page[size]": "100",
         "filter[updated_at.gte]": gteDate,
         ...(params || {}),
       };
