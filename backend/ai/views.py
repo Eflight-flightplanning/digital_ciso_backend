@@ -751,6 +751,7 @@ def _retrieve_relevant_findings(
             explicit_checks = re.findall(r'(?:check(?:_id)?|finding)[\s:=]+["\']?([a-zA-Z0-9_\-]+)["\']?', question, re.IGNORECASE)
             quoted_terms = re.findall(r'["\']([a-zA-Z0-9_\-]+)["\']', question)
             target_candidates = list(dict.fromkeys(explicit_checks + quoted_terms))
+            found_candidate = False
             for cand in target_candidates:
                 if len(cand) >= 4 and not _uuid_pattern.match(cand) and cand.lower() not in ("finding", "check", "severity", "resource"):
                     try:
@@ -764,9 +765,18 @@ def _retrieve_relevant_findings(
                         if exact_f and exact_f.id not in matching_ids:
                             matching_ids.add(exact_f.id)
                             matching_findings.insert(0, _serialize_finding(exact_f, pinned=True))
+                            found_candidate = True
                             logger.info("Explicit check_id resolved from DB: %s -> %s (%s)", cand, exact_f.id, exact_f.check_id)
                     except Exception as c_err:
                         logger.debug("Check lookup error for %s: %s", cand, c_err)
+
+            if target_candidates and not found_candidate and not matching_findings:
+                unresolved = [c for c in target_candidates if len(c) >= 4 and c.lower() not in ("finding", "check", "severity", "resource")]
+                if unresolved:
+                    matching_findings.append({
+                        "_not_found_target": unresolved[0],
+                        "provider": provider or "azure",
+                    })
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
             is_saas_query = (

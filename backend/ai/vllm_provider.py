@@ -574,6 +574,17 @@ class VLLMAzureProvider(AIProvider):
             for r in refs:
                 if not r.get("provider"):
                     r["provider"] = f_map.get(r.get("id")) or _primary_cloud or "oraclecloud"
+        # If user explicitly asked for a target finding that was not found in DB telemetry:
+        not_found_obj = next((f for f in (relevant_findings or []) if f.get("_not_found_target")), None)
+        if not_found_obj and not_found_obj.get("_not_found_target"):
+            tgt = not_found_obj["_not_found_target"]
+            warning_header = (
+                f"> [!WARNING]\n"
+                f"> **Finding Not Found in Live Telemetry**: The requested finding/check `{tgt}` is not present in your active cloud scan telemetry.\n\n"
+            )
+            if not ans.startswith(">") and "not present in your active" not in ans:
+                ans = warning_header + ans
+
         return AdvisorOutput(
             answer=ans,
             finding_references=refs,
