@@ -365,19 +365,32 @@ class VLLMAzureProvider(AIProvider):
             )
 
         # 2. Always invoke the live LLM (Qwen / vLLM on Azure or OpenAI/Claude)
-        context_str = json.dumps(relevant_findings[:25], indent=2) if relevant_findings else "[]"
-        prov_str = json.dumps(connected_providers, indent=2) if connected_providers else "[]"
+        # Slim findings to only essential fields to stay within small context windows
+        # (e.g. models loaded with max_model_len=4096). Full raw JSON with indent=2
+        # for 25 findings can easily exceed 2000+ tokens on its own.
+        _SLIM_KEYS = ("check_id", "check_title", "severity", "status", "resource", "region", "description", "risk")
+        slim_findings = [
+            {k: f[k] for k in _SLIM_KEYS if k in f}
+            for f in (relevant_findings or [])[:8]
+        ]
+        context_str = json.dumps(slim_findings, indent=1) if slim_findings else "[]"
+        prov_str = json.dumps(connected_providers, indent=1) if connected_providers else "[]"
+
+        # Drop verbose verified_section when context is already substantial to avoid
+        # exceeding the model's context window on small (4096-token) deployments.
+        _context_est_chars = len(prov_str) + len(context_str) + len(question)
+        _include_playbooks = _context_est_chars < 2000 and verified_section
         user_prompt = (
             f"Connected Environments:\n{prov_str}\n\n"
             f"Active Findings Telemetry:\n{context_str}"
-            f"{verified_section}\n\n"
+            f"{verified_section if _include_playbooks else ''}\n\n"
             f"User Question:\n{question}"
         )
         data = self._call_vllm_chat(
             system_prompt=ADVISOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.1,
-            max_tokens=1500,
+            max_tokens=800,
             history=history,
         )
         if data.get("_ai_unavailable"):
