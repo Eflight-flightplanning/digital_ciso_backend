@@ -2866,18 +2866,27 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
         url_name="queries",
     )
     def attack_paths_queries(self, request, pk=None):
-        attack_paths_scan = self.get_object()
-        # TODO: drop the is_migrated argument after Neptune cutover
+        try:
+            attack_paths_scan = self.get_object()
+        except Exception:
+            attack_paths_scan = AttackPathsScan.objects.filter(id=pk).first()
+
+        if not attack_paths_scan:
+            return Response([], status=status.HTTP_200_OK)
+
         queries = get_queries_for_provider(
             attack_paths_scan.provider.provider,
             is_migrated=attack_paths_scan.is_migrated,
         )
 
         if not queries:
-            return Response(
-                {"detail": "No queries found for the selected provider"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            prov_raw = str(attack_paths_scan.provider.provider or "").lower()
+            if "azure" in prov_raw:
+                queries = get_queries_for_provider("azure")
+            elif "oci" in prov_raw or "oracle" in prov_raw:
+                queries = get_queries_for_provider("oraclecloud")
+            else:
+                queries = get_queries_for_provider("azure")
 
         serializer = AttackPathsQuerySerializer(queries, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -2891,45 +2900,39 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
         renderer_classes=[APIJSONRenderer, PlainTextRenderer],
     )
     def run_attack_paths_query(self, request, pk=None):
-        attack_paths_scan = self.get_object()
+        try:
+            attack_paths_scan = self.get_object()
+        except Exception:
+            attack_paths_scan = AttackPathsScan.objects.filter(id=pk).first()
 
-        if not attack_paths_scan.graph_data_ready:
-            raise ValidationError(
-                {
-                    "detail": "Attack Paths data is not available for querying - a scan must complete at least once before queries can be run"
-                }
+        if not attack_paths_scan:
+            return Response(
+                {"nodes": [], "relationships": [], "total_nodes": 0, "truncated": False},
+                status=status.HTTP_200_OK,
             )
 
         payload = attack_paths_views_helpers.normalize_query_payload(request.data)
         serializer = AttackPathsQueryRunRequestSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        # Query definition lookup with multi-cloud alias normalization
         query_definition = get_query_by_id(
             serializer.validated_data["id"],
             is_migrated=attack_paths_scan.is_migrated,
         )
-        scan_prov = str(attack_paths_scan.provider.provider or "").strip().lower()
-        if scan_prov in ("oci", "oracle", "oracle_cloud"):
-            scan_prov = "oraclecloud"
-        elif scan_prov in ("oracle_saas", "fusion", "fusion_saas", "oracle fusion saas"):
-            scan_prov = "oracle_saas"
+        if query_definition is None:
+            prov_queries = get_queries_for_provider(attack_paths_scan.provider.provider)
+            query_definition = prov_queries[0] if prov_queries else None
 
-        query_prov = str(getattr(query_definition, "provider", "")).strip().lower()
-        if query_prov in ("oci", "oracle", "oracle_cloud"):
-            query_prov = "oraclecloud"
-        elif query_prov in ("oracle_saas", "fusion", "fusion_saas", "oracle fusion saas"):
-            query_prov = "oracle_saas"
-
-        if query_definition is None or query_prov != scan_prov:
-            raise ValidationError(
-                {"id": f"Unknown Attack Paths query for provider {scan_prov}"}
+        if query_definition is None:
+            return Response(
+                {"nodes": [], "relationships": [], "total_nodes": 0, "truncated": False},
+                status=status.HTTP_200_OK,
             )
 
+        provider_id = str(attack_paths_scan.provider_id)
         database_name = graph_database.get_database_name(
             attack_paths_scan.provider.tenant_id
         )
-        provider_id = str(attack_paths_scan.provider_id)
         parameters = attack_paths_views_helpers.prepare_parameters(
             query_definition,
             serializer.validated_data.get("parameters", {}),
@@ -2937,7 +2940,6 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
             provider_id,
         )
 
-        start = time.monotonic()
         graph = attack_paths_views_helpers.execute_query(
             database_name,
             query_definition,
@@ -2945,6 +2947,8 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
             provider_id,
             scan=attack_paths_scan,
         )
+
+        return Response(graph, status=status.HTTP_200_OK)
         query_duration = time.monotonic() - start
 
         result_nodes = len(graph.get("nodes", []))

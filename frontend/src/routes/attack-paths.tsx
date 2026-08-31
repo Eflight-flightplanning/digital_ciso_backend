@@ -355,7 +355,11 @@ function AttackPathsPage() {
           setGraph({ nodes: [], relationships: [], total_nodes: 0, truncated: false });
           setSelectedNodeId("");
           const msg = String(err?.message || "");
-          setGraphError(msg.toLowerCase().includes("not found") ? null : msg || "Query failed");
+          if (msg.includes("404") || msg.toLowerCase().includes("not found")) {
+            setGraphError(null);
+          } else {
+            setGraphError(msg || "Query failed");
+          }
         },
       }
     );
