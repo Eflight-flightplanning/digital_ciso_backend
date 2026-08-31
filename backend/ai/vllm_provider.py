@@ -113,13 +113,14 @@ class VLLMAzureProvider(AIProvider):
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "chat_template_kwargs": {"enable_thinking": False},
         }
 
         try:
             timeout_config = httpx.Timeout(connect=5.0, read=self.timeout or 60.0, write=10.0, pool=5.0)
             with httpx.Client(timeout=timeout_config) as client:
                 response = client.post(url, json=payload, headers=headers)
+                if response.is_error:
+                    logger.error("vLLM error response (%s): %s", response.status_code, response.text)
                 response.raise_for_status()
                 resp_json = response.json()
                 raw_content = resp_json["choices"][0]["message"]["content"]
