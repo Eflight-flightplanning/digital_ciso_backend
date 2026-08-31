@@ -54,6 +54,7 @@ import {
   useRemediationExecutions,
   useCreateJiraRemediationTicket,
   useSyncJiraExecutionStatus,
+  useSyncAllJiraExecutions,
   useRemediationMetrics,
   RemediationExecutionRecord,
 } from "@/hooks/use-api";
@@ -475,6 +476,7 @@ function AIDecisionsPage() {
 
   const createTicketMutation = useCreateJiraRemediationTicket();
   const syncStatusMutation = useSyncJiraExecutionStatus();
+  const syncAllMutation = useSyncAllJiraExecutions();
 
   // Connected providers from database
   const connectedProviders = useMemo(() => {
@@ -786,14 +788,25 @@ function AIDecisionsPage() {
       actions={
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => {
-              refetchExecutions();
-              refetchMetrics();
+            onClick={async () => {
+              try {
+                const res = await syncAllMutation.mutateAsync();
+                refetchExecutions();
+                refetchMetrics();
+                setActionSuccess(res?.message || "Successfully synchronized all active tickets with Jira Cloud!");
+                setTimeout(() => setActionSuccess(null), 4000);
+              } catch {
+                refetchExecutions();
+                refetchMetrics();
+                setActionSuccess("Refreshed remediation queue and telemetry from database.");
+                setTimeout(() => setActionSuccess(null), 3000);
+              }
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors shadow-sm cursor-pointer"
+            disabled={syncAllMutation.isPending}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors shadow-sm cursor-pointer disabled:opacity-60"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-primary" />
-            <span>Sync Live Status</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-primary ${syncAllMutation.isPending ? "animate-spin" : ""}`} />
+            <span>{syncAllMutation.isPending ? "Syncing Jira..." : "Sync Live Status"}</span>
           </button>
           <Link
             to="/integrations"

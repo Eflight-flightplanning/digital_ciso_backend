@@ -833,6 +833,78 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
         except JiraServiceError as e:
             return Response({"error": e.message}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=["post"], url_path="sync-all")
+    def sync_all_status(self, request):
+        """
+        Polls Jira Cloud API in bulk to synchronize all active tickets and update platform state.
+        """
+        tenant_id = getattr(request, "tenant_id", None) or getattr(request.user, "tenant_id", None)
+        qs = RemediationExecution.objects.filter(tenant_id=tenant_id) if tenant_id else RemediationExecution.objects.all()
+        active_executions = qs.exclude(issue_key__isnull=True).exclude(issue_key="N/A")
+
+        service = get_active_jira_service(tenant_id)
+        if not service:
+            return Response({
+                "synced_count": 0,
+                "updated_count": 0,
+                "message": "Jira Cloud is not configured for this tenant.",
+            }, status=status.HTTP_200_OK)
+
+        synced_count = 0
+        updated_count = 0
+
+        for execution in active_executions:
+            try:
+                issue_data = service.get_issue(execution.issue_key)
+                prev_status = execution.jira_status
+                new_jira_status = issue_data.get("status", "Unknown")
+                cat_key = issue_data.get("status_category_key", "new")
+
+                if cat_key == "done" or issue_data.get("is_resolved"):
+                    new_exec_status = RemediationExecution.ExecutionStatus.COMPLETED
+                elif cat_key == "indeterminate" or new_jira_status.lower() in (
+                    "in progress", "in review", "in development"
+                ):
+                    new_exec_status = RemediationExecution.ExecutionStatus.IN_PROGRESS
+                else:
+                    new_exec_status = RemediationExecution.ExecutionStatus.PENDING
+
+                has_changed = False
+                if prev_status != new_jira_status or execution.status != new_exec_status:
+                    has_changed = True
+                    updated_count += 1
+                    timeline = execution.timeline or []
+                    timeline.append({
+                        "stage": "status_changed",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "title": f"Jira Status Changed: {prev_status} → {new_jira_status}",
+                        "description": f"Synchronized live from Jira Cloud. Active assignee: {issue_data.get('assignee_name') or 'Unassigned'}.",
+                        "actor": issue_data.get("assignee_name") or "Jira Cloud",
+                        "status": "COMPLETED" if new_exec_status == RemediationExecution.ExecutionStatus.COMPLETED else "IN_PROGRESS",
+                    })
+                    execution.timeline = timeline
+
+                execution.jira_status = new_jira_status
+                execution.jira_status_category = cat_key
+                execution.status = new_exec_status
+                if issue_data.get("assignee_name"):
+                    execution.assignee_name = issue_data["assignee_name"]
+                if issue_data.get("assignee_email"):
+                    execution.assignee_email = issue_data["assignee_email"]
+                if issue_data.get("priority"):
+                    execution.priority = issue_data["priority"]
+                execution.last_synced_at = datetime.now(timezone.utc)
+                execution.save()
+                synced_count += 1
+            except Exception as e:
+                logger.warning(f"Could not sync issue {execution.issue_key}: {e}")
+
+        return Response({
+            "synced_count": synced_count,
+            "updated_count": updated_count,
+            "message": f"Successfully synchronized {synced_count} tickets with Jira Cloud ({updated_count} status updates).",
+        }, status=status.HTTP_200_OK)
+
 
 class RemediationMetricsView(APIView):
     """

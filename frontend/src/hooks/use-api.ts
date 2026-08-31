@@ -846,6 +846,24 @@ export function useSyncJiraExecutionStatus() {
   });
 }
 
+export function useSyncAllJiraExecutions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      return await api.post<{ synced_count: number; updated_count: number; message: string }>(
+        "/remediations/executions/sync-all",
+        {},
+        { jsonApi: false }
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.remediationExecutions() });
+      queryClient.invalidateQueries({ queryKey: qk.remediationMetrics() });
+      queryClient.invalidateQueries({ queryKey: qk.findings() });
+    },
+  });
+}
+
 export interface RemediationMetrics {
   tickets_created: number;
   pending_approval: number;
