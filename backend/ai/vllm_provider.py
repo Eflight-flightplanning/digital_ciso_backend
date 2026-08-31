@@ -441,7 +441,7 @@ class VLLMAzureProvider(AIProvider):
         # Slim findings to only essential fields to stay within small context windows
         # (e.g. models loaded with max_model_len=4096). Full raw JSON with indent=2
         # for 25 findings can easily exceed 2000+ tokens on its own.
-        _SLIM_KEYS = ("check_id", "check_title", "severity", "status", "resource", "region", "description", "risk", "remediation", "status_extended")
+        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status", "resource", "region", "description", "risk", "remediation", "status_extended")
         slim_findings = [
             {k: f[k] for k in _SLIM_KEYS if k in f}
             for f in (relevant_findings or [])[:8]

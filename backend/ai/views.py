@@ -614,73 +614,9 @@ def _retrieve_relevant_findings(
             cm = nullcontext()
 
         with cm:
-            qs = Finding.objects.filter(status="FAIL").select_related(
-                "scan", "scan__provider"
-            ).prefetch_related("resources")
-
-            # Apply provider scope filter when requested
-            if provider:
-                if provider == "oracle_saas":
-                    qs = qs.filter(
-                        Q(scan__provider__provider__iexact="oracle_saas")
-                        | Q(uid__startswith="prowler-oracle_saas")
-                        | Q(uid__startswith="oracle_saas-")
-                        | Q(check_id__startswith="erp_")
-                    )
-                elif provider in ("oraclecloud", "oci"):
-                    qs = qs.filter(
-                        Q(scan__provider__provider__iexact="oraclecloud")
-                        | Q(scan__provider__provider__iexact="oci")
-                        | Q(uid__startswith="prowler-oraclecloud")
-                        | Q(uid__startswith="prowler-oci")
-                        | Q(uid__startswith="oci-")
-                        | Q(check_id__startswith="oci_")
-                    )
-                elif provider == "azure":
-                    qs = qs.filter(
-                        Q(scan__provider__provider__iexact="azure")
-                        | Q(uid__startswith="prowler-azure")
-                        | Q(uid__startswith="azure-")
-                    )
-                elif provider == "aws":
-                    qs = qs.filter(
-                        Q(scan__provider__provider__iexact="aws")
-                        | Q(uid__startswith="prowler-aws")
-                        | Q(uid__startswith="aws-")
-                    )
-                elif provider == "gcp":
-                    qs = qs.filter(
-                        Q(scan__provider__provider__iexact="gcp")
-                        | Q(uid__startswith="prowler-gcp")
-                        | Q(uid__startswith="gcp-")
-                    )
-                else:
-                    qs = qs.filter(scan__provider__provider__iexact=provider)
-
-            # Apply specific severity filter if explicitly mentioned in query
-            if "critical" in q_lower:
-                qs = qs.filter(severity__iexact="critical")
-            elif "high" in q_lower:
-                qs = qs.filter(severity__iexact="high")
-            elif "medium" in q_lower:
-                qs = qs.filter(severity__iexact="medium")
-            elif "low" in q_lower:
-                qs = qs.filter(severity__iexact="low")
-
-            # Keyword matching: extract meaningful terms from question
-            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
-            stop_words = {
-                "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
-                "the", "with", "for", "show", "give", "tell", "about", "which", "are",
-                "from", "that", "this", "can", "our", "all", "does", "have", "first", "today",
-                "high", "critical", "medium", "low", "find", "infrastructure", "environment",
-                "account", "accounts", "missing", "enforce", "enforcement", "status", "check", "user", "users"
-            }
-            meaningful_keywords = [w for w in words if w.lower() not in stop_words]
-
             # --- UUID pinned lookup: extract any UUIDs from the question and fetch them directly ---
             # This ensures "Analyze finding ... (01a05876-d3a8-...)" always resolves the specific
-            # finding even if keyword matching would miss it.
+            # finding even if keyword matching would miss it or if it has status PASS/MUTED.
             _uuid_pattern = re.compile(
                 r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
                 re.IGNORECASE,
@@ -688,61 +624,6 @@ def _retrieve_relevant_findings(
             pinned_ids = _uuid_pattern.findall(question)
             matching_ids = set()
             matching_findings = []
-            if pinned_ids:
-                for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
-                    try:
-                        pinned_f = qs.filter(id=pin_id).first()
-                        if pinned_f and pinned_f.id not in matching_ids:
-                            matching_ids.add(pinned_f.id)
-                            matching_findings.append(_serialize_finding(pinned_f))
-                    except Exception:
-                        pass
-
-            # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
-            is_saas_query = (
-                (provider is None or provider == "oracle_saas")
-                and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes")
-                and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "curtis", "alan", "mandy", "oracle erp"))
-            )
-            if is_saas_query:
-                try:
-                    from api.v1.oracle_saas_views import load_real_pod_users, SOD_TOXIC_MATRICES
-                    saas_users = load_real_pod_users()
-                    if saas_users:
-                        # Filter relevant users based on question keywords
-                        relevant_saas_users = []
-                        for u in saas_users:
-                            dept = (u.get("department") or "").lower()
-                            uname = (u.get("username") or "").lower()
-                            roles = " ".join(u.get("roles") or []).lower()
-                            if any(k in q_lower for k in ("finance", "ap", "gl", "payables", "ledger")) and any(fk in (dept + " " + roles + " " + uname) for fk in ("finance", "ap", "gl", "payables", "account")):
-                                relevant_saas_users.append(u)
-                            elif any(k in q_lower for k in ("hr", "hcm", "human resource")) and any(hk in (dept + " " + roles + " " + uname) for hk in ("hr", "hcm", "human", "resource", "person")):
-                                relevant_saas_users.append(u)
-                            elif "pam" in q_lower or "superuser" in q_lower or "consultant" in q_lower:
-                                if u.get("is_superuser"):
-                                    relevant_saas_users.append(u)
-                            elif "sod" in q_lower:
-                                if u.get("sod_conflicts"):
-                                    relevant_saas_users.append(u)
-
-                        if not relevant_saas_users:
-                            relevant_saas_users = saas_users[:10]
-
-                        matching_findings.append({
-                            "finding_id": "ORACLE-SAAS-TELEMETRY-SUMMARY",
-                            "uid": "oracle_saas-identity-governance",
-                            "check_id": "oracle_saas_identity_governance",
-                            "check_title": "Oracle Fusion SaaS Identity Governance & SoD Posture",
-                            "severity": "CRITICAL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "MEDIUM",
-                            "status": "FAIL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "PASS",
-                            "status_extended": f"Total Monitored SaaS Users: {len(saas_users)}. Active Accounts: {len([u for u in saas_users if u.get('days_inactive', 0) < 30 and not u.get('is_suspended')])}, Dormant: {len([u for u in saas_users if u.get('days_inactive', 0) >= 30])}, Superusers/PAM: {len([u for u in saas_users if u.get('is_superuser')])}, SoD Toxic Combinations: {sum(len(u.get('sod_conflicts', [])) for u in saas_users)}. Inspected Users: {', '.join(u.get('username') for u in relevant_saas_users[:5])}.",
-                            "remediation": "Enforce MFA via Oracle Identity Cloud Service (IDCS) / OCI IAM Domain Conditional Access Policy, decouple conflicting SoD roles, and quarantine unused PAM accounts.",
-                            "provider": "oracle_saas",
-                            "resource": {"name": "Oracle Fusion Cloud Pod (fa-etar-dev13)"},
-                        })
-                except Exception as s_err:
-                    logger.debug("SaaS telemetry inclusion error: %s", s_err)
 
             def _serialize_finding(f):
                 meta = f.check_metadata or {}
@@ -790,8 +671,119 @@ def _retrieve_relevant_findings(
                     "resource": {"name": res_name or "Cloud Resource"},
                 }
 
-            if meaningful_keywords:
-                # Exclude broad noise words to focus on discriminative security and domain terms
+            if pinned_ids:
+                for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
+                    try:
+                        pinned_f = Finding.objects.filter(id=pin_id).select_related(
+                            "scan", "scan__provider"
+                        ).prefetch_related("resources").first()
+                        if pinned_f and pinned_f.id not in matching_ids:
+                            matching_ids.add(pinned_f.id)
+                            matching_findings.append(_serialize_finding(pinned_f))
+                    except Exception as p_err:
+                        logger.debug("Pinned finding lookup error for %s: %s", pin_id, p_err)
+
+            # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
+            is_saas_query = (
+                (provider is None or provider == "oracle_saas")
+                and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes")
+                and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "curtis", "alan", "mandy", "oracle erp"))
+            )
+            if is_saas_query:
+                try:
+                    from api.v1.oracle_saas_views import load_real_pod_users, SOD_TOXIC_MATRICES
+                    saas_users = load_real_pod_users()
+                    if saas_users:
+                        # Filter relevant users based on question keywords
+                        relevant_saas_users = []
+                        for u in saas_users:
+                            dept = (u.get("department") or "").lower()
+                            uname = (u.get("username") or "").lower()
+                            roles = " ".join(u.get("roles") or []).lower()
+                            if any(k in q_lower for k in ("finance", "ap", "gl", "payables", "ledger")) and any(fk in (dept + " " + roles + " " + uname) for fk in ("finance", "ap", "gl", "payables", "account")):
+                                relevant_saas_users.append(u)
+                            elif any(k in q_lower for k in ("hr", "hcm", "human resource")) and any(hk in (dept + " " + roles + " " + uname) for hk in ("hr", "hcm", "human", "resource", "person")):
+                                relevant_saas_users.append(u)
+                            elif "pam" in q_lower or "superuser" in q_lower or "consultant" in q_lower:
+                                if u.get("is_superuser"):
+                                    relevant_saas_users.append(u)
+                            elif "sod" in q_lower:
+                                if u.get("sod_conflicts"):
+                                    relevant_saas_users.append(u)
+
+                        if not relevant_saas_users:
+                            relevant_saas_users = saas_users[:10]
+
+                        matching_findings.append({
+                            "finding_id": "ORACLE-SAAS-TELEMETRY-SUMMARY",
+                            "uid": "oracle_saas-identity-governance",
+                            "check_id": "oracle_saas_identity_governance",
+                            "check_title": "Oracle Fusion SaaS Identity Governance & SoD Posture",
+                            "severity": "CRITICAL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "MEDIUM",
+                            "status": "FAIL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "PASS",
+                            "status_extended": f"Total Monitored SaaS Users: {len(saas_users)}. Active Accounts: {len([u for u in saas_users if u.get('days_inactive', 0) < 30 and not u.get('is_suspended')])}, Dormant: {len([u for u in saas_users if u.get('days_inactive', 0) >= 30])}, Superusers/PAM: {len([u for u in saas_users if u.get('is_superuser')])}, SoD Toxic Combinations: {sum(len(u.get('sod_conflicts', [])) for u in saas_users)}. Inspected Users: {', '.join(u.get('username') for u in relevant_saas_users[:5])}.",
+                            "remediation": "Enforce MFA via Oracle Identity Cloud Service (IDCS) / OCI IAM Domain Conditional Access Policy, decouple conflicting SoD roles, and quarantine unused PAM accounts.",
+                            "provider": "oracle_saas",
+                            "resource": {"name": "Oracle Fusion Cloud Pod (fa-etar-dev13)"},
+                        })
+                except Exception as s_err:
+                    logger.debug("SaaS telemetry inclusion error: %s", s_err)
+
+            base_qs = Finding.objects.select_related(
+                "scan", "scan__provider"
+            ).prefetch_related("resources")
+
+            # Apply provider scope filter when requested
+            if provider:
+                if provider == "oracle_saas":
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="oracle_saas")
+                        | Q(uid__startswith="prowler-oracle_saas")
+                        | Q(uid__startswith="oracle_saas-")
+                        | Q(check_id__startswith="erp_")
+                    )
+                elif provider in ("oraclecloud", "oci"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="oraclecloud")
+                        | Q(scan__provider__provider__iexact="oci")
+                        | Q(uid__startswith="prowler-oraclecloud")
+                        | Q(uid__startswith="prowler-oci")
+                        | Q(uid__startswith="oci-")
+                        | Q(check_id__startswith="oci_")
+                    )
+                elif provider == "azure":
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="azure")
+                        | Q(uid__startswith="prowler-azure")
+                        | Q(uid__startswith="azure-")
+                    )
+                elif provider == "aws":
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="aws")
+                        | Q(uid__startswith="prowler-aws")
+                        | Q(uid__startswith="aws-")
+                    )
+                elif provider == "gcp":
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="gcp")
+                        | Q(uid__startswith="prowler-gcp")
+                        | Q(uid__startswith="gcp-")
+                    )
+                else:
+                    base_qs = base_qs.filter(scan__provider__provider__iexact=provider)
+
+            # Keyword matching: extract meaningful terms from question
+            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
+            stop_words = {
+                "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
+                "the", "with", "for", "show", "give", "tell", "about", "which", "are",
+                "from", "that", "this", "can", "our", "all", "does", "have", "first", "today",
+                "high", "critical", "medium", "low", "find", "infrastructure", "environment",
+                "account", "accounts", "missing", "enforce", "enforcement", "status", "check", "user", "users"
+            }
+            meaningful_keywords = [w for w in words if w.lower() not in stop_words]
+
+            if meaningful_keywords and len(matching_findings) < limit:
                 search_kws = [k for k in meaningful_keywords if len(k) >= 2 and k.lower() not in ("administrator", "administrators", "admin", "admins")]
                 if not search_kws:
                     search_kws = meaningful_keywords
@@ -802,23 +794,26 @@ def _retrieve_relevant_findings(
                         q_obj |= (
                             Q(check_id__icontains=f"_{kw}")
                             | Q(check_id__istartswith=f"{kw}_")
-                            | Q(status_extended__iregex=rf"\b{kw}\b")
+                            | Q(status_extended__icontains=kw)
+                            | Q(resources__name__icontains=kw)
+                            | Q(uid__icontains=kw)
                         )
                     else:
                         q_obj |= (
                             Q(check_id__icontains=kw)
-                            | Q(status_extended__iregex=rf"\b{kw}\b")
+                            | Q(status_extended__icontains=kw)
                             | Q(uid__icontains=kw)
+                            | Q(resources__name__icontains=kw)
+                            | Q(check_metadata__icontains=kw)
                         )
 
-                matched_qs = qs.filter(q_obj).distinct()[:limit]
+                matched_qs = base_qs.exclude(id__in=matching_ids).filter(q_obj).distinct()[: (limit - len(matching_findings))]
                 for f in matched_qs:
                     matching_ids.add(f.id)
                     matching_findings.append(_serialize_finding(f))
 
-            # Only pad with top general findings if user explicitly asked for general prioritization
-            is_general_triage = any(t in q_lower for t in ["remediate first", "top risk", "top finding", "critical", "prioritize", "today", "what should we fix"])
-            if (is_general_triage or not meaningful_keywords) and len(matching_findings) < limit:
+            # Always populate remaining slots with active findings so the AI telemetry is never empty
+            if len(matching_findings) < limit:
                 remaining_limit = limit - len(matching_findings)
                 severity_order = Case(
                     When(severity="critical", then=Value(0)),
@@ -828,13 +823,20 @@ def _retrieve_relevant_findings(
                     default=Value(4),
                     output_field=IntegerField(),
                 )
+                status_order = Case(
+                    When(status="FAIL", then=Value(0)),
+                    When(status="MUTED", then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
                 fill_qs = (
-                    qs.exclude(id__in=matching_ids)
-                    .annotate(severity_rank=severity_order)
-                    .order_by("severity_rank")[:remaining_limit]
+                    base_qs.exclude(id__in=matching_ids)
+                    .annotate(status_rank=status_order, severity_rank=severity_order)
+                    .order_by("status_rank", "severity_rank")[:remaining_limit]
                 )
 
                 for f in fill_qs:
+                    matching_ids.add(f.id)
                     matching_findings.append(_serialize_finding(f))
 
             return matching_findings
