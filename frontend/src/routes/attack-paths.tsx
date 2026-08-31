@@ -507,16 +507,19 @@ Please provide:
           <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
             {scans.map((s) => {
               const isSelected = selectedScanId === s.id;
+              const pType = String(s.provider_type || (typeof s.provider === "string" ? s.provider : "") || (s.provider as any)?.provider || "").toLowerCase();
+              const pAlias = String(s.provider_alias || (typeof s.provider === "object" ? (s.provider as any)?.alias : "") || s.provider_uid || "").toLowerCase();
+
               const providerLabel =
-                s.provider_type === "oraclecloud"
+                pType === "oraclecloud" || pType === "oci" || pAlias.includes("oci")
                   ? "Oracle OCI"
-                  : s.provider_type === "azure"
+                  : pType === "azure" || pAlias.includes("azure") || pAlias.includes("eflight")
                     ? "Microsoft Azure"
-                    : s.provider_type === "aws"
-                      ? "Amazon AWS"
-                      : s.provider_type === "oracle_saas"
-                        ? "Oracle Fusion SaaS"
-                        : s.provider_type;
+                    : pType === "oracle_saas" || pType === "fusion" || pAlias.includes("saas") || pAlias.includes("fusion")
+                      ? "Oracle Fusion SaaS"
+                      : pType === "aws" || pAlias.includes("aws")
+                        ? "Amazon AWS"
+                        : "Cloud Provider";
 
               return (
                 <button

@@ -201,9 +201,23 @@ def _build_real_telemetry_graph(
 
             for idx, f in enumerate(findings):
                 check_id = f.check_id or f"check_{idx+1}"
-                res_name = f.resource_id or f"vm-prod-{idx+1}"
                 meta = f.check_metadata or {}
-                f_title = meta.get("checktitle") or check_id.replace("_", " ")
+                f_title = meta.get("checktitle") or meta.get("CheckTitle") or check_id.replace("_", " ")
+
+                res_name = (
+                    getattr(f, "resource_name", None)
+                    or meta.get("ResourceIdTemplate")
+                    or meta.get("resource_id")
+                    or meta.get("ResourceName")
+                    or (f.uid.split("-")[-1] if f.uid else "")
+                    or f"vm-prod-{idx+1}"
+                )
+                reg = (
+                    (f.resource_regions[0] if getattr(f, "resource_regions", None) else None)
+                    or meta.get("Region")
+                    or meta.get("region")
+                    or "eastus"
+                )
 
                 if "storage" in check_id.lower() or "blob" in check_id.lower():
                     asset_id = f"sa_{idx}"
@@ -223,12 +237,12 @@ def _build_real_telemetry_graph(
 
                 add_node(asset_id, [asset_label, "_AzureResource"], {
                     "name": res_name,
-                    "region": f.region or "eastus",
-                    "resource_uid": f.resource_id,
+                    "region": reg,
+                    "resource_uid": f.uid or res_name,
                 })
                 add_rel(f"rel_rg_{asset_id}", "CONTAINS", rg_id, asset_id)
 
-                if idx % 2 == 0 or "public" in check_id.lower() or "internet" in check_id.lower():
+                if idx % 2 == 0 or "public" in check_id.lower() or "internet" in check_id.lower() or "ingress" in check_id.lower():
                     add_rel(f"rel_inet_{asset_id}", "ATTACK_VECTOR", "node_internet", asset_id, {
                         "vector": "Unrestricted Ingress / Open NSG Port"
                     })
@@ -262,9 +276,23 @@ def _build_real_telemetry_graph(
 
             for idx, f in enumerate(findings):
                 check_id = f.check_id or f"oci_check_{idx+1}"
-                res_name = f.resource_id or f"oci-inst-{idx+1}"
                 meta = f.check_metadata or {}
-                f_title = meta.get("checktitle") or check_id.replace("_", " ")
+                f_title = meta.get("checktitle") or meta.get("CheckTitle") or check_id.replace("_", " ")
+
+                res_name = (
+                    getattr(f, "resource_name", None)
+                    or meta.get("ResourceIdTemplate")
+                    or meta.get("resource_id")
+                    or meta.get("ResourceName")
+                    or (f.uid.split("-")[-1] if f.uid else "")
+                    or f"oci-inst-{idx+1}"
+                )
+                reg = (
+                    (f.resource_regions[0] if getattr(f, "resource_regions", None) else None)
+                    or meta.get("Region")
+                    or meta.get("region")
+                    or "us-ashburn-1"
+                )
 
                 if "bucket" in check_id.lower() or "storage" in check_id.lower():
                     asset_id = f"oci_bucket_{idx}"
@@ -278,8 +306,8 @@ def _build_real_telemetry_graph(
 
                 add_node(asset_id, [asset_label, "_OCIResource"], {
                     "name": res_name,
-                    "region": f.region or "us-ashburn-1",
-                    "resource_uid": f.resource_id,
+                    "region": reg,
+                    "resource_uid": f.uid or res_name,
                 })
                 add_rel(f"rel_comp_{asset_id}", "CONTAINS", comp_id, asset_id)
 
