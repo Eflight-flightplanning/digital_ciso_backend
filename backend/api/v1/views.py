@@ -2904,17 +2904,26 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
         serializer = AttackPathsQueryRunRequestSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        # TODO: drop the is_migrated argument after Neptune cutover
+        # Query definition lookup with multi-cloud alias normalization
         query_definition = get_query_by_id(
             serializer.validated_data["id"],
             is_migrated=attack_paths_scan.is_migrated,
         )
-        if (
-            query_definition is None
-            or query_definition.provider != attack_paths_scan.provider.provider
-        ):
+        scan_prov = str(attack_paths_scan.provider.provider or "").strip().lower()
+        if scan_prov in ("oci", "oracle", "oracle_cloud"):
+            scan_prov = "oraclecloud"
+        elif scan_prov in ("oracle_saas", "fusion", "fusion_saas", "oracle fusion saas"):
+            scan_prov = "oracle_saas"
+
+        query_prov = str(getattr(query_definition, "provider", "")).strip().lower()
+        if query_prov in ("oci", "oracle", "oracle_cloud"):
+            query_prov = "oraclecloud"
+        elif query_prov in ("oracle_saas", "fusion", "fusion_saas", "oracle fusion saas"):
+            query_prov = "oracle_saas"
+
+        if query_definition is None or query_prov != scan_prov:
             raise ValidationError(
-                {"id": "Unknown Attack Paths query for the selected provider"}
+                {"id": f"Unknown Attack Paths query for provider {scan_prov}"}
             )
 
         database_name = graph_database.get_database_name(

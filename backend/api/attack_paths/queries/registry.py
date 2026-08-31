@@ -57,7 +57,15 @@ def get_queries_for_provider(
     # TODO: drop the `is_migrated` parameter after Neptune cutover
     """
     catalog = _QUERY_DEFINITIONS if is_migrated else _DEPRECATED_QUERY_DEFINITIONS
-    return catalog.get(provider, [])
+    p_norm = str(provider or "").strip().lower()
+    if p_norm in ("oci", "oracle", "oracle_cloud"):
+        p_norm = "oraclecloud"
+    elif p_norm in ("oracle_saas", "fusion", "fusion_saas", "oracle fusion saas"):
+        p_norm = "oracle_saas"
+    res = catalog.get(p_norm)
+    if not res:
+        res = catalog.get(str(provider))
+    return res or []
 
 
 def get_query_by_id(
@@ -70,4 +78,4 @@ def get_query_by_id(
     # TODO: drop the `is_migrated` parameter after Neptune cutover
     """
     by_id = _QUERIES_BY_ID if is_migrated else _DEPRECATED_QUERIES_BY_ID
-    return by_id.get(query_id)
+    return by_id.get(query_id) or _QUERIES_BY_ID.get(query_id)
