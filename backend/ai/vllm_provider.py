@@ -441,18 +441,25 @@ class VLLMAzureProvider(AIProvider):
         # Slim findings to only essential fields to stay within small context windows
         # (e.g. models loaded with max_model_len=4096). Full raw JSON with indent=2
         # for 25 findings can easily exceed 2000+ tokens on its own.
-        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status", "resource", "region", "description", "risk", "remediation", "status_extended")
-        slim_findings = [
-            {k: f[k] for k in _SLIM_KEYS if k in f}
-            for f in (relevant_findings or [])[:8]
-        ]
-        context_str = json.dumps(slim_findings, indent=1) if slim_findings else "[]"
+        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status",
+                      "resource", "region", "description", "risk", "remediation", "status_extended")
+
+        # Separate pinned (UUID-fetched) findings from general context findings
+        pinned_findings = [f for f in (relevant_findings or []) if f.get("_pinned")]
+        general_findings = [f for f in (relevant_findings or []) if not f.get("_pinned")]
+
+        def _slim(f: dict) -> dict:
+            return {k: f[k] for k in _SLIM_KEYS if k in f}
+
+        slim_pinned = [_slim(f) for f in pinned_findings[:3]]
+        slim_general = [_slim(f) for f in general_findings[:6]]
+        context_str = json.dumps(slim_general, indent=1) if slim_general else "[]"
         prov_str = json.dumps(connected_providers, indent=1) if connected_providers else "[]"
 
         # Derive the primary cloud provider from findings or connected providers so the LLM
         # generates the correct CLI / Terraform syntax even when telemetry is sparse.
         _primary_cloud = None
-        for f in slim_findings:
+        for f in (slim_pinned + slim_general):
             _primary_cloud = f.get("provider")
             if _primary_cloud:
                 break
@@ -470,21 +477,34 @@ class VLLMAzureProvider(AIProvider):
         }
         _cloud_hint = (
             f"\nCloud Environment: {_CLOUD_LABELS.get(_primary_cloud, _primary_cloud.upper())}"
-            f" — use {_primary_cloud}-specific CLI, Terraform, and portal steps ONLY.\n"
+            f" — generate {_primary_cloud}-specific CLI, Terraform, and portal steps ONLY.\n"
             if _primary_cloud else ""
         )
 
+        # Build pinned-finding block — this is the user's directly requested finding.
+        # It appears first and overrides the anti-hallucination "no live data" rule.
+        pinned_section = ""
+        if slim_pinned:
+            pinned_section = (
+                "\n\nLIVE FINDING DATA (directly retrieved from the scanner database for this exact finding ID):\n"
+                + json.dumps(slim_pinned, indent=1)
+                + "\nINSTRUCTION: The above is verified live telemetry. Analyse it and provide the security risk "
+                  "and step-by-step remediation. Do NOT say 'I don't have live data'.\n"
+            )
+
         # Drop verbose verified_section when context is already substantial to avoid
         # exceeding the model's context window on small (4096-token) deployments.
-        _context_est_chars = len(prov_str) + len(context_str) + len(question)
-        _include_playbooks = _context_est_chars < 2000 and verified_section
+        _context_est_chars = len(prov_str) + len(context_str) + len(question) + len(pinned_section)
+        _include_playbooks = _context_est_chars < 1800 and verified_section
         user_prompt = (
             f"Connected Environments:\n{prov_str}\n"
-            f"{_cloud_hint}\n"
+            f"{_cloud_hint}"
+            f"{pinned_section}\n"
             f"Active Findings Telemetry:\n{context_str}"
             f"{verified_section if _include_playbooks else ''}\n\n"
             f"User Question:\n{question}"
         )
+
         data = self._call_vllm_chat(
             system_prompt=ADVISOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,

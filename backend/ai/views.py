@@ -625,15 +625,22 @@ def _retrieve_relevant_findings(
             matching_ids = set()
             matching_findings = []
 
-            def _serialize_finding(f):
+            def _serialize_finding(f, pinned: bool = False):
                 meta = f.check_metadata or {}
                 first_resource = f.resources.first()
-                res_name = getattr(f, "resource_name", None) or (first_resource.name if first_resource else "")
+                res_name = (
+                    getattr(f, "resource_name", None)
+                    or (first_resource.name if first_resource else "")
+                    or meta.get("ResourceIdTemplate", "")
+                    or meta.get("resource_id", "")
+                )
                 if not res_name and f.uid:
                     parts = f.uid.split("-")
                     if len(parts) > 1:
                         res_name = parts[-1]
 
+                # Derive cloud provider — check scan relationship first, then uid prefix
+                prov = provider  # default to what was requested
                 if f.scan and f.scan.provider:
                     prov = f.scan.provider.provider
                 elif (f.uid or "").startswith(("prowler-oracle_saas", "oracle_saas-")) or (f.check_id or "").startswith("erp_"):
@@ -646,8 +653,8 @@ def _retrieve_relevant_findings(
                     prov = "aws"
                 elif (f.uid or "").startswith(("prowler-gcp", "gcp-")):
                     prov = "gcp"
-                else:
-                    prov = "oraclecloud" if provider in ("oraclecloud", "oci") else "azure"
+                prov = prov or "azure"
+
                 title = meta.get("checktitle") or meta.get("check_title") or meta.get("CheckTitle") or f.check_id.replace("_", " ")
 
                 rem = ""
@@ -658,7 +665,7 @@ def _retrieve_relevant_findings(
                 elif meta.get("remediation_text"):
                     rem = meta["remediation_text"]
 
-                return {
+                result = {
                     "finding_id": str(f.id),
                     "uid": f.uid or "",
                     "check_id": f.check_id,
@@ -670,18 +677,24 @@ def _retrieve_relevant_findings(
                     "provider": prov,
                     "resource": {"name": res_name or "Cloud Resource"},
                 }
+                if pinned:
+                    result["_pinned"] = True  # signal to the LLM prompt formatter
+                return result
 
             if pinned_ids:
                 for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
                     try:
-                        pinned_f = Finding.objects.filter(id=pin_id).select_related(
+                        # Use all_objects (bypasses ActiveProviderPartitionedManager) so findings
+                        # from soft-deleted or inactive providers are still reachable by UUID.
+                        pinned_f = Finding.all_objects.filter(id=pin_id).select_related(
                             "scan", "scan__provider"
                         ).prefetch_related("resources").first()
                         if pinned_f and pinned_f.id not in matching_ids:
                             matching_ids.add(pinned_f.id)
-                            matching_findings.append(_serialize_finding(pinned_f))
+                            matching_findings.append(_serialize_finding(pinned_f, pinned=True))
+                            logger.info("Pinned finding resolved: %s (%s)", pin_id, pinned_f.check_id)
                     except Exception as p_err:
-                        logger.debug("Pinned finding lookup error for %s: %s", pin_id, p_err)
+                        logger.warning("Pinned finding lookup error for %s: %s", pin_id, p_err)
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
             is_saas_query = (
