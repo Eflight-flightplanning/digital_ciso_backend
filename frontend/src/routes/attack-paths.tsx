@@ -318,7 +318,7 @@ function AttackPathsPage() {
   const selectedScan = scans.find((s) => s.id === selectedScanId);
 
   const { data: queriesData, isLoading: queriesLoading } = useAttackPathsQueries(
-    selectedScan?.graph_data_ready ? selectedScan.id : undefined
+    selectedScan?.id
   );
   const queries = (queriesData as Array<Record<string, any>>) ?? [];
 
@@ -538,9 +538,7 @@ Please provide:
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
-            {scans
-              .filter((s) => s.provider_type !== "oracle_saas")
-              .map((s) => {
+            {scans.map((s) => {
               const isSelected = selectedScanId === s.id;
               const providerLabel =
                 s.provider_type === "oraclecloud"
@@ -549,7 +547,9 @@ Please provide:
                     ? "Microsoft Azure"
                     : s.provider_type === "aws"
                       ? "Amazon AWS"
-                      : s.provider_type;
+                      : s.provider_type === "oracle_saas"
+                        ? "Oracle Fusion SaaS"
+                        : s.provider_type;
 
               return (
                 <button
@@ -561,7 +561,7 @@ Please provide:
                       : "bg-surface-2/50 border-border/50 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                   }`}
                 >
-                  <span className={`h-2.5 w-2.5 rounded-full ${s.graph_data_ready ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-400 animate-pulse"}`} />
+                  <span className={`h-2.5 w-2.5 rounded-full ${s.graph_data_ready ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-emerald-500/80"}`} />
                   <span className="font-bold">{providerLabel}</span>
                   <span className="truncate max-w-[160px] font-normal text-[11px] text-muted-foreground">
                     ({s.provider_alias || s.provider_uid})

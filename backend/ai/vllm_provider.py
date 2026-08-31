@@ -154,11 +154,13 @@ class VLLMAzureProvider(AIProvider):
         if "Thinking Process:" in text:
             text = text.split("Thinking Process:")[-1].strip()
 
-        # 3. Detect Qwen 3 verbose scratchpad leakage pattern.
-        # When the response starts with a scratchpad header (e.g. "User Question:"),
-        # find the LAST heading that signals "actual answer begins here" and trim above it.
+        # 3. Detect verbose scratchpad/reasoning leakage patterns
         _SCRATCHPAD_START_HEADERS = (
             "user question:",
+            "user: asks for",
+            "user:",
+            "finding details:",
+            "critical rule:",
             "constraint:",
             "specific rule:",
             "evaluate telemetry:",
@@ -169,58 +171,62 @@ class VLLMAzureProvider(AIProvider):
             "critical constraint:",
             "anti-hallucination:",
             "thinking steps:",
+            "meaning: this finding",
+            "meaning:",
+            "interpretation:",
+            "correction:",
+            "wait, let's",
+            "actually, looking",
         )
         _ANSWER_RESUME_MARKERS = (
-            "direct answer:",
-            "**direct answer",
-            "## direct",
+            "### 1.",
+            "### security risk",
+            "### attack path",
+            "### root cause",
+            "### step-by-step",
             "## security risk",
             "## risk",
             "## remediation",
             "## summary",
             "### spectra",
-            "based on ",
-            "i don't have live",
-            "i don't have",
-            "the finding",
-            "the active findings",
-            "there are no",
+            "direct answer:",
+            "**direct answer",
+            "1. **how an attacker",
+            "1. **step-by-step",
+            "1. **attack path",
+            "1. **security risk",
+            "1. an attacker",
         )
 
         text_lower = text.lower()
-        first_scratchpad = min(
-            (text_lower.find(h) for h in _SCRATCHPAD_START_HEADERS if h in text_lower),
-            default=-1,
-        )
-
-        if first_scratchpad != -1 and first_scratchpad < 200:
-            # Response starts with a scratchpad block — find where the real answer begins
-            best_resume = len(text)  # default: keep all (nothing found)
+        has_scratchpad = any(text_lower.startswith(h) or f"\n{h}" in text_lower[:400] for h in _SCRATCHPAD_START_HEADERS)
+        if has_scratchpad:
+            best_resume = -1
             for marker in _ANSWER_RESUME_MARKERS:
                 idx = text_lower.find(marker)
-                if idx != -1 and idx > first_scratchpad:
-                    # Find the beginning of that line
-                    line_start = text.rfind("\n", 0, idx)
-                    line_start = 0 if line_start == -1 else line_start + 1
-                    if line_start < best_resume:
-                        best_resume = line_start
-
-            if best_resume < len(text):
+                if idx != -1:
+                    if best_resume == -1 or idx < best_resume:
+                        best_resume = idx
+            if best_resume != -1:
                 text = text[best_resume:].strip()
+            elif "critical rule:" in text_lower or "interpretation:" in text_lower or text_lower.startswith("user:"):
+                # The output is entirely scratchpad thoughts without a final answer
+                return ""
 
         # 4. Line-by-line filter: remove individual bullet scratchpad lines
         scratchpad_line_re = re.compile(
-            r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|Role|Task|Constraints|Greeting|"
+            r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|User:|Role|Task|Constraints|Greeting|"
             r"Status|Telemetry|Offer|Formatting|Analyze|Identify|Determine|Draft|Construct|"
             r"Mental|Thinking|Final|Refine|JSON|Context|System Instruction|Critical Constraint|"
-            r"Specific Rule|Evaluate|Drafting|Constraint)\b",
+            r"Critical Rule|Specific Rule|Evaluate|Drafting|Constraint|Interpretation|Correction)\b",
             re.IGNORECASE,
         )
         lines = []
         for line in text.split("\n"):
-            if scratchpad_line_re.match(line.strip()):
+            line_str = line.strip()
+            if scratchpad_line_re.match(line_str):
                 continue
-            if line.strip().startswith("Thinking Process:"):
+            if any(line_str.lower().startswith(h) for h in _SCRATCHPAD_START_HEADERS):
                 continue
             lines.append(line)
 
@@ -552,20 +558,17 @@ class VLLMAzureProvider(AIProvider):
                 connected_providers=connected_providers,
             )
 
-        ans = data.get("answer", data.get("raw_text", "")).strip()
-        if not ans or len(ans) <= 5:
+        raw_ans = data.get("answer", data.get("raw_text", "")).strip()
+        ans = self._clean_thinking_trace(raw_ans)
+
+        if not ans or len(ans) <= 15 or "critical rule:" in ans.lower() or ans.lower().startswith("user:"):
+            logger.info("Engaging grounded response generator for query: %s", question)
             return self._generate_fallback_advisor_response(
                 question=question,
                 relevant_findings=relevant_findings,
                 primary_cloud=_primary_cloud,
                 connected_providers=connected_providers,
             )
-
-        # Strip out thinking process traces if Qwen emitted scratchpad thoughts
-        if "Thinking Process:" in ans:
-            ans = re.sub(r"(?s)Thinking Process:.*?(?=\n\n[A-Z]|\n\n#|\n\n\*\*|\Z)", "", ans).strip()
-            if not ans or len(ans) < 10:
-                ans = data.get("raw_text", "").strip()
 
         refs = data.get("finding_references", [])
         if not refs and relevant_findings:
