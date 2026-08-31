@@ -87,26 +87,26 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
   }, [code]);
 
   return (
-    <div className="relative group my-2.5 rounded-xl overflow-hidden border border-border/70 bg-[hsl(220,15%,9%)] shadow-inner">
+    <div className="relative group my-3 rounded-xl overflow-hidden border border-slate-700/80 bg-[#0f172a] shadow-md">
       {/* Language badge + copy button */}
-      <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-border/50 bg-surface-2/60">
-        <span className="font-mono text-[9.5px] font-bold uppercase tracking-widest text-primary/70">
+      <div className="flex items-center justify-between px-3.5 py-1.5 border-b border-slate-800 bg-[#1e293b]/90">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400">
           {language || "code"}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all cursor-pointer"
+          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700/80 transition-all cursor-pointer"
           title="Copy to clipboard"
         >
           {copied ? (
             <><Check className="h-3 w-3 text-emerald-400" /><span className="text-emerald-400">Copied!</span></>
           ) : (
-            <><Copy className="h-3 w-3" /><span>Copy</span></>
+            <><Copy className="h-3 w-3 text-slate-400" /><span>Copy</span></>
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto px-4 py-3 text-[12px] leading-relaxed font-mono text-foreground/90">
-        <code>{code}</code>
+      <pre className="overflow-x-auto px-4 py-3 text-[12.5px] leading-relaxed font-mono text-slate-100 selection:bg-cyan-500/30">
+        <code className="text-slate-100 font-mono">{code}</code>
       </pre>
     </div>
   );
