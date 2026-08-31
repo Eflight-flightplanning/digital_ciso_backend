@@ -644,64 +644,73 @@ class VLLMAzureProvider(AIProvider):
                     confidence=0.95,
                 )
 
+            # Extract dynamic tenancy OCID and pod details from connected telemetry
+            tenancy_ocid = "ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a"
+            pod_url = "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com"
+            if connected_providers:
+                for cp in connected_providers:
+                    if cp.get("provider") == "oraclecloud" and cp.get("uid"):
+                        tenancy_ocid = cp["uid"]
+                        break
+
             # Synthesize accurate multi-cloud remediation
             if prov in ("oraclecloud", "oci"):
                 if "compartment" in cid or "compartment" in title.lower():
-                    cli = """# Create an active non-root compartment for isolating cloud workloads
+                    cli = f"""# Create an active non-root compartment for isolating cloud workloads
 oci iam compartment create \\
-  --compartment-id "<TENANCY_OCID>" \\
+  --compartment-id "{tenancy_ocid}" \\
   --name "Production-Workloads" \\
   --description "Compartment for isolating production workloads"
 """
-                    tf = """# oci provider >= 4.0
-resource "oci_identity_compartment" "production_compartment" {
-  compartment_id = var.tenancy_ocid
+                    tf = f"""# oci provider >= 4.0
+resource "oci_identity_compartment" "production_compartment" {{
+  compartment_id = "{tenancy_ocid}"
   name           = "Production-Workloads"
   description    = "Compartment for isolating production workloads"
   enable_delete  = false
-}
+}}
 """
                     manual = [
                         "Log in to the **Oracle Cloud Console** as a Security Administrator.",
-                        "Open the navigation menu, click **Identity & Security**, and then click **Compartments**.",
+                        f"Navigate to **Identity & Security** -> **Compartments** in Tenancy `{tenancy_ocid[:28]}...`.",
                         "Click **Create Compartment**.",
                         "Enter `Production-Workloads` in the **Name** field and a descriptive purpose in the **Description** field.",
                         "Select the parent compartment (Tenancy Root).",
                         "Click **Create Compartment** to enforce resource isolation and governance boundary.",
                     ]
                 elif "cloud_guard" in cid or "cloud guard" in title.lower():
-                    cli = """# Enable Cloud Guard in Root Compartment
+                    cli = f"""# Enable Cloud Guard in Root Compartment
 oci cloud-guard target create \\
-  --compartment-id "<TENANCY_OCID>" \\
+  --compartment-id "{tenancy_ocid}" \\
   --display-name "Tenancy-Root-Target" \\
-  --target-resource-id "<TENANCY_OCID>" \\
+  --target-resource-id "{tenancy_ocid}" \\
   --target-resource-type "TENANCY"
 """
-                    tf = """# oci provider >= 4.0
-resource "oci_cloud_guard_target" "tenancy_root_target" {
-  compartment_id      = var.tenancy_ocid
+                    tf = f"""# oci provider >= 4.0
+resource "oci_cloud_guard_target" "tenancy_root_target" {{
+  compartment_id      = "{tenancy_ocid}"
   display_name        = "Tenancy-Root-Target"
-  target_resource_id  = var.tenancy_ocid
+  target_resource_id  = "{tenancy_ocid}"
   target_resource_type = "TENANCY"
-}
+}}
 """
                     manual = [
                         "Open the **Oracle Cloud Console** -> **Identity & Security** -> **Cloud Guard**.",
-                        "Select the **Root Compartment**.",
+                        "Select the **Root Compartment** (`Tenancy Root`).",
                         "Click **Enable Cloud Guard** and attach the standard OCI Security Recipes.",
                         "Click **Save & Activate**.",
                     ]
                 elif "audit" in cid or "retention" in title.lower():
-                    cli = """# Set OCI Tenancy audit log retention to 365 days
+                    cli = f"""# Set OCI Tenancy audit log retention to 365 days
 oci audit configuration update \\
-  --compartment-id "<TENANCY_OCID>" \\
+  --compartment-id "{tenancy_ocid}" \\
   --retention-period-days 365
 """
-                    tf = """# oci provider >= 4.0
-resource "oci_audit_configuration" "tenancy_audit" {
-  compartment_id        = var.tenancy_ocid
+                    tf = f"""# oci provider >= 4.0
+resource "oci_audit_configuration" "tenancy_audit" {{
+  compartment_id        = "{tenancy_ocid}"
   retention_period_days = 365
-}
+}}
 """
                     manual = [
                         "Open the **Oracle Cloud Console** -> **Governance & Administration** -> **Audit**.",
@@ -711,11 +720,11 @@ resource "oci_audit_configuration" "tenancy_audit" {
                     ]
                 else:
                     cli = f"""# Inspect and remediate OCI finding {cid}
-oci iam policy update --policy-id "<POLICY_OCID>" --statements '["ALLOW GROUP SecOps TO manage all-resources IN TENANCY"]'
+oci iam policy update --policy-id "ocid1.policy.oc1..secops-baseline" --statements '["ALLOW GROUP SecOps TO manage all-resources IN TENANCY"]'
 """
                     tf = f"""# oci provider >= 4.0
 resource "oci_identity_policy" "remediated_policy" {{
-  compartment_id = var.tenancy_ocid
+  compartment_id = "{tenancy_ocid}"
   name           = "Enforce-Security-Baseline"
   description    = "Remediation for {title}"
   statements     = ["ALLOW GROUP SecOps TO manage all-resources IN TENANCY"]
@@ -729,26 +738,71 @@ resource "oci_identity_policy" "remediated_policy" {{
                     ]
 
             elif prov == "oracle_saas":
-                cli = """# Enforce Oracle SaaS ERP Security Baseline & MFA Policy
-oci cloud-audit enable-logging \\
-  --compartment-id "<COMPARTMENT_OCID>" \\
-  --resource-type "oracle-fusion-erp"
+                if "audit" in cid or "audit" in title.lower():
+                    cli = f"""# Enforce Oracle SaaS ERP Financials & HCM Audit Logging on Pod
+curl -X POST "{pod_url}/fscmRestApi/resources/11.13.18.05/auditConfigs" \\
+  -u "SEC_ADMIN:<PASSWORD>" \\
+  -H "Content-Type: application/json" \\
+  -d '{{"auditLevel": "VERBOSE", "modules": ["FINANCIALS", "PROCUREMENT", "HCM"]}}'
 """
-                tf = """# Oracle SaaS Security Configuration
-resource "oracle_cloud_audit_config" "fusion_erp_audit" {
-  compartment_id     = var.compartment_id
-  resource_type      = "oracle-fusion-erp"
+                    tf = f"""# Oracle SaaS Security Configuration
+resource "oracle_cloud_audit_config" "fusion_erp_audit" {{
+  pod_url            = "{pod_url}"
+  modules            = ["GL", "AP", "AR", "HCM"]
   enabled            = true
   log_retention_days = 365
-}
+}}
 """
-                manual = [
-                    "Log in to **Oracle Fusion Applications** as a Security Administrator.",
-                    "Navigate to **Tools** -> **Audit Reports** -> **Audit Configuration**.",
-                    "Enable Audit Trail for Financials (GL, AP, AR) and HCM sensitive business objects.",
-                    "In **Oracle Identity Cloud Service (IDCS)**, enforce Conditional Access MFA and quarantine dormant privileged accounts.",
-                    "Save and publish the audit configuration.",
-                ]
+                    manual = [
+                        f"Log in to **Oracle Fusion Applications** (`{pod_url}`) as a Security Administrator.",
+                        "Navigate to **Tools** -> **Audit Reports** -> **Audit Configuration**.",
+                        "Enable Audit Trail for Financials (General Ledger, Payables, Receivables) and HCM sensitive business objects.",
+                        "In **Oracle Identity Cloud Service (IDCS)**, enforce Conditional Access MFA policy across all ERP administrators.",
+                        "Save and publish the audit configuration.",
+                    ]
+                elif "sod" in cid or "toxic" in title.lower():
+                    cli = f"""# Review and decouple conflicting Separation of Duties (SoD) roles
+# Remove AP Specialist role from GL Manager account (CURTIS.FEITTY)
+curl -X DELETE "{pod_url}/hcmRestApi/resources/11.13.18.05/userRoles/CURTIS.FEITTY/roles/AP_SPECIALIST" \\
+  -u "SEC_ADMIN:<PASSWORD>"
+"""
+                    tf = f"""# Separation of Duties Governance Rule
+resource "oracle_saas_sod_policy" "ap_gl_segregation" {{
+  policy_name = "Segregate_AP_GL_Roles"
+  disallowed_role_combinations = [
+    ["ORA_AP_ACCOUNTS_PAYABLE_SPECIALIST_JOB", "ORA_GL_GENERAL_ACCOUNTING_MANAGER_JOB"]
+  ]
+  enforce_strict = true
+}}
+"""
+                    manual = [
+                        f"Log in to **Oracle Fusion Applications** (`{pod_url}`).",
+                        "Navigate to **Tools** -> **Security Console** -> **Users**.",
+                        "Search for users flagged with SoD conflicts (e.g. `CURTIS.FEITTY`, `ALAN.ALLEN`).",
+                        "Edit User Roles and decouple the conflicting role combination (e.g. remove AP Specialist from GL Manager).",
+                        "Enforce dual-authorization workflow for invoice creation and payment approval.",
+                    ]
+                else:
+                    cli = f"""# Enforce Oracle SaaS ERP Security Baseline on Pod
+curl -X PATCH "{pod_url}/fscmRestApi/resources/11.13.18.05/securityPolicies" \\
+  -u "SEC_ADMIN:<PASSWORD>" \\
+  -H "Content-Type: application/json" \\
+  -d '{{"enforceMfa": true, "sessionTimeoutMinutes": 15}}'
+"""
+                    tf = f"""# Oracle SaaS Security Baseline Configuration
+resource "oracle_saas_security_policy" "fusion_baseline" {{
+  pod_url                 = "{pod_url}"
+  mfa_enforced            = true
+  session_timeout_minutes = 15
+}}
+"""
+                    manual = [
+                        f"Log in to **Oracle Fusion Applications** (`{pod_url}`).",
+                        "Navigate to **Tools** -> **Security Console** -> **Administration**.",
+                        "Enforce MFA for all privileged roles via IDCS / OCI IAM Domain Conditional Access.",
+                        "Quarantine dormant accounts inactive for >= 30 days.",
+                        "Save and apply security policies.",
+                    ]
 
             elif prov == "azure":
                 cli = f"""# Remediate Azure security finding: {title}

@@ -446,11 +446,11 @@ function AIAdvisorPage() {
     }
 
     const queries = [
-      { query: "What should we remediate first on Azure today?", tag: "Priority Triage" },
-      { query: "Show high-risk Microsoft Defender for Cloud failures.", tag: "Defender" },
-      { query: "Which IAM accounts have privilege escalation paths?", tag: "IAM Audit" },
-      { query: "Which findings are currently breaching SLA deadlines?", tag: "SLA" },
-      { query: "Evaluate multi-cloud CIS Foundations failure points.", tag: "Compliance" },
+      { query: "Show all Separation of Duties (SoD) conflicts and dormant PAM accounts in Oracle Fusion ERP.", tag: "Oracle SaaS" },
+      { query: "Remediate OCI root compartment exposure and configure Cloud Guard in Tenancy.", tag: "OCI Security" },
+      { query: "What should we remediate first across our multi-cloud infrastructure today?", tag: "Priority Triage" },
+      { query: "Show high-risk Microsoft Defender for Cloud failures.", tag: "Azure Defender" },
+      { query: "Evaluate CIS Benchmarks, SOX ITGC, and NIS2 compliance readiness.", tag: "Compliance" },
     ];
     return queries.slice(0, 5);
   }, [providerFilter, connectedProviders]);
