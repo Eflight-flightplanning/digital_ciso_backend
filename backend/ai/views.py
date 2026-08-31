@@ -517,7 +517,7 @@ class AIAdvisorQueryView(APIView):
                     provider_filter = "oracle_saas"
                 elif any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
                     provider_filter = "oraclecloud"
-                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault")):
+                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault", "app service", "appservice", "app_http", "http_logs", "webapp", "app_")):
                     provider_filter = "azure"
                 elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
                     provider_filter = "aws"
@@ -709,7 +709,7 @@ def _retrieve_relevant_findings(
                     prov = "oraclecloud"
                 elif (
                     (f.uid or "").startswith(("prowler-azure", "azure-"))
-                    or any((f.check_id or "").startswith(pfx) for pfx in ("vm_", "virtualmachine_", "defender_", "entra_", "appservice_", "storage_ensure_", "sqlserver_", "nsg_", "keyvault_", "aks_", "network_"))
+                    or any((f.check_id or "").startswith(pfx) for pfx in ("vm_", "virtualmachine_", "defender_", "entra_", "app_", "appservice_", "storage_ensure_", "sqlserver_", "nsg_", "keyvault_", "aks_", "network_"))
                 ):
                     prov = "azure"
                 elif (

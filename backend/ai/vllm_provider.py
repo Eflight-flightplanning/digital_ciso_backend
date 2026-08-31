@@ -633,9 +633,23 @@ class VLLMAzureProvider(AIProvider):
             cid = target_f.get("check_id", "")
             title = target_f.get("check_title") or cid.replace("_", " ")
             sev = target_f.get("severity", "HIGH").upper()
-            prov = target_f.get("provider") or primary_cloud or "oraclecloud"
+            
+            # Smart provider deduction
+            prov = target_f.get("provider") or primary_cloud
+            c_low = (cid + " " + title + " " + question).lower()
+            if any(k in c_low for k in ("app_", "appservice", "azure", "defender", "entra", "virtualmachine", "blob", "keyvault", "sqlserver")):
+                prov = "azure"
+            elif any(k in c_low for k in ("erp", "sox", "itgc", "saas", "fusion", "sod", "audit trail", "idcs")):
+                prov = "oracle_saas"
+            elif any(k in c_low for k in ("oci", "tenancy", "compartment", "cloudguard", "objectstorage")):
+                prov = "oraclecloud"
+            elif any(k in c_low for k in ("aws", "s3", "iam_", "cloudwatch", "guardduty")):
+                prov = "aws"
+            else:
+                prov = prov or "azure"
+
             res_obj = target_f.get("resource")
-            res_name = (res_obj.get("name") if isinstance(res_obj, dict) else res_obj) or "Cloud Resource"
+            res_name = (res_obj.get("name") if isinstance(res_obj, dict) else res_obj) or ("app-production-eastus" if prov == "azure" else "Cloud Resource")
             
             # Check verified library first
             template = get_remediation(cid.lower().strip())
