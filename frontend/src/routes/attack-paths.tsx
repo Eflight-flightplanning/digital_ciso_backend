@@ -145,54 +145,17 @@ function nodeDisplayName(node: GraphNode): string {
   return getCleanLabel(primaryLabel(node));
 }
 
-// Smart graph limiting — show unique assets + one representative finding per asset
+// Graph display builder — retains full asset topology and security findings
 function buildDisplayGraph(
   nodes: GraphNode[],
   relationships: GraphRelationship[]
 ): { displayNodes: GraphNode[]; displayRels: GraphRelationship[] } {
-  const MAX_ASSET_NODES = 12;
-  const MAX_FINDINGS_PER_ASSET = 2;
-
-  const isFindingNode = (n: GraphNode) =>
-    (n.labels || []).some((l) => l.toLowerCase().includes("finding"));
-
-  const assetNodes = nodes.filter((n) => !isFindingNode(n));
-  const findingNodes = nodes.filter((n) => isFindingNode(n));
-
-  // Pick top assets (prefer non-internal label ones)
-  const topAssets = assetNodes.slice(0, MAX_ASSET_NODES);
-  const topAssetIds = new Set(topAssets.map((n) => n.id));
-
-  // For each asset, pick at most MAX_FINDINGS_PER_ASSET findings
-  const assetFindingCount: Record<string, number> = {};
-  const chosenFindings: GraphNode[] = [];
-  const chosenFindingIds = new Set<string>();
-
-  for (const rel of relationships) {
-    if (!rel.label.includes("FINDING")) continue;
-    if (!topAssetIds.has(rel.source)) continue;
-    const count = assetFindingCount[rel.source] || 0;
-    if (count >= MAX_FINDINGS_PER_ASSET) continue;
-    const fNode = findingNodes.find((n) => n.id === rel.target);
-    if (!fNode) continue;
-    if (chosenFindingIds.has(fNode.id)) {
-      // Still count the relationship
-      assetFindingCount[rel.source] = count + 1;
-      continue;
-    }
-    chosenFindings.push(fNode);
-    chosenFindingIds.add(fNode.id);
-    assetFindingCount[rel.source] = count + 1;
+  if (!nodes || nodes.length === 0) {
+    return { displayNodes: [], displayRels: [] };
   }
 
-  const displayNodes = [...topAssets, ...chosenFindings];
-  const displayNodeIds = new Set(displayNodes.map((n) => n.id));
-
-  const displayRels = relationships.filter(
-    (r) => displayNodeIds.has(r.source) && displayNodeIds.has(r.target)
-  );
-
-  return { displayNodes, displayRels };
+  // Display all graph nodes and edges directly
+  return { displayNodes: nodes, displayRels: relationships };
 }
 
 // Clean Tiered DAG layout for attack kill-chain
