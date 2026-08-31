@@ -585,25 +585,7 @@ class AIAdvisorQueryView(APIView):
 
         except Exception as e:
             logger.error("AI Advisor query error: %s", e, exc_info=True)
-            try:
-                from ai.vllm_provider import VLLMAzureProvider
-                fallback_prov = VLLMAzureProvider()
-                result = fallback_prov._generate_fallback_advisor_response(
-                    question=clean_question if "clean_question" in locals() else (question or "Analyze cloud security findings and remediation."),
-                    relevant_findings=relevant_findings if "relevant_findings" in locals() else [],
-                    primary_cloud=provider_filter if "provider_filter" in locals() else None,
-                    connected_providers=connected_providers if "connected_providers" in locals() else [],
-                )
-                from django.http import JsonResponse
-                return JsonResponse(result.to_dict(), status=200)
-            except Exception as e2:
-                logger.error("Secondary fallback error: %s", e2)
-                from django.http import JsonResponse
-                return JsonResponse({
-                    "answer": "### Multi-Cloud Security Analysis & Remediation\n\nSpectra is analyzing live finding telemetry across your connected infrastructure. Prioritize addressing high-risk IAM misconfigurations, open network security groups, and audit logging retention policies to meet CIS Benchmark standards.",
-                    "finding_references": [],
-                    "confidence": 0.9,
-                }, status=200)
+            return _ai_unavailable_response()
 
 
 def _retrieve_relevant_findings(
@@ -765,42 +747,26 @@ def _retrieve_relevant_findings(
                     result["_pinned"] = True  # signal to the LLM prompt formatter
                 return result
 
-            if pinned_ids:
-                for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
+            # Extract explicit check IDs, quoted finding names, and finding parameters
+            explicit_checks = re.findall(r'(?:check(?:_id)?|finding)[\s:=]+["\']?([a-zA-Z0-9_\-]+)["\']?', question, re.IGNORECASE)
+            quoted_terms = re.findall(r'["\']([a-zA-Z0-9_\-]+)["\']', question)
+            target_candidates = list(dict.fromkeys(explicit_checks + quoted_terms))
+            for cand in target_candidates:
+                if len(cand) >= 4 and not _uuid_pattern.match(cand) and cand.lower() not in ("finding", "check", "severity", "resource"):
                     try:
-                        pinned_f = Finding.all_objects.filter(id=pin_id).select_related(
-                            "scan", "scan__provider"
-                        ).prefetch_related("resources").first()
-                        
-                        # If exact UUID is not in current database, resolve by finding title / check keywords
-                        if not pinned_f:
-                            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
-                            stop = {"analyze", "finding", "what", "risk", "and", "how", "we", "remediate", "the", "with", "for", "resource", "step-by-step", "security"}
-                            key_terms = [w.lower() for w in words if w.lower() not in stop]
-                            fallback_base = Finding.all_objects.select_related("scan", "scan__provider").prefetch_related("resources")
-                            if provider == "oracle_saas":
-                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="oracle_saas") | Q(uid__startswith="prowler-oracle_saas"))
-                            elif provider in ("oraclecloud", "oci"):
-                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="oraclecloud") | Q(uid__startswith="prowler-oraclecloud") | Q(uid__startswith="prowler-oci"))
-                            elif provider == "azure":
-                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="azure") | Q(uid__startswith="prowler-azure"))
-                            elif provider == "aws":
-                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="aws") | Q(uid__startswith="prowler-aws"))
-                            
-                            for kw in key_terms:
-                                fallback_f = fallback_base.filter(
-                                    Q(check_id__icontains=kw) | Q(uid__icontains=kw) | Q(resources__name__icontains=kw)
-                                ).first()
-                                if fallback_f and fallback_f.id not in matching_ids:
-                                    pinned_f = fallback_f
-                                    break
-
-                        if pinned_f and pinned_f.id not in matching_ids:
-                            matching_ids.add(pinned_f.id)
-                            matching_findings.append(_serialize_finding(pinned_f, pinned=True))
-                            logger.info("Pinned finding resolved: %s -> %s (%s)", pin_id, pinned_f.id, pinned_f.check_id)
-                    except Exception as p_err:
-                        logger.warning("Pinned finding lookup error for %s: %s", pin_id, p_err)
+                        exact_f = Finding.all_objects.filter(
+                            Q(check_id__iexact=cand) | Q(uid__icontains=cand)
+                        ).select_related("scan", "scan__provider").prefetch_related("resources").first()
+                        if not exact_f:
+                            exact_f = Finding.all_objects.filter(
+                                Q(check_id__icontains=cand)
+                            ).select_related("scan", "scan__provider").prefetch_related("resources").first()
+                        if exact_f and exact_f.id not in matching_ids:
+                            matching_ids.add(exact_f.id)
+                            matching_findings.insert(0, _serialize_finding(exact_f, pinned=True))
+                            logger.info("Explicit check_id resolved from DB: %s -> %s (%s)", cand, exact_f.id, exact_f.check_id)
+                    except Exception as c_err:
+                        logger.debug("Check lookup error for %s: %s", cand, c_err)
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
             is_saas_query = (

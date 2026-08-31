@@ -2423,6 +2423,50 @@ ORACLE_SAAS_IP_ALLOWLIST = RemediationTemplate(
 # MASTER REGISTRY - maps all check_ids to templates
 # ==============================================================
 
+AZURE_APP_HTTP_LOGS_ENABLED = RemediationTemplate(
+    check_id="app_http_logs_enabled",
+    title="Ensure HTTP Logs are Enabled for Azure App Service",
+    framework="azure",
+    cli="""az webapp log config \\
+  --name "{resource}" \\
+  --resource-group "{rg}" \\
+  --web-server-logging filesystem \\
+  --detailed-error-messages true \\
+  --failed-request-tracing true""",
+    terraform="""resource "azurerm_linux_web_app" "app_service" {
+  name                = "{resource}"
+  resource_group_name = "{rg}"
+  location            = "eastus"
+  service_plan_id     = "/subscriptions/<SUB_ID>/resourceGroups/{rg}/providers/Microsoft.Web/serverfarms/plan-production"
+
+  logs {
+    http_logs {
+      file_system {
+        retention_in_days = 30
+        retention_in_mb   = 35
+      }
+    }
+    detailed_error_messages = true
+    failed_request_tracing  = true
+  }
+}""",
+    manual=[
+        "Sign in to the Azure Portal (https://portal.azure.com).",
+        "Search for App Services and click on '{resource}'.",
+        "In the left navigation under Monitoring, select App Service logs.",
+        "Set Web server logging to File System (or Storage Blob).",
+        "Configure Quota (MB) to 35 and Retention Period (Days) to 30.",
+        "Toggle Detailed Error Messages and Failed Request Tracing to ON.",
+        "Click Save to enforce HTTP access log retention.",
+    ],
+    compliance=["CIS Microsoft Azure Foundations Benchmark v2.0.0 - 9.1", "ISO 27001 A.12.4.1", "SOC 2 CC7.2"],
+    safe_to_automate=True,
+    references=[
+        "https://learn.microsoft.com/en-us/azure/app-service/troubleshoot-diagnostic-logs",
+    ],
+)
+
+
 REMEDIATION_LIBRARY: Dict[str, RemediationTemplate] = {
     # Azure - Network
     "network_ssh_internet_access_restricted": AZURE_NETWORK_SSH,
@@ -2507,49 +2551,6 @@ REMEDIATION_LIBRARY: Dict[str, RemediationTemplate] = {
     "identity_user_mfa_enabled_console_access": OCI_IDENTITY_MFA,
     "identity_user_api_keys_rotated_90_days": OCI_IDENTITY_API_KEYS,
     "identity_password_policy_minimum_length_14": OCI_IDENTITY_PASSWORD_POLICY,
-AZURE_APP_HTTP_LOGS_ENABLED = RemediationTemplate(
-    check_id="app_http_logs_enabled",
-    title="Ensure HTTP Logs are Enabled for Azure App Service",
-    framework="azure",
-    cli="""az webapp log config \\
-  --name "{resource}" \\
-  --resource-group "{rg}" \\
-  --web-server-logging filesystem \\
-  --detailed-error-messages true \\
-  --failed-request-tracing true""",
-    terraform="""resource "azurerm_linux_web_app" "app_service" {
-  name                = "{resource}"
-  resource_group_name = "{rg}"
-  location            = "eastus"
-  service_plan_id     = "/subscriptions/<SUB_ID>/resourceGroups/{rg}/providers/Microsoft.Web/serverfarms/plan-production"
-
-  logs {
-    http_logs {
-      file_system {
-        retention_in_days = 30
-        retention_in_mb   = 35
-      }
-    }
-    detailed_error_messages = true
-    failed_request_tracing  = true
-  }
-}""",
-    manual=[
-        "Sign in to the Azure Portal (https://portal.azure.com).",
-        "Search for App Services and click on '{resource}'.",
-        "In the left navigation under Monitoring, select App Service logs.",
-        "Set Web server logging to File System (or Storage Blob).",
-        "Configure Quota (MB) to 35 and Retention Period (Days) to 30.",
-        "Toggle Detailed Error Messages and Failed Request Tracing to ON.",
-        "Click Save to enforce HTTP access log retention.",
-    ],
-    compliance=["CIS Microsoft Azure Foundations Benchmark v2.0.0 - 9.1", "ISO 27001 A.12.4.1", "SOC 2 CC7.2"],
-    safe_to_automate=True,
-    references=[
-        "https://learn.microsoft.com/en-us/azure/app-service/troubleshoot-diagnostic-logs",
-    ],
-)
-
     # Azure - App Service
     "app_http_logs_enabled": AZURE_APP_HTTP_LOGS_ENABLED,
     "app_ensure_http_logging_is_enabled": AZURE_APP_HTTP_LOGS_ENABLED,
