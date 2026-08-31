@@ -29,6 +29,17 @@ import { Chip } from "@/components/ui-kit/primitives";
 import { useAttackPaths, useAttackPathsQueries, useRunAttackPathsQuery } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/attack-paths")({
+  validateSearch: (search: Record<string, unknown>): {
+    provider?: string;
+    scan_id?: string;
+    finding_id?: string;
+    query_id?: string;
+  } => ({
+    provider: search.provider ? String(search.provider) : undefined,
+    scan_id: search.scan_id ? String(search.scan_id) : undefined,
+    finding_id: search.finding_id ? String(search.finding_id) : undefined,
+    query_id: search.query_id ? String(search.query_id) : undefined,
+  }),
   component: AttackPathsPage,
 });
 
@@ -258,15 +269,51 @@ function layoutGraph(
 }
 
 function AttackPathsPage() {
+  const searchParams = Route.useSearch();
   const { data: scansData, isLoading: scansLoading } = useAttackPaths();
   const scans = (scansData?.items as Array<Record<string, any>>) ?? [];
 
   const [selectedScanId, setSelectedScanId] = useState<string>("");
   useEffect(() => {
-    if (scans.length > 0 && (!selectedScanId || !scans.some((s) => s.id === selectedScanId))) {
-      setSelectedScanId(scans[0].id);
+    if (scans.length === 0) return;
+
+    // 1. Direct scan_id match from query param
+    if (searchParams.scan_id && scans.some((s) => s.id === searchParams.scan_id)) {
+      setSelectedScanId(searchParams.scan_id);
+      return;
     }
-  }, [scans, selectedScanId]);
+
+    // 2. Provider match from query param (e.g. ?provider=oci or ?provider=oraclecloud)
+    if (searchParams.provider) {
+      const p = searchParams.provider.trim().toLowerCase();
+      const matched = scans.find((s) => {
+        const st = (s.provider_type || s.provider?.provider || s.provider || "").toLowerCase();
+        if (p === "oci" || p === "oraclecloud" || p === "oracle cloud" || p === "oracle") {
+          return st === "oraclecloud" || st === "oci";
+        }
+        if (p === "oracle_saas" || p === "oracle-saas" || p === "fusion" || p === "saas" || p === "oracle saas" || p === "oracale saas") {
+          return st === "oracle_saas";
+        }
+        if (p === "azure" || p === "az") {
+          return st === "azure";
+        }
+        if (p === "aws" || p === "amazon") {
+          return st === "aws";
+        }
+        return st === p;
+      });
+      if (matched) {
+        setSelectedScanId(matched.id);
+        return;
+      }
+    }
+
+    // 3. Fallback: retain current selection if valid, or default to first ready scan
+    if (!selectedScanId || !scans.some((s) => s.id === selectedScanId)) {
+      const ready = scans.find((s) => s.graph_data_ready);
+      setSelectedScanId(ready ? ready.id : scans[0].id);
+    }
+  }, [scans, searchParams.scan_id, searchParams.provider, selectedScanId]);
 
   const selectedScan = scans.find((s) => s.id === selectedScanId);
 
@@ -277,12 +324,16 @@ function AttackPathsPage() {
 
   const [selectedQueryId, setSelectedQueryId] = useState<string>("");
   useEffect(() => {
-    if (queries.length > 0 && (!selectedQueryId || !queries.some((q) => q.id === selectedQueryId))) {
-      setSelectedQueryId(queries[0].id);
+    if (queries.length > 0) {
+      if (searchParams.query_id && queries.some((q) => q.id === searchParams.query_id)) {
+        setSelectedQueryId(searchParams.query_id);
+      } else if (!selectedQueryId || !queries.some((q) => q.id === selectedQueryId)) {
+        setSelectedQueryId(queries[0].id);
+      }
     } else if (queries.length === 0) {
       setSelectedQueryId("");
     }
-  }, [queries, selectedQueryId]);
+  }, [queries, selectedQueryId, searchParams.query_id]);
 
   const runQuery = useRunAttackPathsQuery();
   const [graph, setGraph] = useState<GraphResult | null>(null);

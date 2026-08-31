@@ -54,7 +54,12 @@ interface ChatMessage {
   spectra?: string;
   aegis?: string;
   confidence?: number;
-  findings?: Array<{ id: string; name: string; severity: "critical" | "high" | "medium" }>;
+  findings?: Array<{
+    id: string;
+    name: string;
+    severity: "critical" | "high" | "medium";
+    provider?: string;
+  }>;
 }
 
 const initialMessages: ChatMessage[] = [
@@ -197,9 +202,11 @@ function MarkdownMessage({ content }: { content: string }) {
 // ── Interactive Finding Remediation & Action Card ──
 function FindingActionCard({
   finding,
+  providerFilter,
   onAskSpectra,
 }: {
-  finding: { id: string; name: string; severity: "critical" | "high" | "medium" };
+  finding: { id: string; name: string; severity: "critical" | "high" | "medium"; provider?: string };
+  providerFilter?: string;
   onAskSpectra: (prompt: string) => void;
 }) {
   const { data: jiraConfig } = useJiraConfig();
@@ -284,7 +291,12 @@ function FindingActionCard({
 
         <Link
           to="/attack-paths"
-          search={{ finding_id: finding.id }}
+          search={{
+            provider:
+              finding.provider ||
+              (providerFilter && providerFilter !== "All" ? providerFilter.toLowerCase() : undefined),
+            finding_id: finding.id,
+          }}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95"
           title="Inspect Blast Radius in Attack Graph"
         >
@@ -492,6 +504,9 @@ function AIAdvisorPage() {
           id: r.id,
           name: r.name,
           severity: (r.severity as "critical" | "high" | "medium") ?? "medium",
+          provider:
+            (r.provider as string) ||
+            (providerFilter !== "All" ? providerFilter.toLowerCase() : undefined),
         })),
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -830,6 +845,7 @@ ${reportContent}
                             <FindingActionCard
                               key={`${f.id}-${idx}`}
                               finding={f}
+                              providerFilter={providerFilter}
                               onAskSpectra={handleSend}
                             />
                           ))}
