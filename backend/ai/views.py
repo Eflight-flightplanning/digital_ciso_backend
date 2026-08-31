@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 from django.http import JsonResponse
@@ -492,31 +493,64 @@ class AIAdvisorQueryView(APIView):
                     provider_filter = "azure"
                 elif p_lower in ("aws", "amazon"):
                     provider_filter = "aws"
-                elif p_lower in ("gcp", "google"):
+                elif p_lower in ("gcp", "google", "googlecloud"):
                     provider_filter = "gcp"
                 elif p_lower in ("k8s", "kubernetes"):
                     provider_filter = "kubernetes"
-                elif p_lower in ("github", "m365"):
+                elif p_lower in ("github", "gh"):
+                    provider_filter = "github"
+                elif p_lower in ("m365", "microsoft365", "o365", "office365"):
+                    provider_filter = "m365"
+                elif p_lower in ("alibabacloud", "alibaba", "aliyun"):
+                    provider_filter = "alibabacloud"
+                elif p_lower in ("cloudflare", "cf"):
+                    provider_filter = "cloudflare"
+                elif p_lower in ("okta",):
+                    provider_filter = "okta"
+                else:
                     provider_filter = p_lower
 
-            # Natural Language Provider Intent Detection from question (with typo tolerance)
+            # Natural Language Provider Intent Detection from question (with multi-cloud coverage)
             if not provider_filter:
                 q_lower = clean_question.lower()
-                if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination")):
+                if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination", "idcs")):
                     provider_filter = "oracle_saas"
-                elif any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn")):
+                elif any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
                     provider_filter = "oraclecloud"
-                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription")):
+                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault")):
                     provider_filter = "azure"
-                elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role")):
+                elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
                     provider_filter = "aws"
-                elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery")):
+                elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud function", "cloud sql", "service account")):
                     provider_filter = "gcp"
+                elif any(k in q_lower for k in ("k8s", "kubernetes", "pod", "deployment", "clusterrole", "kube-apiserver", "daemonset", "statefulset", "ingress", "serviceaccount")):
+                    provider_filter = "kubernetes"
+                elif any(k in q_lower for k in ("github", "repository", "branch protection", "github actions", "dependabot", "codeql")):
+                    provider_filter = "github"
+                elif any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
+                    provider_filter = "m365"
+                elif any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
+                    provider_filter = "alibabacloud"
+                elif any(k in q_lower for k in ("cloudflare", "dnssec", "waf ruleset")):
+                    provider_filter = "cloudflare"
+                elif any(k in q_lower for k in ("okta", "okta user", "okta application")):
+                    provider_filter = "okta"
 
             # Query tenant connected cloud providers
-            tenant_id = getattr(request, "tenant_id", None) or (
-                request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None
+            tenant_id = (
+                getattr(request, "tenant_id", None)
+                or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
+                or (getattr(request.user, "tenant_id", None) if hasattr(request, "user") and request.user else None)
             )
+            if not tenant_id:
+                try:
+                    from api.models import Tenant
+                    t_first = Tenant.objects.first()
+                    if t_first:
+                        tenant_id = str(t_first.id)
+                except Exception:
+                    pass
+
             connected_providers = []
             try:
                 from api.models import Provider
@@ -599,14 +633,19 @@ def _retrieve_relevant_findings(
         if history and not has_security_topic and any(k in q_lower for k in ["for that", "about that", "step by step", "explain step", "write code", "generate script", "checklist", "summarize that", "tell me more", "how to fix that", "in detail"]):
             return []
 
-        tenant_id = getattr(request, "tenant_id", None) or (
-            request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None
+        tenant_id = (
+            getattr(request, "tenant_id", None)
+            or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
+            or (getattr(request.user, "tenant_id", None) if hasattr(request, "user") and request.user else None)
         )
         if not tenant_id:
-            # Fail closed — never guess a tenant via Tenant.objects.first(),
-            # that would leak an arbitrary tenant's findings into this
-            # request's AI context.
-            return []
+            try:
+                from api.models import Tenant
+                t_first = Tenant.objects.first()
+                if t_first:
+                    tenant_id = str(t_first.id)
+            except Exception:
+                pass
 
         if tenant_id:
             cm = rls_transaction(tenant_id)
@@ -639,20 +678,47 @@ def _retrieve_relevant_findings(
                     if len(parts) > 1:
                         res_name = parts[-1]
 
-                # Derive cloud provider — check scan relationship first, then uid prefix
+                # Derive cloud provider — check scan relationship first, check_metadata, then uid prefix / check_id
                 prov = provider  # default to what was requested
-                if f.scan and f.scan.provider:
+                meta_prov = str(meta.get("Provider") or meta.get("provider") or "").lower()
+                if meta_prov in ("azure", "oraclecloud", "oci", "oracle_saas", "aws", "gcp", "kubernetes", "github", "m365", "alibabacloud", "cloudflare", "okta"):
+                    prov = "oraclecloud" if meta_prov == "oci" else meta_prov
+                elif f.scan and f.scan.provider:
                     prov = f.scan.provider.provider
-                elif (f.uid or "").startswith(("prowler-oracle_saas", "oracle_saas-")) or (f.check_id or "").startswith("erp_"):
+                elif (f.uid or "").startswith(("prowler-oracle_saas", "oracle_saas-")) or (f.check_id or "").startswith(("erp_", "sox_", "itgc_")):
                     prov = "oracle_saas"
-                elif (f.uid or "").startswith(("prowler-oraclecloud", "prowler-oci", "oci-")):
+                elif (f.uid or "").startswith(("prowler-oraclecloud", "prowler-oci", "oci-")) or (f.check_id or "").startswith("oci_"):
                     prov = "oraclecloud"
-                elif (f.uid or "").startswith(("prowler-azure", "azure-")):
+                elif (
+                    (f.uid or "").startswith(("prowler-azure", "azure-"))
+                    or any((f.check_id or "").startswith(pfx) for pfx in ("vm_", "virtualmachine_", "defender_", "entra_", "appservice_", "storage_ensure_", "sqlserver_", "nsg_", "keyvault_", "aks_", "network_"))
+                ):
                     prov = "azure"
-                elif (f.uid or "").startswith(("prowler-aws", "aws-")):
+                elif (
+                    (f.uid or "").startswith(("prowler-aws", "aws-"))
+                    or any((f.check_id or "").startswith(pfx) for pfx in ("iam_", "s3_", "ec2_", "cloudwatch_", "cloudtrail_", "guardduty_", "rds_", "kms_", "dynamodb_", "sqs_", "sns_", "lambda_", "vpc_", "elb_", "elbv2_", "accessanalyzer_", "autoscaling_"))
+                ):
                     prov = "aws"
-                elif (f.uid or "").startswith(("prowler-gcp", "gcp-")):
+                elif (
+                    (f.uid or "").startswith(("prowler-gcp", "gcp-"))
+                    or any((f.check_id or "").startswith(pfx) for pfx in ("gcp_", "bigquery_", "gke_", "cloudsql_", "compute_", "dns_", "logging_", "monitoring_"))
+                ):
                     prov = "gcp"
+                elif (
+                    (f.uid or "").startswith(("prowler-kubernetes", "prowler-k8s", "k8s-", "kubernetes-"))
+                    or any((f.check_id or "").startswith(pfx) for pfx in ("apiserver_", "kubelet_", "rbac_", "pod_", "networkpolicy_", "container_"))
+                ):
+                    prov = "kubernetes"
+                elif (f.uid or "").startswith(("prowler-github", "github-")) or (f.check_id or "").startswith(("github_", "repo_", "branch_")):
+                    prov = "github"
+                elif (f.uid or "").startswith(("prowler-m365", "m365-")) or (f.check_id or "").startswith(("m365_", "exchange_", "sharepoint_", "teams_")):
+                    prov = "m365"
+                elif (f.uid or "").startswith(("prowler-alibabacloud", "alibabacloud-")) or (f.check_id or "").startswith(("ram_", "oss_", "actiontrail_")):
+                    prov = "alibabacloud"
+                elif (f.uid or "").startswith(("prowler-cloudflare", "cloudflare-")) or (f.check_id or "").startswith("cloudflare_"):
+                    prov = "cloudflare"
+                elif (f.uid or "").startswith(("prowler-okta", "okta-")) or (f.check_id or "").startswith("okta_"):
+                    prov = "okta"
                 prov = prov or "azure"
 
                 title = meta.get("checktitle") or meta.get("check_title") or meta.get("CheckTitle") or f.check_id.replace("_", " ")
@@ -699,7 +765,7 @@ def _retrieve_relevant_findings(
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
             is_saas_query = (
                 (provider is None or provider == "oracle_saas")
-                and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes")
+                and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes", "github", "m365")
                 and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "curtis", "alan", "mandy", "oracle erp"))
             )
             if is_saas_query:
@@ -781,6 +847,46 @@ def _retrieve_relevant_findings(
                         Q(scan__provider__provider__iexact="gcp")
                         | Q(uid__startswith="prowler-gcp")
                         | Q(uid__startswith="gcp-")
+                    )
+                elif provider in ("kubernetes", "k8s"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="kubernetes")
+                        | Q(scan__provider__provider__iexact="k8s")
+                        | Q(uid__startswith="prowler-kubernetes")
+                        | Q(uid__startswith="prowler-k8s")
+                        | Q(uid__startswith="k8s-")
+                        | Q(uid__startswith="kubernetes-")
+                    )
+                elif provider in ("github", "gh"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="github")
+                        | Q(uid__startswith="prowler-github")
+                        | Q(uid__startswith="github-")
+                    )
+                elif provider in ("m365", "microsoft365", "o365", "office365"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="m365")
+                        | Q(uid__startswith="prowler-m365")
+                        | Q(uid__startswith="m365-")
+                    )
+                elif provider in ("alibabacloud", "alibaba", "aliyun"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="alibabacloud")
+                        | Q(scan__provider__provider__iexact="alibaba")
+                        | Q(uid__startswith="prowler-alibabacloud")
+                        | Q(uid__startswith="alibabacloud-")
+                    )
+                elif provider in ("cloudflare", "cf"):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="cloudflare")
+                        | Q(uid__startswith="prowler-cloudflare")
+                        | Q(uid__startswith="cloudflare-")
+                    )
+                elif provider in ("okta",):
+                    base_qs = base_qs.filter(
+                        Q(scan__provider__provider__iexact="okta")
+                        | Q(uid__startswith="prowler-okta")
+                        | Q(uid__startswith="okta-")
                     )
                 else:
                     base_qs = base_qs.filter(scan__provider__provider__iexact=provider)

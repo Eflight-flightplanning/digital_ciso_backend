@@ -726,7 +726,52 @@ function FindingsPage() {
                                         if (check.includes("nsg") || check.includes("network")) {
                                           return `az network nsg rule create --nsg-name "${res}" --name "DenyInternetInbound" --access Deny --priority 100`;
                                         }
+                                        if (check.includes("vm") || check.includes("jit")) {
+                                          return `az security jit-policy set --location eastus --name default --resource-group rg-production --virtual-machines '[{"id":"/subscriptions/sub-id/resourceGroups/rg-production/providers/Microsoft.Compute/virtualMachines/${res}"}]'`;
+                                        }
                                         return `az resource update --name "${res}" --resource-type "${f.service}" --set properties.securityPolicy=enforced`;
+                                      }
+                                      if (p === "aws") {
+                                        if (check.includes("s3") || check.includes("bucket")) {
+                                          return `aws s3api put-public-access-block --bucket "${res}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"`;
+                                        }
+                                        if (check.includes("iam") || check.includes("password")) {
+                                          return `aws iam update-account-password-policy --minimum-password-length 14 --require-symbols --require-numbers --require-uppercase-characters`;
+                                        }
+                                        if (check.includes("sg") || check.includes("security_group") || check.includes("ec2")) {
+                                          return `aws ec2 revoke-security-group-ingress --group-id "${res}" --protocol tcp --port 22 --cidr 0.0.0.0/0`;
+                                        }
+                                        return `aws ${f.service?.toLowerCase() || "config"} put-remediation-configurations --config-rule-name "${f.check_id}"`;
+                                      }
+                                      if (p === "gcp" || p === "google") {
+                                        if (check.includes("storage") || check.includes("bucket")) {
+                                          return `gcloud storage buckets update gs://${res} --uniform-bucket-level-access`;
+                                        }
+                                        if (check.includes("iam") || check.includes("serviceaccount")) {
+                                          return `gcloud iam service-accounts disable "${res}"`;
+                                        }
+                                        if (check.includes("firewall") || check.includes("compute")) {
+                                          return `gcloud compute firewall-rules update "${res}" --disabled`;
+                                        }
+                                        return `gcloud ${f.service?.toLowerCase() || "resource-manager"} update --resource="${res}"`;
+                                      }
+                                      if (p === "kubernetes" || p === "k8s") {
+                                        if (check.includes("privilege") || check.includes("pod")) {
+                                          return `kubectl patch deployment "${res}" -p '{"spec":{"template":{"spec":{"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true}}}}}'`;
+                                        }
+                                        if (check.includes("rbac") || check.includes("clusterrole")) {
+                                          return `kubectl delete clusterrolebinding "${res}"`;
+                                        }
+                                        return `kubectl patch ${f.service?.toLowerCase() || "resource"} "${res}" --type=merge -p '{"spec":{"enforceSecurityPolicy":true}}'`;
+                                      }
+                                      if (p === "github") {
+                                        return `gh api --method PUT -H "Accept: application/vnd.github+json" /repos/ORG/${res}/branches/main/protection --input protection-policy.json`;
+                                      }
+                                      if (p === "oracle_saas") {
+                                        return `dciso saas remediate --user "${res}" --enforce-mfa --quarantine-sod`;
+                                      }
+                                      if (p === "m365") {
+                                        return `Set-MsolPasswordPolicy -NotificationDays 14 -ValidityPeriod 90`;
                                       }
                                       return `dciso remediate --finding ${formatFindingId(f.id)} --apply-iac`;
                                     })()}
@@ -745,7 +790,28 @@ function FindingsPage() {
                                       } else if (p === "azure") {
                                         if (check.includes("storage") || check.includes("blob")) cmd = `az storage account update --name "${res}" --allow-blob-public-access false --min-tls-version TLS1_2`;
                                         else if (check.includes("nsg") || check.includes("network")) cmd = `az network nsg rule create --nsg-name "${res}" --name "DenyInternetInbound" --access Deny --priority 100`;
+                                        else if (check.includes("vm") || check.includes("jit")) cmd = `az security jit-policy set --location eastus --name default --resource-group rg-production --virtual-machines '[{"id":"/subscriptions/sub-id/resourceGroups/rg-production/providers/Microsoft.Compute/virtualMachines/${res}"}]'`;
                                         else cmd = `az resource update --name "${res}" --resource-type "${f.service}" --set properties.securityPolicy=enforced`;
+                                      } else if (p === "aws") {
+                                        if (check.includes("s3") || check.includes("bucket")) cmd = `aws s3api put-public-access-block --bucket "${res}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"`;
+                                        else if (check.includes("iam") || check.includes("password")) cmd = `aws iam update-account-password-policy --minimum-password-length 14 --require-symbols --require-numbers --require-uppercase-characters`;
+                                        else if (check.includes("sg") || check.includes("security_group") || check.includes("ec2")) cmd = `aws ec2 revoke-security-group-ingress --group-id "${res}" --protocol tcp --port 22 --cidr 0.0.0.0/0`;
+                                        else cmd = `aws ${f.service?.toLowerCase() || "config"} put-remediation-configurations --config-rule-name "${f.check_id}"`;
+                                      } else if (p === "gcp" || p === "google") {
+                                        if (check.includes("storage") || check.includes("bucket")) cmd = `gcloud storage buckets update gs://${res} --uniform-bucket-level-access`;
+                                        else if (check.includes("iam") || check.includes("serviceaccount")) cmd = `gcloud iam service-accounts disable "${res}"`;
+                                        else if (check.includes("firewall") || check.includes("compute")) cmd = `gcloud compute firewall-rules update "${res}" --disabled`;
+                                        else cmd = `gcloud ${f.service?.toLowerCase() || "resource-manager"} update --resource="${res}"`;
+                                      } else if (p === "kubernetes" || p === "k8s") {
+                                        if (check.includes("privilege") || check.includes("pod")) cmd = `kubectl patch deployment "${res}" -p '{"spec":{"template":{"spec":{"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true}}}}}'`;
+                                        else if (check.includes("rbac") || check.includes("clusterrole")) cmd = `kubectl delete clusterrolebinding "${res}"`;
+                                        else cmd = `kubectl patch ${f.service?.toLowerCase() || "resource"} "${res}" --type=merge -p '{"spec":{"enforceSecurityPolicy":true}}'`;
+                                      } else if (p === "github") {
+                                        cmd = `gh api --method PUT -H "Accept: application/vnd.github+json" /repos/ORG/${res}/branches/main/protection --input protection-policy.json`;
+                                      } else if (p === "oracle_saas") {
+                                        cmd = `dciso saas remediate --user "${res}" --enforce-mfa --quarantine-sod`;
+                                      } else if (p === "m365") {
+                                        cmd = `Set-MsolPasswordPolicy -NotificationDays 14 -ValidityPeriod 90`;
                                       }
                                       handleCopy(cmd, f.id + "-cmd");
                                     }}

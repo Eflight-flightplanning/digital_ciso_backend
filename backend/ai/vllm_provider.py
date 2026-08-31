@@ -456,15 +456,40 @@ class VLLMAzureProvider(AIProvider):
         context_str = json.dumps(slim_general, indent=1) if slim_general else "[]"
         prov_str = json.dumps(connected_providers, indent=1) if connected_providers else "[]"
 
-        # Derive the primary cloud provider from findings or connected providers so the LLM
-        # generates the correct CLI / Terraform syntax even when telemetry is sparse.
+        # Derive the primary cloud provider from findings, question context, or connected providers
         _primary_cloud = None
         for f in (slim_pinned + slim_general):
             _primary_cloud = f.get("provider")
             if _primary_cloud:
                 break
+
         if not _primary_cloud and connected_providers:
             _primary_cloud = connected_providers[0].get("provider")
+
+        if not _primary_cloud:
+            q_lower = (question or "").lower()
+            if any(k in q_lower for k in ("azure", "entra", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "jit", "blob storage", "key vault")):
+                _primary_cloud = "azure"
+            elif any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "idcs")):
+                _primary_cloud = "oracle_saas"
+            elif any(k in q_lower for k in ("oci", "oracle cloud", "compartment", "vcn", "security zone")):
+                _primary_cloud = "oraclecloud"
+            elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "rds", "kms")):
+                _primary_cloud = "aws"
+            elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud sql")):
+                _primary_cloud = "gcp"
+            elif any(k in q_lower for k in ("kubernetes", "k8s", "pod", "deployment", "clusterrole", "kube-apiserver")):
+                _primary_cloud = "kubernetes"
+            elif any(k in q_lower for k in ("github", "repository", "branch protection", "dependabot", "codeql")):
+                _primary_cloud = "github"
+            elif any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
+                _primary_cloud = "m365"
+            elif any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
+                _primary_cloud = "alibabacloud"
+            elif any(k in q_lower for k in ("cloudflare", "dnssec", "waf")):
+                _primary_cloud = "cloudflare"
+            elif any(k in q_lower for k in ("okta", "okta user")):
+                _primary_cloud = "okta"
 
         _CLOUD_LABELS = {
             "azure": "Microsoft Azure",
@@ -473,10 +498,16 @@ class VLLMAzureProvider(AIProvider):
             "oraclecloud": "Oracle Cloud Infrastructure (OCI)",
             "oci": "Oracle Cloud Infrastructure (OCI)",
             "oracle_saas": "Oracle Fusion SaaS (ERP/HCM)",
-            "kubernetes": "Kubernetes",
+            "kubernetes": "Kubernetes (K8s)",
+            "k8s": "Kubernetes (K8s)",
+            "github": "GitHub Security",
+            "m365": "Microsoft 365",
+            "alibabacloud": "Alibaba Cloud",
+            "cloudflare": "Cloudflare",
+            "okta": "Okta Identity",
         }
         _cloud_hint = (
-            f"\nCloud Environment: {_CLOUD_LABELS.get(_primary_cloud, _primary_cloud.upper())}"
+            f"\nCloud Environment: {_CLOUD_LABELS.get(_primary_cloud, str(_primary_cloud).upper())}"
             f" — generate {_primary_cloud}-specific CLI, Terraform, and portal steps ONLY.\n"
             if _primary_cloud else ""
         )
@@ -488,8 +519,8 @@ class VLLMAzureProvider(AIProvider):
             pinned_section = (
                 "\n\nLIVE FINDING DATA (directly retrieved from the scanner database for this exact finding ID):\n"
                 + json.dumps(slim_pinned, indent=1)
-                + "\nINSTRUCTION: The above is verified live telemetry. Analyse it and provide the security risk "
-                  "and step-by-step remediation. Do NOT say 'I don't have live data'.\n"
+                + "\nINSTRUCTION: The above is verified live telemetry for the requested finding. Analyse it directly and provide the security risk "
+                  "and step-by-step remediation (CLI, Terraform, Console). Do NOT claim live data is missing or confuse the cloud provider.\n"
             )
 
         # Drop verbose verified_section when context is already substantial to avoid
