@@ -759,10 +759,20 @@ def _retrieve_relevant_findings(
                             words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
                             stop = {"analyze", "finding", "what", "risk", "and", "how", "we", "remediate", "the", "with", "for", "resource", "step-by-step", "security"}
                             key_terms = [w.lower() for w in words if w.lower() not in stop]
+                            fallback_base = Finding.all_objects.select_related("scan", "scan__provider").prefetch_related("resources")
+                            if provider == "oracle_saas":
+                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="oracle_saas") | Q(uid__startswith="prowler-oracle_saas"))
+                            elif provider in ("oraclecloud", "oci"):
+                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="oraclecloud") | Q(uid__startswith="prowler-oraclecloud") | Q(uid__startswith="prowler-oci"))
+                            elif provider == "azure":
+                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="azure") | Q(uid__startswith="prowler-azure"))
+                            elif provider == "aws":
+                                fallback_base = fallback_base.filter(Q(scan__provider__provider__iexact="aws") | Q(uid__startswith="prowler-aws"))
+                            
                             for kw in key_terms:
-                                fallback_f = Finding.all_objects.filter(
+                                fallback_f = fallback_base.filter(
                                     Q(check_id__icontains=kw) | Q(uid__icontains=kw) | Q(resources__name__icontains=kw)
-                                ).select_related("scan", "scan__provider").prefetch_related("resources").first()
+                                ).first()
                                 if fallback_f and fallback_f.id not in matching_ids:
                                     pinned_f = fallback_f
                                     break
@@ -820,7 +830,7 @@ def _retrieve_relevant_findings(
                 except Exception as s_err:
                     logger.debug("SaaS telemetry inclusion error: %s", s_err)
 
-            base_qs = Finding.objects.select_related(
+            base_qs = Finding.all_objects.select_related(
                 "scan", "scan__provider"
             ).prefetch_related("resources")
 
@@ -956,7 +966,7 @@ def _retrieve_relevant_findings(
                 )
                 status_order = Case(
                     When(status="FAIL", then=Value(0)),
-                    When(status="MUTED", then=Value(1)),
+                    When(status="MANUAL", then=Value(1)),
                     default=Value(2),
                     output_field=IntegerField(),
                 )
