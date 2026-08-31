@@ -557,7 +557,7 @@ ${reportContent}
 
   return (
     <AppShell>
-      <div className="h-[calc(100vh-7.5rem)] flex flex-col justify-between gap-3.5 overflow-hidden">
+      <div className="h-[calc(100vh-5.5rem)] md:h-[calc(100vh-6.25rem)] flex flex-col gap-3 min-h-0 overflow-hidden">
         {/* ── Page Header (Enhanced with Executive Action Bar) ── */}
         <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-2 border-b border-border/60">
           <div className="flex items-center gap-2.5">
@@ -622,7 +622,7 @@ ${reportContent}
         </div>
 
         {/* ── Main Layout: Sidebar Context + Chat Workspace ── */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 flex-1 min-h-0">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 flex-1 min-h-0 overflow-hidden">
           {/* ── Left Sidebar (4 Cols) ── */}
           <div className="lg:col-span-4 flex flex-col gap-3 h-full min-h-0">
             {/* Top Card: Neural Stack Core */}
