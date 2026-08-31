@@ -353,8 +353,9 @@ export function OracleSaasPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [users, setUsers] = useState<InactiveUser[]>([]);
+  const [sodMatrices, setSodMatrices] = useState<SodMatrix[]>(SOD_MATRICES);
 
-  const [selectedSodModal, setSelectedSodModal] = useState<(typeof SOD_MATRICES)[0] | null>(null);
+  const [selectedSodModal, setSelectedSodModal] = useState<SodMatrix | null>(null);
   const [infoModal, setInfoModal] = useState<{
     title: string;
     subtitle: string;
@@ -471,13 +472,16 @@ export function OracleSaasPage() {
         const d = res.data || res;
         if (d.kpis) {
           setKpiData({
-            totalUsers: d.kpis.total_monitored_users || 2545,
-            inactive30d: d.kpis.inactive_users_30d || 2512,
-            dormant90d: d.kpis.dormant_critical_90d || 2512,
+            totalUsers: d.kpis.total_monitored_users || 0,
+            inactive30d: d.kpis.inactive_users_30d || 0,
+            dormant90d: d.kpis.dormant_critical_90d || 0,
             sodCount: d.kpis.sod_toxic_combinations || 17,
-            superuserCount: d.kpis.superuser_roles_active || 54,
+            superuserCount: d.kpis.superuser_roles_active || 0,
             complianceScore: d.kpis.sox_itgc_compliance_score || 82,
           });
+        }
+        if (d.sod_matrices && Array.isArray(d.sod_matrices) && d.sod_matrices.length > 0) {
+          setSodMatrices(d.sod_matrices);
         }
         if (d.pod_url && !d.pod_url.includes("example")) setPodUrl(d.pod_url);
         if (d.active_principal) setAuthUsername(d.active_principal);
@@ -1239,7 +1243,7 @@ export function OracleSaasPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {SOD_MATRICES.map((sod) => {
+              {sodMatrices.map((sod) => {
                 const conflictingUsers = users.filter((u) => u.sod_conflicts.includes(sod.code));
                 return (
                   <Panel key={sod.code} className="p-5 flex flex-col justify-between">

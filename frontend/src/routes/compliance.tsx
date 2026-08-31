@@ -184,7 +184,24 @@ function CompliancePage() {
   // requirement_id server-side, so passed + failed can never exceed total here.
   const dynamicFrameworks: FrameworkCardData[] = useMemo(() => {
     const items = (complianceData?.items as Array<Record<string, any>>) ?? [];
-    return items.map((item) => {
+    return items
+      .filter((item) => {
+        const id = String(item.id || item.compliance_id || "").toLowerCase();
+        const fw = String(item.framework || "").toLowerCase();
+        // Hide deprecated Oracle SaaS baseline, ITGC SOX, and SOC1 frameworks for demo
+        if (
+          id.includes("oracle_saas_security_baseline") ||
+          id.includes("itgc_sox") ||
+          id.includes("soc1_type2") ||
+          fw.includes("oracle cloud saas security baseline") ||
+          fw.includes("itgc sox") ||
+          fw.includes("soc 1 type")
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((item) => {
       const passed = Number(item.requirements_passed) || 0;
       const failed = Number(item.requirements_failed) || 0;
       const manual = Number(item.requirements_manual) || 0;

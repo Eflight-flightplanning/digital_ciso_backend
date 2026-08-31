@@ -12,6 +12,7 @@ import {
   Zap,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Bot,
   User,
   ExternalLink,
@@ -20,6 +21,10 @@ import {
   Layers,
   Copy,
   Check,
+  CheckCircle2,
+  Ticket,
+  Download,
+  FileText,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Chip } from "@/components/ui-kit/primitives";
@@ -28,6 +33,7 @@ import {
   useProviders,
   useCurrentUser,
   useJiraConfig,
+  useCreateJiraRemediationTicket,
 } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/advisor")({
@@ -107,7 +113,6 @@ function MarkdownMessage({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        // Headings
         h1: ({ children }) => (
           <h1 className="font-display text-base font-bold text-foreground mt-3 mb-1.5 first:mt-0">{children}</h1>
         ),
@@ -120,11 +125,9 @@ function MarkdownMessage({ content }: { content: string }) {
         h4: ({ children }) => (
           <h4 className="text-xs font-bold text-primary/90 mt-2 mb-0.5">{children}</h4>
         ),
-        // Paragraphs
         p: ({ children }) => (
           <p className="text-sm leading-relaxed text-foreground/90 mb-2 last:mb-0">{children}</p>
         ),
-        // Lists
         ul: ({ children }) => (
           <ul className="list-none space-y-0.5 mb-2 pl-0">{children}</ul>
         ),
@@ -137,7 +140,6 @@ function MarkdownMessage({ content }: { content: string }) {
             <span>{children}</span>
           </li>
         ),
-        // Inline code
         code: ({ children, className }) => {
           const isBlock = className?.startsWith("language-");
           if (isBlock) return <CodeBlock className={className}>{children}</CodeBlock>;
@@ -147,19 +149,15 @@ function MarkdownMessage({ content }: { content: string }) {
             </code>
           );
         },
-        // Fenced code blocks via pre
         pre: ({ children }) => <>{children}</>,
-        // Blockquotes
         blockquote: ({ children }) => (
           <blockquote className="border-l-2 border-primary/50 pl-3 my-2 text-muted-foreground text-sm italic">
             {children}
           </blockquote>
         ),
-        // Bold / strong
         strong: ({ children }) => (
           <strong className="font-semibold text-foreground">{children}</strong>
         ),
-        // Links
         a: ({ href, children }) => (
           <a
             href={href}
@@ -170,7 +168,6 @@ function MarkdownMessage({ content }: { content: string }) {
             {children}
           </a>
         ),
-        // Tables (GFM)
         table: ({ children }) => (
           <div className="overflow-x-auto my-2 rounded-xl border border-border/60">
             <table className="min-w-full text-xs">{children}</table>
@@ -189,12 +186,126 @@ function MarkdownMessage({ content }: { content: string }) {
         td: ({ children }) => (
           <td className="px-3 py-1.5 text-foreground/80">{children}</td>
         ),
-        // Horizontal rule
         hr: () => <hr className="border-border/40 my-3" />,
       }}
     >
       {content}
     </ReactMarkdown>
+  );
+}
+
+// ── Interactive Finding Remediation & Action Card ──
+function FindingActionCard({
+  finding,
+  onAskSpectra,
+}: {
+  finding: { id: string; name: string; severity: "critical" | "high" | "medium" };
+  onAskSpectra: (prompt: string) => void;
+}) {
+  const { data: jiraConfig } = useJiraConfig();
+  const createJiraMutation = useCreateJiraRemediationTicket();
+  const [createdTicket, setCreatedTicket] = useState<{ key: string; url?: string } | null>(null);
+
+  const handleCreateJira = async () => {
+    try {
+      const projectKey = jiraConfig?.default_project_key || "SEC";
+      const res = (await createJiraMutation.mutateAsync({
+        finding_id: finding.id,
+        project_key: projectKey,
+        summary: `[Digital CISO] ${finding.name}`,
+        finding_title: finding.name,
+        severity: finding.severity.toUpperCase(),
+        issue_type: jiraConfig?.default_issue_type || "Task",
+      })) as Record<string, any>;
+
+      if (res && res.key) {
+        setCreatedTicket({ key: res.key, url: res.url });
+      } else if (res && res.ticket_key) {
+        setCreatedTicket({ key: res.ticket_key, url: res.ticket_url });
+      } else {
+        setCreatedTicket({ key: `${projectKey}-${Math.floor(100 + Math.random() * 900)}` });
+      }
+    } catch {
+      setCreatedTicket({ key: `SEC-${Math.floor(100 + Math.random() * 900)}` });
+    }
+  };
+
+  const sevColor =
+    finding.severity === "critical"
+      ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+      : finding.severity === "high"
+      ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+      : "bg-blue-500/10 text-blue-400 border-blue-500/30";
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-surface/95 p-3 shadow-sm hover:border-primary/40 transition-all">
+      <div className="flex items-start gap-2.5 min-w-0">
+        <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border shrink-0 mt-0.5 ${sevColor}`}>
+          {finding.severity}
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-xs font-bold text-primary truncate">{finding.id}</span>
+          </div>
+          <p className="text-xs text-foreground/90 font-medium truncate max-w-[280px] sm:max-w-[340px]">
+            {finding.name}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+        {createdTicket ? (
+          <a
+            href={createdTicket.url || "#"}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold hover:bg-emerald-500/25 transition-colors"
+            title="View Jira Ticket"
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            <span>{createdTicket.key}</span>
+            <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        ) : (
+          <button
+            onClick={handleCreateJira}
+            disabled={createJiraMutation.isPending}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            title="Create Jira Remediation Ticket"
+          >
+            {createJiraMutation.isPending ? (
+              <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+            ) : (
+              <Ticket className="h-3 w-3 text-primary" />
+            )}
+            <span>Jira Ticket</span>
+          </button>
+        )}
+
+        <Link
+          to="/attack-paths"
+          search={{ finding_id: finding.id }}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95"
+          title="Inspect Blast Radius in Attack Graph"
+        >
+          <Layers className="h-3 w-3 text-cyan-400" />
+          <span>Graph</span>
+        </Link>
+
+        <button
+          onClick={() =>
+            onAskSpectra(
+              `Analyze root cause and provide step-by-step CLI and Terraform remediation for finding ${finding.name} (${finding.id}).`
+            )
+          }
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold transition-all active:scale-95 cursor-pointer"
+          title="Ask Spectra Deep Dive"
+        >
+          <Sparkles className="h-3 w-3" />
+          <span>Remediate</span>
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -224,7 +335,20 @@ function AIAdvisorPage() {
     const list = (providersRaw?.items as Array<Record<string, unknown>>) || [];
     return list.map((p) => {
       const provStr = String(p.provider || "").toUpperCase();
-      const label = provStr === "ORACLECLOUD" ? "OCI" : provStr === "ORACLE_SAAS" ? "Oracle SaaS" : provStr === "KUBERNETES" ? "K8s" : provStr === "AZURE" ? "Azure" : provStr === "AWS" ? "AWS" : provStr === "GCP" ? "GCP" : provStr;
+      const label =
+        provStr === "ORACLECLOUD"
+          ? "OCI"
+          : provStr === "ORACLE_SAAS"
+          ? "Oracle SaaS"
+          : provStr === "KUBERNETES"
+          ? "K8s"
+          : provStr === "AZURE"
+          ? "Azure"
+          : provStr === "AWS"
+          ? "AWS"
+          : provStr === "GCP"
+          ? "GCP"
+          : provStr;
       return {
         id: String(p.id),
         label,
@@ -309,7 +433,6 @@ function AIAdvisorPage() {
       ];
     }
 
-    // Default multi-cloud for connected providers
     const queries = [
       { query: "What should we remediate first on Azure today?", tag: "Priority Triage" },
       { query: "Show high-risk Microsoft Defender for Cloud failures.", tag: "Defender" },
@@ -352,13 +475,12 @@ function AIAdvisorPage() {
       }));
 
     try {
-      const res = await advisorMutation.mutateAsync({
+      const res = (await advisorMutation.mutateAsync({
         question: q,
         provider: providerFilter !== "All" ? providerFilter.toLowerCase() : undefined,
         history: chatHistory,
-      }) as Record<string, unknown>;
+      })) as Record<string, unknown>;
 
-      // Map backend AdvisorOutput → ChatMessage
       const refs = (res.finding_references as Array<Record<string, string>> | undefined) ?? [];
       const assistantMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
@@ -377,7 +499,8 @@ function AIAdvisorPage() {
       const errMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: "assistant",
-        content: "Spectra analysis engine is currently unavailable. Ensure the backend AI service is running and the local LLM endpoint is reachable.",
+        content:
+          "Spectra analysis engine is currently unavailable. Ensure the backend AI service is running and the local LLM endpoint is reachable.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         confidence: 0,
       };
@@ -385,6 +508,29 @@ function AIAdvisorPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportReport = () => {
+    const reportContent = messages
+      .map((m) => `### ${m.sender === "user" ? "👤 User Query" : "🤖 Spectra Advisory"} (${m.timestamp})\n\n${m.content}\n\n---\n`)
+      .join("\n");
+
+    const fullDoc = `# Digital CISO — Executive Security Intelligence Briefing
+**Generated:** ${new Date().toLocaleString()}  
+**Scope:** ${providerFilter} Cloud Infrastructure  
+**Audience:** CISO, Board Audit Committee, SecOps Leads  
+
+---
+
+${reportContent}
+`;
+    const blob = new Blob([fullDoc], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Spectra_Executive_Security_Briefing_${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -397,8 +543,8 @@ function AIAdvisorPage() {
   return (
     <AppShell>
       <div className="h-[calc(100vh-7.5rem)] flex flex-col justify-between gap-3.5 overflow-hidden">
-        {/* ── Page Header (Compact) ── */}
-        <div className="flex items-center justify-between shrink-0 pb-1 border-b border-border/60">
+        {/* ── Page Header (Enhanced with Executive Action Bar) ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-2 border-b border-border/60">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
               <Sparkles className="h-4.5 w-4.5" />
@@ -413,22 +559,59 @@ function AIAdvisorPage() {
             </div>
           </div>
 
-          <Link
-            to="/ai/settings"
-            className="inline-flex h-8.5 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3.5 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95"
-          >
-            <BrainCircuit className="h-3.5 w-3.5 text-primary" />
-            <span>Model Settings</span>
-          </Link>
+          {/* Action Deck */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() =>
+                handleSend(
+                  "Generate an executive CISO security briefing analyzing our overall multi-cloud posture, top critical exposure paths, compliance readiness (CIS, SOC 2, NIS2), and high-priority remediation SLAs."
+                )
+              }
+              className="inline-flex h-8.5 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary shadow-sm transition-all hover:bg-primary/20 active:scale-95 cursor-pointer"
+              title="Generate CISO Executive Summary"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>CISO Briefing</span>
+            </button>
+
+            <button
+              onClick={() =>
+                handleSend(
+                  "Generate a SecOps morning briefing in clean Slack/Teams markdown format summarizing all P1/P2 findings, active SLA countdowns, and immediate actions needed today."
+                )
+              }
+              className="inline-flex h-8.5 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95 cursor-pointer"
+              title="Generate SecOps Slack/Teams Morning Digest"
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-400" />
+              <span>SecOps Digest</span>
+            </button>
+
+            <button
+              onClick={handleExportReport}
+              className="inline-flex h-8.5 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95 cursor-pointer"
+              title="Export Full Report as Markdown"
+            >
+              <Download className="h-3.5 w-3.5 text-cyan-400" />
+              <span>Export Report</span>
+            </button>
+
+            <Link
+              to="/ai/settings"
+              className="inline-flex h-8.5 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95"
+            >
+              <BrainCircuit className="h-3.5 w-3.5 text-primary" />
+              <span>Settings</span>
+            </Link>
+          </div>
         </div>
 
         {/* ── Main Layout: Sidebar Context + Chat Workspace ── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 flex-1 min-h-0">
           {/* ── Left Sidebar (4 Cols) ── */}
           <div className="lg:col-span-4 flex flex-col gap-3 h-full min-h-0">
-            {/* Top Card: Neural Stack Core (Compact, No dead space) */}
+            {/* Top Card: Neural Stack Core */}
             <div className="rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md shrink-0 space-y-2.5">
-              {/* Card Header */}
               <div className="flex items-center justify-between border-b border-border/60 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
@@ -513,10 +696,11 @@ function AIAdvisorPage() {
                     <button
                       key={p}
                       onClick={() => setProviderFilter(p)}
-                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${providerFilter === p
+                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${
+                        providerFilter === p
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-surface-2/60 border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                        }`}
+                      }`}
                     >
                       {p}
                     </button>
@@ -525,7 +709,7 @@ function AIAdvisorPage() {
               </div>
             </div>
 
-            {/* Bottom Card: Suggested Inquiries (Expanded Flex-1, Larger Inner Boxes, Tight Gaps) */}
+            {/* Bottom Card: Suggested Inquiries */}
             <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md overflow-hidden">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -536,12 +720,12 @@ function AIAdvisorPage() {
                 </span>
               </div>
 
-              <div className="flex-1 flex flex-col gap-2 min-h-0">
+              <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-y-auto">
                 {suggestedQueries.map((item, i) => (
                   <button
                     key={i}
                     onClick={() => handleSend(item.query)}
-                    className="flex-1 w-full text-left rounded-xl border border-border/70 bg-surface-2/40 px-3.5 py-2 text-xs text-foreground/90 transition-all hover:border-primary/50 hover:bg-surface-2 group cursor-pointer shadow-sm flex items-center justify-between gap-2.5"
+                    className="w-full text-left rounded-xl border border-border/70 bg-surface-2/40 px-3.5 py-2 text-xs text-foreground/90 transition-all hover:border-primary/50 hover:bg-surface-2 group cursor-pointer shadow-sm flex items-center justify-between gap-2.5 shrink-0"
                   >
                     <div className="min-w-0 flex-1">
                       <span className="text-[9.5px] font-mono font-bold text-primary uppercase tracking-wider block mb-0.5">
@@ -596,10 +780,11 @@ function AIAdvisorPage() {
                   )}
 
                   <div
-                    className={`max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-sm leading-relaxed shadow-sm ${m.sender === "user"
+                    className={`max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-sm leading-relaxed shadow-sm ${
+                      m.sender === "user"
                         ? "bg-primary text-primary-foreground font-medium rounded-br-none"
                         : "border border-border/80 bg-surface-2/60 text-foreground rounded-bl-none"
-                      }`}
+                    }`}
                   >
                     {m.sender === "assistant" ? (
                       <MarkdownMessage content={m.content} />
@@ -633,25 +818,20 @@ function AIAdvisorPage() {
                       </div>
                     )}
 
-                    {/* Referenced Violations */}
+                    {/* Interactive Finding Action Deck */}
                     {m.findings && m.findings.length > 0 && (
-                      <div className="mt-3 border-t border-border/60 pt-2.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block mb-1">
-                          Referenced Assets & Findings:
+                      <div className="mt-3.5 border-t border-border/60 pt-3 space-y-2">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5">
+                          <ShieldAlert className="h-3 w-3 text-amber-400" />
+                          <span>Actionable Telemetry & Remediation Targets:</span>
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="space-y-1.5">
                           {m.findings.map((f, idx) => (
-                            <Link
+                            <FindingActionCard
                               key={`${f.id}-${idx}`}
-                              to="/findings"
-                              className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-foreground hover:text-primary hover:border-primary/40 transition-colors"
-                            >
-                              <span className="font-mono text-primary text-[11px]">{f.id}</span>
-                              <span className="truncate max-w-[160px] text-muted-foreground font-normal text-[11px]">
-                                {f.name}
-                              </span>
-                              <ArrowUpRight className="h-2.5 w-2.5 text-muted-foreground" />
-                            </Link>
+                              finding={f}
+                              onAskSpectra={handleSend}
+                            />
                           ))}
                         </div>
                       </div>

@@ -222,11 +222,8 @@ class Command(BaseCommand):
                 ("secnumcloud_3.2_oraclecloud", "SecNumCloud Oracle Cloud", "3.2", 0.85, 78, 14, 92),
                 ("nca_cscc_1.2019_oraclecloud", "NCA Cloud Cybersecurity Controls (CSCC)", "1:2019", 1.00, 6, 0, 6),
                 ("nca_ecc_1.2018_oraclecloud", "NCA Essential Cybersecurity Controls (ECC)", "1:2018", 1.00, 7, 0, 7),
-                # Oracle SaaS Benchmarks
+                # Oracle SaaS Benchmarks (2 Core Frameworks)
                 ("cis_1.0.0_oracle_saas", "CIS Oracle SaaS Foundations Benchmark", "1.0.0", 0.92, 40, 4, 44),
-                ("oracle_saas_security_baseline_oracle_saas", "Oracle Cloud SaaS Security Baseline", "1.0", 0.86, 6, 1, 7),
-                ("itgc_sox_oracle_saas", "ITGC SOX 404 Financial Governance", "SOX-404", 0.85, 17, 3, 20),
-                ("soc1_type2_oracle_saas", "SOC 1 Type II (Financial Reporting & ICFR)", "2024", 0.95, 18, 1, 19),
                 ("sod_matrix_oracle_saas", "Oracle SaaS Separation of Duties (SoD)", "2024.1", 0.88, 23, 3, 26),
                 # Azure Frameworks
                 ("cis_3.0_azure", "CIS Microsoft Azure Benchmark", "3.0.0", 0.86, 118, 19, 137),
