@@ -633,17 +633,6 @@ function AIDecisionsPage() {
     return list;
   }, [realFindings, executions, connectedProviderSet]);
 
-  // Set initial selected item
-  useEffect(() => {
-    if (!selectedItemId && remediationItems.length > 0) {
-      setSelectedItemId(remediationItems[0].id);
-    }
-  }, [remediationItems, selectedItemId]);
-
-  const selectedItem = useMemo(() => {
-    return remediationItems.find((item) => item.id === selectedItemId) || remediationItems[0];
-  }, [remediationItems, selectedItemId]);
-
   // Filter items by tab section, provider filter, and search query
   const filteredItems = useMemo(() => {
     return remediationItems.filter((item) => {
@@ -679,6 +668,20 @@ function AIDecisionsPage() {
       return true;
     });
   }, [remediationItems, filterSection, selectedProviderFilter, searchQuery]);
+
+  // Keep selectedItemId synchronized with the filtered items list
+  useEffect(() => {
+    if (filteredItems.length > 0) {
+      const exists = filteredItems.some((item) => item.id === selectedItemId);
+      if (!exists) {
+        setSelectedItemId(filteredItems[0].id);
+      }
+    }
+  }, [filteredItems, selectedItemId]);
+
+  const selectedItem = useMemo(() => {
+    return filteredItems.find((item) => item.id === selectedItemId) || filteredItems[0];
+  }, [filteredItems, selectedItemId]);
 
   // Handle Opening Ticket Creation Modal
   const handleOpenCreateTicket = (item: FindingRemediationItem) => {
@@ -753,18 +756,26 @@ function AIDecisionsPage() {
     }
   };
 
-  // KPI Calculations
-  const totalFindings = remediationItems.length;
-  const pendingTickets = remediationItems.filter(
+  // Provider-scoped items for accurate KPI & Queue metric badges
+  const providerScopedItems = useMemo(() => {
+    if (selectedProviderFilter === "ALL") return remediationItems;
+    return remediationItems.filter(
+      (item) => (item.provider || "").toUpperCase() === selectedProviderFilter
+    );
+  }, [remediationItems, selectedProviderFilter]);
+
+  // KPI Calculations scoped dynamically to the active provider filter
+  const totalFindings = providerScopedItems.length;
+  const pendingTickets = providerScopedItems.filter(
     (item) => !item.execution_record || item.execution_record.status === "PENDING"
   ).length;
-  const inProgressTickets = remediationItems.filter(
+  const inProgressTickets = providerScopedItems.filter(
     (item) => item.execution_record && (item.execution_record.status === "IN_PROGRESS" || item.execution_record.jira_status_category === "indeterminate")
   ).length;
-  const resolvedTickets = remediationItems.filter(
+  const resolvedTickets = providerScopedItems.filter(
     (item) => item.execution_record && (item.execution_record.status === "COMPLETED" || item.execution_record.jira_status_category === "done")
   ).length;
-  const failedTickets = remediationItems.filter(
+  const failedTickets = providerScopedItems.filter(
     (item) => item.execution_record && item.execution_record.status === "FAILED"
   ).length;
 
