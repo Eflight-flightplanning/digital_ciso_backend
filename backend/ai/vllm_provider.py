@@ -449,12 +449,38 @@ class VLLMAzureProvider(AIProvider):
         context_str = json.dumps(slim_findings, indent=1) if slim_findings else "[]"
         prov_str = json.dumps(connected_providers, indent=1) if connected_providers else "[]"
 
+        # Derive the primary cloud provider from findings or connected providers so the LLM
+        # generates the correct CLI / Terraform syntax even when telemetry is sparse.
+        _primary_cloud = None
+        for f in slim_findings:
+            _primary_cloud = f.get("provider")
+            if _primary_cloud:
+                break
+        if not _primary_cloud and connected_providers:
+            _primary_cloud = connected_providers[0].get("provider")
+
+        _CLOUD_LABELS = {
+            "azure": "Microsoft Azure",
+            "aws": "Amazon Web Services (AWS)",
+            "gcp": "Google Cloud Platform (GCP)",
+            "oraclecloud": "Oracle Cloud Infrastructure (OCI)",
+            "oci": "Oracle Cloud Infrastructure (OCI)",
+            "oracle_saas": "Oracle Fusion SaaS (ERP/HCM)",
+            "kubernetes": "Kubernetes",
+        }
+        _cloud_hint = (
+            f"\nCloud Environment: {_CLOUD_LABELS.get(_primary_cloud, _primary_cloud.upper())}"
+            f" — use {_primary_cloud}-specific CLI, Terraform, and portal steps ONLY.\n"
+            if _primary_cloud else ""
+        )
+
         # Drop verbose verified_section when context is already substantial to avoid
         # exceeding the model's context window on small (4096-token) deployments.
         _context_est_chars = len(prov_str) + len(context_str) + len(question)
         _include_playbooks = _context_est_chars < 2000 and verified_section
         user_prompt = (
-            f"Connected Environments:\n{prov_str}\n\n"
+            f"Connected Environments:\n{prov_str}\n"
+            f"{_cloud_hint}\n"
             f"Active Findings Telemetry:\n{context_str}"
             f"{verified_section if _include_playbooks else ''}\n\n"
             f"User Question:\n{question}"
