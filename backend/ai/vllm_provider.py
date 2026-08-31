@@ -135,26 +135,99 @@ class VLLMAzureProvider(AIProvider):
 
     @staticmethod
     def _clean_thinking_trace(raw_text: str) -> str:
-        """Strip out internal reasoning scratchpads, thinking traces, and meta-analysis headers."""
+        """Strip internal reasoning scratchpads and thinking traces from Qwen / other LLM responses.
+
+        Handles multiple leakage patterns:
+        1. Qwen <think>...</think> XML tags
+        2. "Thinking Process:" section headers
+        3. Qwen 3 inline scratchpad pattern: outputs the system-prompt structure verbatim
+           e.g. "User Question:", "Constraint:", "Specific Rule:", "Evaluate Telemetry:",
+           "Drafting the Response:", "Mental Model:", "My reasoning is:" etc.
+        """
         text = raw_text.strip()
+
+        # 1. Strip Qwen XML thinking tags — take only what's after </think>
         if "</think>" in text:
             text = text.split("</think>")[-1].strip()
 
+        # 2. Strip "Thinking Process:" section block
         if "Thinking Process:" in text:
             text = text.split("Thinking Process:")[-1].strip()
 
-        # Strip lines matching scratchpad headers like "* User Input:", "* Task:", "1. Analyze the Request:"
+        # 3. Detect Qwen 3 verbose scratchpad leakage pattern.
+        # When the response starts with a scratchpad header (e.g. "User Question:"),
+        # find the LAST heading that signals "actual answer begins here" and trim above it.
+        _SCRATCHPAD_START_HEADERS = (
+            "user question:",
+            "constraint:",
+            "specific rule:",
+            "evaluate telemetry:",
+            "drafting the response:",
+            "mental model:",
+            "my reasoning is:",
+            "system instruction:",
+            "critical constraint:",
+            "anti-hallucination:",
+            "thinking steps:",
+        )
+        _ANSWER_RESUME_MARKERS = (
+            "direct answer:",
+            "**direct answer",
+            "## direct",
+            "## security risk",
+            "## risk",
+            "## remediation",
+            "## summary",
+            "### spectra",
+            "based on ",
+            "i don't have live",
+            "i don't have",
+            "the finding",
+            "the active findings",
+            "there are no",
+        )
+
+        text_lower = text.lower()
+        first_scratchpad = min(
+            (text_lower.find(h) for h in _SCRATCHPAD_START_HEADERS if h in text_lower),
+            default=-1,
+        )
+
+        if first_scratchpad != -1 and first_scratchpad < 200:
+            # Response starts with a scratchpad block — find where the real answer begins
+            best_resume = len(text)  # default: keep all (nothing found)
+            for marker in _ANSWER_RESUME_MARKERS:
+                idx = text_lower.find(marker)
+                if idx != -1 and idx > first_scratchpad:
+                    # Find the beginning of that line
+                    line_start = text.rfind("\n", 0, idx)
+                    line_start = 0 if line_start == -1 else line_start + 1
+                    if line_start < best_resume:
+                        best_resume = line_start
+
+            if best_resume < len(text):
+                text = text[best_resume:].strip()
+
+        # 4. Line-by-line filter: remove individual bullet scratchpad lines
+        scratchpad_line_re = re.compile(
+            r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|Role|Task|Constraints|Greeting|"
+            r"Status|Telemetry|Offer|Formatting|Analyze|Identify|Determine|Draft|Construct|"
+            r"Mental|Thinking|Final|Refine|JSON|Context|System Instruction|Critical Constraint|"
+            r"Specific Rule|Evaluate|Drafting|Constraint)\b",
+            re.IGNORECASE,
+        )
         lines = []
         for line in text.split("\n"):
-            stripped = line.strip()
-            if re.match(r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|Role|Task|Constraints|Greeting|Status|Telemetry|Offer|Formatting|Analyze|Identify|Determine|Draft|Construct|Mental|Thinking|Final|Refine|JSON|Context|System Instruction|Critical Constraint)\b", stripped, re.IGNORECASE):
+            if scratchpad_line_re.match(line.strip()):
                 continue
-            if stripped.startswith("Thinking Process:"):
+            if line.strip().startswith("Thinking Process:"):
                 continue
             lines.append(line)
 
         result = "\n".join(lines).strip()
         return result or text
+
+
 
     @classmethod
     def _extract_json(cls, text: str) -> dict[str, Any]:

@@ -678,8 +678,25 @@ def _retrieve_relevant_findings(
             }
             meaningful_keywords = [w for w in words if w.lower() not in stop_words]
 
+            # --- UUID pinned lookup: extract any UUIDs from the question and fetch them directly ---
+            # This ensures "Analyze finding ... (01a05876-d3a8-...)" always resolves the specific
+            # finding even if keyword matching would miss it.
+            _uuid_pattern = re.compile(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                re.IGNORECASE,
+            )
+            pinned_ids = _uuid_pattern.findall(question)
             matching_ids = set()
             matching_findings = []
+            if pinned_ids:
+                for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
+                    try:
+                        pinned_f = qs.filter(id=pin_id).first()
+                        if pinned_f and pinned_f.id not in matching_ids:
+                            matching_ids.add(pinned_f.id)
+                            matching_findings.append(_serialize_finding(pinned_f))
+                    except Exception:
+                        pass
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
             is_saas_query = (
