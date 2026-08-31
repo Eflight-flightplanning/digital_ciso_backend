@@ -750,15 +750,27 @@ def _retrieve_relevant_findings(
             if pinned_ids:
                 for pin_id in pinned_ids[:3]:  # cap to 3 UUIDs per query
                     try:
-                        # Use all_objects (bypasses ActiveProviderPartitionedManager) so findings
-                        # from soft-deleted or inactive providers are still reachable by UUID.
                         pinned_f = Finding.all_objects.filter(id=pin_id).select_related(
                             "scan", "scan__provider"
                         ).prefetch_related("resources").first()
+                        
+                        # If exact UUID is not in current database, resolve by finding title / check keywords
+                        if not pinned_f:
+                            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
+                            stop = {"analyze", "finding", "what", "risk", "and", "how", "we", "remediate", "the", "with", "for", "resource", "step-by-step", "security"}
+                            key_terms = [w.lower() for w in words if w.lower() not in stop]
+                            for kw in key_terms:
+                                fallback_f = Finding.all_objects.filter(
+                                    Q(check_id__icontains=kw) | Q(uid__icontains=kw) | Q(resources__name__icontains=kw)
+                                ).select_related("scan", "scan__provider").prefetch_related("resources").first()
+                                if fallback_f and fallback_f.id not in matching_ids:
+                                    pinned_f = fallback_f
+                                    break
+
                         if pinned_f and pinned_f.id not in matching_ids:
                             matching_ids.add(pinned_f.id)
                             matching_findings.append(_serialize_finding(pinned_f, pinned=True))
-                            logger.info("Pinned finding resolved: %s (%s)", pin_id, pinned_f.check_id)
+                            logger.info("Pinned finding resolved: %s -> %s (%s)", pin_id, pinned_f.id, pinned_f.check_id)
                     except Exception as p_err:
                         logger.warning("Pinned finding lookup error for %s: %s", pin_id, p_err)
 
