@@ -1170,7 +1170,7 @@ function AIDecisionsPage() {
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
-                          CLI Command
+                          {selectedItem.provider === "ORACLE_SAAS" ? "REST API / SCIM" : "CLI Command"}
                         </button>
                         <button
                           onClick={() => setActiveRemediationTab("terraform")}
@@ -1180,7 +1180,7 @@ function AIDecisionsPage() {
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
-                          Terraform IaC
+                          {selectedItem.provider === "ORACLE_SAAS" ? "IDCS / Policy Spec" : "Terraform IaC"}
                         </button>
                         <button
                           onClick={() => setActiveRemediationTab("console")}
@@ -1190,12 +1190,12 @@ function AIDecisionsPage() {
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
-                          Console Guide
+                          {selectedItem.provider === "ORACLE_SAAS" ? "Fusion Security Console" : "Console Guide"}
                         </button>
                       </div>
                     </div>
 
-                    {/* Tab 1: CLI */}
+                    {/* Tab 1: CLI / REST API */}
                     {activeRemediationTab === "cli" && (
                       <div className="relative group">
                         <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-4 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner">
@@ -1210,12 +1210,12 @@ function AIDecisionsPage() {
                           className="absolute right-3 top-3 rounded-lg border border-border/60 bg-surface-2/90 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
                         >
                           {copiedTab === "cli" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                          <span>{copiedTab === "cli" ? "Copied!" : "Copy Command"}</span>
+                          <span>{copiedTab === "cli" ? "Copied!" : selectedItem.provider === "ORACLE_SAAS" ? "Copy REST API Payload" : "Copy Command"}</span>
                         </button>
                       </div>
                     )}
 
-                    {/* Tab 2: Terraform */}
+                    {/* Tab 2: Terraform / IDCS Policy */}
                     {activeRemediationTab === "terraform" && (
                       <div className="relative group">
                         <pre className="rounded-xl border border-border/80 bg-[#0d1117] p-4 font-mono text-xs text-sky-400 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner">
@@ -1230,7 +1230,7 @@ function AIDecisionsPage() {
                           className="absolute right-3 top-3 rounded-lg border border-border/60 bg-surface-2/90 px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground opacity-80 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
                         >
                           {copiedTab === "terraform" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                          <span>{copiedTab === "terraform" ? "Copied!" : "Copy Terraform"}</span>
+                          <span>{copiedTab === "terraform" ? "Copied!" : selectedItem.provider === "ORACLE_SAAS" ? "Copy Policy Spec" : "Copy Terraform"}</span>
                         </button>
                       </div>
                     )}

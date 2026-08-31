@@ -838,7 +838,44 @@ aws securityhub get-findings --filters '{{"Id": [{{"Value": "{cid}", "Comparison
                 ]
 
             manual_list = "\n".join(f"{i+1}. {s}" for i, s in enumerate(manual))
-            ans = f"""### Security Risk Analysis & Remediation for `{title}`
+            
+            if prov == "oracle_saas":
+                ans = f"""### Security Risk Analysis & Remediation for `{title}`
+
+**Cloud Environment:** ORACLE FUSION SAAS (ERP / HCM)  
+**Target Resource:** `{res_name}`  
+**Severity Level:** **{sev}**
+
+---
+
+### Root Cause & Security Risk
+Failing to enforce `{title}` leaves Oracle Fusion applications vulnerable to unauthorized transactions, toxic Separation of Duties (SoD) privilege combinations, or non-compliance under SOX ITGC and CIS Oracle SaaS Benchmark.
+
+---
+
+### Step-by-Step Remediation Plan
+
+#### 1. REST API / SCIM 2.0 Automation (Direct Pod Execution)
+
+```bash
+{cli.strip()}
+```
+
+#### 2. Identity Cloud (IDCS) Policy Specification
+
+```json
+{tf.strip()}
+```
+
+#### 3. Oracle Fusion Security Console Guide (Step-by-step UI)
+
+{manual_list}
+
+---
+*Verified against CIS Oracle Fusion SaaS & SOX ITGC standards.*
+"""
+            else:
+                ans = f"""### Security Risk Analysis & Remediation for `{title}`
 
 **Cloud Environment:** {prov.upper()}  
 **Target Resource:** `{res_name}`  
