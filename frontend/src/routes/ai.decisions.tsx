@@ -165,7 +165,7 @@ function generateProviderRemediation(
       recommended_fix: metaRec || `Remediate ${checkId.replace(/_/g, " ")} on AWS resource '${rName}'. Enforce encryption, least privilege IAM policies, and VPC network isolation.`,
       cli_command: metaCli || `aws configservice put-evaluations \\\n  --evaluations "ComplianceResourceType=AWS::Resource,ComplianceResourceId=${rUid},ComplianceType=COMPLIANT"`,
       code_snippet: metaTerraform || `# AWS Remediation Configuration for ${rName}\nresource "aws_resourcegroups_group" "${rName.replace(/[^a-zA-Z0-9_]/g, '_')}_remediation" {\n  name = "remediated-${rName.slice(0, 20)}"\n  tags = {\n    RemediatedBy = "Digital-CISO"\n    CheckId      = "${checkId}"\n  }\n}`,
-      console_steps: `1. Log in to AWS Management Console.\n2. Locate resource '${rName}' in region ${reg}.\n3. Apply security configuration according to AWS CIS Benchmark.\n4. Save changes and trigger compliance evaluation.`,
+      console_steps: `1. Log in to AWS Management Console (https://console.aws.amazon.com).\n2. Navigate to the service for resource '${rName}' in region '${reg}'.\n3. Under 'Security / Configuration', apply the recommended settings for ${checkId.replace(/_/g, " ")}.\n4. Click 'Save Changes' and verify compliance status in AWS Security Hub.`,
       validation_steps: [
         `Verify resource status in AWS CLI or Management Console.`,
         `Trigger on-demand security assessment scan.`,
@@ -182,7 +182,7 @@ function generateProviderRemediation(
         recommended_fix: metaRec || `Configure Azure Storage Account '${rName}' to require HTTPS traffic only, enforce minimum TLS version 1.2, and disable public blob access.`,
         cli_command: metaCli || `az storage account update \\\n  --name "${rName}" \\\n  --resource-group "rg-production" \\\n  --https-only true \\\n  --min-tls-version TLS1_2 \\\n  --allow-blob-public-access false`,
         code_snippet: metaTerraform || `resource "azurerm_storage_account" "${rName.replace(/[^a-zA-Z0-9_]/g, '_')}" {\n  name                            = "${rName.slice(0, 24).toLowerCase()}"\n  resource_group_name             = "rg-production"\n  location                        = "${reg}"\n  account_tier                    = "Standard"\n  account_replication_type        = "GRS"\n  enable_https_traffic_only       = true\n  min_tls_version                 = "TLS1_2"\n  allow_nested_items_to_be_public = false\n}`,
-        console_steps: `1. In Azure Portal, navigate to 'Storage accounts' -> '${rName}'.\n2. Under 'Settings', select 'Configuration'.\n3. Set 'Secure transfer required' to 'Enabled'.\n4. Set 'Minimum TLS version' to 'Version 1.2'.\n5. Set 'Allow Blob public access' to 'Disabled'.\n6. Click 'Save'.`,
+        console_steps: `1. In Azure Portal (https://portal.azure.com), navigate to 'Storage accounts' -> '${rName}'.\n2. In the left menu under 'Settings', select 'Configuration'.\n3. Set 'Secure transfer required' to 'Enabled'.\n4. Set 'Minimum TLS version' to 'Version 1.2'.\n5. Set 'Allow Blob public access' to 'Disabled'.\n6. Click 'Save' at the top of the pane.`,
         validation_steps: [
           `Run: az storage account show --name "${rName}" --query "{httpsOnly:enableHttpsTrafficOnly,minTls:minimumTlsVersion,publicAccess:allowBlobPublicAccess}"`,
           `Verify output: {"httpsOnly": true, "minTls": "TLS1_2", "publicAccess": false}`,
@@ -196,7 +196,7 @@ function generateProviderRemediation(
         recommended_fix: metaRec || `Enable Microsoft Defender for Cloud (Standard pricing tier) across subscription workloads to activate continuous threat detection and vulnerability scanning.`,
         cli_command: metaCli || `az security pricing create \\\n  --name "VirtualMachines" \\\n  --tier "Standard" \\\n  --sub-plan "P2"`,
         code_snippet: metaTerraform || `resource "azurerm_security_center_subscription_pricing" "defender_vms" {\n  tier          = "Standard"\n  resource_type = "VirtualMachines"\n  subplan       = "P2"\n}`,
-        console_steps: `1. Open Microsoft Defender for Cloud in Azure Portal.\n2. Under 'Management', select 'Environment settings' -> Subscription.\n3. Under 'Defender plans', toggle 'Servers' and 'Cloud Workloads' to 'ON'.\n4. Click 'Save' at the top of the pane.`,
+        console_steps: `1. Open Microsoft Defender for Cloud in Azure Portal (https://portal.azure.com).\n2. Under 'Management' in left pane, select 'Environment settings' -> Click on your Subscription.\n3. Under 'Defender plans', toggle 'Servers', 'Databases', and 'Containers' to 'ON'.\n4. Set the pricing sub-plan to Standard / P2.\n5. Click 'Save' at the top of the pane to activate real-time threat protection.`,
         validation_steps: [
           `Run: az security pricing list --query "[].{name:name, pricingTier:pricingTier}"`,
           `Verify pricingTier is 'Standard' for active resource types.`,
@@ -205,12 +205,26 @@ function generateProviderRemediation(
         remediation_url: metaUrl || "https://learn.microsoft.com/en-us/azure/defender-for-cloud/enable-enhanced-security",
       };
     }
+    if (c.includes("jit") || c.includes("virtualmachine") || c.includes("vm_") || c.includes("port_") || c.includes("ssh") || c.includes("rdp")) {
+      return {
+        recommended_fix: metaRec || `Enable Just-In-Time (JIT) Network Access on '${rName}' to lock down management ports (SSH 22 / RDP 3389) and eliminate persistent exposure.`,
+        cli_command: metaCli || `az security jit-policy apply \\\n  --resource-group "rg-production" \\\n  --location "${reg}" \\\n  --name "default"`,
+        code_snippet: metaTerraform || `resource "azurerm_security_center_jit_network_access_policy" "jit_policy" {\n  virtual_machine_id  = "${rUid}"\n  resource_group_name = "rg-production"\n  location            = "${reg}"\n  name                = "default"\n\n  dynamic "port" {\n    for_each = [22, 3389]\n    content {\n      number              = port.value\n      protocol            = "TCP"\n      allowed_source_address_prefix = "*"\n      max_request_access_duration   = "PT3H"\n    }\n  }\n}`,
+        console_steps: `1. Open Microsoft Defender for Cloud in Azure Portal.\n2. In the left navigation, select 'Workload protections' -> 'Just-in-time VM access'.\n3. Locate and select Virtual Machine '${rName}'.\n4. Click 'Enable JIT on 1 VM'.\n5. Verify port rules for SSH (22) and RDP (3389) with a maximum request duration of 3 hours.\n6. Click 'Save' to enforce on-demand just-in-time access.`,
+        validation_steps: [
+          `Run: az security jit-policy list --query "[].{name:name, vms:virtualMachines[].id}"`,
+          `Verify '${rName}' is protected under an active JIT policy.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://learn.microsoft.com/en-us/azure/defender-for-cloud/just-in-time-access-usage",
+      };
+    }
     if (c.includes("sql") || c.includes("database") || c.includes("tde")) {
       return {
         recommended_fix: metaRec || `Enable Transparent Data Encryption (TDE) on Azure SQL Server '${rName}'.`,
         cli_command: metaCli || `az sql server tde set \\\n  --resource-group "rg-production" \\\n  --server "${rName}" \\\n  --status Enabled`,
         code_snippet: metaTerraform || `resource "azurerm_mssql_server_transparent_data_encryption" "tde" {\n  server_id = azurerm_mssql_server.primary.id\n}`,
-        console_steps: `1. In Azure Portal, navigate to 'SQL servers' -> '${rName}'.\n2. Under 'Security', select 'Transparent data encryption'.\n3. Set 'Data encryption' to 'On'.\n4. Click 'Save'.`,
+        console_steps: `1. In Azure Portal, navigate to 'SQL servers' -> Select '${rName}'.\n2. In left navigation under 'Security', select 'Transparent data encryption'.\n3. Toggle 'Data encryption' to 'On'.\n4. Select encryption key type (Service-managed or Customer-managed in Azure Key Vault).\n5. Click 'Save' to encrypt database storage at rest.`,
         validation_steps: [
           `Run: az sql server tde show --resource-group "rg-production" --server "${rName}"`,
           `Verify status is 'Enabled'.`,
@@ -219,11 +233,25 @@ function generateProviderRemediation(
         remediation_url: metaUrl || "https://learn.microsoft.com/en-us/azure/azure-sql/database/transparent-data-encryption-tde-overview",
       };
     }
+    if (c.includes("keyvault") || c.includes("vault") || c.includes("secret") || c.includes("purge")) {
+      return {
+        recommended_fix: metaRec || `Enable Purge Protection and Soft-Delete on Azure Key Vault '${rName}' to protect cryptographic keys and secrets from permanent deletion.`,
+        cli_command: metaCli || `az keyvault update \\\n  --name "${rName}" \\\n  --resource-group "rg-production" \\\n  --enable-purge-protection true`,
+        code_snippet: metaTerraform || `resource "azurerm_key_vault" "kv" {\n  name                       = "${rName.slice(0, 24).toLowerCase()}"\n  location                   = "${reg}"\n  resource_group_name        = "rg-production"\n  sku_name                   = "standard"\n  soft_delete_retention_days = 90\n  purge_protection_enabled   = true\n}`,
+        console_steps: `1. Open Azure Portal -> Navigate to 'Key vaults' -> Select '${rName}'.\n2. In left navigation under 'Settings', select 'Properties'.\n3. Verify 'Soft-delete' is enabled with 90-day retention.\n4. Click 'Enable purge protection'.\n5. Click 'Save' to lock down key retention.`,
+        validation_steps: [
+          `Run: az keyvault show --name "${rName}" --query "properties.enablePurgeProtection"`,
+          `Verify output returns true.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview",
+      };
+    }
     return {
       recommended_fix: metaRec || `Remediate ${checkId.replace(/_/g, " ")} on Azure resource '${rName}'. Enforce Azure Policy compliance, RBAC, and encryption.`,
       cli_command: metaCli || `az resource update --ids "${rUid}" --set properties.encryption.enabled=true`,
       code_snippet: metaTerraform || `# Azure Remediation for ${rName}\nresource "azurerm_resource_group_policy_assignment" "audit_remediation" {\n  name                 = "remediate-${rName.slice(0, 16)}"\n  resource_group_id    = "/subscriptions/sub-id/resourceGroups/rg-production"\n  policy_definition_id = "/providers/Microsoft.Authorization/policyDefinitions/audit"\n}`,
-      console_steps: `1. Sign in to Azure Portal.\n2. Navigate to resource '${rName}'.\n3. In Settings blade, update properties to meet compliance.\n4. Click 'Save'.`,
+      console_steps: `1. Sign in to Azure Portal (https://portal.azure.com) as a Security Contributor.\n2. Search for and navigate to resource '${rName}' (${rUid.slice(0, 32)}...).\n3. In the left navigation pane, open the 'Security' / 'Configuration' blade.\n4. Update settings according to Microsoft Defender for Cloud & CIS Azure Benchmark recommendations.\n5. Click 'Save' and trigger compliance verification.`,
       validation_steps: [
         `Verify resource state in Azure Portal or Azure CLI.`,
         `Rescan finding in Digital CISO console.`
@@ -293,11 +321,67 @@ function generateProviderRemediation(
 
   // 5. ORACLE CLOUD (OCI)
   if (p === "ORACLECLOUD" || p === "OCI") {
+    if (c.includes("compartment") || c.includes("root")) {
+      return {
+        recommended_fix: metaRec || `Create an active non-root compartment in Tenancy to isolate production and non-production workload resources from the root compartment.`,
+        cli_command: metaCli || `oci iam compartment create \\\n  --compartment-id "${rUid || 'ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a'}" \\\n  --name "Production-Workloads" \\\n  --description "Compartment for isolating production workloads"`,
+        code_snippet: metaTerraform || `resource "oci_identity_compartment" "production" {\n  compartment_id = "${rUid || 'var.tenancy_ocid'}"\n  name           = "Production-Workloads"\n  description    = "Compartment for isolating production workloads"\n  enable_delete  = false\n}`,
+        console_steps: `1. Sign in to Oracle Cloud Infrastructure Console (https://cloud.oracle.com).\n2. Open Navigation menu -> Identity & Security -> Compartments.\n3. Click 'Create Compartment'.\n4. Enter Name: 'Production-Workloads' and Description: 'Dedicated workload isolation boundary'.\n5. Select Parent Compartment: Root Tenancy.\n6. Click 'Create Compartment' to enforce isolation boundary.`,
+        validation_steps: [
+          `Run: oci iam compartment list --compartment-id-in-subtree true`,
+          `Verify non-root compartments exist and are in ACTIVE state.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/managingcompartments.htm",
+      };
+    }
+    if (c.includes("cloud_guard") || c.includes("guard")) {
+      return {
+        recommended_fix: metaRec || `Enable Cloud Guard in the root compartment of the tenancy with default security recipes attached.`,
+        cli_command: metaCli || `oci cloud-guard target create \\\n  --compartment-id "${rUid || 'ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a'}" \\\n  --display-name "Tenancy-Root-Target" \\\n  --target-resource-id "${rUid || 'ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a'}" \\\n  --target-resource-type "TENANCY"`,
+        code_snippet: metaTerraform || `resource "oci_cloud_guard_target" "tenancy_root" {\n  compartment_id      = var.tenancy_ocid\n  display_name        = "Tenancy-Root-Target"\n  target_resource_id  = var.tenancy_ocid\n  target_resource_type = "TENANCY"\n}`,
+        console_steps: `1. In OCI Console, open Navigation menu -> Identity & Security -> Cloud Guard.\n2. In left navigation, select 'Administration' -> 'Configuration Settings'.\n3. Select Root Compartment and click 'Enable Cloud Guard'.\n4. Attach 'OCI Default Configuration Recipe' and 'OCI Default Threat Detection Recipe'.\n5. Click 'Save & Activate' to initiate automated posture monitoring.`,
+        validation_steps: [
+          `Run: oci cloud-guard target list --compartment-id "${rUid || 'var.tenancy_ocid'}"`,
+          `Verify Cloud Guard status is ENABLED.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en-us/iaas/cloud-guard/using/enable.htm",
+      };
+    }
+    if (c.includes("audit") || c.includes("retention")) {
+      return {
+        recommended_fix: metaRec || `Configure OCI Tenancy audit log retention period to 365 days or greater for compliance and forensic analysis.`,
+        cli_command: metaCli || `oci audit configuration update \\\n  --compartment-id "${rUid || 'ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a'}" \\\n  --retention-period-days 365`,
+        code_snippet: metaTerraform || `resource "oci_audit_configuration" "tenancy_audit" {\n  compartment_id        = var.tenancy_ocid\n  retention_period_days = 365\n}`,
+        console_steps: `1. In OCI Console, open Navigation menu -> Governance & Administration -> Audit.\n2. In the left navigation, click 'Configuration Settings'.\n3. Update 'Retention Period (in Days)' from 90 to '365'.\n4. Click 'Save Changes'.`,
+        validation_steps: [
+          `Run: oci audit configuration get --compartment-id "${rUid || 'var.tenancy_ocid'}"`,
+          `Verify retention-period-days is >= 365.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en-us/iaas/Content/Audit/Tasks/settingretentionperiod.htm",
+      };
+    }
+    if (c.includes("events") || c.includes("topic") || c.includes("notification")) {
+      return {
+        recommended_fix: metaRec || `Configure at least one OCI Notification Topic with active subscriptions for critical security events.`,
+        cli_command: metaCli || `oci ons topic create \\\n  --compartment-id "${rUid || 'ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a'}" \\\n  --name "Security-Alerts-Topic"`,
+        code_snippet: metaTerraform || `resource "oci_ons_notification_topic" "secops_topic" {\n  compartment_id = var.tenancy_ocid\n  name           = "Security-Alerts-Topic"\n}`,
+        console_steps: `1. In OCI Console, open Navigation menu -> Developer Services -> Application Integration -> Notifications.\n2. Click 'Create Topic' -> Name: 'Security-Alerts-Topic'.\n3. Click into topic -> Click 'Create Subscription' -> Select Protocol (Email/Slack/Webhook).\n4. Confirm subscription verification link sent to the recipient.`,
+        validation_steps: [
+          `Run: oci ons topic list --compartment-id "${rUid || 'var.tenancy_ocid'}"`,
+          `Verify Topic status is ACTIVE with at least 1 verified subscription.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en-us/iaas/Content/Notification/Tasks/managingtopicsandsubscriptions.htm",
+      };
+    }
     return {
       recommended_fix: metaRec || `Configure OCI Object Storage bucket '${rName}' with Private visibility (NoPublicAccess) and enable OCI Vault KMS customer-managed key encryption.`,
       cli_command: metaCli || `oci os bucket update \\\n  --bucket-name "${rName}" \\\n  --public-access-type "NoPublicAccess" \\\n  --namespace-name "$(oci os ns get --query data -r)"`,
       code_snippet: metaTerraform || `resource "oci_objectstorage_bucket" "${rName.replace(/[^a-zA-Z0-9_]/g, '_')}" {\n  compartment_id = var.compartment_ocid\n  name           = "${rName}"\n  namespace      = data.oci_objectstorage_namespace.ns.namespace\n  access_type    = "NoPublicAccess"\n  kms_key_id     = var.vault_kms_key_ocid\n}`,
-      console_steps: `1. In Oracle Cloud Infrastructure Console, open Navigation menu -> Storage -> Object Storage & Archive Storage -> Buckets.\n2. Select bucket '${rName}'.\n3. Click 'Edit Visibility' -> Select 'Private' -> Click 'Save Changes'.\n4. Under 'Encryption', select 'Encrypt using Customer-Managed Keys' via OCI Vault.`,
+      console_steps: `1. In Oracle Cloud Infrastructure Console, open Navigation menu -> Storage -> Object Storage & Archive Storage -> Buckets.\n2. Select bucket '${rName}'.\n3. Click 'Edit Visibility' -> Select 'Private' (NoPublicAccess) -> Click 'Save Changes'.\n4. Under 'Encryption', select 'Encrypt using Customer-Managed Keys' via OCI Vault.`,
       validation_steps: [
         `Run: oci os bucket get --bucket-name "${rName}" --query 'data."public-access-type"' -r`,
         `Verify output returns 'NoPublicAccess'.`,
@@ -309,9 +393,35 @@ function generateProviderRemediation(
 
   // 6. ORACLE SAAS / ERP
   if (p === "ORACLE_SAAS" || p === "ORACLESAAS" || p === "SAAS") {
+    if (c.includes("audit") || c.includes("trail") || c.includes("logging")) {
+      return {
+        recommended_fix: metaRec || `Enable Oracle Fusion Cloud ERP Business Object Audit Trail across Financials (GL, AP, AR) and HCM modules.`,
+        cli_command: metaCli || `curl -X POST "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/fscmRestApi/resources/11.13.18.05/auditConfigs" \\\n  -u "SEC_ADMIN:<PASSWORD>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"auditLevel": "VERBOSE", "modules": ["FINANCIALS", "PROCUREMENT", "HCM"]}'`,
+        code_snippet: metaTerraform || `resource "oracle_cloud_audit_config" "fusion_erp_audit" {\n  pod_url            = "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com"\n  modules            = ["GL", "AP", "AR", "HCM"]\n  enabled            = true\n  log_retention_days = 365\n}`,
+        console_steps: `1. Sign in to Oracle Fusion Cloud ERP (https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com) as a Security Administrator.\n2. Open Navigator -> Tools -> Audit Reports.\n3. Click 'Audit Configuration' -> Select Oracle Fusion Applications product modules (General Ledger, Payables, Receivables, Human Capital Management).\n4. Enable Business Object Audit Trail for sensitive financial transactions, supplier bank accounts, and salary changes.\n5. Click 'Save and Close' to enforce audit immutability.`,
+        validation_steps: [
+          `Verify audit report execution in Navigator -> Tools -> Audit Reports.`,
+          `Rescan ERP in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en/cloud/saas/applications-common/24c/secus/audit-policies.html",
+      };
+    }
+    if (c.includes("sod") || c.includes("toxic") || c.includes("conflict")) {
+      return {
+        recommended_fix: metaRec || `Decouple conflicting Segregation of Duties (SoD) roles for '${rName}' (e.g., Accounts Payable Specialist + General Ledger Manager) in Oracle Fusion Security Console.`,
+        cli_command: metaCli || `curl -X DELETE "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/hcmRestApi/resources/11.13.18.05/userRoles/${rName}/roles/AP_SPECIALIST" \\\n  -u "SEC_ADMIN:<PASSWORD>"`,
+        code_snippet: metaTerraform || `resource "oracle_saas_sod_policy" "ap_gl_segregation" {\n  policy_name = "Segregate_AP_GL_Roles"\n  disallowed_role_combinations = [\n    ["ORA_AP_ACCOUNTS_PAYABLE_SPECIALIST_JOB", "ORA_GL_GENERAL_ACCOUNTING_MANAGER_JOB"]\n  ]\n  enforce_strict = true\n}`,
+        console_steps: `1. Log in to Oracle Fusion Applications -> Open Navigator -> Tools -> Security Console.\n2. In the Users tab, search for the user flagged with SoD conflict ('${rName}').\n3. Click 'Edit' -> View Assigned Roles.\n4. Remove the conflicting role (e.g., decouple Accounts Payable Specialist from General Ledger Manager).\n5. Enforce dual-authorization workflow for invoice creation and payment release -> Click 'Save and Close'.`,
+        validation_steps: [
+          `Query user roles in Security Console to verify segregation.`,
+          `Rescan in platform to confirm PASS.`
+        ],
+        remediation_url: metaUrl || "https://docs.oracle.com/en/cloud/saas/applications-common/24c/secus/segregation-of-duties.html",
+      };
+    }
     return {
       recommended_fix: metaRec || `Remediate ERP Identity & Access Finding for '${rName}': Deactivate dormant account (${rUid}) or decouple conflicting Segregation of Duties (SoD) roles in Oracle Fusion ERP Security Console.`,
-      cli_command: metaCli || `# Oracle Fusion Cloud ERP REST API Remediation\ncurl -X POST "https://fa-pod.oraclecloud.com/fscmRestApi/resources/11.13.18.05/userAccounts/${rUid}/action/suspend" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer \${ORACLE_SAAS_JWT_TOKEN}"`,
+      cli_command: metaCli || `# Oracle Fusion Cloud ERP REST API Remediation\ncurl -X POST "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/fscmRestApi/resources/11.13.18.05/userAccounts/${rUid}/action/suspend" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer \${ORACLE_SAAS_JWT_TOKEN}"`,
       code_snippet: metaTerraform || `# Oracle ERP Automation Payload (REST API Spec)\n{\n  "name": "deactivateUserAccount",\n  "parameters": [\n    {\n      "username": "${rName}",\n      "userGuid": "${rUid}",\n      "suspended": true,\n      "revokedRoles": ["ORA_FND_IT_SECURITY_MANAGER_JOB", "ORA_ASM_APPLICATION_ADMINISTRATOR_JOB"]\n    }\n  ]\n}`,
       console_steps: `1. Log in to Oracle Fusion Cloud ERP as an IT Security Manager.\n2. Open Navigator -> Tools -> Security Console.\n3. In the Users tab, search for user '${rName}' (${rUid}).\n4. Click 'Edit' -> Check 'Lock User Account' / toggle Active status to Inactive.\n5. Click 'Save and Close' -> Run the 'Send Pending LDAP Requests' scheduled process.`,
       validation_steps: [
@@ -328,7 +438,7 @@ function generateProviderRemediation(
     recommended_fix: metaRec || `Apply least-privilege access control, TLS 1.2+ transport security, and continuous logging for resource '${rName}'.`,
     cli_command: metaCli || `# Cloud Provider Remediation CLI for ${rName}\n# Execute vendor-specific configuration update for check: ${checkId}`,
     code_snippet: metaTerraform || `# Remediation IaC Configuration for ${rName}\n# Provider: ${p}\n# Target Resource: ${rUid}\n# Check: ${checkId}`,
-    console_steps: `1. Open your cloud provider management console.\n2. Navigate to resource '${rName}'.\n3. Update configuration according to CIS Benchmark controls for ${checkId}.\n4. Save changes and verify state.`,
+    console_steps: `1. Open your ${p} management console.\n2. Locate resource '${rName}' (${rUid.slice(0, 24)}...).\n3. In the Security / Settings blade, apply configuration controls for '${checkId.replace(/_/g, " ")}'.\n4. Save changes and verify state against CIS Benchmark guidelines.`,
     validation_steps: [
       `Verify resource state in cloud provider console.`,
       `Rescan in platform to confirm PASS.`
