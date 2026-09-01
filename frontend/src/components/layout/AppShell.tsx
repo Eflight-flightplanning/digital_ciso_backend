@@ -70,7 +70,6 @@ export const navSections: NavSection[] = [
     items: [
       { to: "/ai/advisor", label: "Spectra (Analysis)", icon: Sparkles },
       { to: "/ai/decisions", label: "Aegis (Remediation)", icon: ScrollText },
-      { to: "/ai/settings", label: "Model Settings", icon: Settings2 },
     ],
   },
   {
@@ -358,11 +357,6 @@ export function AppShell({
               <DropdownMenuItem asChild>
                 <Link to="/profile">
                   <UserCog className="mr-2 h-3.5 w-3.5" /> Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/ai/settings">
-                  <KeyRound className="mr-2 h-3.5 w-3.5" /> API Keys
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
