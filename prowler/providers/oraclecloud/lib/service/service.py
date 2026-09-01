@@ -26,13 +26,25 @@ class OCIService:
         """
         # Audit Information
         self.provider = provider
-        self.audited_tenancy = provider.identity.tenancy_id
-        self.audited_user = provider.identity.user_id
-        self.audited_regions = provider.regions
-        self.audited_compartments = provider.compartments
-        self.audited_checks = provider.audit_metadata.expected_checks
-        self.audit_config = provider.audit_config
-        self.fixer_config = provider.fixer_config
+        self.audited_tenancy = (
+            getattr(provider.identity, "tenancy_id", None)
+            if hasattr(provider, "identity")
+            else getattr(provider, "audited_tenancy", None)
+        )
+        self.audited_user = (
+            getattr(provider.identity, "user_id", None)
+            if hasattr(provider, "identity")
+            else getattr(provider, "audited_user", None)
+        )
+        self.audited_regions = getattr(provider, "regions", [])
+        self.audited_compartments = getattr(provider, "compartments", [])
+        self.audited_checks = (
+            getattr(provider.audit_metadata, "expected_checks", [])
+            if hasattr(provider, "audit_metadata") and provider.audit_metadata
+            else []
+        )
+        self.audit_config = getattr(provider, "audit_config", {})
+        self.fixer_config = getattr(provider, "fixer_config", {})
 
         # OCI Session
         self.session_config = provider.session.config

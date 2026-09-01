@@ -217,7 +217,14 @@ class OraclecloudProvider(Provider):
                 tenancy_id=self._identity.tenancy_id,
             )
 
+        # Audit Metadata
+        self._audit_metadata = Audit_Metadata()
+
         Provider.set_global_provider(self)
+
+    @property
+    def audit_metadata(self) -> Audit_Metadata:
+        return self._audit_metadata
 
     @property
     def identity(self):
