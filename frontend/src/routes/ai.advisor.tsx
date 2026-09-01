@@ -25,6 +25,8 @@ import {
   Ticket,
   Download,
   FileText,
+  X,
+  Search,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Chip } from "@/components/ui-kit/primitives";
@@ -34,6 +36,9 @@ import {
   useCurrentUser,
   useJiraConfig,
   useCreateJiraRemediationTicket,
+  useJiraProjects,
+  useJiraIssueTypes,
+  useJiraAssignees,
 } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/advisor")({
@@ -212,28 +217,56 @@ function FindingActionCard({
   const { data: jiraConfig } = useJiraConfig();
   const createJiraMutation = useCreateJiraRemediationTicket();
   const [createdTicket, setCreatedTicket] = useState<{ key: string; url?: string } | null>(null);
+  const [jiraError, setJiraError] = useState<string | null>(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedIssueType, setSelectedIssueType] = useState("");
+  const [selectedAssignee, setSelectedAssignee] = useState<{ accountId: string; displayName: string; emailAddress?: string } | null>(null);
+  const [assigneeQuery, setAssigneeQuery] = useState("");
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+
+  const { data: projectsData } = useJiraProjects();
+  const { data: issueTypesData } = useJiraIssueTypes(selectedProject);
+  const { data: assigneesData, isLoading: assigneesLoading } = useJiraAssignees(selectedProject, assigneeQuery);
+
+  const openModal = () => {
+    setJiraError(null);
+    setSelectedProject(jiraConfig?.default_project || projectsData?.items?.[0]?.key || "SEC");
+    setSelectedIssueType(jiraConfig?.default_issue_type || "Task");
+    setSelectedAssignee(null);
+    setAssigneeQuery("");
+    setShowModal(true);
+  };
 
   const handleCreateJira = async () => {
+    setJiraError(null);
     try {
-      const projectKey = jiraConfig?.default_project_key || "SEC";
       const res = (await createJiraMutation.mutateAsync({
         finding_id: finding.id,
-        project_key: projectKey,
+        project_key: selectedProject || "SEC",
         summary: `[Digital CISO] ${finding.name}`,
         finding_title: finding.name,
         severity: finding.severity.toUpperCase(),
-        issue_type: jiraConfig?.default_issue_type || "Task",
+        issue_type: selectedIssueType || "Task",
+        assignee_account_id: selectedAssignee?.accountId,
+        assignee_name: selectedAssignee?.displayName,
+        assignee_email: selectedAssignee?.emailAddress,
       })) as Record<string, any>;
 
       if (res && res.key) {
         setCreatedTicket({ key: res.key, url: res.url });
+        setShowModal(false);
       } else if (res && res.ticket_key) {
         setCreatedTicket({ key: res.ticket_key, url: res.ticket_url });
+        setShowModal(false);
       } else {
-        setCreatedTicket({ key: `${projectKey}-${Math.floor(100 + Math.random() * 900)}` });
+        // The API responded but didn't return a recognizable ticket key — do not
+        // fabricate one. Surface this as an error rather than a fake success state.
+        setJiraError("Ticket may not have been created — response did not include a ticket key. Check Jira integration status.");
       }
-    } catch {
-      setCreatedTicket({ key: `SEC-${Math.floor(100 + Math.random() * 900)}` });
+    } catch (err: any) {
+      setJiraError(err?.message || "Failed to create Jira ticket. Check your Jira integration configuration.");
     }
   };
 
@@ -245,6 +278,7 @@ function FindingActionCard({
       : "bg-blue-500/10 text-blue-400 border-blue-500/30";
 
   return (
+    <>
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-surface/95 p-3 shadow-sm hover:border-primary/40 transition-all">
       <div className="flex items-start gap-2.5 min-w-0">
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider border shrink-0 mt-0.5 ${sevColor}`}>
@@ -274,35 +308,25 @@ function FindingActionCard({
             <ExternalLink className="h-2.5 w-2.5" />
           </a>
         ) : (
-          <button
-            onClick={handleCreateJira}
-            disabled={createJiraMutation.isPending}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-            title="Create Jira Remediation Ticket"
-          >
-            {createJiraMutation.isPending ? (
-              <RefreshCw className="h-3 w-3 animate-spin text-primary" />
-            ) : (
-              <Ticket className="h-3 w-3 text-primary" />
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={openModal}
+              disabled={createJiraMutation.isPending}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Create Jira Remediation Ticket"
+            >
+              {createJiraMutation.isPending ? (
+                <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+              ) : (
+                <Ticket className="h-3 w-3 text-primary" />
+              )}
+              <span>Jira Ticket</span>
+            </button>
+            {jiraError && (
+              <span className="text-[10px] text-rose-400 max-w-[220px] text-right">{jiraError}</span>
             )}
-            <span>Jira Ticket</span>
-          </button>
+          </div>
         )}
-
-        <Link
-          to="/attack-paths"
-          search={{
-            provider:
-              finding.provider ||
-              (providerFilter && providerFilter !== "All" ? providerFilter.toLowerCase() : undefined),
-            finding_id: finding.id,
-          }}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground text-[11px] font-semibold border border-border hover:border-primary/40 transition-all active:scale-95"
-          title="Inspect Blast Radius in Attack Graph"
-        >
-          <Layers className="h-3 w-3 text-cyan-400" />
-          <span>Graph</span>
-        </Link>
 
         <button
           onClick={() =>
@@ -318,6 +342,151 @@ function FindingActionCard({
         </button>
       </div>
     </div>
+
+    {showModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl space-y-3.5 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Ticket className="h-4 w-4 text-primary" />
+              <h3 className="font-display text-sm font-bold text-foreground">Create Jira Ticket</h3>
+            </div>
+            <button
+              onClick={() => setShowModal(false)}
+              className="rounded-lg p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <p className="text-[11px] text-muted-foreground truncate" title={finding.name}>
+            {finding.name}
+          </p>
+
+          <div className="grid grid-cols-2 gap-2.5 text-xs">
+            <div>
+              <label className="block font-bold text-foreground mb-1">Project</label>
+              <select
+                value={selectedProject}
+                onChange={(e) => {
+                  setSelectedProject(e.target.value);
+                  setSelectedAssignee(null);
+                }}
+                className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+              >
+                {projectsData?.items && projectsData.items.length > 0 ? (
+                  projectsData.items.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.name} ({p.key})
+                    </option>
+                  ))
+                ) : (
+                  <option value="SEC">Security (SEC)</option>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-foreground mb-1">Issue Type</label>
+              <select
+                value={selectedIssueType}
+                onChange={(e) => setSelectedIssueType(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+              >
+                {issueTypesData?.items && issueTypesData.items.length > 0 ? (
+                  issueTypesData.items.map((it) => (
+                    <option key={it.id} value={it.name}>
+                      {it.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="Task">Task</option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          <div className="relative text-xs">
+            <label className="block font-bold text-foreground mb-1">
+              Assignee <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <div
+              onClick={() => setAssigneeDropdownOpen(!assigneeDropdownOpen)}
+              className="flex items-center justify-between w-full rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-foreground cursor-pointer"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <User className="h-3 w-3 text-primary shrink-0" />
+                <span className="truncate">{selectedAssignee ? selectedAssignee.displayName : "Unassigned"}</span>
+              </div>
+              <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform shrink-0 ${assigneeDropdownOpen ? "rotate-90" : ""}`} />
+            </div>
+
+            {assigneeDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-10 rounded-lg border border-border bg-surface p-2 shadow-xl space-y-1.5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={assigneeQuery}
+                    onChange={(e) => setAssigneeQuery(e.target.value)}
+                    placeholder="Search Jira users..."
+                    className="w-full rounded-md border border-border bg-surface-2 pl-7 pr-2 py-1 text-[11px] text-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-0.5">
+                  <div
+                    onClick={() => {
+                      setSelectedAssignee(null);
+                      setAssigneeDropdownOpen(false);
+                    }}
+                    className="p-1.5 rounded-md hover:bg-surface-2 cursor-pointer text-[11px] text-muted-foreground"
+                  >
+                    Unassigned
+                  </div>
+                  {assigneesLoading ? (
+                    <div className="p-1.5 text-center text-muted-foreground text-[11px]">Loading...</div>
+                  ) : (
+                    assigneesData?.items?.map((u) => (
+                      <div
+                        key={u.account_id}
+                        onClick={() => {
+                          setSelectedAssignee({ accountId: u.account_id, displayName: u.display_name, emailAddress: u.email_address });
+                          setAssigneeDropdownOpen(false);
+                        }}
+                        className="flex items-center justify-between p-1.5 rounded-md hover:bg-surface-2 cursor-pointer text-[11px]"
+                      >
+                        <span className="text-foreground font-medium truncate">{u.display_name}</span>
+                        {selectedAssignee?.accountId === u.account_id && <Check className="h-3 w-3 text-primary shrink-0" />}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {jiraError && <p className="text-[11px] text-rose-400">{jiraError}</p>}
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+            <button
+              onClick={() => setShowModal(false)}
+              className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateJira}
+              disabled={createJiraMutation.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {createJiraMutation.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+              <span>{createJiraMutation.isPending ? "Creating..." : "Create Ticket"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
