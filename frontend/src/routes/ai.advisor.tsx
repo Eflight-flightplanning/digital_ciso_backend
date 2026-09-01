@@ -970,7 +970,6 @@ ${reportContent}
             </div>
           </div>
         </div>
-      </div>
-    </AppShell>
-  );
-}
+      </AppShell>
+    );
+  }
