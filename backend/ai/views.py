@@ -747,31 +747,42 @@ def _retrieve_relevant_findings(
                     result["_pinned"] = True  # signal to the LLM prompt formatter
                 return result
 
-            # Extract explicit check IDs, quoted finding names, and finding parameters
-            explicit_checks = re.findall(r'(?:check(?:_id)?|finding)[\s:=]+["\']?([a-zA-Z0-9_\-]+)["\']?', question, re.IGNORECASE)
-            quoted_terms = re.findall(r'["\']([a-zA-Z0-9_\-]+)["\']', question)
-            target_candidates = list(dict.fromkeys(explicit_checks + quoted_terms))
-            found_candidate = False
+            # 1. Directly resolve any UUIDs found in the question from the database
+            if pinned_ids:
+                try:
+                    pinned_qs = Finding.all_objects.filter(id__in=pinned_ids).select_related("scan", "scan__provider").prefetch_related("resources")
+                    for pf in pinned_qs:
+                        if pf.id not in matching_ids:
+                            matching_ids.add(pf.id)
+                            matching_findings.insert(0, _serialize_finding(pf, pinned=True))
+                            logger.info("Pinned finding UUID resolved from DB: %s (%s)", pf.id, pf.check_id)
+                except Exception as p_err:
+                    logger.debug("Pinned UUID lookup error: %s", p_err)
+
+            # 2. Extract explicit check IDs (e.g. check_id: xxx or check: xxx or quoted identifiers)
+            explicit_checks = re.findall(r'(?:check(?:_id)?|finding)[\s:=]+["\']?([a-zA-Z0-9_]{3,}_[a-zA-Z0-9_]+)["\']?', question, re.IGNORECASE)
+            quoted_terms = re.findall(r'["\']([a-zA-Z0-9_]{4,})["\']', question)
+            target_candidates = [c for c in list(dict.fromkeys(explicit_checks + quoted_terms)) if not _uuid_pattern.match(c) and "_" in c and c.lower() not in ("finding", "check", "severity", "resource")]
+            found_candidate = bool(matching_findings)
             for cand in target_candidates:
-                if len(cand) >= 4 and not _uuid_pattern.match(cand) and cand.lower() not in ("finding", "check", "severity", "resource"):
-                    try:
+                try:
+                    exact_f = Finding.all_objects.filter(
+                        Q(check_id__iexact=cand) | Q(uid__icontains=cand)
+                    ).select_related("scan", "scan__provider").prefetch_related("resources").first()
+                    if not exact_f:
                         exact_f = Finding.all_objects.filter(
-                            Q(check_id__iexact=cand) | Q(uid__icontains=cand)
+                            Q(check_id__icontains=cand)
                         ).select_related("scan", "scan__provider").prefetch_related("resources").first()
-                        if not exact_f:
-                            exact_f = Finding.all_objects.filter(
-                                Q(check_id__icontains=cand)
-                            ).select_related("scan", "scan__provider").prefetch_related("resources").first()
-                        if exact_f and exact_f.id not in matching_ids:
-                            matching_ids.add(exact_f.id)
-                            matching_findings.insert(0, _serialize_finding(exact_f, pinned=True))
-                            found_candidate = True
-                            logger.info("Explicit check_id resolved from DB: %s -> %s (%s)", cand, exact_f.id, exact_f.check_id)
-                    except Exception as c_err:
-                        logger.debug("Check lookup error for %s: %s", cand, c_err)
+                    if exact_f and exact_f.id not in matching_ids:
+                        matching_ids.add(exact_f.id)
+                        matching_findings.insert(0, _serialize_finding(exact_f, pinned=True))
+                        found_candidate = True
+                        logger.info("Explicit check_id resolved from DB: %s -> %s (%s)", cand, exact_f.id, exact_f.check_id)
+                except Exception as c_err:
+                    logger.debug("Check lookup error for %s: %s", cand, c_err)
 
             if target_candidates and not found_candidate and not matching_findings:
-                unresolved = [c for c in target_candidates if len(c) >= 4 and c.lower() not in ("finding", "check", "severity", "resource")]
+                unresolved = [c for c in target_candidates if len(c) >= 4 and "_" in c and c.lower() not in ("finding", "check", "severity", "resource")]
                 if unresolved:
                     matching_findings.append({
                         "_not_found_target": unresolved[0],
