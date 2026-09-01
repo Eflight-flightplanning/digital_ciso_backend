@@ -1771,17 +1771,8 @@ def create_compliance_requirements(tenant_id: str, scan_id: str):
                             else:
                                 passed_checks = 0
                                 failed_checks = 0
-                            if total_checks == 0:
+                            if total_checks == 0 or (passed_checks == 0 and failed_checks == 0):
                                 requirement_status = "MANUAL"
-                            elif passed_checks == 0 and failed_checks == 0:
-                                # This requirement has checks mapped in the template, but
-                                # none of them produced a PASS/FAIL finding in THIS region
-                                # (e.g. no applicable resource type here). Defaulting this
-                                # to PASS would silently claim a real result that doesn't
-                                # exist. Skip the row for this region instead of fabricating
-                                # a status — the requirement still gets a real row in every
-                                # region where its checks actually ran.
-                                continue
                             elif failed_checks > 0:
                                 requirement_status = "FAIL"
                             else:
