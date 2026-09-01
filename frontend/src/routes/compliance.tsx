@@ -187,6 +187,7 @@ function CompliancePage() {
     return items
       .filter((item) => {
         const id = String(item.id || item.compliance_id || "").toLowerCase();
+        const fw = String(item.framework || "").toLowerCase();
         // Hide internal ThreatScore and deprecated frameworks so only official standards appear
         if (
           id.includes("threatscore") ||
