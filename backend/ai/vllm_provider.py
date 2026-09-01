@@ -576,6 +576,8 @@ class VLLMAzureProvider(AIProvider):
             f_map = {f.get("finding_id"): f.get("provider") for f in (relevant_findings or [])}
             for r in refs:
                 if not r.get("provider"):
+                    r["provider"] = f_map.get(r.get("id")) or _primary_cloud or "oraclecloud"
+
         return AdvisorOutput(
             answer=ans,
             finding_references=refs,
