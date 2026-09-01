@@ -513,28 +513,35 @@ class AIAdvisorQueryView(APIView):
             # Natural Language Provider Intent Detection from question (with multi-cloud coverage)
             if not provider_filter:
                 q_lower = clean_question.lower()
+                detected_provs = []
                 if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination", "idcs")):
-                    provider_filter = "oracle_saas"
-                elif any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
-                    provider_filter = "oraclecloud"
-                elif any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault", "app service", "appservice", "app_http", "http_logs", "webapp", "app_")):
-                    provider_filter = "azure"
-                elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
-                    provider_filter = "aws"
-                elif any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud function", "cloud sql", "service account")):
-                    provider_filter = "gcp"
-                elif any(k in q_lower for k in ("k8s", "kubernetes", "pod", "deployment", "clusterrole", "kube-apiserver", "daemonset", "statefulset", "ingress", "serviceaccount")):
-                    provider_filter = "kubernetes"
-                elif any(k in q_lower for k in ("github", "repository", "branch protection", "github actions", "dependabot", "codeql")):
-                    provider_filter = "github"
-                elif any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
-                    provider_filter = "m365"
-                elif any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
-                    provider_filter = "alibabacloud"
-                elif any(k in q_lower for k in ("cloudflare", "dnssec", "waf ruleset")):
-                    provider_filter = "cloudflare"
-                elif any(k in q_lower for k in ("okta", "okta user", "okta application")):
-                    provider_filter = "okta"
+                    detected_provs.append("oracle_saas")
+                if any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
+                    detected_provs.append("oraclecloud")
+                if any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault", "app service", "appservice", "app_http", "http_logs", "webapp", "app_")):
+                    detected_provs.append("azure")
+                if any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
+                    detected_provs.append("aws")
+                if any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud function", "cloud sql", "service account")):
+                    detected_provs.append("gcp")
+                if any(k in q_lower for k in ("k8s", "kubernetes", "pod", "deployment", "clusterrole", "kube-apiserver", "daemonset", "statefulset", "ingress", "serviceaccount")):
+                    detected_provs.append("kubernetes")
+                if any(k in q_lower for k in ("github", "repository", "branch protection", "github actions", "dependabot", "codeql")):
+                    detected_provs.append("github")
+                if any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
+                    detected_provs.append("m365")
+                if any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
+                    detected_provs.append("alibabacloud")
+                if any(k in q_lower for k in ("cloudflare", "dnssec", "waf ruleset")):
+                    detected_provs.append("cloudflare")
+                if any(k in q_lower for k in ("okta", "okta user", "okta application")):
+                    detected_provs.append("okta")
+
+                # If single provider is detected and not a multi-cloud question, use that provider filter; otherwise keep None for multi-cloud
+                if len(detected_provs) == 1 and not any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
+                    provider_filter = detected_provs[0]
+                else:
+                    provider_filter = None
 
             # Query tenant connected cloud providers
             tenant_id = (
@@ -862,6 +869,47 @@ def _retrieve_relevant_findings(
                     })
                 except Exception as o_err:
                     logger.debug("OCI telemetry inclusion error: %s", o_err)
+
+            # Ingest live Compliance Framework & CIS Benchmark summaries from database
+            if any(w in q_lower for w in ("cis", "compliance", "benchmark", "nis2", "iso", "soc", "sox", "score", "posture", "overview")):
+                try:
+                    from api.models import ComplianceOverview
+                    comp_qs = ComplianceOverview.all_objects.select_related("scan__provider").all()
+                    if provider:
+                        comp_qs = comp_qs.filter(
+                            Q(scan__provider__provider__iexact=provider)
+                            | (Q(scan__provider__provider__iexact="oraclecloud") if provider == "oci" else Q())
+                        )
+                    comp_map = {}
+                    for c in comp_qs[:20]:
+                        p_name = c.scan.provider.provider.lower() if (c.scan and c.scan.provider) else "cloud"
+                        key = f"{p_name}_{c.framework}_{c.version}"
+                        if key not in comp_map:
+                            tot = (c.requirements_passed or 0) + (c.requirements_failed or 0)
+                            pct = round((c.requirements_passed / tot * 100), 1) if tot > 0 else 0
+                            comp_map[key] = {
+                                "provider": p_name,
+                                "framework": c.framework,
+                                "version": c.version,
+                                "passed": c.requirements_passed,
+                                "failed": c.requirements_failed,
+                                "score_pct": f"{pct}%",
+                            }
+                    for item in list(comp_map.values())[:6]:
+                        matching_findings.append({
+                            "finding_id": f"COMPLIANCE-{item['provider'].upper()}-{item['framework'].upper()}",
+                            "uid": f"{item['provider']}-{item['framework']}",
+                            "check_id": f"{item['provider']}_{item['framework']}_benchmark",
+                            "check_title": f"{item['provider'].upper()} {item['framework']} Benchmark Status",
+                            "severity": "CRITICAL" if float(item['score_pct'].replace('%', '')) < 60 else "HIGH" if float(item['score_pct'].replace('%', '')) < 80 else "MEDIUM",
+                            "status": "FAIL" if item['failed'] > 0 else "PASS",
+                            "status_extended": f"Cloud: {item['provider'].upper()}. Framework: {item['framework']} {item['version']}. Score: {item['score_pct']} ({item['passed']} Passed, {item['failed']} Failed).",
+                            "remediation": f"Remediate failing benchmark controls in {item['provider'].upper()} to achieve full compliance.",
+                            "provider": item['provider'],
+                            "resource": {"name": f"{item['provider'].upper()} ({item['framework']})"},
+                        })
+                except Exception as ce:
+                    logger.debug("Compliance overview inclusion error: %s", ce)
 
             base_qs = Finding.all_objects.select_related(
                 "scan", "scan__provider"
