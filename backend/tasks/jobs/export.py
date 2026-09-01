@@ -4,6 +4,7 @@ import zipfile
 
 import boto3
 import config.django.base as base
+from config.env import env
 from api.db_utils import rls_transaction
 from api.models import Scan
 from botocore.exceptions import ClientError, NoCredentialsError, ParamValidationError
