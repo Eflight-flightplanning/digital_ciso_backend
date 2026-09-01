@@ -226,9 +226,7 @@ class VLLMAzureProvider(AIProvider):
         ]:
             text = re.sub(disc_pattern, "", text, flags=re.IGNORECASE).strip()
 
-        result = "\n".join(lines).strip()
-        result = re.sub(r"^i don't have live data[^\n]*\n*", "", result, flags=re.IGNORECASE).strip()
-        return result or text or raw_text
+        return text or raw_text
 
 
 
