@@ -36,7 +36,10 @@ class Monitor(AzureService):
     def diagnostic_settings_with_uri(self, subscription, uri, client):
         diagnostics_settings = []
         try:
-            settings = client.diagnostic_settings.list(resource_uri=uri)
+            diag_client = getattr(client, "diagnostic_settings", None)
+            if not diag_client:
+                return diagnostics_settings
+            settings = diag_client.list(resource_uri=uri)
             for setting in settings:
                 diagnostics_settings.append(
                     DiagnosticSetting(

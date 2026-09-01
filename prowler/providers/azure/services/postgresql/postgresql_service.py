@@ -20,10 +20,14 @@ class PostgreSQL(AzureService):
         for subscription, client in self.clients.items():
             try:
                 flexible_servers.update({subscription: []})
+                list_func = getattr(client.servers, "list", None)
+                list_rg_func = getattr(client.servers, "list_by_resource_group", None)
+                if not list_func and not list_rg_func:
+                    continue
                 flexible_servers_list = self.list_with_rg_scope(
                     subscription,
-                    client.servers.list,
-                    client.servers.list_by_resource_group,
+                    list_func,
+                    list_rg_func,
                 )
 
                 for postgresql_server in flexible_servers_list:
