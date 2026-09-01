@@ -41,7 +41,8 @@ class Command(BaseCommand):
         updated_count = 0
 
         for compliance_id, (fname, fver, passed, failed, total) in FRAMEWORK_STATS_OVERRIDE.items():
-            qs = ComplianceOverview.all_objects.filter(compliance_id=compliance_id)
+            co_mgr = getattr(ComplianceOverview, "all_objects", ComplianceOverview.objects)
+            qs = co_mgr.filter(compliance_id=compliance_id)
             if qs.exists():
                 count = qs.update(
                     framework=fname,
@@ -55,12 +56,14 @@ class Command(BaseCommand):
                 self.stdout.write(f"  [OK] Updated {compliance_id} -> {total} controls ({passed} Pass, {failed} Fail)")
             else:
                 # If record doesn't exist for active tenant scan, create it
-                first_tenant = Tenant.all_objects.first()
+                tenant_mgr = getattr(Tenant, "all_objects", Tenant.objects)
+                scan_mgr = getattr(Scan, "all_objects", Scan.objects)
+                first_tenant = tenant_mgr.first()
                 if first_tenant:
                     prov_key = "oraclecloud" if "oraclecloud" in compliance_id else "azure" if "azure" in compliance_id else "oracle_saas" if "oracle_saas" in compliance_id else "aws"
-                    target_scan = Scan.all_objects.filter(tenant=first_tenant, provider__provider=prov_key).first() or Scan.all_objects.filter(tenant=first_tenant).first()
+                    target_scan = scan_mgr.filter(tenant=first_tenant, provider__provider=prov_key).first() or scan_mgr.filter(tenant=first_tenant).first()
                     if target_scan:
-                        ComplianceOverview.all_objects.create(
+                        co_mgr.create(
                             tenant=first_tenant,
                             compliance_id=compliance_id,
                             scan=target_scan,
