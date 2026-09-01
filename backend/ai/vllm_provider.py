@@ -139,17 +139,87 @@ class VLLMAzureProvider(AIProvider):
             }
 
     @staticmethod
-    def _clean_thinking_trace(raw_text: str) -> str:
+    def _extract_labeled_sections(text: str) -> str | None:
+        """
+        Extract Direct Answer / Risk / Compliance content by the section labels our own
+        prompt asks for, regardless of how the model wraps them in visible planning or
+        bullet meta-commentary (e.g. "1. Drafting Content: * Direct Answer: ..."). This is
+        more robust than matching specific leaked-scratchpad phrasings one at a time, since
+        the model reliably echoes back the exact terms we asked for even when it also
+        narrates its own planning process around them. Returns None if the expected labels
+        aren't found, so the caller can fall back to other cleanup strategies.
+        """
+        label_re = re.compile(
+            r"^[ \t]*(?:\d+[\.\)][ \t]*)?[\*\-][ \t]*\*{0,2}"
+            r"(direct answer|security risk(?:\s+analysis)?|risk analysis|risk|"
+            r"compliance(?:\s+mapping)?)"
+            r"\*{0,2}[ \t]*:[ \t]*",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        matches = list(label_re.finditer(text))
+        if len(matches) < 2:
+            return None
+
+        def canon(label: str) -> str:
+            low = label.lower()
+            if "direct" in low:
+                return "direct"
+            if "compliance" in low:
+                return "compliance"
+            return "risk"
+
+        # Meta-commentary the model sometimes appends right after the real content,
+        # with no label of its own (self-review checklists, word counts).
+        trailing_meta = re.compile(
+            r"\n[ \t]*(?:\d+[\.\)][ \t]*|\*[ \t]*)?"
+            r"(?:word count|paragraph count|review against|verify constraints|formatting|tone)",
+            re.IGNORECASE,
+        )
+
+        sections: dict[str, str] = {}
+        for i, m in enumerate(matches):
+            start = m.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            content = text[start:end].strip()
+            meta_match = trailing_meta.search(content)
+            if meta_match:
+                content = content[: meta_match.start()].strip()
+            if content:
+                # The model sometimes echoes these labels multiple times (a real drafted
+                # paragraph, then a short "Included." self-review pass). The substantive
+                # content is reliably the longest occurrence, not the last one.
+                key = canon(m.group(1))
+                if key not in sections or len(content) > len(sections[key]):
+                    sections[key] = content
+
+        if "direct" not in sections or ("risk" not in sections and "compliance" not in sections):
+            return None
+
+        parts = [sections["direct"]]
+        if "risk" in sections:
+            parts.append(f"**Security Risk:** {sections['risk']}")
+        if "compliance" in sections:
+            parts.append(f"**Compliance:** {sections['compliance']}")
+        return "\n\n".join(parts)
+
+    @classmethod
+    def _clean_thinking_trace(cls, raw_text: str) -> str:
         """Strip internal reasoning scratchpads and thinking traces from Qwen / other LLM responses.
 
         Handles multiple leakage patterns:
-        1. Qwen <think>...</think> XML tags
-        2. "Thinking Process:" section headers
-        3. Qwen 3 inline scratchpad pattern: outputs the system-prompt structure verbatim
+        1. Structured Direct Answer / Risk / Compliance labels, extracted directly regardless
+           of surrounding planning commentary (see `_extract_labeled_sections`).
+        2. Qwen <think>...</think> XML tags
+        3. "Thinking Process:" section headers
+        4. Qwen 3 inline scratchpad pattern: outputs the system-prompt structure verbatim
            e.g. "User Question:", "Constraint:", "Specific Rule:", "Evaluate Telemetry:",
            "Drafting the Response:", "Mental Model:", "My reasoning is:" etc.
         """
         text = raw_text.strip()
+
+        extracted = cls._extract_labeled_sections(text)
+        if extracted:
+            return extracted
 
         # 1. Strip Qwen XML thinking tags — take only what's after </think>
         if "</think>" in text:
