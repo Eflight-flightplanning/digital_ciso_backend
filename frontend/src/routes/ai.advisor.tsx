@@ -790,165 +790,66 @@ ${reportContent}
           </div>
         </div>
 
-        {/* ── Main Layout: Sidebar Context + Chat Workspace ── */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 flex-1 min-h-0 overflow-hidden">
-          {/* ── Left Sidebar (4 Cols) ── */}
-          <div className="lg:col-span-4 flex flex-col gap-3 h-full min-h-0">
-            {/* Top Card: Neural Stack Core */}
-            <div className="rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md shrink-0 space-y-2.5">
-              <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
-                    <BrainCircuit className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-display text-xs font-bold text-foreground">
-                      Neural Stack Core
-                    </h3>
-                    <p className="text-[10px] text-muted-foreground">
-                      Multi-Agent Autonomous Reasoning
-                    </p>
-                  </div>
-                </div>
-                <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-400 border border-emerald-500/20">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live
+        {/* ── Main Full-Width Chat Workspace ── */}
+        <div className="w-full flex-1 flex flex-col min-h-0 rounded-2xl border border-border/80 bg-surface/80 backdrop-blur-sm shadow-md overflow-hidden">
+          {/* Chat Workspace Header with Environment Scope Pills */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 px-5 py-3 bg-surface-2/30 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                <Bot className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <h3 className="font-display text-xs font-bold text-foreground">
+                  Spectra AI Advisor Stream
+                </h3>
+                <span className="text-[11px] text-muted-foreground">
+                  Active Scope: <strong className="text-foreground">{providerFilter} Infrastructure</strong> · Multi-Cloud Reasoning
                 </span>
-              </div>
-
-              {/* 3 Agents Detailed Vertical Rows */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-primary/40">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50" />
-                    <div>
-                      <span className="text-[11px] font-bold text-foreground block">Spectra (Analyzer)</span>
-                      <span className="text-[9.5px] text-muted-foreground">Vulnerability & Path Reasoning</span>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.2 rounded border border-primary/20">
-                    Digital CISO LLM
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-amber-400/40">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
-                    <div>
-                      <span className="text-[11px] font-bold text-foreground block">Aegis (Decisions)</span>
-                      <span className="text-[9.5px] text-muted-foreground">HITL Governance & Approval</span>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/20">
-                    Digital CISO LLM
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl bg-surface-2/50 border border-border/50 px-2.5 py-1.5 transition-colors hover:border-purple-400/40">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-sm shadow-purple-400/50" />
-                    <div>
-                      <span className="text-[11px] font-bold text-foreground block">Phantom (Execution)</span>
-                      <span className="text-[9.5px] text-muted-foreground">Kill-Chain Severance Engine</span>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[9px] font-bold text-purple-400 bg-purple-400/10 px-1.5 py-0.2 rounded border border-purple-400/20">
-                    Digital CISO LLM
-                  </span>
-                </div>
-              </div>
-
-              {/* Environment Scope Selector */}
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Environment Scope
-                  </span>
-                  <div className="flex items-center gap-2.5 text-[9.5px] text-muted-foreground font-mono">
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Zero-Retention
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      38 Assets
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {["All", ...connectedProviders.map((p) => p.label)].map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setProviderFilter(p)}
-                      className={`rounded-lg px-2.5 py-0.8 text-[11px] font-semibold transition-all cursor-pointer border ${
-                        providerFilter === p
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-surface-2/60 border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
-            {/* Bottom Card: Suggested Inquiries */}
-            <div className="flex-1 min-h-0 flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-3.5 sm:p-4 backdrop-blur-sm shadow-md overflow-hidden">
-              <div className="flex items-center justify-between mb-2 shrink-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Suggested Inquiries
-                </span>
-                <span className="text-[9px] font-mono text-muted-foreground/80">
-                  {suggestedQueries.length} prompts
-                </span>
-              </div>
-
-              <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-y-auto">
-                {suggestedQueries.map((item, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleSend(item.query)}
-                    className="w-full text-left rounded-xl border border-border/70 bg-surface-2/40 px-3.5 py-2 text-xs text-foreground/90 transition-all hover:border-primary/50 hover:bg-surface-2 group cursor-pointer shadow-sm flex items-center justify-between gap-2.5 shrink-0"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9.5px] font-mono font-bold text-primary uppercase tracking-wider block mb-0.5">
-                        {item.tag}
-                      </span>
-                      <p className="text-[11.5px] font-semibold leading-snug group-hover:text-foreground line-clamp-1">
-                        {item.query}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5" />
-                  </button>
-                ))}
-              </div>
+            {/* Scope Filter Pills in Header */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1 hidden md:inline">
+                Scope:
+              </span>
+              {["All", ...connectedProviders.map((p) => p.label)].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setProviderFilter(p)}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer border ${
+                    providerFilter === p
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-surface-2/80 border-border/70 text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <span className="hidden sm:flex items-center gap-1 font-mono text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full ml-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Telemetry
+              </span>
             </div>
           </div>
 
-          {/* ── Main Chat Workspace (8 Cols) ── */}
-          <div className="lg:col-span-8 flex flex-col h-full min-h-0 rounded-2xl border border-border/80 bg-surface/80 backdrop-blur-sm shadow-md overflow-hidden">
-            {/* Chat Workspace Header */}
-            <div className="flex items-center justify-between border-b border-border/60 px-5 py-3 bg-surface-2/30 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                  <Bot className="h-4.5 w-4.5" />
-                </div>
-                <div>
-                  <h3 className="font-display text-xs font-bold text-foreground">
-                    Spectra AI Advisor Stream
-                  </h3>
-                  <span className="text-[11px] text-muted-foreground">
-                    Scope: <strong className="text-foreground">{providerFilter} Infrastructure</strong> · Multi-Cloud Reasoning
-                  </span>
-                </div>
-              </div>
-
-              <span className="hidden sm:flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                Live Ingestion
-              </span>
-            </div>
+          {/* Quick Suggested Inquiries Top Bar */}
+          <div className="px-5 py-2 border-b border-border/40 bg-surface/50 flex items-center gap-2 overflow-x-auto shrink-0 scrollbar-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0 flex items-center gap-1">
+              <Sparkles className="h-3 w-3 text-primary" />
+              <span>Suggested:</span>
+            </span>
+            {suggestedQueries.map((item, i) => (
+              <button
+                key={i}
+                onClick={() => handleSend(item.query)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-surface-2/50 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-surface-2 transition-all shrink-0 cursor-pointer"
+              >
+                <span className="font-mono text-[9px] font-bold text-primary">{item.tag}</span>
+                <span className="max-w-[200px] truncate">{item.query}</span>
+              </button>
+            ))}
+          </div>
 
             {/* Messages Feed */}
             <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5 min-h-0">
