@@ -1126,7 +1126,8 @@ export function DashboardPage() {
       const total = Number(item.total_requirements) || 0;
       const evaluated = Math.max(1, passed + failed);
       return {
-        name: String(item.framework || item.id || ""),
+        id: String(item.compliance_id || item.id || "").toLowerCase(),
+        name: String(item.framework || item.title || item.id || ""),
         score: total > 0 ? Math.round((passed / evaluated) * 100) : 0,
       };
     });
@@ -1176,16 +1177,27 @@ export function DashboardPage() {
   }, [selectedProviderObj]);
 
   // Radar chart data metrics — each axis gets its own real per-framework compliance score
-  // (matched against realComplianceFrameworks by name), not a single repeated overall number.
-  // An axis whose framework has no real compliance data yet honestly shows 0 rather than
-  // borrowing the unrelated overall posture score.
+  // calculated directly from (requirements_passed / (requirements_passed + requirements_failed)) * 100%
   const radarData = useMemo(() => {
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
     return radarLabels.map((lbl) => {
       const normLabel = norm(lbl);
       const match = realComplianceFrameworks.find((fw) => {
         const normName = norm(fw.name);
-        return normName.length > 0 && (normLabel.includes(normName) || normName.includes(normLabel));
+        const normId = norm(fw.id);
+        if (normLabel.includes("cisazure") && (normId.includes("cis") && normId.includes("azure") || normName.includes("cis") && normName.includes("azure"))) return true;
+        if (normLabel.includes("cisoci") && (normId.includes("cis") && (normId.includes("oci") || normId.includes("oracle")) || normName.includes("cis") && (normName.includes("oci") || normName.includes("oracle")))) return true;
+        if (normLabel.includes("cis") && (normId.includes("cis") || normName.includes("cis"))) return true;
+        if (normLabel.includes("ncaecc") && (normId.includes("ecc") || normName.includes("ecc"))) return true;
+        if (normLabel.includes("ncacscc") && (normId.includes("cscc") || normName.includes("cscc"))) return true;
+        if (normLabel.includes("soc2") && (normId.includes("soc2") || normName.includes("soc2") || normName.includes("soc 2"))) return true;
+        if (normLabel.includes("iso27001") && (normId.includes("iso27001") || normId.includes("iso") || normName.includes("iso"))) return true;
+        if (normLabel.includes("pcidss") && (normId.includes("pci") || normName.includes("pci"))) return true;
+        if (normLabel.includes("hipaa") && (normId.includes("hipaa") || normName.includes("hipaa"))) return true;
+        if (normLabel.includes("nist") && (normId.includes("nist") || normName.includes("nist"))) return true;
+        if (normLabel.includes("sod") && (normId.includes("sod") || normName.includes("sod"))) return true;
+        return (normName.length > 0 && (normLabel.includes(normName) || normName.includes(normLabel))) ||
+               (normId.length > 0 && (normLabel.includes(normId) || normId.includes(normLabel)));
       });
       return { label: lbl, value: match ? match.score : 0 };
     });
