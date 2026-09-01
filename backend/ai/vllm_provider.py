@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_VLLM_ENDPOINT = "http://10.0.0.4:8000/v1"
 DEFAULT_MODEL = "/home/azureuser/models/qwen3.5-9b"
-DEFAULT_TIMEOUT = 120.0
+DEFAULT_TIMEOUT = 180.0
 
 
 class VLLMAzureProvider(AIProvider):
@@ -121,7 +121,7 @@ class VLLMAzureProvider(AIProvider):
         }
 
         try:
-            timeout_config = httpx.Timeout(connect=5.0, read=self.timeout or 60.0, write=10.0, pool=5.0)
+            timeout_config = httpx.Timeout(connect=10.0, read=self.timeout or 180.0, write=20.0, pool=10.0)
             with httpx.Client(timeout=timeout_config) as client:
                 response = client.post(url, json=payload, headers=headers)
                 if response.is_error:
@@ -549,7 +549,7 @@ class VLLMAzureProvider(AIProvider):
             system_prompt=ADVISOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.1,
-            max_tokens=1800,
+            max_tokens=950,
             history=history,
         )
         if data.get("_ai_unavailable"):
