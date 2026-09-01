@@ -27,6 +27,7 @@ class RemediationTemplate:
     compliance: List[str] = field(default_factory=list)
     references: List[str] = field(default_factory=list)
     safe_to_automate: bool = False
+    framework: str = ""
 
 
 # ==============================================================
@@ -2426,7 +2427,6 @@ ORACLE_SAAS_IP_ALLOWLIST = RemediationTemplate(
 AZURE_APP_HTTP_LOGS_ENABLED = RemediationTemplate(
     check_id="app_http_logs_enabled",
     title="Ensure HTTP Logs are Enabled for Azure App Service",
-    framework="azure",
     cli="""az webapp log config \\
   --name "{resource}" \\
   --resource-group "{rg}" \\
