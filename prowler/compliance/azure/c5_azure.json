@@ -5780,13 +5780,11 @@
         "sqlserver_tde_encrypted_with_cmk",
         "sqlserver_tde_encryption_enabled",
         "vm_ensure_unattached_disks_encrypted_with_cmk",
-        "entra_conditional_access_policy_require_mfa_for_management_app",
+        "entra_conditional_access_policy_require_mfa_for_management_api",
         "app_minimum_tls_version_12",
         "mysql_flexible_server_minimum_tls_version_12",
         "sqlserver_recommended_minimal_tls_version",
-        "storage_ensure_minimum_tls_version_12",
-        "sqlserver_tde_encrypted_with_cmk",
-        "sqlserver_tde_encryption_enabled"
+        "storage_ensure_minimum_tls_version_12"
       ],
       "ConfigRequirements": [
         {
@@ -5818,13 +5816,11 @@
         "sqlserver_tde_encrypted_with_cmk",
         "sqlserver_tde_encryption_enabled",
         "vm_ensure_unattached_disks_encrypted_with_cmk",
-        "entra_conditional_access_policy_require_mfa_for_management_app",
+        "entra_conditional_access_policy_require_mfa_for_management_api",
         "app_minimum_tls_version_12",
         "mysql_flexible_server_minimum_tls_version_12",
         "sqlserver_recommended_minimal_tls_version",
-        "storage_ensure_minimum_tls_version_12",
-        "sqlserver_tde_encrypted_with_cmk",
-        "sqlserver_tde_encryption_enabled"
+        "storage_ensure_minimum_tls_version_12"
       ],
       "ConfigRequirements": [
         {

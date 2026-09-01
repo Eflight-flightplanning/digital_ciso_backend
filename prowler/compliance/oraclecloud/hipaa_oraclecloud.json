@@ -81,9 +81,8 @@
           "Service": "blockstorage"
         }
       ],
-      "Checks": [
-        "blockstorage_block_volume_backup_enabled"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "164.310(a)(1)",
@@ -97,7 +96,7 @@
         }
       ],
       "Checks": [
-        "compute_instance_legacy_metadata_service_endpoint_disabled"
+        "compute_instance_legacy_metadata_endpoint_disabled"
       ]
     },
     {
@@ -162,7 +161,7 @@
       ],
       "Checks": [
         "objectstorage_bucket_not_publicly_accessible",
-        "objectstorage_bucket_emit_object_events_enabled"
+        "objectstorage_bucket_logging_enabled"
       ]
     },
     {

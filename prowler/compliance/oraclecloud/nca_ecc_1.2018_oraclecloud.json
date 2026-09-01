@@ -1,22 +1,37 @@
 {
   "Framework": "NCA-ECC",
-  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
-  "Version": "1:2018",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-2:2024)",
+  "Version": "2:2024",
   "Provider": "oraclecloud",
-  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) across 5 Main Domains, 29 Subdomains, and 114 Cybersecurity Controls.",
+  "Description": "The Essential Cybersecurity Controls (ECC-2:2024) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) across 4 Main Domains and 28 Subdomains. The real published document defines 108 Main Controls and 92 Subcontrols; this file maps one requirement per real numbered control, using Prowler checks only where a real, verifiable technical equivalent exists on Oracle Cloud Infrastructure (OCI).",
   "Requirements": [
     {
       "Id": "1-1-1",
       "Name": "1-1-1 Cybersecurity Strategy Definition & Approval",
       "Description": "A cybersecurity strategy must be defined, documented and approved. It must be supported by the head of the organization or his/her delegate (Authorizing Official). The strategy goals must be in-line with related laws and regulations.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Strategy", "Service": "identity" }],
-      "Checks": ["identity_no_resources_in_root_compartment", "identity_non_root_compartment_exists"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-1 Cybersecurity Strategy",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists"
+      ]
     },
     {
       "Id": "1-1-2",
       "Name": "1-1-2 Cybersecurity Strategy Roadmap Execution",
       "Description": "A roadmap must be executed to implement the cybersecurity strategy across all organizational cloud and digital environments.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Strategy", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-1 Cybersecurity Strategy",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -24,7 +39,13 @@
       "Id": "1-1-3",
       "Name": "1-1-3 Periodic Review of Cybersecurity Strategy",
       "Description": "The cybersecurity strategy must be reviewed periodically according to planned intervals or upon changes to related laws and regulations.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Strategy", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-1 Cybersecurity Strategy",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -32,14 +53,28 @@
       "Id": "1-2-1",
       "Name": "1-2-1 Dedicated Independent Cybersecurity Function",
       "Description": "A dedicated cybersecurity function (e.g. division, department) must be established within the organization, independent from IT/ICT functions, reporting directly to the head of the organization.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Management", "Service": "identity" }],
-      "Checks": ["identity_tenancy_admin_permissions_limited"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-2 Cybersecurity Management",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_tenancy_admin_permissions_limited"
+      ]
     },
     {
       "Id": "1-2-2",
       "Name": "1-2-2 CISO and Critical Security Staff National Hiring",
       "Description": "The position of cybersecurity function head (CISO), and related supervisory and critical positions within the function, must be filled with full-time and experienced Saudi cybersecurity professionals.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-2 Cybersecurity Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -47,7 +82,13 @@
       "Id": "1-2-3",
       "Name": "1-2-3 Cybersecurity Steering Committee",
       "Description": "A cybersecurity steering committee must be established by the Authorizing Official to ensure the support and implementation of cybersecurity programs and initiatives.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-2 Cybersecurity Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -55,14 +96,28 @@
       "Id": "1-3-1",
       "Name": "1-3-1 Cybersecurity Policies and Procedures Documentation",
       "Description": "Cybersecurity policies and procedures must be defined and documented by the cybersecurity function, approved by the Authorizing Official, and disseminated to relevant parties.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Cybersecurity Policies and Procedures", "Service": "identity" }],
-      "Checks": ["identity_user_mfa_enabled_console_access"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Cybersecurity Policies and Procedures",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
+      ]
     },
     {
       "Id": "1-3-2",
       "Name": "1-3-2 Cybersecurity Policies Implementation",
       "Description": "The cybersecurity function must ensure that the approved cybersecurity policies and procedures are actively implemented and enforced.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Cybersecurity Policies and Procedures", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Cybersecurity Policies and Procedures",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -70,14 +125,28 @@
       "Id": "1-3-3",
       "Name": "1-3-3 Technical Security Standards Baseline",
       "Description": "Cybersecurity policies and procedures must be supported by technical security standards (e.g. operating systems, databases, and firewall technical security standards).",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Cybersecurity Policies and Procedures", "Service": "identity" }],
-      "Checks": ["identity_password_policy_minimum_length_14"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Cybersecurity Policies and Procedures",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14"
+      ]
     },
     {
       "Id": "1-3-4",
       "Name": "1-3-4 Periodic Review of Policies and Procedures",
       "Description": "Cybersecurity policies and procedures must be reviewed periodically according to planned intervals or upon regulatory updates. Changes must be approved and documented.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Cybersecurity Policies and Procedures", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Cybersecurity Policies and Procedures",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -85,14 +154,28 @@
       "Id": "1-4-1",
       "Name": "1-4-1 Roles and Responsibilities Structure & Segregation",
       "Description": "Cybersecurity organizational structure and related roles and responsibilities must be defined, documented, approved, and assigned without conflict of interest.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity Roles and Responsibilities", "Service": "identity" }],
-      "Checks": ["identity_user_api_keys_rotated_90_days"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_api_keys_rotated_90_days"
+      ]
     },
     {
       "Id": "1-4-2",
       "Name": "1-4-2 Periodic Review of Roles and Responsibilities",
       "Description": "Cybersecurity roles and responsibilities must be reviewed periodically according to planned intervals or regulatory updates.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity Roles and Responsibilities", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -100,14 +183,28 @@
       "Id": "1-5-1",
       "Name": "1-5-1 Cybersecurity Risk Management Methodology",
       "Description": "Cybersecurity risk management methodology and procedures must be defined, documented, and approved as per confidentiality, integrity, and availability considerations.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-5 Cybersecurity Risk Management", "Service": "cloudguard" }],
-      "Checks": ["cloudguard_enabled"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled"
+      ]
     },
     {
       "Id": "1-5-2",
       "Name": "1-5-2 Risk Management Procedures Implementation",
       "Description": "The cybersecurity risk management methodology and procedures must be implemented by the cybersecurity function.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-5 Cybersecurity Risk Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -115,14 +212,28 @@
       "Id": "1-5-3",
       "Name": "1-5-3 Mandatory Risk Assessments on Projects & Infrastructure Changes",
       "Description": "Cybersecurity risk assessments must be conducted at early project stages, before major infrastructure changes, when procuring 3rd party services, and before go-live.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-5 Cybersecurity Risk Management", "Service": "cloudguard" }],
-      "Checks": ["events_rule_cloudguard_problems"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "events_rule_cloudguard_problems"
+      ]
     },
     {
       "Id": "1-5-4",
       "Name": "1-5-4 Periodic Review of Risk Management Methodology",
       "Description": "Cybersecurity risk management methodology and procedures must be reviewed periodically according to planned intervals.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-5 Cybersecurity Risk Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-5 Cybersecurity Risk Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -130,21 +241,42 @@
       "Id": "1-6-1",
       "Name": "1-6-1 Cybersecurity in Project & Change Management Lifecycle",
       "Description": "Cybersecurity requirements must be included in project and asset change management methodology and procedures to manage risks throughout the project lifecycle.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-6 Cybersecurity in Project Management", "Service": "compute" }],
-      "Checks": ["compute_instance_monitoring_enabled"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-6 Cybersecurity in Project Management",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-6-2",
       "Name": "1-6-2 Project Vulnerability Assessment, Configuration Review & Hardening",
       "Description": "Conduct vulnerability assessment, remediation, secure configuration, hardening, and patching before changes or going live for technology projects.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-6 Cybersecurity in Project Management", "Service": "compute" }],
-      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-6 Cybersecurity in Project Management",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_endpoint_disabled"
+      ]
     },
     {
       "Id": "1-6-3",
       "Name": "1-6-3 Secure Application Development & Secure Coding Standards",
       "Description": "Apply secure coding standards, trusted software libraries, compliance testing, secure component integration, and configuration reviews before software goes live.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-6 Cybersecurity in Project Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-6 Cybersecurity in Project Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -152,7 +284,13 @@
       "Id": "1-6-4",
       "Name": "1-6-4 Periodic Review of Project Management Cybersecurity",
       "Description": "Cybersecurity requirements in project management must be reviewed periodically.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-6 Cybersecurity in Project Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-6 Cybersecurity in Project Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -160,7 +298,13 @@
       "Id": "1-7-1",
       "Name": "1-7-1 Compliance with National Cybersecurity Laws & Regulations",
       "Description": "The organization must comply with related national cybersecurity laws, regulations, and NCA regulatory frameworks.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-7 Compliance with Standards, Laws and Regulations", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-7 Compliance with Standards, Laws and Regulations",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -168,7 +312,13 @@
       "Id": "1-7-2",
       "Name": "1-7-2 Compliance with Approved International Agreements",
       "Description": "The organization must comply with any nationally-approved international agreements and commitments related to cybersecurity.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-7 Compliance with Standards, Laws and Regulations", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-7 Compliance with Standards, Laws and Regulations",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -176,7 +326,13 @@
       "Id": "1-8-1",
       "Name": "1-8-1 Periodic Internal Cybersecurity Reviews",
       "Description": "Cybersecurity reviews must be conducted periodically by the internal cybersecurity function to assess compliance with cybersecurity controls.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-8 Periodical Cybersecurity Review and Audit", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-8 Periodical Cybersecurity Review and Audit",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -184,7 +340,13 @@
       "Id": "1-8-2",
       "Name": "1-8-2 Independent Cybersecurity Audits (GAAS)",
       "Description": "Cybersecurity audits must be conducted by independent parties outside the cybersecurity function (e.g. Internal Audit) as per Generally Accepted Auditing Standards (GAAS).",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-8 Periodical Cybersecurity Review and Audit", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-8 Periodical Cybersecurity Review and Audit",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -192,7 +354,13 @@
       "Id": "1-8-3",
       "Name": "1-8-3 Audit Results Reporting to Steering Committee & Authorizing Official",
       "Description": "Results from cybersecurity audits must be presented to the steering committee and Authorizing Official, including scope, observations, recommendations, and remediation plans.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-8 Periodical Cybersecurity Review and Audit", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-8 Periodical Cybersecurity Review and Audit",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -200,7 +368,13 @@
       "Id": "1-9-1",
       "Name": "1-9-1 Personnel Cybersecurity Requirements Definition",
       "Description": "Personnel cybersecurity requirements (prior to employment, during employment, and after termination/separation) must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -208,7 +382,13 @@
       "Id": "1-9-2",
       "Name": "1-9-2 Personnel Cybersecurity Requirements Implementation",
       "Description": "The personnel cybersecurity requirements must be actively implemented across HR onboarding, employment, and exit operations.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -216,7 +396,13 @@
       "Id": "1-9-3",
       "Name": "1-9-3 Pre-Employment Screening, Vetting & NDA Clauses",
       "Description": "Inclusion of cybersecurity responsibilities and non-disclosure agreements (NDAs) in employment contracts, and screening/vetting candidates for critical/privileged positions.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -224,7 +410,13 @@
       "Id": "1-9-4",
       "Name": "1-9-4 Employment Cybersecurity Awareness & Compliance",
       "Description": "Provide cybersecurity awareness during onboarding and employment, and ensure compliance with organizational cybersecurity policies.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -232,14 +424,28 @@
       "Id": "1-9-5",
       "Name": "1-9-5 Immediate Access Revocation Upon Termination",
       "Description": "Personnel access to information and technology assets must be reviewed and removed immediately upon termination or separation.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "identity" }],
-      "Checks": ["identity_user_api_keys_rotated_90_days"]
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_api_keys_rotated_90_days"
+      ]
     },
     {
       "Id": "1-9-6",
       "Name": "1-9-6 Periodic Review of HR Cybersecurity Requirements",
       "Description": "Personnel cybersecurity requirements must be reviewed periodically.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-9 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -247,7 +453,13 @@
       "Id": "1-10-1",
       "Name": "1-10-1 Cybersecurity Awareness Program Development",
       "Description": "A cybersecurity awareness program must be developed and approved, conducted periodically through multiple channels to strengthen cyber threat culture.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-10 Cybersecurity Awareness and Training", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -255,7 +467,13 @@
       "Id": "1-10-2",
       "Name": "1-10-2 Cybersecurity Awareness Program Implementation",
       "Description": "The cybersecurity awareness program must be implemented across all organizational departments.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-10 Cybersecurity Awareness and Training", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -263,7 +481,13 @@
       "Id": "1-10-3",
       "Name": "1-10-3 Phishing, Mobile, Web & Social Media Security Awareness",
       "Description": "Awareness topics must cover email handling/phishing, mobile devices/storage media, secure browsing, and secure use of social media.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-10 Cybersecurity Awareness and Training", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -271,7 +495,13 @@
       "Id": "1-10-4",
       "Name": "1-10-4 Specialized Cybersecurity Training for Technical Staff & Executives",
       "Description": "Tailored training and skillsets must be provided for cybersecurity personnel, developers, IT operations staff, and executive/supervisory leaders.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-10 Cybersecurity Awareness and Training", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -279,7 +509,13 @@
       "Id": "1-10-5",
       "Name": "1-10-5 Periodic Review of Awareness & Training Program",
       "Description": "The implementation of the cybersecurity awareness program must be reviewed periodically.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-10 Cybersecurity Awareness and Training", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -287,14 +523,28 @@
       "Id": "2-1-1",
       "Name": "2-1-1 Asset Management Policy Definition & Approval",
       "Description": "Cybersecurity requirements for managing information and technology assets must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "objectstorage" }],
-      "Checks": ["objectstorage_bucket_public_access_type_is_not_allowed"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible"
+      ]
     },
     {
       "Id": "2-1-2",
       "Name": "2-1-2 Asset Management Implementation & Inventory",
       "Description": "The cybersecurity requirements for managing information and technology assets must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -302,7 +552,13 @@
       "Id": "2-1-3",
       "Name": "2-1-3 Acceptable Use Policy Definition",
       "Description": "Acceptable use policy of information and technology assets must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -310,7 +566,13 @@
       "Id": "2-1-4",
       "Name": "2-1-4 Acceptable Use Policy Enforcement",
       "Description": "Acceptable use policy of information and technology assets must be implemented and enforced.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -318,14 +580,28 @@
       "Id": "2-1-5",
       "Name": "2-1-5 Information Asset Classification & Labeling",
       "Description": "Information and technology assets must be classified, labeled, and handled as per related laws and regulatory requirements.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "objectstorage" }],
-      "Checks": ["objectstorage_bucket_cmk_encryption_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
     },
     {
       "Id": "2-1-6",
       "Name": "2-1-6 Periodic Review of Asset Management Requirements",
       "Description": "The cybersecurity requirements for managing information and technology assets must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -333,14 +609,28 @@
       "Id": "2-2-1",
       "Name": "2-2-1 Identity and Access Management Policy",
       "Description": "Cybersecurity requirements for identity and access management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "identity" }],
-      "Checks": ["identity_user_mfa_enabled_console_access"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
+      ]
     },
     {
       "Id": "2-2-2",
       "Name": "2-2-2 Identity and Access Management Implementation",
       "Description": "The cybersecurity requirements for identity and access management must be implemented across all systems.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -348,14 +638,30 @@
       "Id": "2-2-3",
       "Name": "2-2-3 Authentication, MFA, Least Privilege & PAM Controls",
       "Description": "Enforce strong authentication, Multi-Factor Authentication (MFA) for remote/cloud access, Need-to-Know/Need-to-Use least privilege, Privileged Access Management (PAM), and periodic user access reviews.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "identity" }],
-      "Checks": ["identity_password_policy_minimum_length_14", "identity_user_api_keys_rotated_90_days", "identity_tenancy_admin_permissions_limited"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_tenancy_admin_permissions_limited"
+      ]
     },
     {
       "Id": "2-2-4",
       "Name": "2-2-4 Periodic Review of User Identities & Access Rights",
       "Description": "The implementation of identity and access management requirements and user access lists must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -363,14 +669,28 @@
       "Id": "2-3-1",
       "Name": "2-3-1 Information Systems Protection Policy",
       "Description": "Cybersecurity requirements for protecting information systems and processing facilities must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "compute" }],
-      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Systems and Processing Facilities Protection",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_endpoint_disabled"
+      ]
     },
     {
       "Id": "2-3-2",
       "Name": "2-3-2 Information Systems Protection Implementation",
       "Description": "Cybersecurity requirements for protecting information systems and processing facilities must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Systems and Processing Facilities Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -378,14 +698,27 @@
       "Id": "2-3-3",
       "Name": "2-3-3 Antivirus/Anti-Malware, Patching, Media & NTP Time Sync",
       "Description": "Advanced malware protection on servers, restricted external storage media, patch management, and centralized clock synchronization (e.g. SASO NTP).",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "compute" }],
-      "Checks": ["compute_instance_monitoring_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Systems and Processing Facilities Protection",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-3-4",
       "Name": "2-3-4 Periodic Review of System Protection Controls",
       "Description": "Cybersecurity requirements for protecting information systems and processing facilities must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Systems and Processing Facilities Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -393,7 +726,13 @@
       "Id": "2-4-1",
       "Name": "2-4-1 Email Protection Policy Definition",
       "Description": "Cybersecurity requirements for protecting email services must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Email Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Email Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -401,7 +740,13 @@
       "Id": "2-4-2",
       "Name": "2-4-2 Email Protection Implementation",
       "Description": "The cybersecurity requirements for email service must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Email Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Email Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -409,7 +754,13 @@
       "Id": "2-4-3",
       "Name": "2-4-3 Anti-Phishing, Email MFA, Archiving, APT & SPF/DKIM Validation",
       "Description": "Filter phishing/spam, enforce MFA for webmail/remote access, maintain secure archiving, protect against APTs, and validate domains via SPF/DKIM/DMARC.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Email Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Email Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -417,7 +768,13 @@
       "Id": "2-4-4",
       "Name": "2-4-4 Periodic Review of Email Protection Controls",
       "Description": "Cybersecurity requirements for email service must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Email Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Email Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -425,14 +782,29 @@
       "Id": "2-5-1",
       "Name": "2-5-1 Network Security Management Policy",
       "Description": "Cybersecurity requirements for network security management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Networks Security Management", "Service": "core" }],
-      "Checks": ["core_security_list_ingress_stateless_security_rules_restricted"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Networks Security Management",
+          "Service": "core"
+        }
+      ],
+      "Checks": [
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port"
+      ]
     },
     {
       "Id": "2-5-2",
       "Name": "2-5-2 Network Security Management Implementation",
       "Description": "The cybersecurity requirements for network security management must be implemented across all VCNs and subnets.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Networks Security Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Networks Security Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -440,18 +812,32 @@
       "Id": "2-5-3",
       "Name": "2-5-3 Network Segmentation, Firewalls, Port Restrictions & IPS/DNS Security",
       "Description": "Enforce logical/physical segmentation using firewalls, isolate prod/dev/test, restrict internet file sharing, protect wireless with strong encryption, manage ports/protocols, deploy IPS, secure DNS, and guard against APT browsing threats.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Networks Security Management", "Service": "core" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Networks Security Management",
+          "Service": "core"
+        }
+      ],
       "Checks": [
-        "core_default_security_list_no_ingress_rules",
-        "core_security_list_ingress_stateless_security_rules_restricted",
-        "core_network_security_group_ingress_rules_restricted"
+        "network_default_security_list_restricts_traffic",
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port",
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port"
       ]
     },
     {
       "Id": "2-5-4",
       "Name": "2-5-4 Periodic Review of Network Security Controls",
       "Description": "The cybersecurity requirements for network security management must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Networks Security Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-5 Networks Security Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -459,7 +845,13 @@
       "Id": "2-6-1",
       "Name": "2-6-1 Mobile Devices & BYOD Security Policy",
       "Description": "Cybersecurity requirements for mobile devices security and BYOD must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Mobile Devices Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Mobile Devices Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -467,7 +859,13 @@
       "Id": "2-6-2",
       "Name": "2-6-2 Mobile Devices & BYOD Implementation",
       "Description": "The cybersecurity requirements for mobile devices security and BYOD must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Mobile Devices Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Mobile Devices Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -475,7 +873,13 @@
       "Id": "2-6-3",
       "Name": "2-6-3 Mobile Encryption, Remote Wipe, Restricted Use & User Awareness",
       "Description": "Enforce data separation/encryption on mobile devices/BYODs, restrict use to job needs, enable remote wipe upon loss/separation, and conduct user awareness.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Mobile Devices Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Mobile Devices Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -483,7 +887,13 @@
       "Id": "2-6-4",
       "Name": "2-6-4 Periodic Review of Mobile Security Policy",
       "Description": "Cybersecurity requirements for mobile devices security and BYOD must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Mobile Devices Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Mobile Devices Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -491,14 +901,28 @@
       "Id": "2-7-1",
       "Name": "2-7-1 Data and Information Protection Policy",
       "Description": "Cybersecurity requirements for protecting and handling data and information must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Data and Information Protection", "Service": "objectstorage" }],
-      "Checks": ["objectstorage_bucket_public_access_type_is_not_allowed"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible"
+      ]
     },
     {
       "Id": "2-7-2",
       "Name": "2-7-2 Data Protection Policy Implementation",
       "Description": "The cybersecurity requirements for protecting and handling data and information must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Data and Information Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -506,14 +930,28 @@
       "Id": "2-7-3",
       "Name": "2-7-3 Data Ownership, Classification Labeling & Privacy",
       "Description": "Define data ownership, implement data classification labeling mechanisms, and protect data privacy as per Saudi regulations.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Data and Information Protection", "Service": "objectstorage" }],
-      "Checks": ["objectstorage_bucket_cmk_encryption_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
     },
     {
       "Id": "2-7-4",
       "Name": "2-7-4 Periodic Review of Data Protection Controls",
       "Description": "The cybersecurity requirements for protecting and handling data and information must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Data and Information Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Data and Information Protection",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -521,14 +959,28 @@
       "Id": "2-8-1",
       "Name": "2-8-1 Cryptography Policy & Key Management Definition",
       "Description": "Cybersecurity requirements for cryptography must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Cryptography", "Service": "kms" }],
-      "Checks": ["kms_key_rotation_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_key_rotation_enabled"
+      ]
     },
     {
       "Id": "2-8-2",
       "Name": "2-8-2 Cryptography Policy Implementation",
       "Description": "The cybersecurity requirements for cryptography must be implemented across all cloud storage, databases, and networks.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Cryptography", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -536,18 +988,29 @@
       "Id": "2-8-3",
       "Name": "2-8-3 Cryptographic Key Lifecycle Management & Encryption at Rest/In-Transit",
       "Description": "Use approved cryptographic standards, securely manage keys throughout their lifecycle in OCI Vault KMS, and enforce encryption in-transit (TLS 1.2+) and at-rest.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Cryptography", "Service": "kms" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "kms"
+        }
+      ],
       "Checks": [
         "kms_key_rotation_enabled",
-        "objectstorage_bucket_cmk_encryption_enabled",
-        "blockstorage_volume_backup_enabled"
+        "objectstorage_bucket_encrypted_with_cmk"
       ]
     },
     {
       "Id": "2-8-4",
       "Name": "2-8-4 Periodic Review of Cryptography Controls",
       "Description": "The cybersecurity requirements for cryptography must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Cryptography", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Cryptography",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -555,14 +1018,27 @@
       "Id": "2-9-1",
       "Name": "2-9-1 Backup and Recovery Management Policy",
       "Description": "Cybersecurity requirements for backup and recovery management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Backup and Recovery Management", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_volume_backup_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Backup and Recovery Management",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-9-2",
       "Name": "2-9-2 Backup and Recovery Implementation",
       "Description": "The cybersecurity requirements for backup and recovery management must be implemented across all critical systems.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Backup and Recovery Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Backup and Recovery Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -570,14 +1046,27 @@
       "Id": "2-9-3",
       "Name": "2-9-3 Backup Scope, Rapid Recovery & Periodic Recovery Effectiveness Testing",
       "Description": "Ensure backup scope covers all critical cloud technology and data, verify rapid recovery capabilities after incidents, and conduct periodic recovery tests.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Backup and Recovery Management", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_volume_backup_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Backup and Recovery Management",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-9-4",
       "Name": "2-9-4 Periodic Review of Backup & Recovery Controls",
       "Description": "The cybersecurity requirements for backup and recovery management must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Backup and Recovery Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Backup and Recovery Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -585,14 +1074,27 @@
       "Id": "2-10-1",
       "Name": "2-10-1 Vulnerabilities Management Policy Definition",
       "Description": "Cybersecurity requirements for technical vulnerabilities management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Vulnerabilities Management", "Service": "vulnerability" }],
-      "Checks": ["vulnerability_scanning_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-10 Vulnerabilities Management",
+          "Service": "vulnerability"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-10-2",
       "Name": "2-10-2 Vulnerabilities Management Implementation",
       "Description": "The cybersecurity requirements for technical vulnerabilities management must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Vulnerabilities Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-10 Vulnerabilities Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -600,14 +1102,27 @@
       "Id": "2-10-3",
       "Name": "2-10-3 Periodic Scanning, Criticality Classification, Patching & Threat Feeds",
       "Description": "Perform periodic vulnerability assessments, classify by risk criticality, remediate promptly, apply security patches, and subscribe to trusted threat vulnerability intelligence.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Vulnerabilities Management", "Service": "vulnerability" }],
-      "Checks": ["vulnerability_scanning_enabled", "vulnerability_high_severity_resolved"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-10 Vulnerabilities Management",
+          "Service": "vulnerability"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-10-4",
       "Name": "2-10-4 Periodic Review of Vulnerability Management Controls",
       "Description": "The cybersecurity requirements for technical vulnerabilities management must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Vulnerabilities Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-10 Vulnerabilities Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -615,7 +1130,13 @@
       "Id": "2-11-1",
       "Name": "2-11-1 Penetration Testing Policy Definition",
       "Description": "Cybersecurity requirements for penetration testing exercises must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Penetration Testing", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-11 Penetration Testing",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -623,7 +1144,13 @@
       "Id": "2-11-2",
       "Name": "2-11-2 Penetration Testing Processes Implementation",
       "Description": "The cybersecurity requirements for penetration testing processes must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Penetration Testing", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-11 Penetration Testing",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -631,7 +1158,13 @@
       "Id": "2-11-3",
       "Name": "2-11-3 Internet-Facing Scope & Periodic Penetration Testing",
       "Description": "Scope must cover internet-facing infrastructure, websites, APIs, mobile apps, email, and remote access; tests must be conducted periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Penetration Testing", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-11 Penetration Testing",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -639,7 +1172,13 @@
       "Id": "2-11-4",
       "Name": "2-11-4 Periodic Review of Penetration Testing Processes",
       "Description": "Cybersecurity requirements for penetration testing processes must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Penetration Testing", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-11 Penetration Testing",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -647,14 +1186,28 @@
       "Id": "2-12-1",
       "Name": "2-12-1 Event Logs and Monitoring Management Policy",
       "Description": "Cybersecurity requirements for event logs and monitoring management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Event Logs and Monitoring Management", "Service": "audit" }],
-      "Checks": ["audit_retention_period_minimum_365_days"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring Management",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days"
+      ]
     },
     {
       "Id": "2-12-2",
       "Name": "2-12-2 Event Logs & Monitoring Implementation",
       "Description": "The cybersecurity requirements for event logs and monitoring management must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Event Logs and Monitoring Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -662,14 +1215,29 @@
       "Id": "2-12-3",
       "Name": "2-12-3 SIEM Centralization, Privileged Access Logging & 12-Month Log Retention",
       "Description": "Activate event logs on critical assets and privileged accounts, ingest into centralized SIEM for continuous monitoring, and retain logs for a minimum of 12 months (365 days).",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Event Logs and Monitoring Management", "Service": "audit" }],
-      "Checks": ["audit_retention_period_minimum_365_days", "events_rule_cloudguard_problems"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring Management",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "events_rule_cloudguard_problems"
+      ]
     },
     {
       "Id": "2-12-4",
       "Name": "2-12-4 Periodic Review of Logging & Monitoring Controls",
       "Description": "The cybersecurity requirements for event logs and monitoring management must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Event Logs and Monitoring Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Event Logs and Monitoring Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -677,7 +1245,13 @@
       "Id": "2-13-1",
       "Name": "2-13-1 Incident and Threat Management Policy Definition",
       "Description": "Requirements for cybersecurity incidents and threat management must be defined, documented, and approved (as per Royal Decree 37140).",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-13 Incident and Threat Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-13 Incident and Threat Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -685,7 +1259,13 @@
       "Id": "2-13-2",
       "Name": "2-13-2 Incident and Threat Management Implementation",
       "Description": "The requirements for cybersecurity incidents and threat management must be implemented across all operational units.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-13 Incident and Threat Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-13 Incident and Threat Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -693,7 +1273,13 @@
       "Id": "2-13-3",
       "Name": "2-13-3 Incident Response Plans, Classification, NCA Notification & Threat Feeds",
       "Description": "Establish incident response plans, classify severity, report incidents to NCA, share indicators/threat intelligence with NCA, and collect threat feeds.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-13 Incident and Threat Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-13 Incident and Threat Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -701,7 +1287,13 @@
       "Id": "2-13-4",
       "Name": "2-13-4 Periodic Review of Incident Management Procedures",
       "Description": "The requirements for cybersecurity incidents and threat management must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-13 Incident and Threat Management", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-13 Incident and Threat Management",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -709,7 +1301,13 @@
       "Id": "2-14-1",
       "Name": "2-14-1 Physical Security Policy Definition",
       "Description": "Cybersecurity requirements for physical protection of information and technology assets must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-14 Physical Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-14 Physical Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -717,7 +1315,13 @@
       "Id": "2-14-2",
       "Name": "2-14-2 Physical Security Implementation",
       "Description": "The cybersecurity requirements for physical protection of information and technology assets must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-14 Physical Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-14 Physical Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -725,7 +1329,13 @@
       "Id": "2-14-3",
       "Name": "2-14-3 Facility Access Control, CCTV, Secure Disposal & Perimeter Security",
       "Description": "Authorized access to sensitive areas (data centers, network cabinets), entry/exit logs with CCTV monitoring, secure destruction/re-use of classified media, and perimeter security.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-14 Physical Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-14 Physical Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -733,7 +1343,13 @@
       "Id": "2-14-4",
       "Name": "2-14-4 Periodic Review of Physical Security Requirements",
       "Description": "The cybersecurity requirements for physical protection of information and technology assets must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-14 Physical Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-14 Physical Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -741,14 +1357,27 @@
       "Id": "2-15-1",
       "Name": "2-15-1 Web Application Security Policy Definition",
       "Description": "Cybersecurity requirements for external web applications must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Web Application Security", "Service": "waas" }],
-      "Checks": ["waas_policy_rule_protection_settings_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Web Application Security",
+          "Service": "waas"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-15-2",
       "Name": "2-15-2 Web Application Security Implementation",
       "Description": "The cybersecurity requirements for external web applications must be implemented.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Web Application Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Web Application Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -756,14 +1385,27 @@
       "Id": "2-15-3",
       "Name": "2-15-3 Web Application Firewall (WAF), Multi-Tier, HTTPS & User MFA",
       "Description": "Deploy Web Application Firewall (WAF), adopt multi-tier architecture, enforce HTTPS/TLS protocols, clarify secure usage policies, and require MFA for user access.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Web Application Security", "Service": "waas" }],
-      "Checks": ["waas_policy_rule_protection_settings_enabled"]
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Web Application Security",
+          "Service": "waas"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-15-4",
       "Name": "2-15-4 Periodic Review of Web Application Security",
       "Description": "The cybersecurity requirements for external web applications must be reviewed periodically.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Web Application Security", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Web Application Security",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -771,14 +1413,27 @@
       "Id": "3-1-1",
       "Name": "3-1-1 Cybersecurity Resiliency in BCM Definition",
       "Description": "Cybersecurity requirements for business continuity management must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Business Continuity Management (BCM)", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_volume_backup_enabled"]
+      "Attributes": [
+        {
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Business Continuity Management (BCM)",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "3-1-2",
       "Name": "3-1-2 BCM Resiliency Implementation",
       "Description": "The cybersecurity requirements for business continuity management must be implemented across all critical operations.",
-      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Business Continuity Management (BCM)", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Business Continuity Management (BCM)",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -786,14 +1441,27 @@
       "Id": "3-1-3",
       "Name": "3-1-3 Continuity of Security Systems, Incident Plans & Disaster Recovery (DR)",
       "Description": "Ensure continuity of cybersecurity systems, develop incident response plans affecting business continuity, and maintain tested disaster recovery (DR) plans.",
-      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Business Continuity Management (BCM)", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_volume_backup_enabled"]
+      "Attributes": [
+        {
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Business Continuity Management (BCM)",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "3-1-4",
       "Name": "3-1-4 Periodic Review of BCM Cybersecurity Requirements",
       "Description": "The cybersecurity requirements for business continuity management must be reviewed periodically.",
-      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Business Continuity Management (BCM)", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Business Continuity Management (BCM)",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -801,7 +1469,13 @@
       "Id": "4-1-1",
       "Name": "4-1-1 Third-Party Cybersecurity Requirements in Contracts",
       "Description": "Cybersecurity requirements for contracts and agreements with third-parties must be identified, documented, and approved.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-1 Third-Party Cybersecurity", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-1 Third-Party Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -809,7 +1483,13 @@
       "Id": "4-1-2",
       "Name": "4-1-2 NDA Clauses, Incident Communication & Regulatory Compliance",
       "Description": "Third-party SLAs must include non-disclosure clauses, secure data removal upon service termination, incident communication procedures, and regulatory compliance obligations.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-1 Third-Party Cybersecurity", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-1 Third-Party Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -817,7 +1497,13 @@
       "Id": "4-1-3",
       "Name": "4-1-3 Risk Assessment & In-Kingdom SOC/NOC Presence for Managed Services",
       "Description": "Conduct risk assessments before outsourcing contracts, and mandate that cybersecurity managed services monitoring/operations centers (SOC/NOC) must be completely located inside the Kingdom of Saudi Arabia.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-1 Third-Party Cybersecurity", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-1 Third-Party Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -825,7 +1511,13 @@
       "Id": "4-1-4",
       "Name": "4-1-4 Periodic Review of Third-Party Agreements",
       "Description": "The cybersecurity requirements for contracts and agreements with third-parties must be reviewed periodically.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-1 Third-Party Cybersecurity", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-1 Third-Party Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -833,14 +1525,28 @@
       "Id": "4-2-1",
       "Name": "4-2-1 Cloud Computing & Hosting Cybersecurity Policy",
       "Description": "Cybersecurity requirements related to the use of hosting and cloud computing services must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity", "Service": "cloudguard" }],
-      "Checks": ["cloudguard_enabled"]
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled"
+      ]
     },
     {
       "Id": "4-2-2",
       "Name": "4-2-2 Cloud Cybersecurity Requirements Implementation",
       "Description": "The cybersecurity requirements related to the use of hosting and cloud computing services must be implemented.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     },
@@ -848,49 +1554,29 @@
       "Id": "4-2-3",
       "Name": "4-2-3 Data Classification, Multi-Tenant Isolation & In-Kingdom Data Hosting",
       "Description": "Classify data prior to cloud hosting, ensure virtual server tenant isolation from other environments, and mandate that organizational information hosting and storage must reside inside the Kingdom of Saudi Arabia.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity", "Service": "objectstorage" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity",
+          "Service": "objectstorage"
+        }
+      ],
       "Checks": [
-        "objectstorage_bucket_cmk_encryption_enabled",
-        "objectstorage_bucket_public_access_type_is_not_allowed"
+        "objectstorage_bucket_encrypted_with_cmk",
+        "objectstorage_bucket_not_publicly_accessible"
       ]
     },
     {
       "Id": "4-2-4",
       "Name": "4-2-4 Periodic Review of Cloud Hosting Controls",
       "Description": "The cybersecurity requirements related to the use of hosting and cloud computing services must be reviewed periodically.",
-      "Attributes": [{ "Section": "4. Third-Party and Cloud Computing", "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
-    },
-    {
-      "Id": "5-1-1",
-      "Name": "5-1-1 Industrial Control Systems (ICS/OT) Security Policy",
-      "Description": "Cybersecurity requirements related to Industrial Control Systems and Operational Technology (ICS/OT) must be defined, documented, and approved.",
-      "Attributes": [{ "Section": "5. Industrial Control Systems (ICS)", "SubSection": "5-1 Industrial Control Systems Protection", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
-    },
-    {
-      "Id": "5-1-2",
-      "Name": "5-1-2 ICS/OT Cybersecurity Implementation",
-      "Description": "The cybersecurity requirements related to Industrial Control Systems and Operational Technology (ICS/OT) must be implemented.",
-      "Attributes": [{ "Section": "5. Industrial Control Systems (ICS)", "SubSection": "5-1 Industrial Control Systems Protection", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
-    },
-    {
-      "Id": "5-1-3",
-      "Name": "5-1-3 ICS Segmentation, Log Monitoring, SIS Isolation, Patching & Malware Defense",
-      "Description": "Physical/virtual network segmentation from corporate and external networks, continuous log monitoring, Safety Instrumented Systems (SIS) isolation, external media limits, vulnerability management, patching, and malware defense on ICS/OT assets.",
-      "Attributes": [{ "Section": "5. Industrial Control Systems (ICS)", "SubSection": "5-1 Industrial Control Systems Protection", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
-    },
-    {
-      "Id": "5-1-4",
-      "Name": "5-1-4 Periodic Review of ICS/OT Cybersecurity Controls",
-      "Description": "The cybersecurity requirements related to Industrial Control Systems and Operational Technology (ICS/OT) must be reviewed periodically.",
-      "Attributes": [{ "Section": "5. Industrial Control Systems (ICS)", "SubSection": "5-1 Industrial Control Systems Protection", "Service": "governance" }],
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing",
+          "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity",
+          "Service": "governance"
+        }
+      ],
       "Checks": [],
       "AssessmentType": "Manual"
     }

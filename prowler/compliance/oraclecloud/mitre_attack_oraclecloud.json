@@ -35,7 +35,7 @@
         }
       ],
       "Checks": [
-        "compute_instance_legacy_metadata_service_endpoint_disabled"
+        "compute_instance_legacy_metadata_endpoint_disabled"
       ]
     },
     {
@@ -147,7 +147,7 @@
       ],
       "Checks": [
         "objectstorage_bucket_not_publicly_accessible",
-        "objectstorage_bucket_emit_object_events_enabled"
+        "objectstorage_bucket_logging_enabled"
       ]
     },
     {
@@ -179,8 +179,7 @@
       ],
       "Checks": [
         "blockstorage_block_volume_encrypted_with_cmk",
-        "blockstorage_boot_volume_encrypted_with_cmk",
-        "blockstorage_block_volume_backup_enabled"
+        "blockstorage_boot_volume_encrypted_with_cmk"
       ]
     }
   ]

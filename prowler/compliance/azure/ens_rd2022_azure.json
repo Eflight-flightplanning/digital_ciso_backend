@@ -642,7 +642,7 @@
         }
       ],
       "Checks": [
-        " app_http_logs_enabled"
+        "app_http_logs_enabled"
       ]
     },
     {

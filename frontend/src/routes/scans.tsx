@@ -31,13 +31,14 @@ export const Route = createFileRoute("/scans")({
 /** Ticks once a second so the "connecting" phase visibly counts up instead of
  * looking frozen while there's no real percentage to report yet. */
 function useElapsedSeconds(startIso: string | undefined | null): number {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
+    setNow(Date.now());
     if (!startIso) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [startIso]);
-  if (!startIso) return 0;
+  if (!startIso || now === null) return 0;
   const startMs = new Date(startIso).getTime();
   if (Number.isNaN(startMs)) return 0;
   return Math.max(0, Math.floor((now - startMs) / 1000));

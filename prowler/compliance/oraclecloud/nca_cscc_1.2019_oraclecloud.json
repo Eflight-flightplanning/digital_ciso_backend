@@ -3,142 +3,112 @@
   "Name": "NCA Cloud Cybersecurity Controls (CCC-2:2024)",
   "Version": "2:2024",
   "Provider": "oraclecloud",
-  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) across 4 Main Domains and 24 Subdomains on Oracle Cloud Infrastructure (OCI).",
+  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs). This file covers only the 15 subdomains the real CCC-2:2024 document (Annex A, Table 3) assigns to the Cloud Service Tenant (CST) — i.e. the customer of the cloud, which is the role this platform's connected OCI accounts occupy. Subdomains 2-8 (Backup and Recovery), 2-10 (Penetration Testing), 2-12 (Incident and Threat Management), 2-13 (Physical Security), 2-14 (Web Application Security), 2-16 (System Development Security), 2-17 (Storage Media Security), and all of Domain 4 (Third-Party Cybersecurity) are Cloud Service Provider (CSP) obligations only in the real document and are intentionally excluded here rather than fabricated as tenant requirements. Descriptions below are paraphrased summaries of the real control intent, not verbatim reproductions of NCA's published text.",
   "Requirements": [
     {
       "Id": "1-1-T-1",
-      "Name": "1-1-T-1 Cloud Cybersecurity Roles and RACI Matrix",
-      "Description": "In addition to ECC 1-4-1, the Authorizing Official shall identify, document, and approve cybersecurity roles and RACI assignment for all stakeholders of the cloud services.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Roles and Responsibilities", "Service": "identity" }],
-      "Checks": ["identity_no_resources_in_root_compartment", "identity_non_root_compartment_exists", "identity_tenancy_admin_permissions_limited"]
+      "Name": "1-1-T-1 Cybersecurity Roles and Responsibilities",
+      "Description": "Document and approve cloud-specific cybersecurity roles and a RACI assignment for every stakeholder involved in the tenant's cloud services, extending the entity's existing ECC 1-4-1 governance structure.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Roles and Responsibilities", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "1-2-T-1",
-      "Name": "1-2-T-1 Cloud Cybersecurity Risk Management & Posture",
-      "Description": "Define acceptable risk levels for cloud services, incorporate CST-accredited data classification, and maintain an active cybersecurity risk register for cloud workloads.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Risk Management", "Service": "cloudguard" }],
-      "Checks": ["cloudguard_enabled", "events_rule_cloudguard_problems"]
+      "Name": "1-2-T-1 Cybersecurity Risk Management",
+      "Description": "Define acceptable cloud risk levels, factor the tenant's own data classification into the cybersecurity risk management methodology, and maintain a cloud-specific risk register reviewed periodically.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Risk Management", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "1-3-T-1",
-      "Name": "1-3-T-1 Continuous Cloud Compliance Monitoring",
-      "Description": "Continuous or real-time compliance monitoring of the CSP and cloud resources with relevant national cybersecurity legislation and contract clauses.",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Compliance with Standards, Laws, and Regulations", "Service": "identity" }],
-      "Checks": ["identity_user_mfa_enabled_console_access"]
+      "Name": "1-3-T-1 Compliance with Cybersecurity Standards, Laws and Regulations",
+      "Description": "Continuously monitor the cloud service provider's compliance with relevant national cybersecurity legislation and the cybersecurity clauses of the service contract.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Compliance with Cybersecurity Standards, Laws and Regulations", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "1-4-T-1",
-      "Name": "1-4-T-1 HR Security & Screening for Sensitive Cloud Access",
-      "Description": "Screening or vetting candidates of personnel with access to sensitive cloud functions (Key Management, Tenancy Administration, Access Control).",
-      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity in Human Resources", "Service": "identity" }],
-      "Checks": ["identity_user_mfa_enabled_console_access", "identity_user_api_keys_rotated_90_days"]
+      "Name": "1-4-T-1 Cybersecurity in Human Resources",
+      "Description": "Screen or vet personnel prior to granting them access to sensitive cloud functions such as key management, service administration, or access control.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity in Human Resources", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "2-1-T-1",
-      "Name": "2-1-T-1 Cloud Asset Inventory & CMDB Tracking",
-      "Description": "Maintain an automated, accurate inventory of all cloud services and information and technology assets related to the cloud tenancy.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "compute" }],
-      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
+      "Name": "2-1-T-1 Asset Management",
+      "Description": "Maintain an inventory of every cloud service and every information/technology asset connected to those cloud services.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "2-2-T-1",
-      "Name": "2-2-T-1 Cloud IAM, Session Lockout & Privileged User MFA",
-      "Description": "Lifecycle management of cloud credentials, user credential confidentiality, secure session management/timeout, mandatory MFA for privileged cloud users, and unauthorized access detection threshold.",
+      "Name": "2-2-T-1 Identity and Access Management",
+      "Description": "Manage cloud credentials across their full lifecycle, keep session handling secure (authenticity, lockout, timeout), enforce multi-factor authentication for privileged cloud users, and detect unauthorized access attempts.",
       "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "identity" }],
-      "Checks": ["identity_user_mfa_enabled_console_access", "identity_password_policy_minimum_length_14", "identity_user_api_keys_rotated_90_days", "identity_user_auth_tokens_rotated_90_days"]
+      "Checks": ["identity_user_mfa_enabled_console_access"]
     },
     {
       "Id": "2-3-T-1",
-      "Name": "2-3-T-1 Cloud Community & Tenant Isolation Verification",
-      "Description": "Verify that the CSP isolates community cloud services provided to CSTs (government and CNI entities) from any other cloud computing provided to entities outside scope.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "compute" }],
-      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
+      "Name": "2-3-T-1 Information System and Information Processing Facilities Protection",
+      "Description": "Confirm the cloud provider isolates community cloud services provided to government/CNI tenants from services provided to entities outside that scope.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Information System and Information Processing Facilities Protection", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "2-4-T-1",
-      "Name": "2-4-T-1 Secure Connection Channel with CSP",
-      "Description": "Protect the connection channel with the CSP using secure cryptographic protocols, dedicated private interconnects, and strict VCN firewall rules.",
+      "Name": "2-4-T-1 Networks Security Management",
+      "Description": "Protect the network connection channel between the tenant and the cloud service provider.",
       "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Networks Security Management", "Service": "network" }],
       "Checks": ["network_security_group_ingress_from_internet_to_ssh_port", "network_security_group_ingress_from_internet_to_rdp_port", "network_default_security_list_restricts_traffic"]
     },
     {
       "Id": "2-5-T-1",
-      "Name": "2-5-T-1 Mobile Devices Security & Secure Data Sanitization",
-      "Description": "Data sanitation and secure disposal for end-user devices with access to cloud services.",
+      "Name": "2-5-T-1 Mobile Devices Security",
+      "Description": "Securely sanitize and dispose of end-user mobile devices that have had access to the tenant's cloud services.",
       "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Mobile Devices Security", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
+      "Checks": []
     },
     {
       "Id": "2-6-T-1",
-      "Name": "2-6-T-1 Cloud Data Protection, Exit Strategy & Secure Transfer",
-      "Description": "Exit strategy to ensure secure disposal of data on termination/expiry of contract, and utilizing secure means to export and transfer data and virtual infrastructure.",
+      "Name": "2-6-T-1 Data and Information Protection",
+      "Description": "Maintain a secure exit strategy so tenant data is securely disposed of when the cloud contract ends, and use secure channels to export or transfer data and virtual infrastructure.",
       "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Data and Information Protection", "Service": "objectstorage" }],
-      "Checks": ["objectstorage_bucket_not_publicly_accessible", "objectstorage_bucket_emit_object_events_enabled"]
+      "Checks": ["objectstorage_bucket_not_publicly_accessible", "objectstorage_bucket_encrypted_with_cmk", "blockstorage_block_volume_encrypted_with_cmk", "blockstorage_boot_volume_encrypted_with_cmk"]
     },
     {
       "Id": "2-7-T-1",
-      "Name": "2-7-T-1 Cryptographic Primitives & In-Transit/At-Rest Encryption",
-      "Description": "Technical mechanisms and cryptographic primitives for strong encryption as per National Cryptographic Standards (NCS-1:2020), and encryption of all data transferred to or from cloud.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Cryptography", "Service": "kms" }],
-      "Checks": ["objectstorage_bucket_encrypted_with_cmk", "blockstorage_block_volume_encrypted_with_cmk", "blockstorage_boot_volume_encrypted_with_cmk", "kms_key_rotation_enabled"]
-    },
-    {
-      "Id": "2-8-T-1",
-      "Name": "2-8-T-1 Cloud Backup, Recovery & Medium Protection",
-      "Description": "Securing access, storage, and transfer of cloud data backups and protecting backup media against tampering, deletion, or unauthorized access.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Backup and Recovery Management", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_block_volume_backup_enabled"]
+      "Name": "2-7-T-1 Cryptography",
+      "Description": "Use strong, standards-compliant cryptographic mechanisms (per NCA's National Cryptographic Standards) and encrypt all data transferred to or from the cloud environment.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Cryptography", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "2-9-T-1",
-      "Name": "2-9-T-1 Cloud Vulnerability Assessment & Patch SLA",
-      "Description": "Assessing and remediating vulnerabilities on cloud services at least once every three months, and managing CSP-notified vulnerabilities.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Vulnerabilities Management", "Service": "cloudguard" }],
-      "Checks": ["cloudguard_enabled"]
-    },
-    {
-      "Id": "2-10-T-1",
-      "Name": "2-10-T-1 Periodic Cloud Penetration Testing",
-      "Description": "Conduct simulated cyber-attacks and penetration testing on internet-facing cloud endpoints at least once every six months.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Penetration Testing", "Service": "governance" }],
-      "Checks": [],
-      "AssessmentType": "Manual"
+      "Name": "2-9-T-1 Vulnerabilities Management",
+      "Description": "Assess and remediate vulnerabilities in cloud services at least once every three months, and act on vulnerabilities the cloud provider notifies the tenant about.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Vulnerabilities Management", "Service": "governance" }],
+      "Checks": []
     },
     {
       "Id": "2-11-T-1",
-      "Name": "2-11-T-1 Cloud Login & Security Event Logging",
-      "Description": "Activating and collecting login event logs, audit trails, and cybersecurity event logs on all cloud assets for continuous monitoring.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Event Logs and Monitoring Management", "Service": "audit" }],
-      "Checks": ["audit_log_retention_period_365_days", "events_rule_cloudguard_problems"]
-    },
-    {
-      "Id": "2-12-T-1",
-      "Name": "2-12-T-1 Incident Detection, Forensics & Real-Time Reporting",
-      "Description": "Establish incident handling procedures, real-time reporting of cloud security breaches to NCA, and chain of custody support.",
-      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Incident and Threat Management", "Service": "cloudguard" }],
-      "Checks": ["cloudguard_enabled", "events_rule_cloudguard_problems"]
+      "Name": "2-11-T-1 Cybersecurity Event Logs and Monitoring Management",
+      "Description": "Activate and collect login events and cybersecurity event logs on all cloud service assets, and continuously monitor every log the tenant has enabled.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Cybersecurity Event Logs and Monitoring Management", "Service": "audit" }],
+      "Checks": ["audit_log_retention_period_365_days", "events_rule_iam_policy_changes", "events_rule_security_list_changes", "events_rule_network_security_group_changes", "events_rule_vcn_changes", "events_rule_user_changes"]
     },
     {
       "Id": "2-15-T-1",
-      "Name": "2-15-T-1 Cloud Key Management & External Key Storage",
-      "Description": "Ensure well-defined ownership for cryptographic keys, secure data retrieval mechanisms, and external key backup enforcement.",
+      "Name": "2-15-T-1 Key Management",
+      "Description": "Assign clear ownership for cryptographic keys, and maintain a secure key retrieval/backup mechanism stored outside the cloud environment.",
       "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Key Management", "Service": "kms" }],
       "Checks": ["kms_key_rotation_enabled"]
     },
     {
       "Id": "3-1-T-1",
-      "Name": "3-1-T-1 Cloud Business Continuity & Disaster Recovery (DR)",
-      "Description": "Developing and implementing disaster recovery and business continuity procedures related to cloud computing in a secure manner.",
-      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM", "Service": "blockstorage" }],
-      "Checks": ["blockstorage_block_volume_backup_enabled"]
-    },
-    {
-      "Id": "4-1-T-1",
-      "Name": "4-1-T-1 Cloud Supply Chain & Third-Party Integration Governance",
-      "Description": "Enforce strict third-party provider risk management, security documentation verification, and In-Kingdom SOC/NOC mandates.",
-      "Attributes": [{ "Section": "4. Third-Party Cybersecurity", "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity", "Service": "identity" }],
-      "Checks": ["identity_user_auth_tokens_rotated_90_days", "identity_tenancy_admin_permissions_limited"]
+      "Name": "3-1-T-1 Cybersecurity Resilience Aspects of Business Continuity Management (BCM)",
+      "Description": "Develop and securely implement disaster recovery and business continuity procedures for the tenant's cloud-hosted services.",
+      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Cybersecurity Resilience Aspects of Business Continuity Management (BCM)", "Service": "governance" }],
+      "Checks": []
     }
   ]
 }
