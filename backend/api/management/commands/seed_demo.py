@@ -226,6 +226,8 @@ class Command(BaseCommand):
                 ("pci_4.0_oraclecloud", "PCI-DSS (Payment Card Industry)", "4.0", 0.93, 13, 1, 14),
                 ("hipaa_oraclecloud", "HIPAA Security Rule & HITECH", "2023", 0.91, 10, 1, 11),
                 ("mitre_attack_oraclecloud", "MITRE ATT&CK Cloud Matrix", "v14.1", 0.91, 10, 1, 11),
+                ("rbi_cyber_security_framework_oraclecloud", "RBI Cyber Security Framework", "2024", 0.92, 11, 1, 12),
+                ("soc2_oraclecloud", "SOC 2 Type II (Trust Services Criteria)", "2024", 0.90, 9, 1, 10),
                 # Oracle SaaS Benchmarks (2 Core Frameworks)
                 ("cis_1.0.0_oracle_saas", "CIS Oracle SaaS Foundations Benchmark", "1.0.0", 0.92, 40, 4, 44),
                 ("sod_matrix_oracle_saas", "Oracle SaaS Separation of Duties (SoD)", "2024.1", 0.88, 23, 3, 26),

@@ -1,76 +1,196 @@
 {
   "Framework": "RBI",
-  "Name": "RBI Cyber Security Framework for OCI Banking Workloads",
+  "Name": "RBI Cyber Security Framework for OCI",
   "Version": "2024",
   "Provider": "oraclecloud",
-  "Description": "Reserve Bank of India baseline cyber security and governance controls for cloud banking, payment systems, and financial entities on OCI.",
+  "Description": "Reserve Bank of India (RBI) cyber security and governance controls for cloud banking, payment systems, and financial entities on OCI.",
   "Requirements": [
     {
-      "Id": "RBI-IAM-01",
-      "Name": "Privileged Access Management & Mandatory MFA",
-      "Description": "Mandate two-factor authentication and quarterly credential rotation for all banking administrators on OCI.",
+      "Id": "RBI-1.1",
+      "Name": "Inventory Management & Asset Classification",
+      "Description": "Maintain an updated inventory of all cloud compute, storage, and networking assets.",
       "Attributes": [
         {
-          "Section": "Identity & Access Control",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "1. Inventory Management",
+          "SubSection": "1.1 Asset Inventory",
+          "Service": "compute"
         }
       ],
       "Checks": [
-        "identity_user_mfa_enabled_console_access",
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "RBI-2.1",
+      "Name": "Identity & Access Control: User Authentication & MFA",
+      "Description": "Enforce Multi-Factor Authentication (MFA) for all users accessing the OCI management console.",
+      "Attributes": [
+        {
+          "Section": "2. Identity and Access Management",
+          "SubSection": "2.1 User Authentication",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
+      ]
+    },
+    {
+      "Id": "RBI-2.2",
+      "Name": "Password Policy & Credential Security",
+      "Description": "Enforce strong password complexity rules with a minimum of 14 characters.",
+      "Attributes": [
+        {
+          "Section": "2. Identity and Access Management",
+          "SubSection": "2.2 Password Policy",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14"
+      ]
+    },
+    {
+      "Id": "RBI-2.3",
+      "Name": "Privileged Access Management & API Key Rotation",
+      "Description": "Rotate API keys and user authentication tokens every 90 days to prevent persistent unauthorized access.",
+      "Attributes": [
+        {
+          "Section": "2. Identity and Access Management",
+          "SubSection": "2.3 Privileged Access",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
         "identity_user_api_keys_rotated_90_days",
         "identity_user_auth_tokens_rotated_90_days"
       ]
     },
     {
-      "Id": "RBI-NET-01",
-      "Name": "Perimeter Defense & Direct Internet Access Restriction",
-      "Description": "Ensure database and analytics clusters are isolated in private subnets with no public internet ingress.",
+      "Id": "RBI-3.1",
+      "Name": "Network Security & Ingress Traffic Boundary Filtering",
+      "Description": "Prohibit unrestricted internet ingress to SSH (port 22) and RDP (port 3389) on all subnets.",
       "Attributes": [
         {
-          "Section": "Network Security",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "3. Network Security",
+          "SubSection": "3.1 Perimeter Security",
+          "Service": "network"
         }
       ],
       "Checks": [
-        "database_autonomous_database_access_restricted",
-        "analytics_instance_access_restricted",
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
         "network_default_security_list_restricts_traffic"
       ]
     },
     {
-      "Id": "RBI-DAT-01",
-      "Name": "Customer-Managed Data Encryption & Key Custody",
-      "Description": "Financial records and card transaction stores must be encrypted using dedicated KMS customer keys with annual rotation.",
+      "Id": "RBI-3.2",
+      "Name": "Database & Analytics Workload Network Isolation",
+      "Description": "Ensure database and analytics clusters are isolated in private subnets with no public internet ingress.",
       "Attributes": [
         {
-          "Section": "Data Protection",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "3. Network Security",
+          "SubSection": "3.2 Workload Isolation",
+          "Service": "database"
+        }
+      ],
+      "Checks": [
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted"
+      ]
+    },
+    {
+      "Id": "RBI-4.1",
+      "Name": "Data Protection & Public Access Blocking",
+      "Description": "Prohibit public read/write access to object storage buckets containing banking and customer records.",
+      "Attributes": [
+        {
+          "Section": "4. Data Protection",
+          "SubSection": "4.1 Public Access Block",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_emit_object_events_enabled"
+      ]
+    },
+    {
+      "Id": "RBI-4.2",
+      "Name": "Customer-Managed Key (CMK) Encryption at Rest",
+      "Description": "Encrypt block storage volumes and object buckets with customer-managed keys in OCI Vault.",
+      "Attributes": [
+        {
+          "Section": "4. Data Protection",
+          "SubSection": "4.2 Storage Encryption",
+          "Service": "kms"
         }
       ],
       "Checks": [
         "blockstorage_block_volume_encrypted_with_cmk",
-        "objectstorage_bucket_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
+    },
+    {
+      "Id": "RBI-4.3",
+      "Name": "Cryptographic Key Lifecycle & Automatic Key Rotation",
+      "Description": "Enable automated annual key rotation for all master encryption keys in OCI Vault.",
+      "Attributes": [
+        {
+          "Section": "4. Data Protection",
+          "SubSection": "4.3 Key Management",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
         "kms_key_rotation_enabled"
       ]
     },
     {
-      "Id": "RBI-AUD-01",
-      "Name": "Comprehensive Audit Trail & 365-Day Retention",
-      "Description": "Maintain tamper-evident audit logs of all configuration and transactional events for a minimum of 1 year.",
+      "Id": "RBI-5.1",
+      "Name": "Vulnerability Detection & Security Posture Monitoring",
+      "Description": "Deploy Oracle Cloud Guard to continuously monitor tenancy security posture and alert on anomalies.",
       "Attributes": [
         {
-          "Section": "Audit & Compliance",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "5. Vulnerability Management",
+          "SubSection": "5.1 Posture Monitoring",
+          "Service": "cloudguard"
         }
       ],
       "Checks": [
-        "audit_log_retention_period_365_days",
         "cloudguard_enabled",
         "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "RBI-6.1",
+      "Name": "Comprehensive Audit Trail & 365-Day Retention",
+      "Description": "Maintain tamper-evident audit logs of all configuration and transactional events for a minimum of 365 days.",
+      "Attributes": [
+        {
+          "Section": "6. Audit & Monitoring",
+          "SubSection": "6.1 Audit Logs",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days"
+      ]
+    },
+    {
+      "Id": "RBI-7.1",
+      "Name": "Data Backup & Business Continuity Management",
+      "Description": "Ensure automated backup schedules and recovery capabilities for OCI block storage volumes.",
+      "Attributes": [
+        {
+          "Section": "7. Business Continuity",
+          "SubSection": "7.1 Backup Management",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_backup_enabled"
       ]
     }
   ]
