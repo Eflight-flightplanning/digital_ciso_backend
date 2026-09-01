@@ -1,282 +1,144 @@
 {
-  "Framework": "NCA-CSCC",
-  "Name": "NCA Cloud Cybersecurity Controls (CCC/CSCC)",
+  "Framework": "NCA-CCC",
+  "Name": "NCA Cloud Cybersecurity Controls (CCC-2:2024)",
   "Version": "2:2024",
   "Provider": "oraclecloud",
-  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024 / CSCC) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) on Oracle Cloud Infrastructure (OCI).",
+  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) across 4 Main Domains and 24 Subdomains on Oracle Cloud Infrastructure (OCI).",
   "Requirements": [
     {
       "Id": "1-1-T-1",
-      "Name": "1-1-T-1 Cybersecurity Roles and Responsibilities in OCI",
-      "Description": "Define and enforce clear IAM policies, compartment isolation, and governance boundaries for all tenancy administrators.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-1 Cybersecurity Roles and Responsibilities",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_no_resources_in_root_compartment",
-        "identity_non_root_compartment_exists",
-        "identity_tenancy_admin_permissions_limited"
-      ]
+      "Name": "1-1-T-1 Cloud Cybersecurity Roles and RACI Matrix",
+      "Description": "In addition to ECC 1-4-1, the Authorizing Official shall identify, document, and approve cybersecurity roles and RACI assignment for all stakeholders of the cloud services.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Roles and Responsibilities", "Service": "identity" }],
+      "Checks": ["identity_no_resources_in_root_compartment", "identity_non_root_compartment_exists", "identity_tenancy_admin_permissions_limited"]
     },
     {
       "Id": "1-2-T-1",
-      "Name": "1-2-T-1 OCI Cybersecurity Risk Management & Cloud Guard",
-      "Description": "Enable Oracle Cloud Guard to continuously monitor tenancy security posture, detect misconfigurations, and alert on risk anomalies.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-2 Cybersecurity Risk Management",
-          "Service": "cloudguard"
-        }
-      ],
-      "Checks": [
-        "cloudguard_enabled",
-        "events_rule_cloudguard_problems"
-      ]
+      "Name": "1-2-T-1 Cloud Cybersecurity Risk Management & Posture",
+      "Description": "Define acceptable risk levels for cloud services, incorporate CST-accredited data classification, and maintain an active cybersecurity risk register for cloud workloads.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Risk Management", "Service": "cloudguard" }],
+      "Checks": ["cloudguard_enabled", "events_rule_cloudguard_problems"]
     },
     {
       "Id": "1-3-T-1",
-      "Name": "1-3-T-1 Compliance with Cybersecurity Standards and Regulations",
-      "Description": "Ensure continuous compliance monitoring of OCI compartments and cloud resources against national regulatory mandates.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-3 Compliance with Cybersecurity Standards, Laws, and Regulations",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access"
-      ]
+      "Name": "1-3-T-1 Continuous Cloud Compliance Monitoring",
+      "Description": "Continuous or real-time compliance monitoring of the CSP and cloud resources with relevant national cybersecurity legislation and contract clauses.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Compliance with Standards, Laws, and Regulations", "Service": "identity" }],
+      "Checks": ["identity_user_mfa_enabled_console_access"]
     },
     {
       "Id": "1-4-T-1",
-      "Name": "1-4-T-1 Cybersecurity in Human Resources & Sensitive OCI Functions",
-      "Description": "Personnel with administrative privileges over OCI tenancy root and child compartments must be strictly verified and governed.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-4 Cybersecurity in Human Resources",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access",
-        "identity_user_api_keys_rotated_90_days"
-      ]
+      "Name": "1-4-T-1 HR Security & Screening for Sensitive Cloud Access",
+      "Description": "Screening or vetting candidates of personnel with access to sensitive cloud functions (Key Management, Tenancy Administration, Access Control).",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity in Human Resources", "Service": "identity" }],
+      "Checks": ["identity_user_mfa_enabled_console_access", "identity_user_api_keys_rotated_90_days"]
     },
     {
       "Id": "2-1-T-1",
-      "Name": "2-1-T-1 OCI Cloud Asset Management & Technical Inventory",
-      "Description": "Maintain an updated inventory of all OCI compute instances, block volumes, autonomous databases, and virtual cloud networks.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-1 Asset Management",
-          "Service": "compute"
-        }
-      ],
-      "Checks": [
-        "compute_instance_legacy_metadata_service_endpoint_disabled"
-      ]
+      "Name": "2-1-T-1 Cloud Asset Inventory & CMDB Tracking",
+      "Description": "Maintain an automated, accurate inventory of all cloud services and information and technology assets related to the cloud tenancy.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "compute" }],
+      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
     },
     {
       "Id": "2-2-T-1",
-      "Name": "2-2-T-1 Identity and Access Management & MFA Enforcement",
-      "Description": "Mandate Multi-Factor Authentication (MFA) for console users, strong password policies, and 90-day credential rotation.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-2 Identity and Access Management",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access",
-        "identity_password_policy_minimum_length_14",
-        "identity_user_api_keys_rotated_90_days",
-        "identity_user_auth_tokens_rotated_90_days"
-      ]
+      "Name": "2-2-T-1 Cloud IAM, Session Lockout & Privileged User MFA",
+      "Description": "Lifecycle management of cloud credentials, user credential confidentiality, secure session management/timeout, mandatory MFA for privileged cloud users, and unauthorized access detection threshold.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "identity" }],
+      "Checks": ["identity_user_mfa_enabled_console_access", "identity_password_policy_minimum_length_14", "identity_user_api_keys_rotated_90_days", "identity_user_auth_tokens_rotated_90_days"]
     },
     {
       "Id": "2-3-T-1",
-      "Name": "2-3-T-1 OCI Information Systems & Compute Hardening",
-      "Description": "Harden OCI compute instances, disable legacy metadata endpoints, and enforce secure baseline configurations across workloads.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-3 Information System and Processing Facilities Protection",
-          "Service": "compute"
-        }
-      ],
-      "Checks": [
-        "compute_instance_legacy_metadata_service_endpoint_disabled"
-      ]
+      "Name": "2-3-T-1 Cloud Community & Tenant Isolation Verification",
+      "Description": "Verify that the CSP isolates community cloud services provided to CSTs (government and CNI entities) from any other cloud computing provided to entities outside scope.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "compute" }],
+      "Checks": ["compute_instance_legacy_metadata_service_endpoint_disabled"]
     },
     {
       "Id": "2-4-T-1",
-      "Name": "2-4-T-1 OCI Network Security Management & VCN Ingress Filtering",
-      "Description": "Enforce strict ingress and egress rules on Network Security Groups (NSGs) and Security Lists, prohibiting open internet access to SSH (port 22) and RDP (port 3389).",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-4 Networks Security Management",
-          "Service": "network"
-        }
-      ],
-      "Checks": [
-        "network_security_group_ingress_from_internet_to_ssh_port",
-        "network_security_group_ingress_from_internet_to_rdp_port",
-        "network_default_security_list_restricts_traffic",
-        "database_autonomous_database_access_restricted",
-        "analytics_instance_access_restricted"
-      ]
+      "Name": "2-4-T-1 Secure Connection Channel with CSP",
+      "Description": "Protect the connection channel with the CSP using secure cryptographic protocols, dedicated private interconnects, and strict VCN firewall rules.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Networks Security Management", "Service": "network" }],
+      "Checks": ["network_security_group_ingress_from_internet_to_ssh_port", "network_security_group_ingress_from_internet_to_rdp_port", "network_default_security_list_restricts_traffic"]
+    },
+    {
+      "Id": "2-5-T-1",
+      "Name": "2-5-T-1 Mobile Devices Security & Secure Data Sanitization",
+      "Description": "Data sanitation and secure disposal for end-user devices with access to cloud services.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Mobile Devices Security", "Service": "governance" }],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-6-T-1",
-      "Name": "2-6-T-1 OCI Object Storage Data Protection & Public Access Block",
-      "Description": "Ensure all OCI object storage buckets are private, public access is disabled, and bucket emission events are logged.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-6 Data and Information Protection",
-          "Service": "objectstorage"
-        }
-      ],
-      "Checks": [
-        "objectstorage_bucket_not_publicly_accessible",
-        "objectstorage_bucket_emit_object_events_enabled"
-      ]
+      "Name": "2-6-T-1 Cloud Data Protection, Exit Strategy & Secure Transfer",
+      "Description": "Exit strategy to ensure secure disposal of data on termination/expiry of contract, and utilizing secure means to export and transfer data and virtual infrastructure.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Data and Information Protection", "Service": "objectstorage" }],
+      "Checks": ["objectstorage_bucket_not_publicly_accessible", "objectstorage_bucket_emit_object_events_enabled"]
     },
     {
       "Id": "2-7-T-1",
-      "Name": "2-7-T-1 OCI Cryptography & Customer-Managed Key (CMK) Encryption",
-      "Description": "Enforce encryption with customer-managed keys (CMK) for block volumes, boot volumes, and object buckets with automated KMS key rotation.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-7 Cryptography",
-          "Service": "kms"
-        }
-      ],
-      "Checks": [
-        "objectstorage_bucket_encrypted_with_cmk",
-        "blockstorage_block_volume_encrypted_with_cmk",
-        "blockstorage_boot_volume_encrypted_with_cmk",
-        "kms_key_rotation_enabled"
-      ]
+      "Name": "2-7-T-1 Cryptographic Primitives & In-Transit/At-Rest Encryption",
+      "Description": "Technical mechanisms and cryptographic primitives for strong encryption as per National Cryptographic Standards (NCS-1:2020), and encryption of all data transferred to or from cloud.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Cryptography", "Service": "kms" }],
+      "Checks": ["objectstorage_bucket_encrypted_with_cmk", "blockstorage_block_volume_encrypted_with_cmk", "blockstorage_boot_volume_encrypted_with_cmk", "kms_key_rotation_enabled"]
     },
     {
       "Id": "2-8-T-1",
-      "Name": "2-8-T-1 OCI Backup, Recovery and Resilience Management",
-      "Description": "Ensure automated backup schedules, cross-region replication, and disaster recovery capability for OCI block storage and databases.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-8 Backup and Recovery Management",
-          "Service": "blockstorage"
-        }
-      ],
-      "Checks": [
-        "blockstorage_block_volume_backup_enabled"
-      ]
+      "Name": "2-8-T-1 Cloud Backup, Recovery & Medium Protection",
+      "Description": "Securing access, storage, and transfer of cloud data backups and protecting backup media against tampering, deletion, or unauthorized access.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Backup and Recovery Management", "Service": "blockstorage" }],
+      "Checks": ["blockstorage_block_volume_backup_enabled"]
     },
     {
       "Id": "2-9-T-1",
-      "Name": "2-9-T-1 OCI Vulnerability Detection & Cloud Threat Assessment",
-      "Description": "Continuously assess vulnerabilities and misconfigurations in OCI compute, databases, and network architectures.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-9 Vulnerabilities Management",
-          "Service": "cloudguard"
-        }
-      ],
-      "Checks": [
-        "cloudguard_enabled"
-      ]
+      "Name": "2-9-T-1 Cloud Vulnerability Assessment & Patch SLA",
+      "Description": "Assessing and remediating vulnerabilities on cloud services at least once every three months, and managing CSP-notified vulnerabilities.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Vulnerabilities Management", "Service": "cloudguard" }],
+      "Checks": ["cloudguard_enabled"]
+    },
+    {
+      "Id": "2-10-T-1",
+      "Name": "2-10-T-1 Periodic Cloud Penetration Testing",
+      "Description": "Conduct simulated cyber-attacks and penetration testing on internet-facing cloud endpoints at least once every six months.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Penetration Testing", "Service": "governance" }],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-11-T-1",
-      "Name": "2-11-T-1 OCI Event Logs, Audit Trails & 365-Day Retention",
-      "Description": "Retain OCI audit logs for at least 365 days and enable event notification rules for critical security actions.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-11 Cybersecurity Event Logs and Monitoring Management",
-          "Service": "audit"
-        }
-      ],
-      "Checks": [
-        "audit_log_retention_period_365_days",
-        "events_rule_cloudguard_problems"
-      ]
+      "Name": "2-11-T-1 Cloud Login & Security Event Logging",
+      "Description": "Activating and collecting login event logs, audit trails, and cybersecurity event logs on all cloud assets for continuous monitoring.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Event Logs and Monitoring Management", "Service": "audit" }],
+      "Checks": ["audit_log_retention_period_365_days", "events_rule_cloudguard_problems"]
     },
     {
       "Id": "2-12-T-1",
-      "Name": "2-12-T-1 OCI Security Incident Detection & Threat Management",
-      "Description": "Enable Cloud Guard and event rules to detect and respond to security threats across all tenancy compartments.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-12 Cybersecurity Incident and Threat Management",
-          "Service": "cloudguard"
-        }
-      ],
-      "Checks": [
-        "cloudguard_enabled",
-        "events_rule_cloudguard_problems"
-      ]
+      "Name": "2-12-T-1 Incident Detection, Forensics & Real-Time Reporting",
+      "Description": "Establish incident handling procedures, real-time reporting of cloud security breaches to NCA, and chain of custody support.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Incident and Threat Management", "Service": "cloudguard" }],
+      "Checks": ["cloudguard_enabled", "events_rule_cloudguard_problems"]
     },
     {
       "Id": "2-15-T-1",
-      "Name": "2-15-T-1 OCI Key Vault & KMS Cryptographic Management",
-      "Description": "Ensure all master encryption keys in OCI Vault are actively rotated, protected against deletion, and monitored.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-15 Key Management",
-          "Service": "kms"
-        }
-      ],
-      "Checks": [
-        "kms_key_rotation_enabled"
-      ]
+      "Name": "2-15-T-1 Cloud Key Management & External Key Storage",
+      "Description": "Ensure well-defined ownership for cryptographic keys, secure data retrieval mechanisms, and external key backup enforcement.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Key Management", "Service": "kms" }],
+      "Checks": ["kms_key_rotation_enabled"]
     },
     {
       "Id": "3-1-T-1",
-      "Name": "3-1-T-1 OCI Business Continuity & Disaster Recovery (BCM)",
-      "Description": "Establish multi-availability domain and cross-region disaster recovery architecture for OCI critical workloads.",
-      "Attributes": [
-        {
-          "Section": "3. Cybersecurity Resilience",
-          "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM",
-          "Service": "blockstorage"
-        }
-      ],
-      "Checks": [
-        "blockstorage_block_volume_backup_enabled"
-      ]
+      "Name": "3-1-T-1 Cloud Business Continuity & Disaster Recovery (DR)",
+      "Description": "Developing and implementing disaster recovery and business continuity procedures related to cloud computing in a secure manner.",
+      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM", "Service": "blockstorage" }],
+      "Checks": ["blockstorage_block_volume_backup_enabled"]
     },
     {
       "Id": "4-1-T-1",
-      "Name": "4-1-T-1 OCI Supply Chain & Third-Party Integration Security",
-      "Description": "Restrict third-party API integration and verify least-privilege policies for third-party access tokens and IAM groups.",
-      "Attributes": [
-        {
-          "Section": "4. Third-Party Cybersecurity",
-          "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity",
-          "Service": "identity"
-        }
-      ],
-      "Checks": [
-        "identity_user_auth_tokens_rotated_90_days",
-        "identity_tenancy_admin_permissions_limited"
-      ]
+      "Name": "4-1-T-1 Cloud Supply Chain & Third-Party Integration Governance",
+      "Description": "Enforce strict third-party provider risk management, security documentation verification, and In-Kingdom SOC/NOC mandates.",
+      "Attributes": [{ "Section": "4. Third-Party Cybersecurity", "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity", "Service": "identity" }],
+      "Checks": ["identity_user_auth_tokens_rotated_90_days", "identity_tenancy_admin_permissions_limited"]
     }
   ]
 }

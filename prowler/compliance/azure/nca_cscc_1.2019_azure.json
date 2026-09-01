@@ -1,363 +1,144 @@
 {
-  "Framework": "NCA-CSCC",
-  "Name": "NCA Cloud Cybersecurity Controls (CCC/CSCC)",
+  "Framework": "NCA-CCC",
+  "Name": "NCA Cloud Cybersecurity Controls (CCC-2:2024)",
   "Version": "2:2024",
   "Provider": "Azure",
-  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024 / CSCC) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) in the Kingdom of Saudi Arabia.",
+  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) across 4 Main Domains and 24 Subdomains on Microsoft Azure.",
   "Requirements": [
     {
       "Id": "1-1-T-1",
-      "Name": "1-1-T-1 Cybersecurity Roles and Responsibilities in Cloud",
-      "Description": "Cybersecurity roles, responsibilities, and RACI matrix for cloud services stakeholders, administrators, and Authorizing Officials must be clearly defined, documented, and approved.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-1 Cybersecurity Roles and Responsibilities",
-          "Service": "entra"
-        }
-      ],
-      "Checks": [
-        "entra_global_admin_in_less_than_five_users",
-        "iam_custom_roles_least_privileges",
-        "entra_policy_default_users_cannot_create_security_groups",
-        "entra_policy_ensure_default_user_cannot_create_apps"
-      ]
+      "Name": "1-1-T-1 Cloud Cybersecurity Roles and RACI Matrix",
+      "Description": "In addition to ECC 1-4-1, the Authorizing Official shall identify, document, and approve cybersecurity roles and RACI assignment for all stakeholders of the cloud services.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-1 Cybersecurity Roles and Responsibilities", "Service": "entra" }],
+      "Checks": ["entra_global_admin_in_less_than_five_users", "iam_custom_roles_least_privileges"]
     },
     {
       "Id": "1-2-T-1",
       "Name": "1-2-T-1 Cloud Cybersecurity Risk Management & Posture",
-      "Description": "Establish a continuous cloud cybersecurity risk assessment methodology, risk register, and automated threat posture monitoring for all cloud assets.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-2 Cybersecurity Risk Management",
-          "Service": "defender"
-        }
-      ],
-      "Checks": [
-        "defender_ensure_defender_for_server_is_on",
-        "defender_ensure_defender_for_arm_is_on",
-        "defender_ensure_defender_for_storage_is_on",
-        "defender_ensure_defender_for_keyvault_is_on",
-        "defender_ensure_defender_for_containers_is_on",
-        "defender_ensure_defender_for_azure_sql_databases_is_on"
-      ]
+      "Description": "Define acceptable risk levels for cloud services, incorporate CST-accredited data classification, and maintain an active cybersecurity risk register for cloud workloads.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-2 Cybersecurity Risk Management", "Service": "defender" }],
+      "Checks": ["defender_ensure_defender_for_server_is_on", "defender_ensure_defender_for_arm_is_on"]
     },
     {
       "Id": "1-3-T-1",
-      "Name": "1-3-T-1 Compliance with Cybersecurity Standards and Regulations",
-      "Description": "Ensure continuous, real-time compliance monitoring of cloud subscriptions, policies, and resources against national regulatory mandates.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-3 Compliance with Cybersecurity Standards, Laws, and Regulations",
-          "Service": "policy"
-        }
-      ],
-      "Checks": [
-        "policy_ensure_asc_enforcement_enabled",
-        "entra_security_defaults_enabled"
-      ]
+      "Name": "1-3-T-1 Continuous Cloud Compliance Monitoring",
+      "Description": "Continuous or real-time compliance monitoring of the CSP and cloud resources with relevant national cybersecurity legislation and contract clauses.",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-3 Compliance with Standards, Laws, and Regulations", "Service": "policy" }],
+      "Checks": ["policy_ensure_asc_enforcement_enabled", "entra_security_defaults_enabled"]
     },
     {
       "Id": "1-4-T-1",
-      "Name": "1-4-T-1 Cybersecurity in Human Resources & Sensitive Operations",
-      "Description": "Personnel with privileged access to sensitive cloud functions (Key Management, Cloud Administration, IAM) must undergo strict verification and access reviews.",
-      "Attributes": [
-        {
-          "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-4 Cybersecurity in Human Resources",
-          "Service": "entra"
-        }
-      ],
-      "Checks": [
-        "entra_privileged_user_has_mfa",
-        "iam_custom_roles_least_privileges"
-      ]
+      "Name": "1-4-T-1 HR Security & Screening for Sensitive Cloud Access",
+      "Description": "Screening or vetting candidates of personnel with access to sensitive cloud functions (Key Management, Tenancy Administration, Access Control).",
+      "Attributes": [{ "Section": "1. Cybersecurity Governance", "SubSection": "1-4 Cybersecurity in Human Resources", "Service": "entra" }],
+      "Checks": ["entra_privileged_user_has_mfa", "iam_custom_roles_least_privileges"]
     },
     {
       "Id": "2-1-T-1",
-      "Name": "2-1-T-1 Cloud Asset Management and Technical Inventory",
-      "Description": "Maintain an accurate, updated, and automated inventory of all cloud subscriptions, virtual networks, compute instances, databases, and serverless assets.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-1 Asset Management",
-          "Service": "vm"
-        }
-      ],
-      "Checks": [
-        "vm_trusted_launch_enabled",
-        "vm_secure_boot_enabled",
-        "vm_vtpm_enabled",
-        "app_ensure_auth_is_set_up"
-      ]
+      "Name": "2-1-T-1 Cloud Asset Inventory & CMDB Tracking",
+      "Description": "Maintain an automated, accurate inventory of all cloud services and information and technology assets related to the cloud tenancy.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-1 Asset Management", "Service": "vm" }],
+      "Checks": ["vm_trusted_launch_enabled"]
     },
     {
       "Id": "2-2-T-1",
-      "Name": "2-2-T-1 Cloud Identity, Privileged Access & MFA Management",
-      "Description": "Enforce mandatory Multi-Factor Authentication (MFA) for privileged and remote cloud users, least privilege authorization, secure session lockouts, and prompt revoking of unused credentials.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-2 Identity and Access Management",
-          "Service": "entra"
-        }
-      ],
-      "Checks": [
-        "entra_privileged_user_has_mfa",
-        "entra_non_privileged_user_has_mfa",
-        "entra_conditional_access_policy_require_mfa_for_management_api",
-        "entra_user_with_vm_access_has_mfa",
-        "sqlserver_azuread_administrator_enabled"
-      ]
+      "Name": "2-2-T-1 Cloud IAM, Session Lockout & Privileged User MFA",
+      "Description": "Lifecycle management of cloud credentials, user credential confidentiality, secure session management/timeout, mandatory MFA for privileged cloud users, and unauthorized access detection threshold.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-2 Identity and Access Management", "Service": "entra" }],
+      "Checks": ["entra_non_privileged_user_has_mfa", "entra_privileged_user_has_mfa", "entra_user_with_vm_access_has_mfa", "entra_conditional_access_policy_require_mfa_for_management_api"]
     },
     {
       "Id": "2-3-T-1",
-      "Name": "2-3-T-1 Cloud System Isolation & Information Processing Protection",
-      "Description": "Ensure complete separation and isolation of cloud workloads, hardened baseline configurations, endpoint detection (EDR), and prevention of unauthorized system modifications.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-3 Information System and Processing Facilities Protection",
-          "Service": "vm"
-        }
-      ],
-      "Checks": [
-        "vm_trusted_launch_enabled",
-        "vm_secure_boot_enabled",
-        "vm_vtpm_enabled",
-        "vm_ensure_os_disk_is_encrypted_with_cmk",
-        "app_ensure_auth_is_set_up"
-      ]
+      "Name": "2-3-T-1 Cloud Community & Tenant Isolation Verification",
+      "Description": "Verify that the CSP isolates community cloud services provided to CSTs (government and CNI entities) from any other cloud computing provided to entities outside scope.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-3 Systems and Processing Facilities Protection", "Service": "vm" }],
+      "Checks": ["vm_trusted_launch_enabled"]
     },
     {
       "Id": "2-4-T-1",
-      "Name": "2-4-T-1 Cloud Network Security Management & Segmentation",
-      "Description": "Implement virtual network segmentation, Network Security Groups (NSGs), firewall filtering on management ports (SSH 22, RDP 3389), private endpoints, and DDoS protection.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-4 Networks Security Management",
-          "Service": "network"
-        }
-      ],
-      "Checks": [
-        "network_http_internet_access_restricted",
-        "network_rdp_internet_access_restricted",
-        "network_ssh_internet_access_restricted",
-        "network_all_inbound_traffic_restricted",
-        "aks_network_policy_enabled",
-        "aks_clusters_public_access_disabled",
-        "aks_clusters_created_with_private_nodes",
-        "sqlserver_firewall_rule_allows_internet_access"
-      ]
+      "Name": "2-4-T-1 Secure Connection Channel with CSP",
+      "Description": "Protect the connection channel with the CSP using secure cryptographic protocols, dedicated private interconnects, and strict VCN firewall rules.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-4 Networks Security Management", "Service": "network" }],
+      "Checks": ["network_rdp_internet_access_restricted", "network_ssh_internet_access_restricted", "network_http_internet_access_restricted"]
     },
     {
       "Id": "2-5-T-1",
-      "Name": "2-5-T-1 Mobile & Remote Cloud Management Device Security",
-      "Description": "Enforce secure sanitation, screen lockouts, and centralized compliance policies on devices connecting to cloud administration interfaces.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-5 Mobile Devices Security",
-          "Service": "entra"
-        }
-      ],
-      "Checks": [
-        "entra_conditional_access_policy_require_mfa_for_management_api"
-      ]
+      "Name": "2-5-T-1 Mobile Devices Security & Secure Data Sanitization",
+      "Description": "Data sanitation and secure disposal for end-user devices with access to cloud services.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-5 Mobile Devices Security", "Service": "governance" }],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-6-T-1",
-      "Name": "2-6-T-1 Cloud Data Protection, Classification & Public Access Block",
-      "Description": "Prohibit public access to cloud storage containers, enforce secure transfer protocols (TLS 1.2+), and classify sensitive information stored across cloud services.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-6 Data and Information Protection",
-          "Service": "storage"
-        }
-      ],
-      "Checks": [
-        "storage_blob_public_access_level_is_disabled",
-        "storage_ensure_https_traffic_only_is_enabled",
-        "storage_ensure_minimum_tls_version_12",
-        "storage_infrastructure_encryption_is_enabled",
-        "storage_ensure_private_endpoints_in_storage_accounts"
-      ]
+      "Name": "2-6-T-1 Cloud Data Protection, Exit Strategy & Secure Transfer",
+      "Description": "Exit strategy to ensure secure disposal of data on termination/expiry of contract, and utilizing secure means to export and transfer data and virtual infrastructure.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-6 Data and Information Protection", "Service": "storage" }],
+      "Checks": ["storage_blob_public_access_level_is_disabled", "storage_secure_transfer_required_is_enabled"]
     },
     {
       "Id": "2-7-T-1",
-      "Name": "2-7-T-1 Cloud Cryptography & Transit/Rest Encryption",
-      "Description": "Apply strong cryptographic primitives according to National Cryptographic Standards (NCS), customer-managed keys (CMK), and TLS encryption for all data in-transit and at-rest.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-7 Cryptography",
-          "Service": "storage"
-        }
-      ],
-      "Checks": [
-        "storage_customer_managed_key_encryption_enabled",
-        "sqlserver_tde_encryption_enabled",
-        "cosmosdb_account_encryption_at_rest_with_cmk",
-        "mysql_flexible_server_ssl_connection_enabled",
-        "postgresql_flexible_server_enforce_ssl_enabled"
-      ]
+      "Name": "2-7-T-1 Cryptographic Primitives & In-Transit/At-Rest Encryption",
+      "Description": "Technical mechanisms and cryptographic primitives for strong encryption as per National Cryptographic Standards (NCS-1:2020), and encryption of all data transferred to or from cloud.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-7 Cryptography", "Service": "keyvault" }],
+      "Checks": ["keyvault_key_rotation_enabled", "keyvault_access_only_through_private_endpoints", "storage_ensure_encryption_with_customer_managed_keys"]
     },
     {
       "Id": "2-8-T-1",
-      "Name": "2-8-T-1 Cloud Backup and Disaster Recovery Management",
-      "Description": "Ensure regular, secure, and isolated backups of cloud databases, virtual disks, and application configurations with verified periodic recovery tests.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-8 Backup and Recovery Management",
-          "Service": "recovery"
-        }
-      ],
-      "Checks": [
-        "recovery_backup_reports_configured",
-        "sqlserver_auditing_retention_greater_than_90_days"
-      ]
+      "Name": "2-8-T-1 Cloud Backup, Recovery & Medium Protection",
+      "Description": "Securing access, storage, and transfer of cloud data backups and protecting backup media against tampering, deletion, or unauthorized access.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-8 Backup and Recovery Management", "Service": "vm" }],
+      "Checks": ["vm_backup_enabled"]
     },
     {
       "Id": "2-9-T-1",
-      "Name": "2-9-T-1 Cloud Vulnerability & Patch Management",
-      "Description": "Conduct continuous vulnerability scans, automated OS patching, container image scanning, and timely remediation of high/critical cloud security flaws.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-9 Vulnerabilities Management",
-          "Service": "defender"
-        }
-      ],
-      "Checks": [
-        "defender_ensure_defender_for_server_is_on",
-        "defender_ensure_defender_for_containers_is_on",
-        "sqlserver_vulnerability_assessment_enabled"
-      ]
+      "Name": "2-9-T-1 Cloud Vulnerability Assessment & Patch SLA",
+      "Description": "Assessing and remediating vulnerabilities on cloud services at least once every three months, and managing CSP-notified vulnerabilities.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-9 Vulnerabilities Management", "Service": "defender" }],
+      "Checks": ["defender_auto_provisioning_vulnerabilty_assessments_machines_on"]
     },
     {
       "Id": "2-10-T-1",
-      "Name": "2-10-T-1 Cloud Penetration Testing & Defense Verification",
-      "Description": "Periodically assess the resilience of cloud workloads, APIs, and public endpoints through authorized penetration testing and attack simulations.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-10 Penetration Testing",
-          "Service": "network"
-        }
-      ],
-      "Checks": [
-        "network_all_inbound_traffic_restricted",
-        "app_ensure_auth_is_set_up"
-      ]
+      "Name": "2-10-T-1 Periodic Cloud Penetration Testing",
+      "Description": "Conduct simulated cyber-attacks and penetration testing on internet-facing cloud endpoints at least once every six months.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-10 Penetration Testing", "Service": "governance" }],
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "2-11-T-1",
-      "Name": "2-11-T-1 Cloud Event Logs, SIEM Integration & 12-Month Retention",
-      "Description": "Activate and protect comprehensive audit logs (Activity Logs, Diagnostic Logs, Network Flow Logs), stream them to centralized SIEM, and retain for a minimum of 12 months.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-11 Cybersecurity Event Logs and Monitoring Management",
-          "Service": "monitor"
-        }
-      ],
-      "Checks": [
-        "monitor_diagnostic_settings_exists",
-        "monitor_activity_log_retention_policy_365_days",
-        "network_flow_log_more_than_90_days",
-        "keyvault_logging_enabled",
-        "sqlserver_auditing_enabled"
-      ]
+      "Name": "2-11-T-1 Cloud Login & Security Event Logging",
+      "Description": "Activating and collecting login event logs, audit trails, and cybersecurity event logs on all cloud assets for continuous monitoring.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-11 Event Logs and Monitoring Management", "Service": "monitor" }],
+      "Checks": ["monitor_diagnostic_settings_exists", "keyvault_logging_enabled"]
     },
     {
       "Id": "2-12-T-1",
-      "Name": "2-12-T-1 Cloud Incident Response & Threat Intelligence",
-      "Description": "Implement automated threat detection, incident response procedures, real-time alert notifications, and statutory incident reporting to NCA.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-12 Cybersecurity Incident and Threat Management",
-          "Service": "defender"
-        }
-      ],
-      "Checks": [
-        "defender_ensure_defender_for_server_is_on",
-        "defender_ensure_defender_for_arm_is_on",
-        "appinsights_smart_detection_enabled"
-      ]
-    },
-    {
-      "Id": "2-14-T-1",
-      "Name": "2-14-T-1 Cloud Web Application & API Security (WAF)",
-      "Description": "Protect external web apps, microservices, and APIs using Web Application Firewalls (WAF), HTTPS enforcement, and client certificate authentication.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-14 Web Application Security",
-          "Service": "app"
-        }
-      ],
-      "Checks": [
-        "app_ensure_http_is_redirected_to_https",
-        "app_ensure_minimum_tls_version_is_12",
-        "app_client_certificates_on",
-        "app_ensure_auth_is_set_up"
-      ]
+      "Name": "2-12-T-1 Incident Detection, Forensics & Real-Time Reporting",
+      "Description": "Establish incident handling procedures, real-time reporting of cloud security breaches to NCA, and chain of custody support.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-12 Incident and Threat Management", "Service": "defender" }],
+      "Checks": ["defender_ensure_notify_alerts_severity_is_high", "defender_ensure_notify_emails_to_owners"]
     },
     {
       "Id": "2-15-T-1",
-      "Name": "2-15-T-1 Cryptographic Key Management & Vault Protection",
-      "Description": "Store and manage cryptographic keys, secrets, and certificates in dedicated HSM/Key Vaults with purge protection, auto-rotation, and strict RBAC.",
-      "Attributes": [
-        {
-          "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-15 Key Management",
-          "Service": "keyvault"
-        }
-      ],
-      "Checks": [
-        "keyvault_vault_recoverable",
-        "keyvault_purge_protection_enabled",
-        "keyvault_private_endpoints_enabled",
-        "keyvault_rbac_enabled"
-      ]
+      "Name": "2-15-T-1 Cloud Key Management & External Key Storage",
+      "Description": "Ensure well-defined ownership for cryptographic keys, secure data retrieval mechanisms, and external key backup enforcement.",
+      "Attributes": [{ "Section": "2. Cybersecurity Defense", "SubSection": "2-15 Key Management", "Service": "keyvault" }],
+      "Checks": ["keyvault_key_rotation_enabled"]
     },
     {
       "Id": "3-1-T-1",
-      "Name": "3-1-T-1 Cloud Business Continuity & Resilience (BCM)",
-      "Description": "Develop, document, and test cloud disaster recovery procedures, multi-region failover, and high availability architectures for critical systems.",
-      "Attributes": [
-        {
-          "Section": "3. Cybersecurity Resilience",
-          "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM",
-          "Service": "recovery"
-        }
-      ],
-      "Checks": [
-        "recovery_backup_reports_configured",
-        "sqlserver_auditing_retention_greater_than_90_days"
-      ]
+      "Name": "3-1-T-1 Cloud Business Continuity & Disaster Recovery (DR)",
+      "Description": "Developing and implementing disaster recovery and business continuity procedures related to cloud computing in a secure manner.",
+      "Attributes": [{ "Section": "3. Cybersecurity Resilience", "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM", "Service": "storage" }],
+      "Checks": ["storage_geo_redundant_enabled"]
     },
     {
       "Id": "4-1-T-1",
-      "Name": "4-1-T-1 Cloud Supply Chain & Third-Party Cybersecurity",
-      "Description": "Enforce cybersecurity requirements in third-party cloud agreements, managed service providers, and cloud marketplace integrations.",
-      "Attributes": [
-        {
-          "Section": "4. Third-Party Cybersecurity",
-          "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity",
-          "Service": "entra"
-        }
-      ],
-      "Checks": [
-        "entra_policy_ensure_default_user_cannot_create_apps",
-        "iam_custom_roles_least_privileges"
-      ]
+      "Name": "4-1-T-1 Cloud Supply Chain & Third-Party Integration Governance",
+      "Description": "Enforce strict third-party provider risk management, security documentation verification, and In-Kingdom SOC/NOC mandates.",
+      "Attributes": [{ "Section": "4. Third-Party Cybersecurity", "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity", "Service": "entra" }],
+      "Checks": ["entra_policy_guest_users_access_restrictions"]
     }
   ]
 }

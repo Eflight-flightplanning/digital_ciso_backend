@@ -5109,12 +5109,22 @@ class ComplianceOverviewViewSet(
                 self.get_queryset(), self.filterset_class
             )
 
+        # Group only by requirement_id (+ framework/version, constant within one
+        # compliance_id). `description` must NOT be a group-by column: if a
+        # requirement_id ever has more than one distinct description value across
+        # its underlying rows — e.g. leftover rows from an older version of the
+        # compliance template, or (for a shared requirement_id like "2-11-T-1")
+        # rows belonging to a different provider's compliance_id under the same
+        # framework label — grouping on it would silently split one real
+        # requirement into multiple summary rows with mismatched counts, instead
+        # of the one deterministic row per requirement the frontend expects.
+        # Max() picks a single stable description regardless of how many rows exist.
         all_requirements = filtered_queryset.values(
             "requirement_id",
             "framework",
             "version",
-            "description",
         ).annotate(
+            description=Max("description"),
             total_instances=Count("id"),
             manual_count=Count("id", filter=Q(requirement_status="MANUAL")),
             passed_findings_sum=Sum("passed_findings"),
