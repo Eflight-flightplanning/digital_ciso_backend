@@ -108,10 +108,10 @@ class VLLMAzureProvider(AIProvider):
                     messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": user_prompt})
 
-        # Calculate dynamic token ceiling to ensure input_tokens + max_tokens <= 3900 (vLLM max_model_len is 4096)
+        # Calculate dynamic token ceiling to ensure input_tokens + max_tokens <= 7800 (vLLM max_model_len is 8192)
         total_prompt_chars = sum(len(m.get("content", "")) for m in messages)
         est_input_tokens = int(total_prompt_chars / 3.2) + 30
-        safe_max_tokens = max(350, min(max_tokens, 3900 - est_input_tokens))
+        safe_max_tokens = max(500, min(max_tokens, 7800 - est_input_tokens))
 
         payload = {
             "model": self.model,
