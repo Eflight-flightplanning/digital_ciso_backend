@@ -2813,7 +2813,9 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
 
     def get_queryset(self):
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        base_queryset = AttackPathsScan.objects.filter(tenant_id=self.request.tenant_id)
+        base_queryset = AttackPathsScan.objects.filter(tenant_id=self.request.tenant_id).exclude(
+            provider__provider__iexact="oracle_saas"
+        )
 
         if user_roles.unlimited_visibility:
             queryset = base_queryset

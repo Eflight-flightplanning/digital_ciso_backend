@@ -234,7 +234,33 @@ function layoutGraph(
 function AttackPathsPage() {
   const searchParams = Route.useSearch();
   const { data: scansData, isLoading: scansLoading } = useAttackPaths();
-  const scans = (scansData?.items as Array<Record<string, any>>) ?? [];
+  const scans = useMemo(() => {
+    const raw = (scansData?.items as Array<Record<string, any>>) ?? [];
+    return raw.filter((s) => {
+      const pType = String(
+        s.provider_type ||
+          (typeof s.provider === "string" ? s.provider : "") ||
+          (s.provider as any)?.provider ||
+          ""
+      ).toLowerCase();
+      const pAlias = String(
+        s.provider_alias ||
+          (typeof s.provider === "object" ? (s.provider as any)?.alias : "") ||
+          s.provider_uid ||
+          ""
+      ).toLowerCase();
+      // Exclude Oracle SaaS from Attack Paths
+      if (
+        pType === "oracle_saas" ||
+        pType === "fusion" ||
+        pAlias.includes("saas") ||
+        pAlias.includes("fusion")
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [scansData]);
 
   const [selectedScanId, setSelectedScanId] = useState<string>("");
   useEffect(() => {

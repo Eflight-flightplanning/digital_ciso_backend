@@ -197,9 +197,10 @@ class Command(BaseCommand):
                 except Exception as exc:
                     self.stdout.write(f"  [WARN] Compliance requirement materialization note for {demo_scan.provider.provider}: {exc}")
 
-            # Attack Paths Scans — Seed completed attack path graph state for all tenant providers
+            # Attack Paths Scans — Seed completed attack path graph state for cloud providers (excluding SaaS)
             from api.models import AttackPathsScan
-            for p in Provider.objects.filter(tenant=tenant):
+            AttackPathsScan.objects.filter(tenant=tenant, provider__provider__iexact="oracle_saas").delete()
+            for p in Provider.objects.filter(tenant=tenant).exclude(provider__iexact="oracle_saas"):
                 AttackPathsScan.objects.update_or_create(
                     tenant=tenant,
                     provider=p,
@@ -212,7 +213,7 @@ class Command(BaseCommand):
                         "is_migrated": True,
                     }
                 )
-            self.stdout.write("  [OK] Attack Paths Scans seeded: Completed graph state enabled for all providers")
+            self.stdout.write("  [OK] Attack Paths Scans seeded: Completed graph state enabled for cloud providers")
 
             # Compliance Frameworks — Exact requirement counts from Prowler's official JSON definitions
             frameworks_data = [
