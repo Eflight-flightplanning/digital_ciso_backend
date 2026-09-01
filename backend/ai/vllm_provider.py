@@ -160,63 +160,45 @@ class VLLMAzureProvider(AIProvider):
             if tp_prefix in text:
                 text = text.split(tp_prefix)[-1].strip()
 
-        # 3. Detect verbose scratchpad/reasoning leakage patterns
-        _SCRATCHPAD_START_HEADERS = (
-            "user question:",
-            "user: asks for",
-            "user:",
-            "finding details:",
-            "critical rule:",
-            "constraint:",
-            "specific rule:",
-            "evaluate telemetry:",
-            "drafting the response:",
-            "mental model:",
-            "my reasoning is:",
-            "system instruction:",
-            "critical constraint:",
-            "anti-hallucination:",
-            "thinking steps:",
-            "meaning: this finding",
-            "meaning:",
-            "interpretation:",
-            "correction:",
-            "wait, let's",
-            "actually, looking",
+        # 3. Aggressively strip scratchpad / reasoning lines from the beginning of response
+        scratchpad_prefixes = (
+            "analyze the request", "analyze:", "role:", "task:", "constraint:", "input data:",
+            "user question:", "user:", "finding details:", "critical rule:", "specific rule:",
+            "evaluate telemetry:", "drafting the response:", "mental model:", "my reasoning is:",
+            "system instruction:", "critical constraint:", "anti-hallucination:", "thinking steps:",
+            "meaning:", "interpretation:", "correction:", "verify template", "headline:",
+            "drafting:", "reasoning:", "let's check", "wait,", "actually,", "telemetry:",
+            "risk:", "remediation template", "how to respond"
         )
-        _ANSWER_RESUME_MARKERS = (
-            "### 1.",
-            "### security risk",
-            "### attack path",
-            "### root cause",
-            "### step-by-step",
-            "## security risk",
-            "## risk",
-            "## remediation",
-            "## summary",
-            "### spectra",
-            "direct answer:",
-            "**direct answer",
-            "1. **how an attacker",
-            "1. **step-by-step",
-            "1. **attack path",
-            "1. **security risk",
-            "1. an attacker",
-        )
+        
+        # Check if an explicit markdown answer header exists later in text
+        for marker in (
+            "## security risk", "## risk", "### security risk", "### risk",
+            "## remediation", "### remediation", "### 1.", "1. **security risk",
+            "1. **attack path", "## overview", "## summary", "## analysis",
+            "### step-by-step", "### root cause"
+        ):
+            idx = text.lower().find(marker)
+            if idx != -1:
+                text = text[idx:].strip()
+                break
+        else:
+            # Otherwise, strip line by line from start
+            lines = text.split("\n")
+            start_idx = 0
+            while start_idx < len(lines):
+                line_s = lines[start_idx].strip().lower()
+                if not line_s:
+                    start_idx += 1
+                    continue
+                if any(line_s.startswith(p) for p in scratchpad_prefixes) or any(f"**{p}" in line_s for p in scratchpad_prefixes):
+                    start_idx += 1
+                else:
+                    break
+            if start_idx > 0:
+                text = "\n".join(lines[start_idx:]).strip()
 
-        text_lower = text.lower()
-        has_scratchpad = any(text_lower.startswith(h) or f"\n{h}" in text_lower[:400] for h in _SCRATCHPAD_START_HEADERS)
-        if has_scratchpad:
-            best_resume = -1
-            for marker in _ANSWER_RESUME_MARKERS:
-                idx = text_lower.find(marker)
-                if idx != -1:
-                    if best_resume == -1 or idx < best_resume:
-                        best_resume = idx
-            if best_resume != -1:
-                text = text[best_resume:].strip()
-
-        # 5. Remove opening disclaimers
+        # 4. Remove opening disclaimers
         for disc_pattern in [
             r"^i don't have live data[^\n]*\n*",
             r"^i do not have live data[^\n]*\n*",
@@ -561,6 +543,7 @@ class VLLMAzureProvider(AIProvider):
 
         refs = data.get("finding_references", [])
         if not refs and relevant_findings:
+            real_findings = [f for f in relevant_findings if not str(f.get("finding_id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS", "AZURE-TENANCY"))]
             refs = [
                 {
                     "id": f.get("finding_id", ""),
@@ -568,9 +551,10 @@ class VLLMAzureProvider(AIProvider):
                     "severity": f.get("severity", "high"),
                     "provider": f.get("provider", _primary_cloud or "oraclecloud"),
                 }
-                for f in relevant_findings[:4]
+                for f in real_findings[:4]
             ]
         elif refs:
+            refs = [r for r in refs if not str(r.get("id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS", "AZURE-TENANCY"))]
             f_map = {f.get("finding_id"): f.get("provider") for f in (relevant_findings or [])}
             for r in refs:
                 if not r.get("provider"):
