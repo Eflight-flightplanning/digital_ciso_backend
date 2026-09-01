@@ -736,15 +736,15 @@ class User(BaseModel):
 
     id: str
     name: str
-    description: str
-    email: str
-    email_verified: bool
+    description: Optional[str] = ""
+    email: Optional[str] = ""
+    email_verified: Optional[bool] = False
     compartment_id: str
-    time_created: datetime
+    time_created: Optional[datetime] = None
     lifecycle_state: str
-    can_use_api_keys: bool
-    can_use_console_password: bool
-    is_mfa_activated: bool
+    can_use_api_keys: Optional[bool] = False
+    can_use_console_password: Optional[bool] = False
+    is_mfa_activated: Optional[bool] = False
     api_keys: list[ApiKey] = []
     auth_tokens: list[AuthToken] = []
     customer_secret_keys: list[CustomerSecretKey] = []
@@ -758,9 +758,9 @@ class Group(BaseModel):
 
     id: str
     name: str
-    description: str
+    description: Optional[str] = ""
     compartment_id: str
-    time_created: datetime
+    time_created: Optional[datetime] = None
     lifecycle_state: str
     region: str
 
@@ -770,10 +770,10 @@ class Policy(BaseModel):
 
     id: str
     name: str
-    description: str
+    description: Optional[str] = ""
     compartment_id: str
     statements: list[str]
-    time_created: datetime
+    time_created: Optional[datetime] = None
     lifecycle_state: str
     region: str
 
@@ -801,10 +801,10 @@ class DynamicGroup(BaseModel):
 
     id: str
     name: str
-    description: str
+    description: Optional[str] = ""
     compartment_id: str
     matching_rule: str
-    time_created: datetime
+    time_created: Optional[datetime] = None
     lifecycle_state: str
     region: str
 
@@ -814,12 +814,12 @@ class DomainPasswordPolicy(BaseModel):
 
     id: str
     name: str
-    description: str
-    min_length: Optional[int]
-    password_expires_after: Optional[int]
-    num_passwords_in_history: Optional[int]
-    password_expire_warning: Optional[int]
-    min_password_age: Optional[int]
+    description: Optional[str] = ""
+    min_length: Optional[int] = None
+    password_expires_after: Optional[int] = None
+    num_passwords_in_history: Optional[int] = None
+    password_expire_warning: Optional[int] = None
+    min_password_age: Optional[int] = None
 
 
 class IdentityDomain(BaseModel):
@@ -827,14 +827,14 @@ class IdentityDomain(BaseModel):
 
     id: str
     display_name: str
-    description: str
+    description: Optional[str] = ""
     url: str
     home_region: str
     compartment_id: str
     lifecycle_state: str
-    time_created: datetime
+    time_created: Optional[datetime] = None
     region: str
-    password_policies: list[DomainPasswordPolicy]
+    password_policies: list[DomainPasswordPolicy] = []
 
 
 class RootCompartmentResource(BaseModel):
