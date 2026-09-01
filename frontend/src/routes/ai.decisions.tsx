@@ -507,6 +507,85 @@ function extractFindingProvider(f: any): string {
   return "AZURE";
 }
 
+function extractFindingResourceAndRegion(f: any): { resourceName: string; resourceUid: string; region: string } {
+  const meta = f.check_metadata || f.raw_result || {};
+  const uid = String(f.uid || f.resource_uid || f.id || "");
+  
+  let resObj: any = {};
+  if (Array.isArray(f.resources) && f.resources.length > 0 && typeof f.resources[0] === "object") {
+    resObj = f.resources[0];
+  } else if (typeof f.resource === "object" && f.resource) {
+    resObj = f.resource;
+  }
+
+  let resourceName = String(
+    resObj.name ||
+    f.resource_name ||
+    (typeof f.resource === "string" ? f.resource : "") ||
+    meta.resource_name ||
+    meta.resource_id ||
+    meta.ResourceName ||
+    meta.ResourceId ||
+    ""
+  );
+
+  let resourceUid = String(
+    resObj.uid ||
+    f.resource_uid ||
+    meta.resource_uid ||
+    f.uid ||
+    f.id ||
+    ""
+  );
+
+  let region = String(
+    resObj.region ||
+    f.region ||
+    meta.region ||
+    meta.Region ||
+    ""
+  );
+
+  // If region or resourceName is missing or generic, parse from Prowler UID
+  if (uid.startsWith("prowler-") && ((!region || region === "global") || (!resourceName || resourceName === "cloud-resource"))) {
+    let rest = uid.replace(/^prowler-[a-z0-9_]+-[a-z0-9_]+-/i, "");
+    rest = rest.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, ""); // Azure sub GUID
+    rest = rest.replace(/^ocid1\.[a-z]+\.[a-z0-9.]*-/i, ""); // OCI OCID
+    const restParts = rest.split("-").filter(Boolean);
+
+    if (restParts.length >= 1) {
+      const globalIdx = restParts.indexOf("global");
+      if (globalIdx !== -1 && globalIdx < restParts.length - 1) {
+        if (!region || region === "global") region = "global";
+        if (!resourceName || resourceName === "cloud-resource") resourceName = restParts.slice(globalIdx + 1).join("-");
+      } else if (
+        restParts.length >= 4 &&
+        /^[a-z]{2}$/i.test(restParts[0]) &&
+        /^[a-z]+$/i.test(restParts[1]) &&
+        /^\d+$/.test(restParts[2])
+      ) {
+        if (!region || region === "global") region = restParts.slice(0, 3).join("-");
+        if (!resourceName || resourceName === "cloud-resource") resourceName = restParts.slice(3).join("-");
+      } else if (restParts.length >= 2) {
+        if (!region || region === "global") region = restParts[0];
+        if (!resourceName || resourceName === "cloud-resource") resourceName = restParts.slice(1).join("-");
+      } else {
+        if (!resourceName || resourceName === "cloud-resource") resourceName = restParts[0];
+      }
+    }
+  }
+
+  if (!resourceName || resourceName === "undefined" || resourceName.startsWith("resource-")) {
+    resourceName = String(f.check_id || "cloud-resource").replace(/_/g, " ");
+  }
+
+  if (!region || region === "undefined") {
+    region = "global";
+  }
+
+  return { resourceName, resourceUid, region };
+}
+
 function AIDecisionsPage() {
   const { data: providersRaw } = useProviders();
   const { data: findingsRaw } = useFindings();
@@ -617,12 +696,8 @@ function AIDecisionsPage() {
       const checkId = f.check_id || `check_${idx + 1}`;
       const checkMeta = f.check_metadata || {};
       const title = checkMeta.checktitle || f.raw_result?.CheckTitle || f.title || checkId.replace(/_/g, " ");
-      const res = (f.resources && f.resources[0]) || f.resource || {};
-      const resName = res.name || f.resource_name || f.raw_result?.ResourceName || `resource-${idx + 1}`;
-      const resUid = res.uid || f.resource_uid || f.uid || `res-uid-${idx + 1}`;
-      
+      const { resourceName: resName, resourceUid: resUid, region } = extractFindingResourceAndRegion(f);
       const provider = extractFindingProvider(f);
-      const region = res.region || f.region || f.raw_result?.Region || (provider === "AZURE" ? "eastus" : provider === "OCI" ? "us-ashburn-1" : "Global");
       const severity = (f.severity || "medium").toLowerCase();
 
       const matchedExec = executions.find(
