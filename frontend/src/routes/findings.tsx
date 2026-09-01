@@ -348,16 +348,20 @@ function FindingsPage() {
   }, [data, selectedProvider]);
 
   // Real compliance framework keys present in the currently provider-filtered data —
-  // automatically includes specific frameworks like CIS Oracle SaaS and SoD Matrix.
+  // when Oracle SaaS is selected, exclusively display CIS Oracle SaaS and SoD Matrix.
   const complianceOptions = useMemo(() => {
+    const selProv = (selectedProvider || "ALL").toUpperCase();
+    if (selProv === "ORACLE_SAAS" || selProv === "ORACLE-SAAS" || selProv === "ERP") {
+      return ["cis_1.0.0_oracle_saas", "sod_matrix_oracle_saas"];
+    }
+
     const set = new Set<string>();
     for (const item of providerFilteredData) {
       for (const key of Object.keys(item.compliance || {})) {
         set.add(key);
       }
     }
-    const selProv = (selectedProvider || "ALL").toUpperCase();
-    if (selProv === "ORACLE_SAAS" || selProv === "ALL") {
+    if (selProv === "ALL") {
       set.add("cis_1.0.0_oracle_saas");
       set.add("sod_matrix_oracle_saas");
     }
