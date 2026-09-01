@@ -1913,10 +1913,15 @@ class ScanViewSet(BaseRLSViewSet):
     def perform_create(self, serializer):
         scan = serializer.save()
         try:
-            from tasks.tasks import enqueue_scan_execution_on_commit, initialize_task
+            from tasks.tasks import (
+                create_scan_task_record,
+                enqueue_scan_execution_on_commit,
+            )
             import uuid
             task_id = str(uuid.uuid4())
-            prowler_task = initialize_task(str(scan.tenant_id), task_id, task_name="scan-perform")
+            prowler_task = create_scan_task_record(
+                str(scan.tenant_id), task_id, task_name="scan-perform"
+            )
             scan.task = prowler_task
             scan.save(update_fields=["task"])
             enqueue_scan_execution_on_commit(str(scan.tenant_id), scan, task_id)
