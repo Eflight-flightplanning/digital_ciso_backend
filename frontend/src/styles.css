@@ -340,6 +340,30 @@
   }
 }
 
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes indeterminate-sweep {
+  0% {
+    left: -35%;
+    right: 100%;
+  }
+  60% {
+    left: 100%;
+    right: -35%;
+  }
+  100% {
+    left: 100%;
+    right: -35%;
+  }
+}
+
 @keyframes enter-slide {
   from {
     opacity: 0;

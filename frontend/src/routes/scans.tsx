@@ -28,6 +28,21 @@ export const Route = createFileRoute("/scans")({
   component: ScansPage,
 });
 
+/** Ticks once a second so the "connecting" phase visibly counts up instead of
+ * looking frozen while there's no real percentage to report yet. */
+function useElapsedSeconds(startIso: string | undefined | null): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!startIso) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [startIso]);
+  if (!startIso) return 0;
+  const startMs = new Date(startIso).getTime();
+  if (Number.isNaN(startMs)) return 0;
+  return Math.max(0, Math.floor((now - startMs) / 1000));
+}
+
 function ScansPage() {
   const queryClient = useQueryClient();
   const { data: apiScans, isLoading, refetch } = useScans();
@@ -124,6 +139,9 @@ function ScansPage() {
     return scanList.find((s) => s.status === "Running");
   }, [scanList]);
 
+  const activeScanStartedAt = (activeRunningScan?.raw as Record<string, unknown> | undefined)?.started_at as string | undefined;
+  const activeScanElapsedSeconds = useElapsedSeconds(activeRunningScan ? activeScanStartedAt : null);
+
   const providers = (apiProviders?.items || []) as Array<Record<string, any>>;
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
@@ -207,7 +225,9 @@ function ScansPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-mono font-black text-cyan-400">
-                {activeRunningScan.progress}%
+                {activeRunningScan.progress < 10
+                  ? `${activeScanElapsedSeconds}s`
+                  : `${activeRunningScan.progress}%`}
               </span>
               <span className="text-xs text-muted-foreground font-mono">
                 ({activeRunningScan.progress >= 100
@@ -216,25 +236,33 @@ function ScansPage() {
                     ? "Finalizing & Scoring..."
                     : activeRunningScan.progress >= 10
                       ? "Executing Checks..."
-                      : "Initializing & Authenticating..."})
+                      : "Connecting & Authenticating..."})
               </span>
             </div>
           </div>
 
-          {/* Animated Status Bar */}
+          {/* Animated Status Bar — during connection there is no real percentage yet
+              (see backend note above), so an indeterminate sweep honestly signals
+              "still working" instead of a static bar that looks frozen. */}
           <div className="h-3.5 w-full rounded-full bg-slate-900 border border-cyan-500/30 p-0.5 overflow-hidden shadow-inner relative">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500 shadow-[0_0_12px_rgba(6,182,212,0.6)] transition-all duration-700 ease-out relative overflow-hidden"
-              style={{ width: `${Math.max(activeRunningScan.progress, 5)}%` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-            </div>
+            {activeRunningScan.progress < 10 ? (
+              <div className="absolute inset-0.5 rounded-full overflow-hidden">
+                <div className="absolute inset-y-0 rounded-full bg-gradient-to-r from-cyan-600 via-sky-400 to-cyan-600 shadow-[0_0_12px_rgba(6,182,212,0.6)] animate-[indeterminate-sweep_1.4s_ease-in-out_infinite]" />
+              </div>
+            ) : (
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500 shadow-[0_0_12px_rgba(6,182,212,0.6)] transition-all duration-700 ease-out relative overflow-hidden"
+                style={{ width: `${Math.max(activeRunningScan.progress, 5)}%` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+              </div>
+            )}
           </div>
           <div className="mt-2 flex justify-between text-[11.5px]">
             <span className="text-cyan-300 font-medium flex items-center gap-1.5">
               <RefreshCw className="h-3 w-3 animate-spin text-cyan-400" />
               {activeRunningScan.progress < 10
-                ? "Connecting to Cloud API & discovering infrastructure resources..."
+                ? `Connecting to Cloud API & authenticating (${activeScanElapsedSeconds}s elapsed)...`
                 : activeRunningScan.progress >= 95
                   ? "Finalizing compliance scoring & attack graph delta..."
                   : `Evaluating CIS Benchmarks & security controls (${activeRunningScan.progress}% complete)...`}
