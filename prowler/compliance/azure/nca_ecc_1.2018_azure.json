@@ -1,14 +1,14 @@
 {
   "Framework": "NCA-ECC",
-  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
-  "Version": "1:2018",
+  "Name": "NCA Essential Cybersecurity Controls (ECC)",
+  "Version": "2:2024",
   "Provider": "Azure",
-  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) to set minimum cybersecurity requirements for national organizations to protect information assets and technology infrastructure against cyber threats.",
+  "Description": "The Essential Cybersecurity Controls (ECC-2:2024 / ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) to set minimum cybersecurity requirements across 4 Main Domains and 28 Subdomains.",
   "Requirements": [
     {
-      "Id": "ECC-1.1.1",
-      "Name": "1-1-1 Cybersecurity Strategy & Governance",
-      "Description": "A cybersecurity strategy must be defined, approved by management, and aligned with organizational objectives and regulatory requirements.",
+      "Id": "1-1-1",
+      "Name": "1-1 Cybersecurity Strategy",
+      "Description": "A cybersecurity strategy must be defined, documented, and approved by the Authorizing Official.",
       "Attributes": [
         {
           "Section": "1. Cybersecurity Governance",
@@ -17,33 +17,59 @@
         }
       ],
       "Checks": [
-        "policy_ensure_asc_enforcement_enabled",
-        "entra_security_defaults_enabled"
+        "policy_ensure_asc_enforcement_enabled"
       ]
     },
     {
-      "Id": "ECC-1.4.1",
-      "Name": "1-4-1 Cybersecurity Roles and Responsibilities",
-      "Description": "Cybersecurity roles and responsibilities must be clearly defined, assigned to authorized personnel, and segregated to avoid conflict of interest.",
+      "Id": "1-2-1",
+      "Name": "1-2 Cybersecurity Management & Organization",
+      "Description": "A dedicated cybersecurity function must be established, independent from IT/ICT functions.",
       "Attributes": [
         {
           "Section": "1. Cybersecurity Governance",
-          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "SubSection": "1-2 Cybersecurity Management",
           "Service": "entra"
         }
       ],
       "Checks": [
-        "entra_global_admin_in_less_than_five_users",
-        "entra_policy_default_users_cannot_create_security_groups",
-        "entra_policy_ensure_default_user_cannot_create_apps",
-        "entra_policy_ensure_default_user_cannot_create_tenants",
-        "iam_custom_roles_least_privileges"
+        "entra_global_admin_in_less_than_five_users"
       ]
     },
     {
-      "Id": "ECC-1.5.1",
-      "Name": "1-5-1 Cybersecurity Risk Management",
-      "Description": "Cybersecurity risks must be continuously identified, analyzed, evaluated, and treated using automated threat intelligence and vulnerability management.",
+      "Id": "1-3-1",
+      "Name": "1-3 Cybersecurity Policies and Procedures",
+      "Description": "Cybersecurity policies and procedures must be defined, approved, implemented, and supported by technical security standards.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Cybersecurity Policies and Procedures",
+          "Service": "policy"
+        }
+      ],
+      "Checks": [
+        "policy_ensure_asc_enforcement_enabled"
+      ]
+    },
+    {
+      "Id": "1-4-1",
+      "Name": "1-4 Cybersecurity Roles and Responsibilities",
+      "Description": "Cybersecurity organizational structure and roles must be defined without conflict of interest.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_custom_roles_least_privileges",
+        "entra_policy_default_users_cannot_create_security_groups"
+      ]
+    },
+    {
+      "Id": "1-5-1",
+      "Name": "1-5 Cybersecurity Risk Management",
+      "Description": "Cybersecurity risk management methodology must be implemented across all technology projects and assets.",
       "Attributes": [
         {
           "Section": "1. Cybersecurity Governance",
@@ -53,19 +79,89 @@
       ],
       "Checks": [
         "defender_ensure_defender_for_server_is_on",
-        "defender_ensure_defender_for_arm_is_on",
-        "defender_ensure_defender_for_storage_is_on",
-        "defender_ensure_defender_for_azure_sql_databases_is_on",
-        "defender_ensure_defender_for_containers_is_on",
-        "defender_ensure_defender_for_keyvault_is_on",
-        "defender_ensure_notify_alerts_severity_is_high",
-        "defender_ensure_notify_emails_to_owners"
+        "defender_ensure_defender_for_arm_is_on"
       ]
     },
     {
-      "Id": "ECC-2.1.1",
-      "Name": "2-1-1 Asset Management & Inventory",
-      "Description": "An accurate and up-to-date inventory of all technology assets and cloud resources must be maintained and protected.",
+      "Id": "1-6-1",
+      "Name": "1-6 Cybersecurity in Project Management",
+      "Description": "Include secure configuration, hardening, and vulnerability assessment before launching projects.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-6 Cybersecurity in Information and Technology Project Management",
+          "Service": "defender"
+        }
+      ],
+      "Checks": [
+        "defender_ensure_defender_for_containers_is_on",
+        "defender_ensure_defender_for_storage_is_on"
+      ]
+    },
+    {
+      "Id": "1-7-1",
+      "Name": "1-7 Compliance with Laws, Standards, and Regulations",
+      "Description": "Ensure continuous compliance with national cybersecurity regulations and international commitments.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-7 Compliance with Cybersecurity Standards, Laws and Regulations",
+          "Service": "policy"
+        }
+      ],
+      "Checks": [
+        "policy_ensure_asc_enforcement_enabled"
+      ]
+    },
+    {
+      "Id": "1-8-1",
+      "Name": "1-8 Periodical Cybersecurity Review and Audit",
+      "Description": "Conduct periodic internal and independent cybersecurity audits and present results to management.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-8 Periodical Cybersecurity Review and Audit",
+          "Service": "monitor"
+        }
+      ],
+      "Checks": [
+        "monitor_diagnostic_settings_exists"
+      ]
+    },
+    {
+      "Id": "1-9-1",
+      "Name": "1-9 Cybersecurity in Human Resources",
+      "Description": "Manage cybersecurity requirements and vetting for personnel prior to, during, and after employment.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-9 Cybersecurity in Human Resources",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_privileged_user_has_mfa"
+      ]
+    },
+    {
+      "Id": "1-10-1",
+      "Name": "1-10 Cybersecurity Awareness and Training Program",
+      "Description": "Implement periodic cybersecurity awareness training covering phishing, social media, and mobile devices.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-10 Cybersecurity Awareness and Training Program",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_non_privileged_user_has_mfa"
+      ]
+    },
+    {
+      "Id": "2-1-1",
+      "Name": "2-1 Asset Management",
+      "Description": "Maintain an accurate, updated inventory of all technology assets and classify them accordingly.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
@@ -74,15 +170,15 @@
         }
       ],
       "Checks": [
-        "vm_instance_os_and_data_disks_encrypted_with_cmk",
-        "vm_ensure_system_updates_applied",
-        "storage_ensure_soft_delete_is_enabled"
+        "vm_trusted_launch_enabled",
+        "vm_secure_boot_enabled",
+        "vm_vtpm_enabled"
       ]
     },
     {
-      "Id": "ECC-2.2.1",
-      "Name": "2-2-1 Identity and Access Management (IAM)",
-      "Description": "Access to systems and data must be controlled through unique identification, Multi-Factor Authentication (MFA), and least-privilege role assignment.",
+      "Id": "2-2-1",
+      "Name": "2-2 Identity and Access Management",
+      "Description": "Enforce single-factor/multi-factor authentication, least privilege, PAM, and periodic access reviews.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
@@ -94,35 +190,44 @@
         "entra_privileged_user_has_mfa",
         "entra_non_privileged_user_has_mfa",
         "entra_conditional_access_policy_require_mfa_for_management_api",
-        "entra_user_with_vm_access_has_mfa",
-        "entra_trusted_named_locations_exists",
-        "sqlserver_azuread_administrator_enabled",
-        "aks_cluster_rbac_enabled"
+        "sqlserver_azuread_administrator_enabled"
       ]
     },
     {
-      "Id": "ECC-2.3.1",
-      "Name": "2-3-1 Information System Protection & Hardening",
-      "Description": "Workloads and virtual infrastructure must be hardened with Secure Boot, vTPM, trusted launch, and endpoint security agents.",
+      "Id": "2-3-1",
+      "Name": "2-3 Information System & Processing Facilities Protection",
+      "Description": "Protect systems with anti-malware, patch management, restricted external media, and trusted NTP clock synchronization.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-3 Information System Protection",
+          "SubSection": "2-3 Information Systems and Information Processing Facilities Protection",
           "Service": "vm"
         }
       ],
       "Checks": [
         "vm_trusted_launch_enabled",
-        "vm_ensure_auto_backup_configured",
-        "aks_clusters_created_with_private_nodes",
-        "aks_clusters_public_access_disabled",
-        "containerregistry_admin_user_disabled"
+        "vm_ensure_os_disk_is_encrypted_with_cmk"
       ]
     },
     {
-      "Id": "ECC-2.5.1",
-      "Name": "2-5-1 Network Security Management",
-      "Description": "Network perimeters, virtual networks, and subnets must be segmented and protected using network security groups, firewalls, and private endpoints.",
+      "Id": "2-4-1",
+      "Name": "2-4 Email Protection",
+      "Description": "Validate email service domains using SPF, DKIM, and DMARC, with anti-phishing filtering and MFA.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Email Protection",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_conditional_access_policy_require_mfa_for_management_api"
+      ]
+    },
+    {
+      "Id": "2-5-1",
+      "Name": "2-5 Networks Security Management",
+      "Description": "Network segmentation, firewall filtering on management ports (SSH 22, RDP 3389), secure browsing, and DDoS protection.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
@@ -134,19 +239,30 @@
         "network_http_internet_access_restricted",
         "network_rdp_internet_access_restricted",
         "network_ssh_internet_access_restricted",
-        "network_udp_internet_access_restricted",
         "network_all_inbound_traffic_restricted",
-        "network_flow_log_more_than_90_days",
-        "network_watcher_enabled",
-        "storage_ensure_private_endpoints_in_storage_accounts",
-        "storage_default_network_access_rule_is_denied",
-        "sqlserver_firewall_rule_allows_internet_access"
+        "aks_network_policy_enabled",
+        "aks_clusters_public_access_disabled"
       ]
     },
     {
-      "Id": "ECC-2.7.1",
-      "Name": "2-7-1 Data and Information Protection",
-      "Description": "Data at rest and in transit must be protected against unauthorized disclosure, modification, and deletion.",
+      "Id": "2-6-1",
+      "Name": "2-6 Mobile Devices Security",
+      "Description": "Encrypt data on mobile devices and BYOD, enforce remote wiping capability, and screen lockouts.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Mobile Devices Security",
+          "Service": "entra"
+        }
+      ],
+      "Checks": [
+        "entra_conditional_access_policy_require_mfa_for_management_api"
+      ]
+    },
+    {
+      "Id": "2-7-1",
+      "Name": "2-7 Data and Information Protection",
+      "Description": "Protect data based on classification level, prevent public access, and enforce HTTPS transit encryption.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
@@ -155,99 +271,129 @@
         }
       ],
       "Checks": [
+        "storage_blob_public_access_level_is_disabled",
         "storage_ensure_https_traffic_only_is_enabled",
         "storage_ensure_minimum_tls_version_12",
-        "storage_blob_public_access_level_is_disabled",
-        "storage_infrastructure_encryption_is_enabled",
-        "storage_customer_managed_key_encryption_enabled",
-        "sqlserver_tde_encryption_enabled",
-        "cosmosdb_account_encryption_at_rest_with_cmk"
+        "storage_ensure_private_endpoints_in_storage_accounts"
       ]
     },
     {
-      "Id": "ECC-2.8.1",
-      "Name": "2-8-1 Cryptography and Key Management",
-      "Description": "Cryptographic keys, certificates, and secrets must be managed securely through dedicated Hardware Security Modules (HSM) or Key Vault with automatic rotation and expiration.",
+      "Id": "2-8-1",
+      "Name": "2-8 Cryptography",
+      "Description": "Apply National Cryptographic Standards (NCS), secure key lifecycle management, and at-rest/in-transit encryption.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
           "SubSection": "2-8 Cryptography",
-          "Service": "keyvault"
+          "Service": "storage"
         }
       ],
       "Checks": [
-        "keyvault_key_expiration_set_in_non_rbac",
-        "keyvault_rbac_key_expiration_set",
-        "keyvault_secret_expiration_set_in_non_rbac",
-        "keyvault_rbac_secret_expiration_set",
-        "keyvault_soft_delete_and_purge_protection_enabled",
-        "keyvault_private_endpoints_enabled",
-        "keyvault_logging_enabled"
+        "storage_customer_managed_key_encryption_enabled",
+        "sqlserver_tde_encryption_enabled",
+        "cosmosdb_account_encryption_at_rest_with_cmk",
+        "keyvault_vault_recoverable"
       ]
     },
     {
-      "Id": "ECC-2.9.1",
-      "Name": "2-9-1 Backup and Recovery Management",
-      "Description": "Automated backups of critical workloads and databases must be configured, encrypted, tested periodically, and protected with immutable soft-delete.",
+      "Id": "2-9-1",
+      "Name": "2-9 Backup and Recovery Management",
+      "Description": "Ensure backup coverage of critical assets, fast incident recovery capability, and periodic recovery testing.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-9 Backup and Recovery",
+          "SubSection": "2-9 Backup and Recovery Management",
           "Service": "recovery"
         }
       ],
       "Checks": [
-        "recovery_vault_soft_delete_enabled",
-        "recovery_vault_backup_storage_redundancy",
-        "storage_ensure_soft_delete_is_enabled"
+        "recovery_backup_reports_configured"
       ]
     },
     {
-      "Id": "ECC-2.10.1",
-      "Name": "2-10-1 Vulnerabilities Management",
-      "Description": "Vulnerabilities across cloud infrastructure, databases, container registries, and serverless functions must be regularly scanned and remediated.",
+      "Id": "2-10-1",
+      "Name": "2-10 Vulnerabilities Management",
+      "Description": "Conduct periodic vulnerability assessments, severity classification, prompt patching, and subscription to threat bulletins.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-10 Vulnerabilities Management",
+          "SubSection": "2-10 Vulnerability Management",
           "Service": "defender"
         }
       ],
       "Checks": [
-        "defender_ensure_system_updates_are_applied",
-        "sqlserver_vulnerability_assessments_enabled",
-        "sqlserver_va_periodic_scans_enabled",
-        "containerregistry_not_publicly_accessible"
+        "defender_ensure_defender_for_server_is_on",
+        "sqlserver_vulnerability_assessment_enabled"
       ]
     },
     {
-      "Id": "ECC-2.12.1",
-      "Name": "2-12-1 Event Logs and Monitoring Management",
-      "Description": "Security event logs, administrative audit trails, and network traffic flow logs must be centralized, protected from tampering, and retained for at least one year.",
+      "Id": "2-11-1",
+      "Name": "2-11 Penetration Testing",
+      "Description": "Conduct periodic penetration tests against internet-facing services, web applications, and network infrastructure.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
-          "SubSection": "2-12 Event Logs and Monitoring",
+          "SubSection": "2-11 Penetration Testing",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_all_inbound_traffic_restricted"
+      ]
+    },
+    {
+      "Id": "2-12-1",
+      "Name": "2-12 Cybersecurity Event Logs and Monitoring Management",
+      "Description": "Collect and monitor cybersecurity event logs in real time via SIEM and retain them for at least 12 months.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Cybersecurity Event Logs and Monitoring Management",
           "Service": "monitor"
         }
       ],
       "Checks": [
         "monitor_diagnostic_settings_exists",
-        "monitor_activity_log_retention_days_greater_than_365",
-        "monitor_alert_create_update_nsg",
-        "monitor_alert_delete_nsg",
-        "monitor_alert_create_policy_assignment",
-        "monitor_alert_delete_policy_assignment",
-        "monitor_alert_create_update_security_solution",
-        "monitor_alert_delete_security_solution",
-        "sqlserver_auditing_enabled",
-        "sqlserver_auditing_retention_greater_than_90_days"
+        "monitor_activity_log_retention_policy_365_days",
+        "network_flow_log_more_than_90_days",
+        "keyvault_logging_enabled"
       ]
     },
     {
-      "Id": "ECC-2.15.1",
-      "Name": "2-15-1 Web Application Security",
-      "Description": "Web applications and APIs must enforce HTTPS with strong TLS ciphers, client certificate authentication, authentication redirects, and secure headers.",
+      "Id": "2-13-1",
+      "Name": "2-13 Cybersecurity Incident and Threat Management",
+      "Description": "Implement incident response plans, threat intelligence integration, and mandatory reporting to the NCA.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-13 Cybersecurity Incident and Threat Management",
+          "Service": "defender"
+        }
+      ],
+      "Checks": [
+        "defender_ensure_defender_for_server_is_on",
+        "defender_ensure_defender_for_arm_is_on"
+      ]
+    },
+    {
+      "Id": "2-14-1",
+      "Name": "2-14 Physical Security",
+      "Description": "Control physical access to data centers, CCTV monitoring, and secure hardware asset disposal.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-14 Physical Security",
+          "Service": "vm"
+        }
+      ],
+      "Checks": [
+        "vm_trusted_launch_enabled"
+      ]
+    },
+    {
+      "Id": "2-15-1",
+      "Name": "2-15 Web Application Security",
+      "Description": "Deploy Web Application Firewalls (WAF), multi-tier architectures, HTTPS protocols, and user authentication.",
       "Attributes": [
         {
           "Section": "2. Cybersecurity Defense",
@@ -257,30 +403,56 @@
       ],
       "Checks": [
         "app_ensure_http_is_redirected_to_https",
-        "app_ensure_minimum_tls_version_12",
-        "app_ensure_auth_is_set_up",
-        "app_ensure_client_certificates_are_required",
-        "app_ftps_deployment_disabled",
-        "app_function_not_publicly_accessible"
+        "app_ensure_minimum_tls_version_is_12",
+        "app_client_certificates_on",
+        "app_ensure_auth_is_set_up"
       ]
     },
     {
-      "Id": "ECC-4.2.1",
-      "Name": "4-2-1 Cloud Computing and Hosting Security",
-      "Description": "Cloud resources and multi-tenant environments must adhere to strict tenant isolation, external collaboration controls, and data sovereignty policies.",
+      "Id": "3-1-1",
+      "Name": "3-1 Business Continuity Management (BCM)",
+      "Description": "Include cybersecurity resilience in business continuity plans, disaster recovery plans, and failover testing.",
       "Attributes": [
         {
-          "Section": "4. Third-Party and Cloud Computing",
-          "SubSection": "4-2 Cloud Computing and Hosting",
-          "Service": "entra"
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM",
+          "Service": "recovery"
         }
       ],
       "Checks": [
-        "entra_policy_guest_invite_only_for_admin_roles",
-        "entra_policy_guest_users_access_restrictions",
-        "entra_policy_restricts_user_consent_for_apps",
-        "entra_policy_user_consent_for_verified_apps",
-        "entra_users_cannot_create_microsoft_365_groups"
+        "recovery_backup_reports_configured"
+      ]
+    },
+    {
+      "Id": "4-1-1",
+      "Name": "4-1 Third-Party Cybersecurity",
+      "Description": "Include non-disclosure clauses, incident notification SLAs, and risk assessments in third-party and outsourcing contracts.",
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing Cybersecurity",
+          "SubSection": "4-1 Third-Party Cybersecurity",
+          "Service": "iam"
+        }
+      ],
+      "Checks": [
+        "iam_custom_roles_least_privileges"
+      ]
+    },
+    {
+      "Id": "4-2-1",
+      "Name": "4-2 Cloud Computing and Hosting Cybersecurity",
+      "Description": "Classify hosted cloud data, enforce tenant environment separation, and ensure in-country data sovereignty.",
+      "Attributes": [
+        {
+          "Section": "4. Third-Party and Cloud Computing Cybersecurity",
+          "SubSection": "4-2 Cloud Computing and Hosting Cybersecurity",
+          "Service": "storage"
+        }
+      ],
+      "Checks": [
+        "storage_blob_public_access_level_is_disabled",
+        "storage_ensure_https_traffic_only_is_enabled",
+        "storage_customer_managed_key_encryption_enabled"
       ]
     }
   ]

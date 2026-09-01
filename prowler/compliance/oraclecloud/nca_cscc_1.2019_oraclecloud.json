@@ -1,75 +1,281 @@
 {
   "Framework": "NCA-CSCC",
-  "Name": "NCA Cloud Cybersecurity Controls (CSCC) for OCI",
-  "Version": "1:2019",
+  "Name": "NCA Cloud Cybersecurity Controls (CCC/CSCC)",
+  "Version": "2:2024",
   "Provider": "oraclecloud",
-  "Description": "National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CSCC-1:2019) for Cloud Service Customers (CSC) on OCI.",
+  "Description": "The National Cybersecurity Authority (NCA) Cloud Cybersecurity Controls (CCC-2:2024 / CSCC) set mandatory cybersecurity requirements for Cloud Service Tenants (CSTs) and Cloud Service Providers (CSPs) on Oracle Cloud Infrastructure (OCI).",
   "Requirements": [
     {
-      "Id": "CSCC-1-1",
-      "Name": "Cloud Tenancy Access & MFA Enforcement",
-      "Description": "Enforce mandatory multi-factor authentication for all cloud console administrators and service users.",
+      "Id": "1-1-T-1",
+      "Name": "1-1-T-1 Cybersecurity Roles and Responsibilities in OCI",
+      "Description": "Define and enforce clear IAM policies, compartment isolation, and governance boundaries for all tenancy administrators.",
       "Attributes": [
         {
-          "Section": "Cloud Identity & Access",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-1 Cybersecurity Roles and Responsibilities",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists",
+        "identity_tenancy_admin_permissions_limited"
+      ]
+    },
+    {
+      "Id": "1-2-T-1",
+      "Name": "1-2-T-1 OCI Cybersecurity Risk Management & Cloud Guard",
+      "Description": "Enable Oracle Cloud Guard to continuously monitor tenancy security posture, detect misconfigurations, and alert on risk anomalies.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-2 Cybersecurity Risk Management",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "1-3-T-1",
+      "Name": "1-3-T-1 Compliance with Cybersecurity Standards and Regulations",
+      "Description": "Ensure continuous compliance monitoring of OCI compartments and cloud resources against national regulatory mandates.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-3 Compliance with Cybersecurity Standards, Laws, and Regulations",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
+      ]
+    },
+    {
+      "Id": "1-4-T-1",
+      "Name": "1-4-T-1 Cybersecurity in Human Resources & Sensitive OCI Functions",
+      "Description": "Personnel with administrative privileges over OCI tenancy root and child compartments must be strictly verified and governed.",
+      "Attributes": [
+        {
+          "Section": "1. Cybersecurity Governance",
+          "SubSection": "1-4 Cybersecurity in Human Resources",
+          "Service": "identity"
         }
       ],
       "Checks": [
         "identity_user_mfa_enabled_console_access",
-        "identity_password_policy_minimum_length_14"
+        "identity_user_api_keys_rotated_90_days"
       ]
     },
     {
-      "Id": "CSCC-2-1",
-      "Name": "Cloud Network Boundary & Perimeter Protection",
-      "Description": "Ensure internet ingress is prohibited to internal management interfaces and database services.",
+      "Id": "2-1-T-1",
+      "Name": "2-1-T-1 OCI Cloud Asset Management & Technical Inventory",
+      "Description": "Maintain an updated inventory of all OCI compute instances, block volumes, autonomous databases, and virtual cloud networks.",
       "Attributes": [
         {
-          "Section": "Cloud Network Security",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-1 Asset Management",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "2-2-T-1",
+      "Name": "2-2-T-1 Identity and Access Management & MFA Enforcement",
+      "Description": "Mandate Multi-Factor Authentication (MFA) for console users, strong password policies, and 90-day credential rotation.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-2 Identity and Access Management",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access",
+        "identity_password_policy_minimum_length_14",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "2-3-T-1",
+      "Name": "2-3-T-1 OCI Information Systems & Compute Hardening",
+      "Description": "Harden OCI compute instances, disable legacy metadata endpoints, and enforce secure baseline configurations across workloads.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-3 Information System and Processing Facilities Protection",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "2-4-T-1",
+      "Name": "2-4-T-1 OCI Network Security Management & VCN Ingress Filtering",
+      "Description": "Enforce strict ingress and egress rules on Network Security Groups (NSGs) and Security Lists, prohibiting open internet access to SSH (port 22) and RDP (port 3389).",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-4 Networks Security Management",
+          "Service": "network"
         }
       ],
       "Checks": [
         "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_rdp_port",
+        "network_default_security_list_restricts_traffic",
         "database_autonomous_database_access_restricted",
         "analytics_instance_access_restricted"
       ]
     },
     {
-      "Id": "CSCC-3-1",
-      "Name": "Cloud Data Protection & Storage Isolation",
-      "Description": "Ensure object storage buckets are private and all stored assets are encrypted with dedicated keys.",
+      "Id": "2-6-T-1",
+      "Name": "2-6-T-1 OCI Object Storage Data Protection & Public Access Block",
+      "Description": "Ensure all OCI object storage buckets are private, public access is disabled, and bucket emission events are logged.",
       "Attributes": [
         {
-          "Section": "Cloud Data Security",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-6 Data and Information Protection",
+          "Service": "objectstorage"
         }
       ],
       "Checks": [
         "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_emit_object_events_enabled"
+      ]
+    },
+    {
+      "Id": "2-7-T-1",
+      "Name": "2-7-T-1 OCI Cryptography & Customer-Managed Key (CMK) Encryption",
+      "Description": "Enforce encryption with customer-managed keys (CMK) for block volumes, boot volumes, and object buckets with automated KMS key rotation.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-7 Cryptography",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
         "objectstorage_bucket_encrypted_with_cmk",
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
         "kms_key_rotation_enabled"
       ]
     },
     {
-      "Id": "CSCC-4-1",
-      "Name": "Continuous Cloud Monitoring & Threat Intelligence",
-      "Description": "Deploy Oracle Cloud Guard to continuously monitor tenancy security posture and alert on anomalous activities.",
+      "Id": "2-8-T-1",
+      "Name": "2-8-T-1 OCI Backup, Recovery and Resilience Management",
+      "Description": "Ensure automated backup schedules, cross-region replication, and disaster recovery capability for OCI block storage and databases.",
       "Attributes": [
         {
-          "Section": "Cloud Operations & Monitoring",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-8 Backup and Recovery Management",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_backup_enabled"
+      ]
+    },
+    {
+      "Id": "2-9-T-1",
+      "Name": "2-9-T-1 OCI Vulnerability Detection & Cloud Threat Assessment",
+      "Description": "Continuously assess vulnerabilities and misconfigurations in OCI compute, databases, and network architectures.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-9 Vulnerabilities Management",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled"
+      ]
+    },
+    {
+      "Id": "2-11-T-1",
+      "Name": "2-11-T-1 OCI Event Logs, Audit Trails & 365-Day Retention",
+      "Description": "Retain OCI audit logs for at least 365 days and enable event notification rules for critical security actions.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-11 Cybersecurity Event Logs and Monitoring Management",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "2-12-T-1",
+      "Name": "2-12-T-1 OCI Security Incident Detection & Threat Management",
+      "Description": "Enable Cloud Guard and event rules to detect and respond to security threats across all tenancy compartments.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-12 Cybersecurity Incident and Threat Management",
+          "Service": "cloudguard"
         }
       ],
       "Checks": [
         "cloudguard_enabled",
-        "audit_log_retention_period_365_days",
         "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "2-15-T-1",
+      "Name": "2-15-T-1 OCI Key Vault & KMS Cryptographic Management",
+      "Description": "Ensure all master encryption keys in OCI Vault are actively rotated, protected against deletion, and monitored.",
+      "Attributes": [
+        {
+          "Section": "2. Cybersecurity Defense",
+          "SubSection": "2-15 Key Management",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "3-1-T-1",
+      "Name": "3-1-T-1 OCI Business Continuity & Disaster Recovery (BCM)",
+      "Description": "Establish multi-availability domain and cross-region disaster recovery architecture for OCI critical workloads.",
+      "Attributes": [
+        {
+          "Section": "3. Cybersecurity Resilience",
+          "SubSection": "3-1 Cybersecurity Resilience Aspects of BCM",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_backup_enabled"
+      ]
+    },
+    {
+      "Id": "4-1-T-1",
+      "Name": "4-1-T-1 OCI Supply Chain & Third-Party Integration Security",
+      "Description": "Restrict third-party API integration and verify least-privilege policies for third-party access tokens and IAM groups.",
+      "Attributes": [
+        {
+          "Section": "4. Third-Party Cybersecurity",
+          "SubSection": "4-1 Supply Chain and Third-Party Cybersecurity",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_auth_tokens_rotated_90_days",
+        "identity_tenancy_admin_permissions_limited"
       ]
     }
   ]
