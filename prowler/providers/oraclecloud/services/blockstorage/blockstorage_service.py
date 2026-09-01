@@ -82,14 +82,20 @@ class BlockStorage(OCIService):
                                 )
                             )
                 except Exception as error:
-                    logger.error(
-                        f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-                    )
+                    if hasattr(error, "status") and error.status == 404:
+                        logger.debug(f"BlockStorage - No volumes in compartment {compartment.name or compartment.id}")
+                    else:
+                        logger.error(
+                            f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                        )
                     continue
         except Exception as error:
-            logger.error(
-                f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-            )
+            if hasattr(error, "status") and error.status == 404:
+                logger.debug(f"BlockStorage - 404 in {regional_client.region}")
+            else:
+                logger.error(
+                    f"{regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
 
     def __list_boot_volumes__(self, regional_client):
         """

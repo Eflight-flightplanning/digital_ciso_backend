@@ -78,9 +78,14 @@ class Analytics(OCIService):
                     )
 
         except Exception as error:
-            logger.error(
-                f"{region_key if 'region_key' in locals() else region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-            )
+            if hasattr(error, "status") and error.status == 404:
+                logger.debug(
+                    f"Analytics - No instances found or service not provisioned in {region_key if 'region_key' in locals() else regional_client.region}"
+                )
+            else:
+                logger.error(
+                    f"{region_key if 'region_key' in locals() else regional_client.region} -- {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
 
 
 class AnalyticsInstance(BaseModel):

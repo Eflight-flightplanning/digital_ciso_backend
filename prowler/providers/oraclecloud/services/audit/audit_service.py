@@ -43,16 +43,22 @@ class Audit(OCIService):
                     ),
                 )
             except Exception as error:
-                logger.error(
-                    f"Audit - Error getting audit configuration: {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-                )
+                if hasattr(error, "status") and error.status == 404:
+                    logger.debug("Audit - Audit configuration API returned 404 (using 90-day default)")
+                else:
+                    logger.error(
+                        f"Audit - Error getting audit configuration: {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                    )
                 self.configuration = AuditConfiguration(
                     compartment_id=self.audited_tenancy, retention_period_days=90
                 )
         except Exception as error:
-            logger.error(
-                f"Audit - Error in audit service initialization: {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
-            )
+            if hasattr(error, "status") and error.status == 404:
+                logger.debug("Audit - 404 in audit service initialization")
+            else:
+                logger.error(
+                    f"Audit - Error in audit service initialization: {error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                )
 
 
 # Service Models
