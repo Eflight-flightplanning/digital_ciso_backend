@@ -158,18 +158,22 @@ function buildDisplayGraph(
   return { displayNodes: nodes, displayRels: relationships };
 }
 
-// Clean Tiered DAG layout for attack kill-chain
+// Clean, intelligent Tiered DAG layout for attack kill-chain with multi-column distribution
 function layoutGraph(
   nodes: GraphNode[],
-  relationships: GraphRelationship[]
-): Record<string, { x: number; y: number }> {
+  _relationships: GraphRelationship[]
+): {
+  positions: Record<string, { x: number; y: number }>;
+  width: number;
+  height: number;
+} {
   const n = nodes.length;
-  if (n === 0) return {};
+  if (n === 0) return { positions: {}, width: 940, height: 480 };
   const positions: Record<string, { x: number; y: number }> = {};
 
   if (n === 1) {
-    positions[nodes[0].id] = { x: 470, y: 230 };
-    return positions;
+    positions[nodes[0].id] = { x: 470, y: 240 };
+    return { positions, width: 940, height: 480 };
   }
 
   // Assign tiers based on node type (left = ingress/root, right = data/findings)
@@ -182,11 +186,10 @@ function layoutGraph(
       l.includes("compute") ||
       l.includes("vm") ||
       l.includes("appservice") ||
-      l.includes("instance") ||
-      l.includes("user")
+      l.includes("instance")
     )
       return 3;
-    if (l.includes("policy") || l.includes("dynamicgroup") || l.includes("keyvault") || l.includes("role")) return 4;
+    if (l.includes("user") || l.includes("group") || l.includes("policy") || l.includes("role") || l.includes("key") || l.includes("vault")) return 4;
     if (
       l.includes("bucket") ||
       l.includes("storage") ||
@@ -210,25 +213,42 @@ function layoutGraph(
     .filter((t) => tierBuckets[t].length > 0)
     .sort((a, b) => a - b);
 
-  const canvasW = 900;
-  const canvasH = 440;
-  const numTiers = Math.max(activeTiers.length, 1);
-  const tierStepX = Math.min(180, (canvasW - 160) / Math.max(numTiers - 1, 1));
-  const startX = 80;
+  const NODE_ROW_HEIGHT = 90; // minimum vertical distance between node centers
+  const SUB_COL_WIDTH = 195;  // horizontal distance between sub-columns
+  const MAX_NODES_PER_COL = 5;
 
-  activeTiers.forEach((tier, tierIdx) => {
+  let currentX = 100;
+  let maxGraphY = 480;
+
+  activeTiers.forEach((tier) => {
     const tierNodes = tierBuckets[tier];
-    const x = startX + tierIdx * tierStepX;
-    const count = tierNodes.length;
-    const stepY = count > 1 ? (canvasH - 100) / (count - 1) : 0;
+    const totalCount = tierNodes.length;
+    const numSubCols = Math.max(1, Math.ceil(totalCount / MAX_NODES_PER_COL));
+    const nodesPerCol = Math.ceil(totalCount / numSubCols);
 
-    tierNodes.forEach((node, nodeIdx) => {
-      const y = count > 1 ? 50 + nodeIdx * stepY : canvasH / 2;
-      positions[node.id] = { x, y };
-    });
+    for (let col = 0; col < numSubCols; col++) {
+      const colNodes = tierNodes.slice(col * nodesPerCol, (col + 1) * nodesPerCol);
+      const colX = currentX + col * SUB_COL_WIDTH;
+      const count = colNodes.length;
+
+      colNodes.forEach((node, rowIdx) => {
+        // Center column items vertically if fewer than max
+        const startY = 70 + (col % 2 === 1 ? 25 : 0); // slight stagger for adjacent sub-columns
+        const y = startY + rowIdx * NODE_ROW_HEIGHT;
+        positions[node.id] = { x: colX, y };
+        if (y + 100 > maxGraphY) {
+          maxGraphY = y + 100;
+        }
+      });
+    }
+
+    currentX += numSubCols * SUB_COL_WIDTH + 40;
   });
 
-  return positions;
+  const totalWidth = Math.max(940, currentX + 60);
+  const totalHeight = Math.max(480, maxGraphY);
+
+  return { positions, width: totalWidth, height: totalHeight };
 }
 
 function AttackPathsPage() {
@@ -330,43 +350,6 @@ function AttackPathsPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Pan + zoom state — SVG viewBox manipulation instead of CSS scale
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const isDragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  const VB_W = 940;
-  const VB_H = 460;
-  const viewBox = `${panX} ${panY} ${VB_W / zoom} ${VB_H / zoom}`;
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom((z) => Math.max(0.4, Math.min(3, z + delta)));
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    isDragging.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    const dx = (e.clientX - lastMouse.current.x) / zoom;
-    const dy = (e.clientY - lastMouse.current.y) / zoom;
-    setPanX((p) => p - dx);
-    setPanY((p) => p - dy);
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleMouseUp = () => { isDragging.current = false; };
-
-  const resetView = () => { setZoom(1); setPanX(0); setPanY(0); };
-
   const executeQuery = () => {
     if (!selectedScan?.id || !selectedQueryId) return;
     setGraphError(null);
@@ -403,7 +386,7 @@ function AttackPathsPage() {
   const allNodes = graph?.nodes ?? [];
   const allRelationships = graph?.relationships ?? [];
 
-  // Smart display graph — limit nodes for readability
+  // Smart display graph — retain full topology and security findings
   const { displayNodes: nodes, displayRels: relationships } = useMemo(
     () => buildDisplayGraph(allNodes, allRelationships),
     [allNodes, allRelationships]
@@ -417,10 +400,55 @@ function AttackPathsPage() {
       setPanY(0);
       setZoom(1);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes]);
 
-  const positions = useMemo(() => layoutGraph(nodes, relationships), [nodes, relationships]);
+  const graphLayout = useMemo(() => layoutGraph(nodes, relationships), [nodes, relationships]);
+  const positions = graphLayout.positions;
+  const VB_W = graphLayout.width;
+  const VB_H = graphLayout.height;
+
+  // Pan + zoom state — SVG viewBox manipulation
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const isDragging = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const viewBox = `${panX} ${panY} ${VB_W / zoom} ${VB_H / zoom}`;
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((z) => Math.max(0.3, Math.min(3, z + delta)));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isDragging.current = true;
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const dx = (e.clientX - lastMouse.current.x) / zoom;
+    const dy = (e.clientY - lastMouse.current.y) / zoom;
+    setPanX((p) => p - dx);
+    setPanY((p) => p - dy);
+    lastMouse.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
   const activeNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0];
   const activeQuery = queries.find((q) => q.id === selectedQueryId);
 
@@ -750,43 +778,50 @@ Please provide:
                           const to = positions[rel.target];
                           if (!from || !to) return null;
                           const isFindingRel = rel.label.includes("FINDING");
-                          const midX = (from.x + to.x) / 2;
-                          const midY = (from.y + to.y) / 2;
                           const dx = to.x - from.x;
                           const dy = to.y - from.y;
-                          const curveOffset = Math.min(Math.abs(dy) * 0.25 + 20, 50);
-                          const cpx = midX + (dy > 0 ? curveOffset * 0.4 : -curveOffset * 0.4);
-                          const cpy = midY - curveOffset;
+                          const fromX = from.x + (dx >= 0 ? 50 : -50);
+                          const fromY = from.y;
+                          const toX = to.x - (dx >= 0 ? 50 : -50);
+                          const toY = to.y;
+                          const curveDist = Math.max(Math.abs(toX - fromX) * 0.45, 30);
+                          const cp1x = fromX + (dx >= 0 ? curveDist : -curveDist);
+                          const cp1y = fromY;
+                          const cp2x = toX - (dx >= 0 ? curveDist : -curveDist);
+                          const cp2y = toY;
+                          const edgePath = `M ${fromX} ${fromY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toX} ${toY}`;
+                          const midX = (fromX + toX) / 2;
+                          const midY = (fromY + toY) / 2;
 
                           return (
                             <g key={rel.id}>
                               {/* Wider invisible hit area for hover */}
                               <path
-                                d={`M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`}
-                                fill="none" stroke="transparent" strokeWidth="12"
+                                d={edgePath}
+                                fill="none" stroke="transparent" strokeWidth="14"
                               />
                               <path
-                                d={`M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`}
+                                d={edgePath}
                                 fill="none"
                                 stroke={isFindingRel ? "#dc2626" : "#2563eb"}
-                                strokeWidth={isFindingRel ? "2.5" : "2"}
-                                strokeDasharray={isFindingRel ? "7 4" : undefined}
-                                strokeOpacity="0.85"
+                                strokeWidth={isFindingRel ? "2.2" : "1.8"}
+                                strokeDasharray={isFindingRel ? "6 3" : undefined}
+                                strokeOpacity="0.75"
                                 markerEnd={isFindingRel ? "url(#arrowRed)" : "url(#arrowBlue)"}
                               />
                               {/* Edge label only for longer edges */}
-                              {(Math.abs(dx) + Math.abs(dy)) > 100 && (
-                                <g transform={`translate(${cpx}, ${cpy - 4})`}>
-                                  <rect x="-34" y="-9" width="68" height="18" rx="9"
+                              {(Math.abs(dx) + Math.abs(dy)) > 140 && (
+                                <g transform={`translate(${midX}, ${midY - 4})`}>
+                                  <rect x="-30" y="-8" width="60" height="16" rx="8"
                                     fill={isFindingRel ? "#fef2f2" : "#eff6ff"}
                                     stroke={isFindingRel ? "#fca5a5" : "#93c5fd"}
                                     strokeWidth="1"
                                   />
-                                  <text x="0" y="4" textAnchor="middle"
+                                  <text x="0" y="3.5" textAnchor="middle"
                                     fill={isFindingRel ? "#991b1b" : "#1d4ed8"}
-                                    fontFamily="ui-monospace,monospace" fontSize="7" fontWeight="700"
+                                    fontFamily="ui-monospace,monospace" fontSize="6.5" fontWeight="700"
                                   >
-                                    {rel.label.replace(/_/g, " ").slice(0, 13)}
+                                    {rel.label.replace(/_/g, " ").slice(0, 11)}
                                   </text>
                                 </g>
                               )}
