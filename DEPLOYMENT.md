@@ -329,20 +329,7 @@ server {
 
     client_max_body_size 50M;
 
-    # 1. TanStack Start SSR Frontend (Node.js Server on Port 3000)
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # 2. Django REST API
+    # 1. Django REST API — MUST be before the / block
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -353,19 +340,7 @@ server {
         proxy_read_timeout 180s;
     }
 
-    # 3. Spectra AI Copilot & Streaming Inference
-    location /ai/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_buffering off;
-        proxy_read_timeout 300s;
-    }
-
-    # 4. Django Admin & Static / Media Assets
+    # 2. Django Admin & Static / Media Assets
     location /admin/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
@@ -379,6 +354,20 @@ server {
 
     location /media/ {
         alias /opt/security_platform/backend/media/;
+    }
+
+    # 3. Everything else → TanStack Start SSR (handles ALL frontend routes including /ai/*, /scans, /compliance, etc.)
+    #    NOTE: Do NOT add a separate /ai/ block here — that was routing /ai/* to Django and causing "Not Found" on refresh.
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_cache_bypass $http_upgrade;
     }
 }
 ```

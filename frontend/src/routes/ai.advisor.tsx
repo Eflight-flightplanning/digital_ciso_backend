@@ -838,6 +838,9 @@ ${reportContent}
             ))}
           </div>
 
+          {/* Inner flex container: messages + input */}
+          <div className="flex-1 flex flex-col min-h-0">
+
             {/* Messages Feed */}
             <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5 min-h-0">
               {messages.map((m) => (
@@ -968,6 +971,7 @@ ${reportContent}
                 </button>
               </form>
             </div>
+          </div>
           </div>
         </div>
       </AppShell>
