@@ -59,6 +59,42 @@ export function formatFindingId(rawId: string): string {
   return rawId.replace(/^prowler-/i, "CISO-");
 }
 
+export function formatComplianceFrameworkName(key: string): string {
+  const map: Record<string, string> = {
+    "cis_1.0.0_oracle_saas": "CIS Oracle SaaS v1.0.0",
+    "sod_matrix_oracle_saas": "Oracle SaaS SoD Matrix (Segregation of Duties)",
+    "cis_3.0_oraclecloud": "CIS OCI Benchmark v3.0",
+    "cis_3.1_oraclecloud": "CIS OCI Benchmark v3.1",
+    "nca_ecc_2.2024_oraclecloud": "NCA ECC-2:2024 (OCI)",
+    "nca_cscc_1.2019_oraclecloud": "NCA CSCC-1:2019 (OCI)",
+    "nca_ecc_1.2018_oraclecloud": "NCA ECC-1:2018 (OCI)",
+    "iso27001_2022_oraclecloud": "ISO 27001:2022 (OCI)",
+    "soc2_oraclecloud": "SOC 2 Type II (OCI)",
+    "pci_4.0_oraclecloud": "PCI-DSS v4.0 (OCI)",
+    "hipaa_oraclecloud": "HIPAA Security Rule (OCI)",
+    "mitre_attack_oraclecloud": "MITRE ATT&CK Matrix (OCI)",
+    "rbi_cyber_security_framework_oraclecloud": "RBI Cyber Security Framework (OCI)",
+    "secnumcloud_3.2_oraclecloud": "ANSSI SecNumCloud 3.2 (OCI)",
+    "csa_ccm_4.0": "CSA Cloud Controls Matrix (CCM 4.0)",
+    "cis_controls_8.1": "CIS Critical Security Controls v8.1",
+    "cis_2.1_azure": "CIS Microsoft Azure Benchmark v2.1",
+    "cis_3.0_azure": "CIS Microsoft Azure Benchmark v3.0",
+    "nca_ecc_2.2024_azure": "NCA ECC-2:2024 (Azure)",
+    "nca_ecc_1.2018_azure": "NCA ECC-1:2018 (Azure)",
+    "iso27001_2022_azure": "ISO 27001:2022 (Azure)",
+    "soc2_azure": "SOC 2 Type II (Azure)",
+    "pci_4.0_azure": "PCI-DSS v4.0 (Azure)",
+    "hipaa_azure": "HIPAA Security Rule (Azure)",
+  };
+
+  if (map[key]) return map[key];
+
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b(cis|nca|ecc|cscc|iso|soc|pci|hipaa|rbi|csa|ccm|dora|nist)\b/gi, (m) => m.toUpperCase())
+    .trim();
+}
+
 export function formatScanTime(isoDateString?: string): string {
   if (!isoDateString) return "Recently";
   try {
@@ -312,8 +348,7 @@ function FindingsPage() {
   }, [data, selectedProvider]);
 
   // Real compliance framework keys present in the currently provider-filtered data —
-  // never a hardcoded list, so the dropdown only ever offers frameworks that findings
-  // actually carry (a finding's `compliance` field mirrors what the Compliance page uses).
+  // automatically includes specific frameworks like CIS Oracle SaaS and SoD Matrix.
   const complianceOptions = useMemo(() => {
     const set = new Set<string>();
     for (const item of providerFilteredData) {
@@ -321,8 +356,17 @@ function FindingsPage() {
         set.add(key);
       }
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [providerFilteredData]);
+    const selProv = (selectedProvider || "ALL").toUpperCase();
+    if (selProv === "ORACLE_SAAS" || selProv === "ALL") {
+      set.add("cis_1.0.0_oracle_saas");
+      set.add("sod_matrix_oracle_saas");
+    }
+    return Array.from(set).sort((a, b) => {
+      const nameA = formatComplianceFrameworkName(a);
+      const nameB = formatComplianceFrameworkName(b);
+      return nameA.localeCompare(nameB);
+    });
+  }, [providerFilteredData, selectedProvider]);
 
   // If the provider filter changes and the previously selected framework no longer
   // appears in the data, fall back to "All" rather than silently filtering to nothing.
@@ -343,8 +387,25 @@ function FindingsPage() {
           item.service.toLowerCase().includes(query);
         if (!matches) return false;
       }
-      if (selectedCompliance !== "All" && !(selectedCompliance in (item.compliance || {}))) {
-        return false;
+      if (selectedCompliance !== "All") {
+        const itemComp = item.compliance || {};
+        const checkId = (item.check_id || "").toLowerCase();
+        const hasDirectCompliance = selectedCompliance in itemComp;
+        const matchesSod =
+          selectedCompliance === "sod_matrix_oracle_saas" &&
+          (hasDirectCompliance ||
+            checkId.startsWith("erp_iam_") ||
+            checkId.includes("sod") ||
+            item.service.toLowerCase().includes("sod"));
+        const matchesCisSaas =
+          selectedCompliance === "cis_1.0.0_oracle_saas" &&
+          (hasDirectCompliance ||
+            item.provider === "ORACLE_SAAS" ||
+            checkId.startsWith("erp_"));
+
+        if (!hasDirectCompliance && !matchesSod && !matchesCisSaas) {
+          return false;
+        }
       }
       const selSev = (selectedSeverity || "ALL").toLowerCase();
       if (selSev !== "all" && item.severity.toLowerCase() !== selSev) {
@@ -519,13 +580,13 @@ function FindingsPage() {
             <select
               value={selectedCompliance}
               onChange={(e) => setSelectedCompliance(e.target.value)}
-              className="h-9 min-w-[170px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
+              className="h-9 min-w-[220px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
               title="Filter by compliance framework"
             >
               <option value="All">All Compliance Frameworks</option>
               {complianceOptions.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {formatComplianceFrameworkName(c)}
                 </option>
               ))}
             </select>
