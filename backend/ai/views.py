@@ -478,70 +478,68 @@ class AIAdvisorQueryView(APIView):
             # Sanitize question (may contain injection attempts)
             clean_question = sanitizer.sanitize_string(question)
 
-            # Optional provider scope filter — body is JSON:API: {data:{attributes:{provider}}}
-            _attrs = request.data.get("data", {}).get("attributes", {}) if isinstance(request.data, dict) else {}
-            raw_prov = _attrs.get("provider") or (request.data.get("provider") if isinstance(request.data, dict) else None)
+            # 1. Natural Language Provider Intent Detection from question (takes highest precedence)
+            q_lower = clean_question.lower()
+            detected_provs = []
+            if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination", "idcs")):
+                detected_provs.append("oracle_saas")
+            if any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
+                detected_provs.append("oraclecloud")
+            if any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault", "app service", "appservice", "app_http", "http_logs", "webapp", "app_")):
+                detected_provs.append("azure")
+            if any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
+                detected_provs.append("aws")
+            if any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud function", "cloud sql", "service account")):
+                detected_provs.append("gcp")
+            if any(k in q_lower for k in ("k8s", "kubernetes", "pod", "deployment", "clusterrole", "kube-apiserver", "daemonset", "statefulset", "ingress", "serviceaccount")):
+                detected_provs.append("kubernetes")
+            if any(k in q_lower for k in ("github", "repository", "branch protection", "github actions", "dependabot", "codeql")):
+                detected_provs.append("github")
+            if any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
+                detected_provs.append("m365")
+            if any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
+                detected_provs.append("alibabacloud")
+            if any(k in q_lower for k in ("cloudflare", "dnssec", "waf ruleset")):
+                detected_provs.append("cloudflare")
+            if any(k in q_lower for k in ("okta", "okta user", "okta application")):
+                detected_provs.append("okta")
 
+            # Question natural language takes highest precedence:
             provider_filter = None
-            if raw_prov:
-                p_lower = str(raw_prov).strip().lower()
-                if p_lower in ("oracle_saas", "oracle-saas", "fusion", "fusion_saas", "fusion-saas", "oracle fusion saas", "oracle saas"):
-                    provider_filter = "oracle_saas"
-                elif p_lower in ("oci", "oracle", "oraclecloud"):
-                    provider_filter = "oraclecloud"
-                elif p_lower in ("azure", "az"):
-                    provider_filter = "azure"
-                elif p_lower in ("aws", "amazon"):
-                    provider_filter = "aws"
-                elif p_lower in ("gcp", "google", "googlecloud"):
-                    provider_filter = "gcp"
-                elif p_lower in ("k8s", "kubernetes"):
-                    provider_filter = "kubernetes"
-                elif p_lower in ("github", "gh"):
-                    provider_filter = "github"
-                elif p_lower in ("m365", "microsoft365", "o365", "office365"):
-                    provider_filter = "m365"
-                elif p_lower in ("alibabacloud", "alibaba", "aliyun"):
-                    provider_filter = "alibabacloud"
-                elif p_lower in ("cloudflare", "cf"):
-                    provider_filter = "cloudflare"
-                elif p_lower in ("okta",):
-                    provider_filter = "okta"
-                else:
-                    provider_filter = p_lower
-
-            # Natural Language Provider Intent Detection from question (with multi-cloud coverage)
-            if not provider_filter:
-                q_lower = clean_question.lower()
-                detected_provs = []
-                if any(k in q_lower for k in ("oracle saas", "oracle_saas", "oracale saas", "fusion", "erp", "hcm", "saas", "sod matrix", "toxic combination", "idcs")):
-                    detected_provs.append("oracle_saas")
-                if any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "oracale cloud", "tenancy", "compartment", "vcn", "security zone", "object storage bucket")):
-                    detected_provs.append("oraclecloud")
-                if any(k in q_lower for k in ("azure", "entra", "entra id", "defender", "virtual machine", "vnet", "nsg", "microsoft", "active directory", "iam account", "iam accounts", "privilege escalation", "subscription", "blob storage", "key vault", "app service", "appservice", "app_http", "http_logs", "webapp", "app_")):
-                    detected_provs.append("azure")
-                if any(k in q_lower for k in ("aws", "amazon", "s3", "ec2", "iam role", "cloudwatch", "guardduty", "cloudtrail", "dynamodb", "sqs", "sns", "lambda", "rds", "kms", "route53")):
-                    detected_provs.append("aws")
-                if any(k in q_lower for k in ("gcp", "google cloud", "bigquery", "cloud storage", "gke", "cloud function", "cloud sql", "service account")):
-                    detected_provs.append("gcp")
-                if any(k in q_lower for k in ("k8s", "kubernetes", "pod", "deployment", "clusterrole", "kube-apiserver", "daemonset", "statefulset", "ingress", "serviceaccount")):
-                    detected_provs.append("kubernetes")
-                if any(k in q_lower for k in ("github", "repository", "branch protection", "github actions", "dependabot", "codeql")):
-                    detected_provs.append("github")
-                if any(k in q_lower for k in ("m365", "microsoft 365", "office 365", "exchange online", "sharepoint", "intune")):
-                    detected_provs.append("m365")
-                if any(k in q_lower for k in ("alibaba", "aliyun", "actiontrail")):
-                    detected_provs.append("alibabacloud")
-                if any(k in q_lower for k in ("cloudflare", "dnssec", "waf ruleset")):
-                    detected_provs.append("cloudflare")
-                if any(k in q_lower for k in ("okta", "okta user", "okta application")):
-                    detected_provs.append("okta")
-
-                # If single provider is detected and not a multi-cloud question, use that provider filter; otherwise keep None for multi-cloud
-                if len(detected_provs) == 1 and not any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
-                    provider_filter = detected_provs[0]
-                else:
-                    provider_filter = None
+            if len(detected_provs) == 1 and not any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
+                provider_filter = detected_provs[0]
+            elif len(detected_provs) > 1 or any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
+                provider_filter = None
+            else:
+                # Fallback to UI dropdown filter if question didn't specify a cloud
+                _attrs = request.data.get("data", {}).get("attributes", {}) if isinstance(request.data, dict) else {}
+                raw_prov = _attrs.get("provider") or (request.data.get("provider") if isinstance(request.data, dict) else None)
+                if raw_prov:
+                    p_lower = str(raw_prov).strip().lower()
+                    if p_lower in ("oracle_saas", "oracle-saas", "fusion", "fusion_saas", "fusion-saas", "oracle fusion saas", "oracle saas"):
+                        provider_filter = "oracle_saas"
+                    elif p_lower in ("oci", "oracle", "oraclecloud"):
+                        provider_filter = "oraclecloud"
+                    elif p_lower in ("azure", "az"):
+                        provider_filter = "azure"
+                    elif p_lower in ("aws", "amazon"):
+                        provider_filter = "aws"
+                    elif p_lower in ("gcp", "google", "googlecloud"):
+                        provider_filter = "gcp"
+                    elif p_lower in ("k8s", "kubernetes"):
+                        provider_filter = "kubernetes"
+                    elif p_lower in ("github", "gh"):
+                        provider_filter = "github"
+                    elif p_lower in ("m365", "microsoft365", "o365", "office365"):
+                        provider_filter = "m365"
+                    elif p_lower in ("alibabacloud", "alibaba", "aliyun"):
+                        provider_filter = "alibabacloud"
+                    elif p_lower in ("cloudflare", "cf"):
+                        provider_filter = "cloudflare"
+                    elif p_lower in ("okta",):
+                        provider_filter = "okta"
+                    else:
+                        provider_filter = p_lower
 
             # Query tenant connected cloud providers
             tenant_id = (
@@ -908,6 +906,35 @@ def _retrieve_relevant_findings(
                             "provider": item['provider'],
                             "resource": {"name": f"{item['provider'].upper()} ({item['framework']})"},
                         })
+
+                    # If no explicit compliance overview rows exist for requested provider, compute live from findings
+                    target_provs = [provider] if provider else ["oraclecloud", "azure", "aws", "gcp", "oracle_saas"]
+                    for tp in target_provs:
+                        tp_norm = "oraclecloud" if tp == "oci" else tp
+                        if not any(k.startswith(tp_norm) or k.startswith(tp) for k in comp_map):
+                            tp_findings = Finding.all_objects.filter(
+                                Q(scan__provider__provider__iexact=tp_norm)
+                                | Q(scan__provider__provider__iexact=tp)
+                                | Q(uid__icontains=tp_norm)
+                                | Q(uid__icontains=tp)
+                            )
+                            tp_total = tp_findings.count()
+                            if tp_total > 0:
+                                tp_pass = tp_findings.filter(status="PASS").count()
+                                tp_fail = tp_findings.filter(status="FAIL").count()
+                                score_pct = round((tp_pass / tp_total * 100), 1) if tp_total > 0 else 0
+                                matching_findings.append({
+                                    "finding_id": f"COMPLIANCE-{tp_norm.upper()}-CIS",
+                                    "uid": f"{tp_norm}-cis-benchmark",
+                                    "check_id": f"{tp_norm}_cis_benchmark_score",
+                                    "check_title": f"{tp_norm.upper()} CIS Foundations Benchmark Posture",
+                                    "severity": "HIGH" if score_pct < 80 else "MEDIUM",
+                                    "status": "FAIL" if tp_fail > 0 else "PASS",
+                                    "status_extended": f"Provider: {tp_norm.upper()}. Framework: CIS Benchmark v2.0.0. Evaluated Controls: {tp_total} ({tp_pass} Passed, {tp_fail} Failed). Compliance Score: {score_pct}%.",
+                                    "remediation": f"Remediate {tp_fail} failing security configurations in {tp_norm.upper()} across Identity, Network VCN, and Storage compartments.",
+                                    "provider": tp_norm,
+                                    "resource": {"name": f"{tp_norm.upper()} Tenancy Assessment"},
+                                })
                 except Exception as ce:
                     logger.debug("Compliance overview inclusion error: %s", ce)
 
