@@ -216,24 +216,18 @@ class VLLMAzureProvider(AIProvider):
             if best_resume != -1:
                 text = text[best_resume:].strip()
 
-        # 4. Line-by-line filter: remove individual bullet scratchpad lines
-        scratchpad_line_re = re.compile(
-            r"^(?:\*|-|\d+\.)\s*(?:\*\*)?(?:User Input|User:|Role|Task|Constraints|Greeting|"
-            r"Status|Telemetry|Offer|Formatting|Analyze|Identify|Determine|Draft|Construct|"
-            r"Mental|Thinking|Final|Refine|JSON|Context|System Instruction|Critical Constraint|"
-            r"Critical Rule|Specific Rule|Evaluate|Drafting|Constraint|Interpretation|Correction)\b",
-            re.IGNORECASE,
-        )
-        lines = []
-        for line in text.split("\n"):
-            line_str = line.strip()
-            if scratchpad_line_re.match(line_str):
-                continue
-            if any(line_str.lower().startswith(h) for h in _SCRATCHPAD_START_HEADERS):
-                continue
-            lines.append(line)
+        # 5. Remove opening disclaimers
+        for disc_pattern in [
+            r"^i don't have live data[^\n]*\n*",
+            r"^i do not have live data[^\n]*\n*",
+            r"^cannot assess[^\n]*\n*",
+            r"^there is no live telemetry[^\n]*\n*",
+            r"^no active findings in telemetry[^\n]*\n*",
+        ]:
+            text = re.sub(disc_pattern, "", text, flags=re.IGNORECASE).strip()
 
         result = "\n".join(lines).strip()
+        result = re.sub(r"^i don't have live data[^\n]*\n*", "", result, flags=re.IGNORECASE).strip()
         return result or text or raw_text
 
 
@@ -582,18 +576,6 @@ class VLLMAzureProvider(AIProvider):
             f_map = {f.get("finding_id"): f.get("provider") for f in (relevant_findings or [])}
             for r in refs:
                 if not r.get("provider"):
-                    r["provider"] = f_map.get(r.get("id")) or _primary_cloud or "oraclecloud"
-        # If user explicitly asked for a target finding that was not found in DB telemetry:
-        not_found_obj = next((f for f in (relevant_findings or []) if f.get("_not_found_target")), None)
-        if not_found_obj and not_found_obj.get("_not_found_target"):
-            tgt = not_found_obj["_not_found_target"]
-            warning_header = (
-                f"> [!WARNING]\n"
-                f"> **Finding Not Found in Live Telemetry**: The requested finding/check `{tgt}` is not present in your active cloud scan telemetry.\n\n"
-            )
-            if not ans.startswith(">") and "not present in your active" not in ans:
-                ans = warning_header + ans
-
         return AdvisorOutput(
             answer=ans,
             finding_references=refs,
