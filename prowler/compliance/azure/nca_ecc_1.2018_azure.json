@@ -1,9 +1,9 @@
 {
   "Framework": "NCA-ECC",
-  "Name": "NCA Essential Cybersecurity Controls (ECC)",
-  "Version": "2:2024",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
+  "Version": "1:2018",
   "Provider": "Azure",
-  "Description": "The Essential Cybersecurity Controls (ECC-2:2024 / ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) to set minimum cybersecurity requirements across 4 Main Domains and 28 Subdomains.",
+  "Description": "The Essential Cybersecurity Controls (ECC-1:2018) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) across 5 Main Domains and 29 Subdomains (114 controls) for Microsoft Azure.",
   "Requirements": [
     {
       "Id": "1-1-1",

@@ -222,7 +222,7 @@ class Command(BaseCommand):
                 ("cis_3.0_oraclecloud", "CIS Oracle Cloud Infrastructure Foundations Benchmark", "3.0.0", 0.72, 39, 15, 54),
                 ("secnumcloud_3.2_oraclecloud", "SecNumCloud Oracle Cloud", "3.2", 0.85, 78, 14, 92),
                 ("nca_cscc_1.2019_oraclecloud", "NCA Cloud Cybersecurity Controls (CCC/CSCC)", "2:2024", 0.94, 17, 1, 18),
-                ("nca_ecc_1.2018_oraclecloud", "NCA Essential Cybersecurity Controls (ECC)", "2:2024", 0.93, 26, 2, 28),
+                ("nca_ecc_1.2018_oraclecloud", "NCA Essential Cybersecurity Controls (ECC-1:2018)", "1:2018", 0.93, 26, 2, 28),
                 ("iso27001_2022_oraclecloud", "ISO/IEC 27001:2022 (ISMS)", "2022", 0.91, 10, 1, 11),
                 ("pci_4.0_oraclecloud", "PCI-DSS (Payment Card Industry)", "4.0", 0.93, 13, 1, 14),
                 ("hipaa_oraclecloud", "HIPAA Security Rule & HITECH", "2023", 0.91, 10, 1, 11),
@@ -238,7 +238,7 @@ class Command(BaseCommand):
                 ("soc2_azure", "SOC 2 Type II (Trust Services Criteria)", "2023", 0.92, 24, 2, 26),
                 ("iso27001_2022_azure", "ISO/IEC 27001:2022 (ISMS)", "2022", 0.89, 82, 10, 92),
                 ("hipaa_azure", "HIPAA Security Rule & HITECH", "2023", 0.91, 31, 3, 34),
-                ("nca_ecc_1.2018_azure", "NCA Essential Cybersecurity Controls (ECC)", "2:2024", 0.89, 25, 3, 28),
+                ("nca_ecc_1.2018_azure", "NCA Essential Cybersecurity Controls (ECC-1:2018)", "1:2018", 0.89, 25, 3, 28),
                 ("nca_cscc_1.2019_azure", "NCA Cloud Cybersecurity Controls (CCC/CSCC)", "2:2024", 0.89, 16, 2, 18),
                 # AWS & GCP Frameworks
                 ("cis_3.0_aws", "CIS AWS Foundations Benchmark", "3.0.0", 0.91, 156, 15, 171),
