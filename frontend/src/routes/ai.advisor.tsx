@@ -327,19 +327,6 @@ function FindingActionCard({
             )}
           </div>
         )}
-
-        <button
-          onClick={() =>
-            onAskSpectra(
-              `Analyze root cause and provide step-by-step CLI and Terraform remediation for finding ${finding.name} (${finding.id}).`
-            )
-          }
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold transition-all active:scale-95 cursor-pointer"
-          title="Ask Spectra Deep Dive"
-        >
-          <Sparkles className="h-3 w-3" />
-          <span>Remediate</span>
-        </button>
       </div>
     </div>
 
