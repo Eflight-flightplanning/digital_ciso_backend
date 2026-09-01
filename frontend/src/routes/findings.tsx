@@ -650,15 +650,25 @@ function FindingsPage() {
                         <p className="mono truncate text-[10px] text-muted-foreground" title={f.resource}>
                           {f.resource}
                         </p>
-                        {Object.keys(f.compliance || {}).length > 0 && (
-                          <div
-                            className="mt-0.5 truncate text-[10px] text-primary/80"
-                            title={`Mapped to: ${Object.keys(f.compliance).join(", ")}`}
-                          >
-                            {Object.keys(f.compliance).slice(0, 2).join(" · ")}
-                            {Object.keys(f.compliance).length > 2 && ` +${Object.keys(f.compliance).length - 2}`}
-                          </div>
-                        )}
+                        {Object.keys(f.compliance || {}).length > 0 && (() => {
+                          const allTags = Object.keys(f.compliance);
+                          // When a compliance filter is active, always surface the tag that
+                          // actually matched it first — otherwise it can be silently buried
+                          // under "+N" while unrelated frameworks occupy the two visible slots,
+                          // making a correct filter match look like it didn't work.
+                          const ordered = selectedCompliance !== "All" && allTags.includes(selectedCompliance)
+                            ? [selectedCompliance, ...allTags.filter((t) => t !== selectedCompliance)]
+                            : allTags;
+                          return (
+                            <div
+                              className="mt-0.5 truncate text-[10px] text-primary/80"
+                              title={`Mapped to: ${allTags.join(", ")}`}
+                            >
+                              {ordered.slice(0, 2).join(" · ")}
+                              {ordered.length > 2 && ` +${ordered.length - 2}`}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-2 py-2.5 truncate">

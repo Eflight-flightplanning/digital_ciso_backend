@@ -1,9 +1,9 @@
 {
   "Framework": "NCA-ECC",
-  "Name": "NCA Essential Cybersecurity Controls (ECC-1:2018)",
-  "Version": "1:2018",
-  "Provider": "azure",
-  "Description": "The original Essential Cybersecurity Controls (ECC-1:2018), published by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA), across 5 Main Domains, 29 Subdomains, and 114 Cybersecurity Controls. NCA superseded this version with ECC-2:2024 (4 Domains, 28 Subdomains — Domain 5, Industrial Control Systems, was removed in that update). This file is kept as a distinct, separately-selectable framework for organizations still tracking against the original 2018 baseline.",
+  "Name": "NCA Essential Cybersecurity Controls (ECC-2:2024)",
+  "Version": "2:2024",
+  "Provider": "Azure",
+  "Description": "The Essential Cybersecurity Controls (ECC-2:2024) were developed by the National Cybersecurity Authority (NCA) of the Kingdom of Saudi Arabia (KSA) across 4 Main Domains and 28 Subdomains. The real published document defines 108 Main Controls and 92 Subcontrols; this file maps one requirement per real numbered control, using Prowler checks only where a real, verifiable technical equivalent exists on Microsoft Azure.",
   "Requirements": [
     {
       "Id": "1-1-1",
@@ -1595,58 +1595,6 @@
       ],
       "Checks": [],
       "AssessmentType": "Manual"
-    },
-    {
-      "Id": "5-1-1",
-      "Name": "5-1-1 ICS/OT Cybersecurity Requirements Definition",
-      "Description": "Define, document, and approve cybersecurity requirements for Industrial Control Systems and Operational Technology (ICS/OT).",
-      "Attributes": [
-        {
-          "Section": "5. Industrial Control Systems Cybersecurity",
-          "SubSection": "5-1 Industrial Control Systems (ICS) Protection",
-          "Service": "governance"
-        }
-      ],
-      "Checks": []
-    },
-    {
-      "Id": "5-1-2",
-      "Name": "5-1-2 ICS/OT Cybersecurity Requirements Implementation",
-      "Description": "Implement the approved cybersecurity requirements for Industrial Control Systems and Operational Technology (ICS/OT).",
-      "Attributes": [
-        {
-          "Section": "5. Industrial Control Systems Cybersecurity",
-          "SubSection": "5-1 Industrial Control Systems (ICS) Protection",
-          "Service": "governance"
-        }
-      ],
-      "Checks": []
-    },
-    {
-      "Id": "5-1-3",
-      "Name": "5-1-3 ICS/OT Network Segmentation, Monitoring & Patch Management",
-      "Description": "Physically/virtually segment industrial networks from corporate and external networks, continuously monitor and log ICS/OT events, isolate Safety Instrumented Systems, restrict external media and mobile device connections, and maintain vulnerability/patch management and malware protection for ICS/OT systems.",
-      "Attributes": [
-        {
-          "Section": "5. Industrial Control Systems Cybersecurity",
-          "SubSection": "5-1 Industrial Control Systems (ICS) Protection",
-          "Service": "governance"
-        }
-      ],
-      "Checks": []
-    },
-    {
-      "Id": "5-1-4",
-      "Name": "5-1-4 Periodic Review of ICS/OT Cybersecurity Requirements",
-      "Description": "Periodically review the cybersecurity requirements related to Industrial Control Systems and Operational Technology (ICS/OT).",
-      "Attributes": [
-        {
-          "Section": "5. Industrial Control Systems Cybersecurity",
-          "SubSection": "5-1 Industrial Control Systems (ICS) Protection",
-          "Service": "governance"
-        }
-      ],
-      "Checks": []
     }
   ]
 }
