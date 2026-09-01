@@ -9,7 +9,6 @@ import {
   ArrowUpRight,
   RefreshCw,
   Terminal,
-  Zap,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -745,18 +744,6 @@ ${reportContent}
               <span>CISO Briefing</span>
             </button>
 
-            <button
-              onClick={() =>
-                handleSend(
-                  "Generate a SecOps morning briefing in clean Slack/Teams markdown format summarizing all P1/P2 findings, active SLA countdowns, and immediate actions needed today."
-                )
-              }
-              className="inline-flex h-8.5 items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-surface-3 active:scale-95 cursor-pointer"
-              title="Generate SecOps Slack/Teams Morning Digest"
-            >
-              <Zap className="h-3.5 w-3.5 text-amber-400" />
-              <span>SecOps Digest</span>
-            </button>
 
             <button
               onClick={handleExportReport}
