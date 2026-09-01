@@ -88,9 +88,17 @@ class Command(BaseCommand):
                     new_rows = []
                     passed_req_count = 0
                     failed_req_count = 0
+                    seen_req_ids = set()
 
                     for req in requirements:
-                        req_id = str(req.get("Id") or req.get("Name") or uuid4())
+                        base_req_id = str(req.get("Id") or req.get("Name") or uuid4())
+                        req_id = base_req_id
+                        counter = 1
+                        while req_id in seen_req_ids:
+                            counter += 1
+                            req_id = f"{base_req_id}_{counter}"
+                        seen_req_ids.add(req_id)
+
                         checks = req.get("Checks", [])
                         total_checks = len(checks)
                         
@@ -130,7 +138,7 @@ class Command(BaseCommand):
                         )
 
                     if new_rows:
-                        cro_mgr.bulk_create(new_rows, batch_size=500)
+                        cro_mgr.bulk_create(new_rows, batch_size=500, ignore_conflicts=True)
                         total_created += len(new_rows)
                         total_frameworks += 1
 
