@@ -107,17 +107,22 @@ class BlockStorage(OCIService):
                 f"BlockStorage - Listing Boot Volumes in {regional_client.region}..."
             )
 
+            # Get availability domains for this region once using tenancy ID
+            tenancy_id = getattr(self.provider.identity, "tenancy_id", None) or self.session_config.get("tenancy")
+            identity_client = self._create_oci_client(
+                oci.identity.IdentityClient,
+                config_overrides={"region": regional_client.region},
+            )
+            try:
+                availability_domains = identity_client.list_availability_domains(
+                    compartment_id=tenancy_id
+                ).data
+            except Exception as ad_err:
+                logger.warning(f"Could not list ADs in {regional_client.region}: {ad_err}")
+                availability_domains = []
+
             for compartment in self.audited_compartments:
                 try:
-                    # Get availability domains for this compartment
-                    identity_client = self._create_oci_client(
-                        oci.identity.IdentityClient,
-                        config_overrides={"region": regional_client.region},
-                    )
-                    availability_domains = identity_client.list_availability_domains(
-                        compartment_id=compartment.id
-                    ).data
-
                     for ad in availability_domains:
                         boot_volumes = oci.pagination.list_call_get_all_results(
                             blockstorage_client.list_boot_volumes,
