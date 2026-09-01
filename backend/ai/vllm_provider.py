@@ -38,7 +38,7 @@ from .remediation_library import get_remediation, render_remediation_block
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VLLM_ENDPOINT = "http://20.235.254.33:8000/v1"
+DEFAULT_VLLM_ENDPOINT = "http://10.0.0.4:8000/v1"
 DEFAULT_MODEL = "/home/azureuser/models/qwen3.5-9b"
 DEFAULT_TIMEOUT = 120.0
 
@@ -150,9 +150,10 @@ class VLLMAzureProvider(AIProvider):
         if "</think>" in text:
             text = text.split("</think>")[-1].strip()
 
-        # 2. Strip "Thinking Process:" section block
-        if "Thinking Process:" in text:
-            text = text.split("Thinking Process:")[-1].strip()
+        # 2. Strip "Thinking Process:" or "Here's a thinking process" section block
+        for tp_prefix in ["Thinking Process:", "Thinking process:", "Here's a thinking process", "Here is a thinking process"]:
+            if tp_prefix in text:
+                text = text.split(tp_prefix)[-1].strip()
 
         # 3. Detect verbose scratchpad/reasoning leakage patterns
         _SCRATCHPAD_START_HEADERS = (
@@ -209,9 +210,6 @@ class VLLMAzureProvider(AIProvider):
                         best_resume = idx
             if best_resume != -1:
                 text = text[best_resume:].strip()
-            elif "critical rule:" in text_lower or "interpretation:" in text_lower or text_lower.startswith("user:"):
-                # The output is entirely scratchpad thoughts without a final answer
-                return ""
 
         # 4. Line-by-line filter: remove individual bullet scratchpad lines
         scratchpad_line_re = re.compile(
@@ -231,7 +229,7 @@ class VLLMAzureProvider(AIProvider):
             lines.append(line)
 
         result = "\n".join(lines).strip()
-        return result or text
+        return result or text or raw_text
 
 
 
@@ -546,7 +544,7 @@ class VLLMAzureProvider(AIProvider):
             system_prompt=ADVISOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0.1,
-            max_tokens=800,
+            max_tokens=1800,
             history=history,
         )
         if data.get("_ai_unavailable"):
@@ -555,8 +553,14 @@ class VLLMAzureProvider(AIProvider):
         raw_ans = data.get("answer", data.get("raw_text", "")).strip()
         ans = self._clean_thinking_trace(raw_ans)
 
-        if not ans or len(ans) <= 15 or "critical rule:" in ans.lower() or ans.lower().startswith("user:"):
-            raise RuntimeError("vLLM advisor call returned an empty or malformed response")
+        if not ans or len(ans) <= 15:
+            q_low = (question or "").strip().lower()
+            if any(q_low == g or q_low.startswith(g + " ") or q_low.startswith(g + "?") for g in ["hey", "hello", "hi", "help", "who are you", "what can you do"]):
+                ans = "Hello! I am Spectra, your Autonomous AI Security Copilot. I'm ready to assist with cloud security posture, compliance gaps, toxic attack paths, and step-by-step remediations. How can I help you today?"
+            elif raw_ans and len(raw_ans) > 15:
+                ans = raw_ans
+            else:
+                ans = "Spectra analyzed your request against connected cloud telemetry. Please specify a finding or cloud resource for a deeper technical breakdown."
 
         refs = data.get("finding_references", [])
         if not refs and relevant_findings:

@@ -30,8 +30,8 @@ export const Route = createFileRoute("/ai/settings")({
 });
 
 function AISettingsPage() {
-  const [vllmEndpoint, setVllmEndpoint] = useState("http://20.235.254.33:8000/v1");
-  const [modelName, setModelName] = useState("/home/azureuser/models/digital-ciso-llm");
+  const [vllmEndpoint, setVllmEndpoint] = useState("http://10.0.0.4:8000/v1");
+  const [modelName, setModelName] = useState("/home/azureuser/models/qwen3.5-9b");
   const [vllmApiKey, setVllmApiKey] = useState("");
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"healthy" | "testing" | "error">("healthy");
@@ -310,7 +310,7 @@ function AISettingsPage() {
                 <Server className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="http://20.235.254.33:8000/v1"
+                  placeholder="http://10.0.0.4:8000/v1"
                   value={vllmEndpoint}
                   onChange={(e) => setVllmEndpoint(e.target.value)}
                   className="h-10 w-full rounded-xl border border-border bg-surface-2/60 pr-4 pl-9 font-mono text-xs text-foreground placeholder:text-muted-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary"

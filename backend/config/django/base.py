@@ -8,7 +8,7 @@ from config.settings.partitions import *  # noqa
 from config.settings.sentry import *  # noqa
 
 SECRET_KEY = env("SECRET_KEY", default="prowler_secret_key_32_bytes_long_12345_67890")
-VLLM_AZURE_ENDPOINT = env("VLLM_AZURE_ENDPOINT", default="http://20.235.254.33:8000/v1")
+VLLM_AZURE_ENDPOINT = env("VLLM_AZURE_ENDPOINT", default="http://10.0.0.4:8000/v1")
 VLLM_AZURE_MODEL = env("VLLM_AZURE_MODEL", default="/home/azureuser/models/qwen3.5-9b")
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 ANTHROPIC_MODEL = env("ANTHROPIC_MODEL", default="qwen3.5-9b")

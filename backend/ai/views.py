@@ -572,7 +572,7 @@ class AIAdvisorQueryView(APIView):
                 request, clean_question, provider=provider_filter, history=history
             )
 
-            ai_provider = get_ai_provider()
+            ai_provider = get_ai_provider(tenant_id=tenant_id)
             result = ai_provider.answer_advisor_query(
                 question=clean_question,
                 relevant_findings=relevant_findings,
@@ -1131,6 +1131,7 @@ class AIRemediationGeneratorView(APIView):
         from ai.remediation_library import get_remediation
         template = get_remediation(finding.check_id.lower().strip())
         res_name = getattr(finding, "resource_id", "Resource")
+        provider = get_ai_provider(tenant_id=tenant_id)
         
         if template:
             cli_code = template.cli.format(resource=res_name, rg="rg-production") if "{resource}" in template.cli else template.cli

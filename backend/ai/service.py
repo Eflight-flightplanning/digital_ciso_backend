@@ -46,10 +46,8 @@ class AIAnalysisService:
     def __init__(self) -> None:
         self._provider = None  # Lazy — only instantiate when AI is enabled
 
-    def _get_provider(self):
-        if self._provider is None:
-            self._provider = get_ai_provider()
-        return self._provider
+    def _get_provider(self, tenant_id: str | None = None):
+        return get_ai_provider(tenant_id=tenant_id)
 
     def analyze(
         self,
@@ -129,7 +127,7 @@ class AIAnalysisService:
             }
 
         # ── Step 6: Reasoning AI ──
-        provider = self._get_provider()
+        provider = self._get_provider(tenant_id)
         logger.info("Calling Reasoning AI for finding %s", finding_id)
         reasoning = provider.analyze_finding(sanitized_normalized, sanitized_context)
 
