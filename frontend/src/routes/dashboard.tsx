@@ -353,6 +353,7 @@ function AssetVolumeView({
   ociAssets,
   oracleSaasAssets = 0,
   resources = [],
+  findings = [],
 }: {
   totalAssets: number;
   azureAssets: number;
@@ -361,6 +362,7 @@ function AssetVolumeView({
   ociAssets: number;
   oracleSaasAssets?: number;
   resources?: any[];
+  findings?: any[];
 }) {
   const safeTotal = Math.max(1, totalAssets);
   const azPct = Math.round((azureAssets / safeTotal) * 100);
@@ -369,69 +371,99 @@ function AssetVolumeView({
   const ociPct = Math.round((ociAssets / safeTotal) * 100);
   const saasPct = Math.round((oracleSaasAssets / safeTotal) * 100);
 
+  // Shared bucketing so a resource and a finding for the same real service (e.g. "keyvault")
+  // land in the same group — this is what lets us compute a real health status per group below.
+  const classifyServiceKey = (serviceStr: string): string => {
+    const s = serviceStr.toLowerCase();
+    if (s.includes("defender") || s.includes("security") || s.includes("pricing")) return "defender";
+    if (s.includes("iam") || s.includes("role") || s.includes("authorization") || s.includes("identity")) return "iam";
+    if (s.includes("network") || s.includes("nsg") || s.includes("vnet") || s.includes("subnet") || s.includes("watcher")) return "network";
+    if (s.includes("keyvault") || s.includes("vault") || s.includes("secret")) return "keyvault";
+    if (s.includes("app") || s.includes("web") || s.includes("site")) return "app";
+    if (s.includes("vm") || s.includes("compute") || s.includes("virtualmachine") || s.includes("disk")) return "compute";
+    if (s.includes("policy")) return "policy";
+    if (s.includes("storage") || s.includes("blob") || s.includes("bucket")) return "storage";
+    return "other";
+  };
+
+  // Real per-group fail count, derived from the same findings shown elsewhere on the
+  // dashboard — a group only shows "Audited" (healthy) when it genuinely has zero real
+  // FAIL findings, instead of that label being hardcoded regardless of actual status.
+  const failCountByKey = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const f of findings) {
+      if (String(f.status || "").toUpperCase() !== "FAIL") continue;
+      const s = String(f.check_metadata?.servicename || f.service || "").toLowerCase();
+      const key = classifyServiceKey(s);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [findings]);
+
   const services = useMemo(() => {
     if (!resources || resources.length === 0) {
       return [];
     }
 
-    const map = new Map<string, { name: string; icon: any; count: number; provider: string; health: string }>();
+    const map = new Map<string, { name: string; icon: any; count: number; provider: string; key: string }>();
 
     for (const r of resources) {
       const s = String(r.service || r.service_name || r.type || "").toLowerCase();
-      let key = "other";
+      const key = classifyServiceKey(s);
       let name = "Discovered Cloud Assets";
       let prov = String(r.provider || r.provider_type || "Azure").toUpperCase();
       let icon = Server;
 
-      if (s.includes("defender") || s.includes("security") || s.includes("pricing")) {
-        key = "defender";
+      if (key === "defender") {
         name = "Defender for Cloud & Security Posture";
         prov = "Microsoft Defender";
         icon = ShieldCheck;
-      } else if (s.includes("iam") || s.includes("role") || s.includes("authorization") || s.includes("identity")) {
-        key = "iam";
+      } else if (key === "iam") {
         name = "Entra ID & Identity Role Assignments";
         prov = prov.includes("OCI") || prov.includes("ORACLE") ? "OCI Identity" : "Azure IAM / Entra ID";
         icon = Lock;
-      } else if (s.includes("network") || s.includes("nsg") || s.includes("vnet") || s.includes("subnet") || s.includes("watcher")) {
-        key = "network";
+      } else if (key === "network") {
         name = "Network Security Groups & VNets";
         prov = "Azure Virtual Network";
         icon = Globe;
-      } else if (s.includes("keyvault") || s.includes("vault") || s.includes("secret")) {
-        key = "keyvault";
+      } else if (key === "keyvault") {
         name = "Key Vaults & Cryptographic Secrets";
         prov = "Azure Key Vault";
         icon = Lock;
-      } else if (s.includes("app") || s.includes("web") || s.includes("site")) {
-        key = "app";
+      } else if (key === "app") {
         name = "App Services & Cloud Workloads";
         prov = "Azure App Service";
         icon = Globe;
-      } else if (s.includes("vm") || s.includes("compute") || s.includes("virtualmachine") || s.includes("disk")) {
-        key = "compute";
+      } else if (key === "compute") {
         name = "Virtual Machines & Disks";
         prov = "Azure Compute";
         icon = Server;
-      } else if (s.includes("policy")) {
-        key = "policy";
+      } else if (key === "policy") {
         name = "OCI Tenancy IAM Policies";
         prov = "Oracle Cloud IAM";
         icon = Lock;
-      } else if (s.includes("storage") || s.includes("blob") || s.includes("bucket")) {
-        key = "storage";
+      } else if (key === "storage") {
         name = "Storage Accounts & Object Stores";
         prov = "Cloud Storage";
         icon = Database;
       }
 
       if (!map.has(key)) {
-        map.set(key, { name, icon, count: 0, provider: prov, health: "Audited" });
+        map.set(key, { name, icon, count: 0, provider: prov, key });
       }
       map.get(key)!.count += 1;
     }
 
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    return Array.from(map.values())
+      .map((entry) => {
+        const fails = failCountByKey.get(entry.key) || 0;
+        return {
+          ...entry,
+          health: fails > 0 ? `${fails} Failing` : "Audited",
+          healthy: fails === 0,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
   }, [resources]);
 
   return (
@@ -492,7 +524,7 @@ function AssetVolumeView({
               </div>
               <div className="text-right">
                 <div className="font-mono font-bold text-foreground">{svc.count}</div>
-                <div className="text-[10px] font-semibold text-emerald-400">{svc.health}</div>
+                <div className={`text-[10px] font-semibold ${svc.healthy ? "text-emerald-400" : "text-rose-400"}`}>{svc.health}</div>
               </div>
             </div>
           );
@@ -605,6 +637,36 @@ function RiskPipelineView({ findings, providers }: { findings: any[]; providers:
 
   const safeTotal = Math.max(1, pipelineData.totalFindings);
 
+  // Real proportional layout for the Sankey flow bands and severity nodes — each band's
+  // thickness (and each node's height) is computed from its real share of total severity
+  // findings, instead of fixed pixel values that don't reflect the actual data. A minimum
+  // height keeps every row readable, but only a nonzero real count ever draws a flow band.
+  const bandLayout = useMemo(() => {
+    const order: Array<{ key: "critical" | "high" | "medium" | "low"; count: number; gradient: string; label: string; stroke: string; text: string }> = [
+      { key: "critical", count: pipelineData.critical, gradient: "url(#flowBandCritical)", label: "Critical", stroke: "#f43f5e", text: "#f43f5e" },
+      { key: "high", count: pipelineData.high, gradient: "url(#flowBandHigh)", label: "High", stroke: "#ea580c", text: "#ea580c" },
+      { key: "medium", count: pipelineData.medium, gradient: "url(#flowBandMedium)", label: "Medium", stroke: "#eab308", text: "#eab308" },
+      { key: "low", count: pipelineData.low, gradient: "url(#flowBandLow)", label: "Low", stroke: "#38bdf8", text: "#38bdf8" },
+    ];
+    const severityTotal = Math.max(1, pipelineData.critical + pipelineData.high + pipelineData.medium + pipelineData.low);
+    const top = 10;
+    const bottom = 216;
+    const available = bottom - top;
+    const MIN_H = 14;
+    // First pass: raw proportional heights, floored at MIN_H so every row stays readable.
+    const raw = order.map((o) => Math.max(MIN_H, (o.count / severityTotal) * available));
+    const rawSum = raw.reduce((a, b) => a + b, 0);
+    // Scale back down to fit the available space if the floor pushed the total over it.
+    const scale = rawSum > available ? available / rawSum : 1;
+    let cursor = top;
+    return order.map((o, i) => {
+      const height = raw[i] * scale;
+      const startY = cursor;
+      cursor += height;
+      return { ...o, startY, height, endY: startY + height };
+    });
+  }, [pipelineData]);
+
   return (
     <div className="space-y-4 py-3">
       {/* Top Banner KPI Cards - 100% Real Live Telemetry */}
@@ -682,41 +744,21 @@ function RiskPipelineView({ findings, providers }: { findings: any[]; providers:
                 </linearGradient>
               </defs>
 
-              {/* Dynamic Flow Bands (Bezier Curve Ribbons) */}
+              {/* Dynamic Flow Bands (Bezier Curve Ribbons) — thickness is each severity's
+                  real proportional share of total findings; a band only appears at all
+                  when that severity has at least one real finding. */}
               <g>
-                {/* Critical Band */}
-                {pipelineData.critical > 0 && (
-                  <path
-                    d="M 150 35 C 310 35, 370 25, 520 25 L 520 45 C 370 45, 310 50, 150 50 Z"
-                    fill="url(#flowBandCritical)"
-                    className="transition-opacity hover:opacity-95 cursor-pointer"
-                  />
-                )}
-
-                {/* High Band */}
-                <path
-                  d="M 150 60 C 310 60, 370 75, 520 75 L 520 140 C 370 140, 310 120, 150 120 Z"
-                  fill="url(#flowBandHigh)"
-                  className="transition-opacity hover:opacity-95 cursor-pointer"
-                />
-
-                {/* Medium Band */}
-                {pipelineData.medium > 0 && (
-                  <path
-                    d="M 150 125 C 310 125, 370 155, 520 155 L 520 185 C 370 185, 310 155, 150 155 Z"
-                    fill="url(#flowBandMedium)"
-                    className="transition-opacity hover:opacity-95 cursor-pointer"
-                  />
-                )}
-
-                {/* Low Band */}
-                {pipelineData.low > 0 && (
-                  <path
-                    d="M 150 160 C 310 160, 370 195, 520 195 L 520 215 C 370 215, 310 180, 150 180 Z"
-                    fill="url(#flowBandLow)"
-                    className="transition-opacity hover:opacity-95 cursor-pointer"
-                  />
-                )}
+                {bandLayout.filter((b) => b.count > 0).map((b) => {
+                  const swoosh = 6;
+                  return (
+                    <path
+                      key={b.key}
+                      d={`M 150 ${b.startY} C 310 ${b.startY}, 370 ${b.startY - swoosh}, 520 ${b.startY - swoosh} L 520 ${b.endY - swoosh} C 370 ${b.endY - swoosh}, 310 ${b.endY}, 150 ${b.endY} Z`}
+                      fill={b.gradient}
+                      className="transition-opacity hover:opacity-95 cursor-pointer"
+                    />
+                  );
+                })}
               </g>
 
               {/* Left Column: Cloud Provider Nodes */}
@@ -746,31 +788,18 @@ function RiskPipelineView({ findings, providers }: { findings: any[]; providers:
                 )}
               </g>
 
-              {/* Right Column: Severity Nodes with Real Live Counts */}
+              {/* Right Column: Severity Nodes — box height matches each severity's real
+                  proportional share (same layout the flow bands use), so a category with
+                  more real findings visibly takes up more space than one with fewer. */}
               <g transform="translate(520, 10)">
-                {/* Critical Node */}
-                <rect x="0" y="0" width="140" height="35" rx="6" fill="#1e293b" stroke="#f43f5e" strokeWidth="2" />
-                <text x="12" y="22" fill="#f43f5e" fontSize="11" fontWeight="bold" fontFamily="monospace">
-                  Critical ({pipelineData.critical})
-                </text>
-
-                {/* High Node */}
-                <rect x="0" y="45" width="140" height="85" rx="6" fill="#1e293b" stroke="#ea580c" strokeWidth="2" />
-                <text x="12" y="70" fill="#ea580c" fontSize="12" fontWeight="bold" fontFamily="monospace">
-                  High ({pipelineData.high})
-                </text>
-
-                {/* Medium Node */}
-                <rect x="0" y="140" width="140" height="38" rx="6" fill="#1e293b" stroke="#eab308" strokeWidth="2" />
-                <text x="12" y="163" fill="#eab308" fontSize="11" fontWeight="bold" fontFamily="monospace">
-                  Medium ({pipelineData.medium})
-                </text>
-
-                {/* Low Node */}
-                <rect x="0" y="186" width="140" height="30" rx="6" fill="#1e293b" stroke="#38bdf8" strokeWidth="1.5" />
-                <text x="12" y="205" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="monospace">
-                  Low ({pipelineData.low})
-                </text>
+                {bandLayout.map((b) => (
+                  <g key={b.key}>
+                    <rect x="0" y={b.startY - 10} width="140" height={b.height} rx="6" fill="#1e293b" stroke={b.stroke} strokeWidth={b.key === "low" ? 1.5 : 2} />
+                    <text x="12" y={b.startY - 10 + b.height / 2 + 4} fill={b.text} fontSize={b.height > 40 ? "12" : "10.5"} fontWeight="bold" fontFamily="monospace">
+                      {b.label} ({b.count})
+                    </text>
+                  </g>
+                ))}
               </g>
             </svg>
           </div>
@@ -1266,6 +1295,33 @@ export function DashboardPage() {
   const attackPathsScans = (attackPathsData?.items as Array<Record<string, any>>) ?? [];
   const readyAttackPathsCount = attackPathsScans.filter((s: any) => s.graph_data_ready).length;
 
+  // Real per-framework compliance data (same endpoint /compliance uses) — needed both for
+  // the evaluated-framework KPI below and for the Radar Posture chart's real per-framework scores.
+  const complianceOverviewParams = useMemo(() => {
+    if (connectedProviderTypes.length === 0) return undefined;
+    const params: Record<string, string> = {};
+    if (selectedProviderObj) {
+      params["filter[provider_type]"] = String(selectedProviderObj.provider || "").toLowerCase();
+    } else {
+      params["filter[provider_type__in]"] = connectedProviderTypes.join(",");
+    }
+    return params;
+  }, [connectedProviderTypes, selectedProviderObj]);
+  const { data: dashboardComplianceData } = useCompliance(complianceOverviewParams);
+  const realComplianceFrameworks = useMemo(() => {
+    const items = (dashboardComplianceData?.items as Array<Record<string, any>>) ?? [];
+    return items.map((item) => {
+      const passed = Number(item.requirements_passed) || 0;
+      const failed = Number(item.requirements_failed) || 0;
+      const total = Number(item.total_requirements) || 0;
+      const evaluated = Math.max(1, passed + failed);
+      return {
+        name: String(item.framework || item.id || ""),
+        score: total > 0 ? Math.round((passed / evaluated) * 100) : 0,
+      };
+    });
+  }, [dashboardComplianceData]);
+
   // Real live numbers from database findings
   const realPass = filteredFindings.filter((f: any) => f.status === "PASS").length;
   const realFail = filteredFindings.filter((f: any) => f.status === "FAIL").length;
@@ -1309,11 +1365,21 @@ export function DashboardPage() {
     }
   }, [selectedProviderObj]);
 
-  // Radar chart data metrics derived from live compliance posture
+  // Radar chart data metrics — each axis gets its own real per-framework compliance score
+  // (matched against realComplianceFrameworks by name), not a single repeated overall number.
+  // An axis whose framework has no real compliance data yet honestly shows 0 rather than
+  // borrowing the unrelated overall posture score.
   const radarData = useMemo(() => {
-    const scoreVal = totalFindingsCount > 0 ? Math.min(100, Math.max(0, postureScore)) : 0;
-    return radarLabels.map((lbl) => ({ label: lbl, value: scoreVal }));
-  }, [radarLabels, totalFindingsCount, postureScore]);
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return radarLabels.map((lbl) => {
+      const normLabel = norm(lbl);
+      const match = realComplianceFrameworks.find((fw) => {
+        const normName = norm(fw.name);
+        return normName.length > 0 && (normLabel.includes(normName) || normName.includes(normLabel));
+      });
+      return { label: lbl, value: match ? match.score : 0 };
+    });
+  }, [radarLabels, realComplianceFrameworks]);
 
   // Dynamically filter resources by selected provider
   const filteredResources = useMemo(() => {
@@ -1365,19 +1431,8 @@ export function DashboardPage() {
 
   const totalDiscoveredAssets = filteredResources.length;
 
-  // Real evaluated-framework count from the compliance backend (same endpoint /compliance uses),
-  // instead of a findings-count stand-in.
-  const complianceOverviewParams = useMemo(() => {
-    if (connectedProviderTypes.length === 0) return undefined;
-    const params: Record<string, string> = {};
-    if (selectedProviderObj) {
-      params["filter[provider_type]"] = String(selectedProviderObj.provider || "").toLowerCase();
-    } else {
-      params["filter[provider_type__in]"] = connectedProviderTypes.join(",");
-    }
-    return params;
-  }, [connectedProviderTypes, selectedProviderObj]);
-  const { data: dashboardComplianceData } = useCompliance(complianceOverviewParams);
+  // Real evaluated-framework count from the compliance backend (fetched above, alongside
+  // the Radar Posture's real per-framework scores), instead of a findings-count stand-in.
   const evaluatedFrameworkCount = (dashboardComplianceData?.items as Array<unknown> | undefined)?.length ?? 0;
 
   // Startup Animation Trigger
@@ -1718,6 +1773,7 @@ export function DashboardPage() {
                     ociAssets={ociAssets}
                     oracleSaasAssets={oracleSaasAssets}
                     resources={filteredResources}
+                    findings={filteredFindings}
                   />
                 </div>
               )}

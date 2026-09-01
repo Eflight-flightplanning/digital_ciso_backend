@@ -165,22 +165,58 @@ function FindingsPage() {
         }
 
         // 4. Real Region & Resource Name from UID & Status Extended
-        const uidParts = uid.split("-");
+        //
+        // Prowler UIDs follow: prowler-{provider}-{check_id}-{account/tenancy-id}-{region}-{resource-name}
+        // A naive "grab the last hyphen segment as resource, second-to-last as region" split
+        // is wrong whenever the resource's own name contains hyphens (e.g. a VM literally
+        // named "Digital-CISO-LLM" was being chopped into resource="LLM", region="CISO" —
+        // both wrong). Instead, strip the known "prowler-{provider}-{check_id}-" prefix and
+        // the account/tenancy identifier, then treat the first remaining segment as the
+        // region and everything after it (rejoined with "-") as the real resource name.
         let region = String(meta.region || f.region || "");
         let resource = String(f.resource_name || f.resource_id || meta.resource_name || meta.resource_id || "");
 
-        if (uid.startsWith("prowler-")) {
-          if (!region || region === "global") {
-            const possibleRegion = uidParts[uidParts.length - 2];
-            if (possibleRegion && !possibleRegion.includes("ab5c") && !possibleRegion.includes("ocid1") && possibleRegion.length > 2) {
-              region = possibleRegion;
+        if (uid.startsWith("prowler-") && ((!region || region === "global") || (!resource || resource === "cloud-resource"))) {
+          // Both segments allow underscores — provider slugs like "oracle_saas" contain one.
+          let rest = uid.replace(/^prowler-[a-z0-9_]+-[a-z0-9_]+-/i, "");
+          rest = rest.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, ""); // Azure subscription GUID
+          rest = rest.replace(/^ocid1\.[a-z]+\.[a-z0-9.]*-/i, ""); // OCI tenancy/compartment OCID
+          const restParts = rest.split("-").filter(Boolean);
+
+          if (restParts.length >= 1) {
+            let parsedRegion = "";
+            let parsedResource = "";
+            const globalIdx = restParts.indexOf("global");
+            // "global" is a literal region marker Prowler uses for account-wide checks — if it
+            // shows up anywhere (e.g. after a provider-specific account identifier this function
+            // doesn't otherwise know how to strip, like an Oracle SaaS pod hostname), anchor on
+            // it directly rather than guessing at segment positions.
+            if (globalIdx !== -1 && globalIdx < restParts.length - 1) {
+              parsedRegion = "global";
+              parsedResource = restParts.slice(globalIdx + 1).join("-");
+            } else if (
+              // OCI region codes are themselves hyphenated: "xx-cityname-N" (e.g. uk-london-1,
+              // us-ashburn-1) — a single-segment region assumption would wrongly split this.
+              restParts.length >= 4 &&
+              /^[a-z]{2}$/i.test(restParts[0]) &&
+              /^[a-z]+$/i.test(restParts[1]) &&
+              /^\d+$/.test(restParts[2])
+            ) {
+              parsedRegion = restParts.slice(0, 3).join("-");
+              parsedResource = restParts.slice(3).join("-");
+            } else if (restParts.length >= 2) {
+              parsedRegion = restParts[0];
+              parsedResource = restParts.slice(1).join("-");
+            } else {
+              parsedResource = restParts[0];
             }
-          }
-          if (!resource || resource === "cloud-resource") {
-            const possibleRes = uidParts[uidParts.length - 1];
-            if (possibleRes && possibleRes !== "global" && possibleRes.length > 2) {
-              resource = possibleRes;
+            if (!parsedRegion || parsedRegion.length <= 2 || parsedRegion.includes("ab5c") || parsedRegion.includes("ocid1")) {
+              // Not a plausible region after all — don't guess, keep the whole remainder as resource.
+              parsedResource = restParts.join("-");
+              parsedRegion = "";
             }
+            if ((!region || region === "global") && parsedRegion) region = parsedRegion;
+            if ((!resource || resource === "cloud-resource") && parsedResource) resource = parsedResource;
           }
         }
         if (!region || region === "global") {
@@ -188,11 +224,16 @@ function FindingsPage() {
         }
         if (!resource || resource === "cloud-resource") {
           const statusExt = String(f.status_extended || "");
-          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription|policy|domain)\s+'?([a-zA-Z0-9_\-\s]+)'?/i);
+          // Non-greedy capture stopping at the next sentence-boundary word, so a name
+          // like "Digital-CISO-LLM" isn't swallowed along with the rest of the sentence
+          // ("...has trusted launch disabled in subscription...").
+          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription|policy|domain)\s+'?([a-zA-Z0-9_\-]+(?:\s[a-zA-Z0-9_\-]+)*?)'?\s+(?:has|is|does|was|were|in\b)/i);
           if (match && match[1]) {
             resource = match[1].trim();
           } else {
-            resource = prov === "OCI" ? "OCI Tenancy" : "Digital-CISO-LLM";
+            // Last resort — an honest, generic placeholder. Never fall back to a name
+            // that could be mistaken for a real, specific resource.
+            resource = "Unidentified Resource";
           }
         }
 

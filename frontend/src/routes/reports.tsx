@@ -17,7 +17,7 @@ import {
   DataTable,
   Row,
 } from "@/components/ui-kit/primitives";
-import { useFindings, useResources, useProviders } from "@/hooks/use-api";
+import { useFindings, useResources, useProviders, useCompliance } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/reports")({
 
 interface ReportItem {
   id: string;
-  framework: string;
+  title: string;
   range: string;
   format: "PDF" | "CSV" | "JSON" | string;
   created: string;
@@ -41,26 +41,82 @@ function ReportsPage() {
 
   const [reports, setReports] = useState<ReportItem[]>(initialReportHistory);
   const [selectedProvider, setSelectedProvider] = useState<string>("ALL");
-  const [framework, setFramework] = useState("Comprehensive Multi-Cloud Posture Assessment");
   const [format, setFormat] = useState<"PDF" | "CSV" | "JSON">("PDF");
   const [range, setRange] = useState("Current Live State");
   const [generating, setGenerating] = useState(false);
 
   const findings = findingsRaw?.items ?? [];
   const resources = resourcesRaw?.items ?? [];
-  
+
   const connectedProviders = useMemo(() => {
     const list = (providersRaw?.items as Array<Record<string, unknown>>) || [];
     return list.map((p) => {
-      const provStr = String(p.provider || "").toUpperCase();
+      const providerSlug = String(p.provider || "").toLowerCase();
+      const provStr = providerSlug.toUpperCase();
       const provType = provStr === "ORACLECLOUD" ? "OCI" : provStr;
       return {
         id: String(p.id),
         alias: String(p.alias || p.name || provType),
         providerUpper: provType,
+        providerSlug, // real backend provider_type value, e.g. "oraclecloud", "azure"
       };
     });
   }, [providersRaw]);
+
+  // Real per-framework compliance data (ComplianceOverviewViewSet — the same backend the
+  // Compliance page uses), scoped to whichever cloud is selected below. The backend requires
+  // an explicit provider filter — no "everything" mode — so for "All Providers" we pass the
+  // full set of connected provider types.
+  const complianceParams = useMemo((): Record<string, string> | undefined => {
+    if (selectedProvider === "ALL") {
+      if (connectedProviders.length === 0) return undefined;
+      return { "filter[provider_type__in]": connectedProviders.map((p) => p.providerSlug).join(",") };
+    }
+    const match = connectedProviders.find((p) => p.providerUpper === selectedProvider);
+    const slug = match?.providerSlug || (selectedProvider === "OCI" ? "oraclecloud" : selectedProvider.toLowerCase());
+    return { "filter[provider_type]": slug };
+  }, [selectedProvider, connectedProviders]);
+
+  const { data: complianceRaw } = useCompliance(complianceParams);
+
+  const complianceFrameworks = useMemo(() => {
+    const items = (complianceRaw?.items as Array<Record<string, any>>) ?? [];
+    return items
+      .filter((item) => {
+        // Match the real Compliance page's filtering — hide internal/deprecated framework
+        // rows so reports don't surface anything the Compliance page itself hides.
+        const id = String(item.id || item.compliance_id || "").toLowerCase();
+        const fw = String(item.framework || "").toLowerCase();
+        return !(
+          id.includes("threatscore") ||
+          id.includes("threat_score") ||
+          fw.includes("threatscore") ||
+          fw.includes("threat score") ||
+          id.includes("oracle_saas_security_baseline") ||
+          id.includes("itgc_sox") ||
+          id.includes("soc1_type2") ||
+          fw.includes("itgc sox") ||
+          fw.includes("soc 1 type")
+        );
+      })
+      .map((item) => {
+        const passed = Number(item.requirements_passed) || 0;
+        const failed = Number(item.requirements_failed) || 0;
+        const total = Number(item.total_requirements) || 0;
+        const evaluated = Math.max(1, passed + failed);
+        const score = total > 0 ? Math.round((passed / evaluated) * 100) : 0;
+        return {
+          id: String(item.id ?? ""),
+          name: String(item.framework || item.id || "Unnamed Framework"),
+          version: String(item.version || ""),
+          passed,
+          failed,
+          total,
+          score,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [complianceRaw]);
 
   // Extract findings strictly scoped to selected provider
   const scopedFindings = useMemo(() => {
@@ -86,6 +142,14 @@ function ReportsPage() {
     const found = connectedProviders.find((p) => p.providerUpper === selectedProvider);
     if (found) return `${found.providerUpper} · ${found.alias}`;
     return selectedProvider;
+  }, [selectedProvider, connectedProviders]);
+
+  // Report title is derived from the selected cloud, not a picked framework — the report
+  // always covers every real compliance framework connected to that provider.
+  const reportTitle = useMemo(() => {
+    if (selectedProvider === "ALL") return "Multi-Cloud Security & Compliance Report";
+    const label = connectedProviders.find((p) => p.providerUpper === selectedProvider)?.providerUpper || selectedProvider;
+    return `${label} Security & Compliance Report`;
   }, [selectedProvider, connectedProviders]);
 
   const stats = useMemo(() => {
@@ -197,15 +261,11 @@ function ReportsPage() {
 
           <div class="title">${reportName}</div>
           <div class="subtitle">Executive Compliance Attestation & Cloud Security Posture Assessment</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 20px; padding: 8px 12px; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 4px;">
-            <strong>Report scope:</strong> this report contains all ${stats.total} security findings evaluated for ${activeProviderLabel}.
-            It is not filtered to only the controls defined by "${reportName}" — per-framework requirement filtering is not yet implemented.
-          </div>
 
           <div class="kpi-grid">
             <div class="kpi-card">
               <div class="kpi-val" style="color: #0284c7;">${stats.score}%</div>
-              <div class="kpi-lbl">Compliance Score</div>
+              <div class="kpi-lbl">Overall Finding Pass Rate</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-val" style="color: #e11d48;">${stats.fail}</div>
@@ -220,6 +280,30 @@ function ReportsPage() {
               <div class="kpi-lbl">Total Evaluated Checks</div>
             </div>
           </div>
+
+          <h3 style="font-size: 16px; margin-top: 30px; margin-bottom: 10px;">Compliance Framework Breakdown — ${activeProviderLabel}</h3>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40%;">Framework</th>
+                <th style="width: 15%;">Version</th>
+                <th style="width: 15%;">Score</th>
+                <th style="width: 15%;">Passed</th>
+                <th style="width: 15%;">Failed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${complianceFrameworks.length > 0 ? complianceFrameworks.map((c) => `
+                <tr>
+                  <td><strong>${c.name}</strong></td>
+                  <td style="font-family: monospace; font-size: 11px;">${c.version || "—"}</td>
+                  <td><span style="font-weight: 700; color: ${c.score >= 80 ? '#059669' : c.score >= 50 ? '#ea580c' : '#e11d48'};">${c.score}%</span></td>
+                  <td class="badge-pass">${c.passed}</td>
+                  <td class="badge-fail">${c.failed}</td>
+                </tr>
+              `).join("") : `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 16px;">No compliance framework data available for ${activeProviderLabel} yet.</td></tr>`}
+            </tbody>
+          </table>
 
           <h3 style="font-size: 16px; margin-top: 30px; margin-bottom: 10px;">Audit Telemetry Findings</h3>
           <table>
@@ -273,13 +357,12 @@ function ReportsPage() {
   const generateJSON = (reportId: string, reportName: string) => {
     const payload = {
       report_id: reportId,
-      framework: reportName,
+      report_title: reportName,
       generated_at: new Date().toISOString(),
       tenant_environment: activeProviderLabel,
       provider_scope: selectedProvider,
-      report_scope_note: `Contains all findings evaluated for ${activeProviderLabel}. Not filtered to the specific control set of "${reportName}" — per-framework requirement filtering is not yet implemented.`,
       executive_summary: {
-        compliance_score: stats.score,
+        overall_finding_pass_rate: stats.score,
         total_findings: stats.total,
         passing_controls: stats.pass,
         failing_violations: stats.fail,
@@ -291,6 +374,7 @@ function ReportsPage() {
         },
         audited_resources_count: stats.total,
       },
+      compliance_frameworks: complianceFrameworks,
       findings: scopedFindings,
     };
 
@@ -319,7 +403,7 @@ function ReportsPage() {
       const reportId = `RPT-${Math.floor(3000 + Math.random() * 9000)}`;
       const newReport: ReportItem = {
         id: reportId,
-        framework: `${framework} (${selectedProvider})`,
+        title: reportTitle,
         range,
         format,
         created: "Just now",
@@ -327,7 +411,7 @@ function ReportsPage() {
       };
 
       setReports([newReport, ...reports]);
-      handleDownload(reportId, framework, format);
+      handleDownload(reportId, reportTitle, format);
       setGenerating(false);
     }, 600);
   };
@@ -351,14 +435,7 @@ function ReportsPage() {
               <label className="section-label mb-1.5 block">Target Cloud Environment</label>
               <select
                 value={selectedProvider}
-                onChange={(e) => {
-                  const p = e.target.value;
-                  setSelectedProvider(p);
-                  if (p === "OCI") setFramework("CIS Oracle Cloud Infrastructure (OCI) Benchmark v3.0");
-                  else if (p === "AZURE") setFramework("CIS Microsoft Azure Foundations Benchmark v3.0");
-                  else if (p === "ORACLE_SAAS") setFramework("Oracle Fusion Cloud ERP & HCM Security Baseline");
-                  else setFramework("Comprehensive Multi-Cloud Posture Assessment");
-                }}
+                onChange={(e) => setSelectedProvider(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none font-medium cursor-pointer"
               >
                 <option value="ALL">🌍 Multi-Cloud Fleet (All Connected Providers)</option>
@@ -368,39 +445,9 @@ function ReportsPage() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="section-label mb-1.5 block">Audit Framework & Profile</label>
-              <select
-                value={framework}
-                onChange={(e) => setFramework(e.target.value)}
-                className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary font-medium cursor-pointer"
-              >
-                <optgroup label="Oracle Cloud & SaaS Security">
-                  <option value="CIS Oracle Cloud Infrastructure (OCI) Benchmark v3.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v3.0</option>
-                  <option value="CIS Oracle Cloud Infrastructure (OCI) Benchmark v2.0">CIS Oracle Cloud Infrastructure (OCI) Benchmark v2.0</option>
-                  <option value="Oracle Fusion Cloud ERP & HCM Security Baseline">Oracle Fusion Cloud ERP & HCM Security Baseline</option>
-                </optgroup>
-                <optgroup label="Microsoft Azure Security">
-                  <option value="CIS Microsoft Azure Foundations Benchmark v3.0">CIS Microsoft Azure Foundations Benchmark v3.0</option>
-                  <option value="CIS Microsoft Azure Foundations Benchmark v2.0">CIS Microsoft Azure Foundations Benchmark v2.0</option>
-                  <option value="Microsoft Cloud Security Benchmark (MCSB)">Microsoft Cloud Security Benchmark (MCSB)</option>
-                </optgroup>
-                <optgroup label="Global Enterprise & Regulatory">
-                  <option value="Comprehensive Multi-Cloud Posture Assessment">Comprehensive Multi-Cloud Posture Assessment</option>
-                  <option value="SOC 2 Type II Security Assessment">SOC 2 Type II Security Assessment</option>
-                  <option value="ISO/IEC 27001:2022 ISMS Audit">ISO 27001:2022 ISMS Audit</option>
-                  <option value="NCA Essential Cybersecurity Controls (ECC-1:2018)">NCA Essential Cybersecurity Controls (ECC-1:2018)</option>
-                  <option value="NCA Cloud Cybersecurity Controls (CSCC-1:2019)">NCA Cloud Cybersecurity Controls (CSCC-1:2019)</option>
-                  <option value="SAMA Cyber Security Framework">SAMA Cyber Security Framework</option>
-                  <option value="RBI Cyber Security Master Directions">RBI Cyber Security Master Directions</option>
-                  <option value="EU GDPR & DORA Compliance Attestation">EU GDPR & DORA Compliance Attestation</option>
-                  <option value="NIS2 Directive (EU 2022/2555)">NIS2 Directive (EU 2022/2555)</option>
-                  <option value="PCI-DSS v4.0 Cardholder Security">PCI-DSS v4.0 Cardholder Security</option>
-                  <option value="NIST SP 800-53 Rev 5 Moderate">NIST SP 800-53 Rev 5 Moderate</option>
-                </optgroup>
-              </select>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                The report covers every real compliance framework connected to this cloud — see the live breakdown below.
+              </p>
             </div>
 
             <div>
@@ -447,9 +494,46 @@ function ReportsPage() {
           </div>
         </Panel>
 
-        {/* ── Generated Reports History ── */}
+        {/* ── Live Compliance Framework Breakdown, by cloud provider ── */}
         <div className="space-y-4 lg:col-span-2">
           <Panel index={1} className="p-0">
+            <div className="p-4 border-b border-border/80 flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Compliance Frameworks — {activeProviderLabel}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Real per-framework pass/fail data from the Compliance page, scoped to the selected cloud
+                </p>
+              </div>
+              <span className="mono text-xs font-bold text-primary">{complianceFrameworks.length} Frameworks</span>
+            </div>
+            <DataTable head={["Framework", "Version", "Score", "Passed", "Failed"]}>
+              {complianceFrameworks.length === 0 && (
+                <Row index={0}>
+                  <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    No compliance framework data available for {activeProviderLabel} yet.
+                  </td>
+                </Row>
+              )}
+              {complianceFrameworks.map((c, i) => (
+                <Row key={c.id || c.name} index={i}>
+                  <td className="px-4 py-3 text-xs font-semibold text-foreground">{c.name}</td>
+                  <td className="mono text-[11px] text-muted-foreground px-4 py-3">{c.version || "—"}</td>
+                  <td className="px-4 py-3">
+                    <Chip tone={c.score >= 80 ? "success" : c.score >= 50 ? "high" : "critical"}>
+                      {c.score}%
+                    </Chip>
+                  </td>
+                  <td className="mono text-[11px] text-emerald-400 px-4 py-3">{c.passed}</td>
+                  <td className="mono text-[11px] text-rose-400 px-4 py-3">{c.failed}</td>
+                </Row>
+              ))}
+            </DataTable>
+          </Panel>
+
+          <Panel index={2} className="p-0">
             <div className="p-4 border-b border-border/80 flex items-center justify-between">
               <div>
                 <h3 className="font-display text-sm font-bold text-foreground">
@@ -465,7 +549,7 @@ function ReportsPage() {
             <DataTable
               head={[
                 "Report ID",
-                "Framework / Scope",
+                "Report / Scope",
                 "Range",
                 "Format",
                 "Generated",
@@ -486,7 +570,7 @@ function ReportsPage() {
                     {r.id}
                   </td>
                   <td className="px-4 py-3 text-xs font-medium text-foreground">
-                    {r.framework}
+                    {r.title}
                   </td>
                   <td className="mono text-[11px] text-muted-foreground px-4 py-3">
                     {r.range}
@@ -504,7 +588,7 @@ function ReportsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <button
-                      onClick={() => handleDownload(r.id, r.framework, r.format)}
+                      onClick={() => handleDownload(r.id, r.title, r.format)}
                       className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-surface-2 px-3.5 text-xs font-semibold text-foreground hover:bg-surface-2/80 transition-colors cursor-pointer"
                     >
                       <Download className="h-3 w-3 text-primary" />
