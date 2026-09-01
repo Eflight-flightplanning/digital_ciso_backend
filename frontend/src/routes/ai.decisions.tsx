@@ -46,6 +46,8 @@ import {
   useFindings,
   useDecisionLogs,
   useRemediationPlaybooks,
+  useRemediationTemplates,
+  type VerifiedRemediationTemplate,
   useJiraConfig,
   useJiraProjects,
   useJiraIssueTypes,
@@ -91,14 +93,14 @@ interface FindingRemediationItem {
   inserted_at: string;
 }
 
-function generateProviderRemediation(
-  provider: string,
-  checkId: string,
+// Renders a verified remediation template (the same source of truth used by the AI
+// Advisor and the backend playbook generator) with real resource values substituted in
+// place of {resource}/{rg}/{region} placeholders — so a check with a verified template
+// shows identical, real content everywhere in the platform instead of a per-page guess.
+function renderVerifiedTemplate(
+  template: VerifiedRemediationTemplate,
   resName: string,
-  resUid: string,
-  region: string,
-  checkMeta: any,
-  rawResult: any
+  region: string
 ): {
   recommended_fix: string;
   cli_command: string;
@@ -107,11 +109,52 @@ function generateProviderRemediation(
   validation_steps: string[];
   remediation_url?: string;
 } {
+  const substitute = (text: string) =>
+    text.replace(/\{resource\}/g, resName).replace(/\{rg\}/g, "rg-production").replace(/\{region\}/g, region);
+
+  return {
+    recommended_fix: template.title,
+    cli_command: substitute(template.cli),
+    code_snippet: substitute(template.terraform),
+    console_steps: template.manual.map((s, i) => `${i + 1}. ${substitute(s)}`).join("\n"),
+    validation_steps: [
+      "Re-run a scan in Digital CISO to verify the check transitions to PASS.",
+      ...(template.safe_to_automate ? [] : ["Review changes with a maintenance window — this remediation is not marked safe to automate."]),
+    ],
+    remediation_url: template.references?.[0],
+  };
+}
+
+function generateProviderRemediation(
+  provider: string,
+  checkId: string,
+  resName: string,
+  resUid: string,
+  region: string,
+  checkMeta: any,
+  rawResult: any,
+  verifiedTemplate?: VerifiedRemediationTemplate
+): {
+  recommended_fix: string;
+  cli_command: string;
+  code_snippet: string;
+  console_steps: string;
+  validation_steps: string[];
+  remediation_url?: string;
+} {
+  const rName = resName || "cloud-resource";
+  const reg = region || "us-east-1";
+
+  // A verified template is a curated, checked source of truth — prefer it over both
+  // the raw Prowler-embedded remediation metadata and the hardcoded per-provider guess
+  // below, so this check_id renders identically wherever it's shown in the platform.
+  if (verifiedTemplate) {
+    return renderVerifiedTemplate(verifiedTemplate, rName, reg);
+  }
+
   const p = (provider || "cloud").toUpperCase();
   const c = (checkId || "").toLowerCase();
-  const rName = resName || "cloud-resource";
   const rUid = resUid || "res-001";
-  const reg = region || "us-east-1";
 
   const metaRec = checkMeta?.remediation?.recommendation?.text || rawResult?.Remediation?.Recommendation?.Text;
   const metaCli = checkMeta?.remediation?.code?.cli || rawResult?.Remediation?.Code?.CLI;
@@ -468,6 +511,7 @@ function AIDecisionsPage() {
   const { data: providersRaw } = useProviders();
   const { data: findingsRaw } = useFindings();
   const { data: playbooksRaw } = useRemediationPlaybooks();
+  const { data: verifiedTemplates } = useRemediationTemplates();
   const { data: executionsRaw, refetch: refetchExecutions } = useRemediationExecutions();
   const { data: metricsRaw, refetch: refetchMetrics } = useRemediationMetrics();
   const { data: jiraConfig } = useJiraConfig();
@@ -596,7 +640,8 @@ function AIDecisionsPage() {
         resUid,
         region,
         checkMeta,
-        f.raw_result
+        f.raw_result,
+        verifiedTemplates?.[checkId.toLowerCase().trim()]
       );
 
       let approvalStatus: FindingRemediationItem["approval_status"] = "PENDING_APPROVAL";
@@ -633,7 +678,7 @@ function AIDecisionsPage() {
     });
 
     return list;
-  }, [realFindings, executions, connectedProviderSet]);
+  }, [realFindings, executions, connectedProviderSet, verifiedTemplates]);
 
   // Filter items by tab section, provider filter, and search query
   const filteredItems = useMemo(() => {

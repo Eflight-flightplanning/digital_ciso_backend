@@ -162,13 +162,16 @@ class VLLMAzureProvider(AIProvider):
 
         # 3. Aggressively strip scratchpad / reasoning lines from the beginning of response
         scratchpad_prefixes = (
-            "analyze the request", "analyze:", "role:", "task:", "constraint:", "input data:",
+            "analyze the request", "analyze the telemetry", "analyze the templates",
+            "analyze:", "role:", "task:", "constraint:", "input data:",
             "user question:", "user:", "finding details:", "critical rule:", "specific rule:",
-            "evaluate telemetry:", "drafting the response:", "mental model:", "my reasoning is:",
-            "system instruction:", "critical constraint:", "anti-hallucination:", "thinking steps:",
+            "evaluate telemetry:", "drafting the response:", "draft the response:", "mental model:",
+            "my reasoning is:", "system instruction:", "critical constraint:", "anti-hallucination:",
+            "thinking steps:", "review constraints:", "refine analysis:", "final polish:",
             "meaning:", "interpretation:", "correction:", "verify template", "headline:",
             "drafting:", "reasoning:", "let's check", "wait,", "actually,", "telemetry:",
-            "risk:", "remediation template", "how to respond"
+            "risk:", "remediation template", "how to respond", "ensure the", "ensure no",
+            "final answer:", "action:", "interpretation of", "note:"
         )
         
         # Check if an explicit markdown answer header exists later in text
@@ -380,55 +383,45 @@ class VLLMAzureProvider(AIProvider):
         relevant_findings = sanitizer.sanitize_list(relevant_findings) if relevant_findings else relevant_findings
         connected_providers = sanitizer.sanitize_list(connected_providers) if connected_providers else connected_providers
 
-        # 1. Check for verified remediation templates matching active findings
-        verified_playbooks: list[str] = []
-        if relevant_findings:
-            for f in relevant_findings[:5]:
-                cid = f.get("check_id", "").lower().strip()
-                template = get_remediation(cid)
-                if template:
-                    f_res = (
-                        f.get("resource", {}).get("name")
-                        if isinstance(f.get("resource"), dict)
-                        else (f.get("resource") or "target-resource")
-                    )
-                    f_region = f.get("region") or "eastus"
-                    f_sub = f.get("subscription_id") or "sub-id"
-                    f_rg = f.get("resource_group") or "rg-production"
-                    f_acc = f.get("account_id") or "123456789012"
-                    f_comp = f.get("compartment_id") or "ocid1.compartment.oc1..example"
-                    f_ten = f.get("tenancy_id") or "ocid1.tenancy.oc1..example"
-                    f_resid = f.get("resource_id") or f_res
+        # 1. Separate pinned (UUID-fetched) findings from general context findings, and
+        # look up a verified remediation template for the primary finding (the one the
+        # user is actually asking about). When a template matches, the LLM is never asked
+        # to reproduce CLI/Terraform/Console content itself — it's rendered deterministically
+        # and appended below. This is more reliable than asking a small local model to copy
+        # a template verbatim: it can't drop/alter it, and it can't burn its token budget
+        # re-generating text we already have, which was causing responses to get cut off
+        # before ever reaching the actual remediation steps.
+        pinned_findings = [f for f in (relevant_findings or []) if f.get("_pinned")]
+        general_findings = [f for f in (relevant_findings or []) if not f.get("_pinned")]
+        _primary_finding = (pinned_findings or general_findings or [None])[0]
 
-                    rendered = render_remediation_block(
-                        template,
-                        resource=f_res,
-                        region=f_region,
-                        subscription_id=f_sub,
-                        rg=f_rg,
-                        account_id=f_acc,
-                        compartment_id=f_comp,
-                        tenancy_id=f_ten,
-                        resource_id=f_resid,
-                    )
-                    verified_playbooks.append(rendered)
-
-        verified_section = ""
-        if verified_playbooks:
-            verified_section = (
-                "\n\nVERIFIED_REMEDIATION_TEMPLATES (USE THESE EXACT COMMANDS, TERRAFORM, AND CONSOLE STEPS):\n"
-                + "\n\n---\n\n".join(verified_playbooks)
-            )
+        primary_template_block: str | None = None
+        if _primary_finding:
+            cid = _primary_finding.get("check_id", "").lower().strip()
+            template = get_remediation(cid)
+            if template:
+                f_res = (
+                    _primary_finding.get("resource", {}).get("name")
+                    if isinstance(_primary_finding.get("resource"), dict)
+                    else (_primary_finding.get("resource") or "target-resource")
+                )
+                primary_template_block = render_remediation_block(
+                    template,
+                    resource=f_res,
+                    region=_primary_finding.get("region") or "eastus",
+                    subscription_id=_primary_finding.get("subscription_id") or "sub-id",
+                    rg=_primary_finding.get("resource_group") or "rg-production",
+                    account_id=_primary_finding.get("account_id") or "123456789012",
+                    compartment_id=_primary_finding.get("compartment_id") or "ocid1.compartment.oc1..example",
+                    tenancy_id=_primary_finding.get("tenancy_id") or "ocid1.tenancy.oc1..example",
+                    resource_id=_primary_finding.get("resource_id") or f_res,
+                )
 
         # 2. Always invoke the live LLM (Qwen / vLLM on Azure or OpenAI/Claude)
         # Slim findings to only essential fields to stay within small context windows
         # (e.g. models loaded with max_model_len=4096). Full raw JSON with indent=2
         # for 25 findings can easily exceed 2000+ tokens on its own.
         _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status", "resource", "remediation")
-
-        # Separate pinned (UUID-fetched) findings from general context findings
-        pinned_findings = [f for f in (relevant_findings or []) if f.get("_pinned")]
-        general_findings = [f for f in (relevant_findings or []) if not f.get("_pinned")]
 
         def _slim(f: dict) -> dict:
             return {k: f[k] for k in _SLIM_KEYS if k in f}
@@ -497,25 +490,32 @@ class VLLMAzureProvider(AIProvider):
 
         # Build pinned-finding block — this is the user's directly requested finding.
         # It appears first and overrides the anti-hallucination "no live data" rule.
+        if primary_template_block:
+            remediation_instruction = (
+                "A verified remediation playbook for this exact finding already exists and will be "
+                "appended automatically after your response. Do NOT write any CLI commands, Terraform "
+                "code, or console steps yourself — write ONLY a concise Direct Answer (1 sentence), "
+                "Security Risk analysis, and Compliance mapping (2-4 short paragraphs total, under 150 words). "
+                "Do not repeat or summarize remediation steps; that section is handled separately."
+            )
+        else:
+            remediation_instruction = (
+                "Analyse it directly and provide the security risk and step-by-step remediation (CLI, Terraform, Console)."
+            )
         pinned_section = ""
         if slim_pinned:
             pinned_section = (
                 "\n\nLIVE FINDING DATA (directly retrieved from the scanner database for this exact finding ID):\n"
                 + json.dumps(slim_pinned, indent=1)
-                + "\nINSTRUCTION: The above is verified live telemetry for the requested finding. Analyse it directly and provide the security risk "
-                  "and step-by-step remediation (CLI, Terraform, Console). Do NOT claim live data is missing or confuse the cloud provider.\n"
+                + f"\nINSTRUCTION: The above is verified live telemetry for the requested finding. {remediation_instruction} "
+                  "Do NOT claim live data is missing or confuse the cloud provider.\n"
             )
 
-        # Drop verbose verified_section when context is already substantial to avoid
-        # exceeding the model's context window on small (4096-token) deployments.
-        _context_est_chars = len(prov_str) + len(context_str) + len(question) + len(pinned_section)
-        _include_playbooks = _context_est_chars < 1800 and verified_section
         user_prompt = (
             f"Connected Environments:\n{prov_str}\n"
             f"{_cloud_hint}"
             f"{pinned_section}\n"
-            f"Active Findings Telemetry:\n{context_str}"
-            f"{verified_section if _include_playbooks else ''}\n\n"
+            f"Active Findings Telemetry:\n{context_str}\n\n"
             f"User Question:\n{question}"
         )
 
@@ -536,10 +536,21 @@ class VLLMAzureProvider(AIProvider):
             q_low = (question or "").strip().lower()
             if any(q_low == g or q_low.startswith(g + " ") or q_low.startswith(g + "?") for g in ["hey", "hello", "hi", "help", "who are you", "what can you do"]):
                 ans = "Hello! I am Spectra, your Autonomous AI Security Copilot. I'm ready to assist with cloud security posture, compliance gaps, toxic attack paths, and step-by-step remediations. How can I help you today?"
+            elif primary_template_block:
+                # No usable narrative came back (empty/truncated), but we still have a
+                # real, deterministic remediation playbook — better to show that than
+                # nothing, or worse, a raw scratchpad dump.
+                ans = f"Analysis of `{_primary_finding.get('check_title') or _primary_finding.get('check_id', 'this finding')}`:"
             elif raw_ans and len(raw_ans) > 15:
                 ans = raw_ans
             else:
                 ans = "Spectra analyzed your request against connected cloud telemetry. Please specify a finding or cloud resource for a deeper technical breakdown."
+
+        # Append the deterministic, verified remediation playbook — never generated by
+        # the LLM, so it is guaranteed to match the real CLI/Terraform/Console content
+        # for this check_id regardless of how the model's narrative portion turned out.
+        if primary_template_block:
+            ans = f"{ans.rstrip()}\n\n{primary_template_block}"
 
         refs = data.get("finding_references", [])
         if not refs and relevant_findings:

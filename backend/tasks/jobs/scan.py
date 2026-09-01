@@ -260,6 +260,23 @@ def _create_finding_delta(
     return Finding.DeltaChoices.CHANGED if last_status != new_status else None
 
 
+def _normalize_region(region: str | None) -> str | None:
+    """
+    Canonicalize a region string to lowercase with no whitespace.
+
+    Different Prowler check modules for the same provider (observed on Azure)
+    return the region as either a human-readable display name ("Central India")
+    or the API region code ("centralindia") for the exact same real region. Left
+    unnormalized, this splits one real region into two distinct values wherever
+    region is used as a grouping/matching key (e.g. per-region compliance
+    aggregation), silently hiding real findings from the region their compliance
+    rollup expects them under.
+    """
+    if not region:
+        return region
+    return re.sub(r"\s+", "", region).lower()
+
+
 def _store_resources(
     finding: ProwlerFinding, tenant_id: str, provider_instance: Provider
 ) -> tuple[Resource, tuple[str, str]]:
@@ -284,7 +301,7 @@ def _store_resources(
             uid=finding.resource_uid,
             defaults={
                 "name": finding.resource_name,
-                "region": finding.region,
+                "region": _normalize_region(finding.region),
                 "service": finding.service_name,
                 "type": finding.resource_type,
             },
@@ -292,7 +309,7 @@ def _store_resources(
 
         if not created:
             resource_instance.name = finding.resource_name
-            resource_instance.region = finding.region
+            resource_instance.region = _normalize_region(finding.region)
             resource_instance.service = finding.service_name
             resource_instance.type = finding.resource_type
             resource_instance.save()
@@ -685,7 +702,7 @@ def _process_finding_micro_batch(
                                     tenant_id=tenant_id,
                                     provider=provider_instance,
                                     uid=uid,
-                                    region=f.region,
+                                    region=_normalize_region(f.region),
                                     service=f.service_name,
                                     type=f.resource_type,
                                     name=f.resource_name,
@@ -769,8 +786,9 @@ def _process_finding_micro_batch(
                     check_metadata = finding.get_metadata()
                     group = check_metadata.get("resourcegroup") or None
                     updated = False
-                    if finding.region and resource_instance.region != finding.region:
-                        resource_instance.region = finding.region
+                    normalized_region = _normalize_region(finding.region)
+                    if normalized_region and resource_instance.region != normalized_region:
+                        resource_instance.region = normalized_region
                         updated = True
                     if (
                         finding.resource_name
@@ -1755,6 +1773,15 @@ def create_compliance_requirements(tenant_id: str, scan_id: str):
                                 failed_checks = 0
                             if total_checks == 0:
                                 requirement_status = "MANUAL"
+                            elif passed_checks == 0 and failed_checks == 0:
+                                # This requirement has checks mapped in the template, but
+                                # none of them produced a PASS/FAIL finding in THIS region
+                                # (e.g. no applicable resource type here). Defaulting this
+                                # to PASS would silently claim a real result that doesn't
+                                # exist. Skip the row for this region instead of fabricating
+                                # a status — the requirement still gets a real row in every
+                                # region where its checks actually ran.
+                                continue
                             elif failed_checks > 0:
                                 requirement_status = "FAIL"
                             else:

@@ -27,7 +27,19 @@ from rest_framework.views import APIView
 from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 
-from api.models import DecisionLog, Finding, Provider, RemediationPlaybook, Resource, Tenant
+from django.db.models import Count, Q
+
+from api.models import (
+    ComplianceRequirementOverview,
+    DecisionLog,
+    Finding,
+    Provider,
+    RemediationPlaybook,
+    Resource,
+    Scan,
+    StateChoices,
+    Tenant,
+)
 from ai.claude_provider import get_ai_provider
 
 logger = logging.getLogger(__name__)
@@ -118,13 +130,44 @@ class ExecutiveReportView(APIView):
         risk_deduction = (critical_count * 15) + (high_count * 8) + (medium_count * 3) + (low_count * 1)
         posture_score = max(0, min(100, 100 - risk_deduction)) if total_findings > 0 else 98
 
-        # 2. Compliance Framework Readiness
-        compliance_data = [
-            {"framework": "CIS AWS Benchmark 3.0", "score": 88.5, "passed": 142, "failed": 18, "status": "COMPLIANT"},
-            {"framework": "SOC 2 Type II (Security & Confidentiality)", "score": 93.0, "passed": 98, "failed": 7, "status": "COMPLIANT"},
-            {"framework": "ISO/IEC 27001:2022", "score": 90.2, "passed": 115, "failed": 12, "status": "COMPLIANT"},
-            {"framework": "PCI-DSS 4.0 (Cloud Payment Security)", "score": 95.0, "passed": 80, "failed": 4, "status": "COMPLIANT"},
-        ]
+        # 2. Compliance Framework Readiness — real per-framework pass/fail counts
+        # from ComplianceRequirementOverview, scoped to each provider's latest
+        # completed scan so results reflect current posture, not scan history.
+        compliance_data = []
+        if tenant:
+            latest_scan_ids = list(
+                Scan.all_objects.filter(
+                    tenant_id=tenant.id, state=StateChoices.COMPLETED
+                )
+                .order_by("provider_id", "-inserted_at")
+                .distinct("provider_id")
+                .values_list("id", flat=True)
+            )
+            framework_rows = (
+                ComplianceRequirementOverview.objects.filter(
+                    tenant_id=tenant.id, scan_id__in=latest_scan_ids
+                )
+                .values("framework", "version")
+                .annotate(
+                    pass_count=Count("id", filter=Q(requirement_status="PASS")),
+                    fail_count=Count("id", filter=Q(requirement_status="FAIL")),
+                    total_count=Count("id"),
+                )
+                .order_by("-total_count")
+            )
+            for row in framework_rows:
+                scored = row["pass_count"] + row["fail_count"]
+                if scored == 0:
+                    continue
+                score = round((row["pass_count"] / scored) * 100, 1)
+                label = f"{row['framework']} {row['version']}".strip()
+                compliance_data.append({
+                    "framework": label,
+                    "score": score,
+                    "passed": row["pass_count"],
+                    "failed": row["fail_count"],
+                    "status": "COMPLIANT" if score >= 80 else "NEEDS ATTENTION",
+                })
 
         # 3. Decision Log History
         decisions_qs = DecisionLog.objects.filter(tenant_id=tenant.id).order_by("-inserted_at")[:5] if tenant else []

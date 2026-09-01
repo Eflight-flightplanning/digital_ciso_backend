@@ -10,6 +10,7 @@ from .views import (
     AIFindingDecisionView,
     AIReasoningProxyView,
     AIRemediationGeneratorView,
+    AIRemediationTemplateCatalogView,
 )
 from .mcp_views import MCPGatewayView
 
@@ -35,6 +36,11 @@ ai_urlpatterns = [
         "findings/<uuid:finding_id>/playbook",
         AIRemediationGeneratorView.as_view(),
         name="ai-finding-playbook",
+    ),
+    path(
+        "remediation-templates",
+        AIRemediationTemplateCatalogView.as_view(),
+        name="ai-remediation-templates",
     ),
     # Aegis Decision Intelligence
     path(

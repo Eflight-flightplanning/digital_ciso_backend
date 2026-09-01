@@ -869,7 +869,13 @@ def _retrieve_relevant_findings(
                     logger.debug("OCI telemetry inclusion error: %s", o_err)
 
             # Ingest live Compliance Framework & CIS Benchmark summaries from database
-            if any(w in q_lower for w in ("cis", "compliance", "benchmark", "nis2", "iso", "soc", "sox", "score", "posture", "overview")):
+            # Word-boundary match — a naive substring check here previously matched "cis"
+            # inside resource names like "digitalciso", spuriously pulling unrelated
+            # compliance framework summaries into answers about a specific VM/finding.
+            _compliance_trigger_re = re.compile(
+                r"\b(cis|compliance|benchmark|nis2|iso|soc|sox|score|posture|overview)\b"
+            )
+            if _compliance_trigger_re.search(q_lower):
                 try:
                     from api.models import ComplianceOverview
                     comp_qs = ComplianceOverview.all_objects.select_related("scan__provider").all()
@@ -1196,6 +1202,32 @@ class AIReasoningProxyView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class AIRemediationTemplateCatalogView(APIView):
+    """
+    Exposes the full verified remediation template catalog (the same source of truth used by
+    the AI Advisor and AIRemediationGeneratorView) as a flat check_id -> template map, so other
+    surfaces (e.g. the Aegis remediation queue) can render the identical, real CLI/Terraform/
+    Console content instead of maintaining their own separate copy that can drift out of sync.
+    """
+
+    def get(self, request: Request) -> Response:
+        from ai.remediation_library import REMEDIATION_LIBRARY
+
+        catalog = {
+            check_id: {
+                "title": template.title,
+                "cli": template.cli,
+                "terraform": template.terraform,
+                "manual": template.manual,
+                "compliance": template.compliance,
+                "references": template.references,
+                "safe_to_automate": template.safe_to_automate,
+            }
+            for check_id, template in REMEDIATION_LIBRARY.items()
+        }
+        return Response({"data": catalog}, status=status.HTTP_200_OK)
+
+
 class AIRemediationGeneratorView(APIView):
     """
     Auto-generates Terraform / CLI remediation playbooks for a specific finding using Qwen 3.5 9B.
@@ -1235,32 +1267,64 @@ class AIRemediationGeneratorView(APIView):
                 "compliance": template.compliance,
             }
         elif hasattr(provider, "_call_vllm_chat"):
-            data = provider._call_vllm_chat(
+            finding_provider = (
+                finding.scan.provider.provider
+                if finding.scan and finding.scan.provider
+                else "unknown"
+            )
+            system_prompt = (
+                "You are Spectra, an expert cloud security remediation engine. Given a security "
+                "finding, respond with ONLY a JSON object (no markdown, no commentary) with these "
+                'exact keys: "title" (short remediation title), "cli_command" (a real, runnable CLI '
+                'command for the finding\'s cloud provider), "terraform_code" (a real Terraform '
+                'resource block), "console_steps" (numbered step-by-step instructions as a single '
+                'string), "compliance" (a list of relevant compliance control references). '
+                "Ground every command and step strictly in the specific cloud provider named below — "
+                "never invent syntax for a different provider."
+            )
+            meta = finding.check_metadata or {}
+            finding_title = meta.get("checktitle") or meta.get("CheckTitle") or finding.check_id.replace("_", " ")
+            user_prompt = (
+                f"Finding: {finding_title}\n"
+                f"Check ID: {finding.check_id}\n"
+                f"Cloud Provider: {finding_provider}\n"
+                f"Severity: {finding.severity}\n"
+                f"Resource: {res_name}\n"
+                f"Status detail: {finding.status_extended or ''}\n"
+            )
+            result = provider._call_vllm_chat(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 temperature=0.1,
-                max_tokens=1500,
+                max_tokens=1200,
             )
-            if not data or data.get("_ai_unavailable"):
-                data = {
-                    "title": f"Remediate {finding.check_id}",
-                    "code_snippet": f"# Remediation for {finding.check_id}\n# Apply via {script_type}",
-                    "cli_command": f"# Execute CLI remediation for {finding.check_id}",
-                    "console_steps": f"1. Open Cloud Console.\n2. Navigate to '{res_name}'.\n3. Apply security configuration according to CIS Benchmark standards.\n4. Click Save.",
-                    "rollback_snippet": "# Rollback steps",
-                    "estimated_downtime_minutes": 0,
-                    "requires_maintenance_window": False,
-                }
-        else:
+            if not result or result.get("_ai_unavailable"):
+                return Response(
+                    {
+                        "error": "No verified remediation template exists for this check, and live "
+                        "AI generation failed. Please try again shortly."
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
             data = {
-                "title": f"Remediate {finding.check_id}",
-                "code_snippet": f"# Remediation for {finding.check_id}\n# Apply via {script_type}",
-                "cli_command": f"# Execute CLI remediation for {finding.check_id}",
-                "console_steps": f"1. Open Cloud Console.\n2. Navigate to '{res_name}'.\n3. Apply security configuration according to CIS Benchmark standards.\n4. Click Save.",
-                "rollback_snippet": "# Rollback steps",
+                "title": result.get("title") or f"Remediate {finding.check_id}",
+                "code_snippet": result.get("terraform_code") if script_type == "terraform" else result.get("cli_command"),
+                "cli_command": result.get("cli_command", ""),
+                "terraform_code": result.get("terraform_code", ""),
+                "console_steps": result.get("console_steps", ""),
+                "rollback_snippet": "# Review changes carefully before applying; no automated rollback is available for AI-generated remediation.",
                 "estimated_downtime_minutes": 0,
-                "requires_maintenance_window": False,
+                "requires_maintenance_window": True,
+                "compliance": result.get("compliance", []),
             }
+        else:
+            return Response(
+                {
+                    "error": "No verified remediation template exists for this check, and this AI "
+                    "provider does not support live remediation generation."
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Save to RemediationPlaybook if tenant exists
         if tenant_id:

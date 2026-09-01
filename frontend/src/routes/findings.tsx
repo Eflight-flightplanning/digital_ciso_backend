@@ -39,6 +39,7 @@ export interface Finding {
   service: string;
   scanned: string;
   remediation: string;
+  compliance: Record<string, string[]>;
 }
 
 export function formatFindingId(rawId: string): string {
@@ -219,6 +220,7 @@ function FindingsPage() {
           service,
           scanned: String(f.inserted_at || f.first_seen_at || f.updated_at || ""),
           remediation,
+          compliance: (f.compliance && typeof f.compliance === "object" && !Array.isArray(f.compliance)) ? f.compliance : {},
         };
       });
     }
@@ -229,6 +231,7 @@ function FindingsPage() {
   const [remediatedIds, setRemediatedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string>("All");
+  const [selectedCompliance, setSelectedCompliance] = useState<string>("All");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [expandedId, setExpandedId] = useState<string | null>("FND-40281");
@@ -267,6 +270,27 @@ function FindingsPage() {
     });
   }, [data, selectedProvider]);
 
+  // Real compliance framework keys present in the currently provider-filtered data —
+  // never a hardcoded list, so the dropdown only ever offers frameworks that findings
+  // actually carry (a finding's `compliance` field mirrors what the Compliance page uses).
+  const complianceOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of providerFilteredData) {
+      for (const key of Object.keys(item.compliance || {})) {
+        set.add(key);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [providerFilteredData]);
+
+  // If the provider filter changes and the previously selected framework no longer
+  // appears in the data, fall back to "All" rather than silently filtering to nothing.
+  useEffect(() => {
+    if (selectedCompliance !== "All" && !complianceOptions.includes(selectedCompliance)) {
+      setSelectedCompliance("All");
+    }
+  }, [complianceOptions, selectedCompliance]);
+
   const filtered = useMemo(() => {
     return providerFilteredData.filter((item) => {
       if (search) {
@@ -278,6 +302,9 @@ function FindingsPage() {
           item.service.toLowerCase().includes(query);
         if (!matches) return false;
       }
+      if (selectedCompliance !== "All" && !(selectedCompliance in (item.compliance || {}))) {
+        return false;
+      }
       const selSev = (selectedSeverity || "ALL").toLowerCase();
       if (selSev !== "all" && item.severity.toLowerCase() !== selSev) {
         return false;
@@ -288,7 +315,7 @@ function FindingsPage() {
       }
       return true;
     });
-  }, [providerFilteredData, search, selectedSeverity, selectedStatus]);
+  }, [providerFilteredData, search, selectedCompliance, selectedSeverity, selectedStatus]);
 
   const counts = useMemo(() => {
     return {
@@ -447,6 +474,20 @@ function FindingsPage() {
               <option value="GCP">GCP</option>
               <option value="K8S">Kubernetes</option>
             </select>
+
+            <select
+              value={selectedCompliance}
+              onChange={(e) => setSelectedCompliance(e.target.value)}
+              className="h-9 min-w-[170px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
+              title="Filter by compliance framework"
+            >
+              <option value="All">All Compliance Frameworks</option>
+              {complianceOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </Panel>
@@ -568,6 +609,15 @@ function FindingsPage() {
                         <p className="mono truncate text-[10px] text-muted-foreground" title={f.resource}>
                           {f.resource}
                         </p>
+                        {Object.keys(f.compliance || {}).length > 0 && (
+                          <div
+                            className="mt-0.5 truncate text-[10px] text-primary/80"
+                            title={`Mapped to: ${Object.keys(f.compliance).join(", ")}`}
+                          >
+                            {Object.keys(f.compliance).slice(0, 2).join(" · ")}
+                            {Object.keys(f.compliance).length > 2 && ` +${Object.keys(f.compliance).length - 2}`}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-2.5 truncate">
@@ -847,6 +897,34 @@ function FindingsPage() {
                               </div>
                             </div>
                           </div>
+
+                          {Object.keys(f.compliance || {}).length > 0 && (
+                            <div className="mt-3 rounded-xl border border-border/80 bg-surface-2/40 p-3.5 space-y-2">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                                <ShieldAlert className="h-3.5 w-3.5 text-primary" />
+                                <span>Compliance Frameworks Mapped to This Check</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {Object.entries(f.compliance).map(([framework, requirementIds]) => (
+                                  <span
+                                    key={framework}
+                                    title={`Requirement(s): ${(requirementIds || []).join(", ")}`}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-primary/25 bg-primary/5 px-2 py-1 text-[11px] font-semibold text-primary"
+                                  >
+                                    {framework}
+                                    {requirementIds && requirementIds.length > 0 && (
+                                      <span className="mono text-[10px] text-primary/70">
+                                        ({requirementIds.join(", ")})
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                This check's real PASS/FAIL result is exactly what the Compliance page rolls up for these frameworks — same underlying data, viewed by framework instead of by check.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>

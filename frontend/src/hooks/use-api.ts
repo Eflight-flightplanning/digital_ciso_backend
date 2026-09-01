@@ -560,6 +560,32 @@ export function useRunAttackPathsQuery() {
 
 // ─── Human-In-The-Loop (HITL) Playbooks & Execution ────────────────────────
 
+export interface VerifiedRemediationTemplate {
+  title: string;
+  cli: string;
+  terraform: string;
+  manual: string[];
+  compliance: string[];
+  references: string[];
+  safe_to_automate: boolean;
+}
+
+// The single real source of truth for verified remediation content (backend
+// ai/remediation_library.py). Any UI surface showing remediation steps for a
+// check_id present in this map should render exactly this content, not its
+// own guess — otherwise different pages can show conflicting commands for
+// the same finding.
+export function useRemediationTemplates() {
+  return useQuery({
+    queryKey: ["remediation-templates"],
+    queryFn: async () => {
+      const res = await api.get("/ai/remediation-templates");
+      return (res?.data ?? {}) as Record<string, VerifiedRemediationTemplate>;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useRemediationPlaybooks(params?: Record<string, string>) {
   return useQuery({
     queryKey: ["remediation-playbooks", params ?? {}],

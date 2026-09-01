@@ -32,24 +32,7 @@ interface ReportItem {
   size: string;
 }
 
-const initialReportHistory: ReportItem[] = [
-  {
-    id: "RPT-8421",
-    framework: "CIS Microsoft Azure Foundations v2.0",
-    range: "Current Live State",
-    format: "PDF",
-    created: "2 hours ago",
-    size: "2.8 MB",
-  },
-  {
-    id: "RPT-8419",
-    framework: "Comprehensive Finding Telemetry (Azure)",
-    range: "Current Live State",
-    format: "CSV",
-    created: "Today at 09:30",
-    size: "184 KB",
-  },
-];
+const initialReportHistory: ReportItem[] = [];
 
 function ReportsPage() {
   const { data: findingsRaw } = useFindings();
@@ -113,7 +96,7 @@ function ReportsPage() {
     const high = scopedFindings.filter((f: any) => f.severity === "high").length;
     const medium = scopedFindings.filter((f: any) => f.severity === "medium").length;
     const low = scopedFindings.filter((f: any) => f.severity === "low").length;
-    const score = total > 0 ? Math.round((pass / total) * 100) : 78;
+    const score = total > 0 ? Math.round((pass / total) * 100) : 0;
 
     return { total, pass, fail, critical, high, medium, low, score };
   }, [scopedFindings]);
@@ -214,6 +197,10 @@ function ReportsPage() {
 
           <div class="title">${reportName}</div>
           <div class="subtitle">Executive Compliance Attestation & Cloud Security Posture Assessment</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 20px; padding: 8px 12px; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 4px;">
+            <strong>Report scope:</strong> this report contains all ${stats.total} security findings evaluated for ${activeProviderLabel}.
+            It is not filtered to only the controls defined by "${reportName}" — per-framework requirement filtering is not yet implemented.
+          </div>
 
           <div class="kpi-grid">
             <div class="kpi-card">
@@ -290,6 +277,7 @@ function ReportsPage() {
       generated_at: new Date().toISOString(),
       tenant_environment: activeProviderLabel,
       provider_scope: selectedProvider,
+      report_scope_note: `Contains all findings evaluated for ${activeProviderLabel}. Not filtered to the specific control set of "${reportName}" — per-framework requirement filtering is not yet implemented.`,
       executive_summary: {
         compliance_score: stats.score,
         total_findings: stats.total,
@@ -485,6 +473,13 @@ function ReportsPage() {
                 "Action",
               ]}
             >
+              {reports.length === 0 && (
+                <Row index={0}>
+                  <td colSpan={7} className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    No reports generated yet this session. Use the panel on the left to generate one.
+                  </td>
+                </Row>
+              )}
               {reports.map((r, i) => (
                 <Row key={r.id} index={i}>
                   <td className="mono px-4 py-3 text-xs font-semibold text-foreground">
