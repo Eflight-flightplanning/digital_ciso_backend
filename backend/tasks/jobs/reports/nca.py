@@ -59,11 +59,18 @@ class NCAReportGenerator(BaseComplianceReportGenerator):
         elements.append(Spacer(1, 0.4 * inch))
 
         # Title
-        framework_title = (
-            "NCA Essential Cybersecurity Controls (ECC-1:2018)"
-            if "ecc" in self.config.name.lower()
-            else "NCA Cloud Cybersecurity Controls (CSCC-1:2019)"
-        )
+        c_id = getattr(data, "compliance_id", "").lower()
+        if "2024" in c_id or "2" in c_id:
+            if "ecc" in self.config.name.lower() or "ecc" in c_id:
+                framework_title = "NCA Essential Cybersecurity Controls (ECC-2:2024)"
+            else:
+                framework_title = "NCA Cloud Cybersecurity Controls (CCC-2:2024)"
+        else:
+            if "ecc" in self.config.name.lower() or "ecc" in c_id:
+                framework_title = "NCA Essential Cybersecurity Controls (ECC-1:2018)"
+            else:
+                framework_title = "NCA Cloud Cybersecurity Controls (CCC/CSCC)"
+
         title = Paragraph(
             f"{framework_title}<br/>National Cybersecurity Authority Attestation",
             self.styles["title"],

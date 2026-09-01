@@ -216,13 +216,29 @@ CSA_CCM_SECTION_SHORT_NAMES = {
     "Infrastructure & Virtualization Security": "Infrastructure & Virtualization",
 }
 
-# Saudi NCA ECC-1:2018 sections (Domains)
+# Saudi NCA ECC-1:2018 sections (5 Domains)
 NCA_ECC_SECTIONS = [
     "1. Cybersecurity Governance",
     "2. Cybersecurity Defense",
     "3. Cybersecurity Resilience",
     "4. Third-Party and Cloud Computing",
     "5. Industrial Control Systems",
+]
+
+# Saudi NCA ECC-2:2024 sections (4 Domains - Domain 5 moved to OTCC)
+NCA_ECC_2024_SECTIONS = [
+    "1. Cybersecurity Governance",
+    "2. Cybersecurity Defense",
+    "3. Cybersecurity Resilience",
+    "4. Third-Party and Cloud Computing Cybersecurity",
+]
+
+# Saudi NCA CCC-2:2024 / CSCC Cloud Sections (4 Domains)
+NCA_CCC_2024_SECTIONS = [
+    "1. Cybersecurity Governance",
+    "2. Cybersecurity Defense",
+    "3. Cybersecurity Resilience",
+    "4. Third-Party Cybersecurity",
 ]
 
 # Saudi NCA CSCC-1:2019 sections (Cloud Domains)
