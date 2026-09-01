@@ -101,20 +101,31 @@ class Command(BaseCommand):
 
                         checks = req.get("Checks", [])
                         total_checks = len(checks)
+                        req_desc = str(req.get("Description") or req.get("Name") or description)
                         
-                        # Determine if this requirement fails based on active findings
-                        is_failed = any(c in failed_check_ids for c in checks) if checks else False
+                        # Determine if this requirement is Manual, Pass, or Fail
+                        is_manual = (
+                            total_checks == 0
+                            or req.get("AssessmentType") == "Manual"
+                            or req.get("Manual") is True
+                        )
                         
-                        if is_failed:
-                            req_status = StatusChoices.FAIL
-                            failed_req_count += 1
-                            pass_chk = max(0, total_checks - 1)
-                            fail_chk = 1
-                        else:
-                            req_status = StatusChoices.PASS
-                            passed_req_count += 1
-                            pass_chk = total_checks
+                        if is_manual:
+                            req_status = StatusChoices.MANUAL
+                            pass_chk = 0
                             fail_chk = 0
+                        else:
+                            is_failed = any(c in failed_check_ids for c in checks)
+                            if is_failed:
+                                req_status = StatusChoices.FAIL
+                                failed_req_count += 1
+                                pass_chk = max(0, total_checks - 1)
+                                fail_chk = 1
+                            else:
+                                req_status = StatusChoices.PASS
+                                passed_req_count += 1
+                                pass_chk = total_checks
+                                fail_chk = 0
 
                         new_rows.append(
                             ComplianceRequirementOverview(
@@ -124,7 +135,7 @@ class Command(BaseCommand):
                                 compliance_id=compliance_id,
                                 framework=framework_name,
                                 version=version,
-                                description=description,
+                                description=req_desc,
                                 region="global",
                                 requirement_id=req_id,
                                 requirement_status=req_status,
