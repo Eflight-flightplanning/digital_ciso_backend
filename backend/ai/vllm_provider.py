@@ -108,11 +108,16 @@ class VLLMAzureProvider(AIProvider):
                     messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": user_prompt})
 
+        # Calculate dynamic token ceiling to ensure input_tokens + max_tokens <= 3900 (vLLM max_model_len is 4096)
+        total_prompt_chars = sum(len(m.get("content", "")) for m in messages)
+        est_input_tokens = int(total_prompt_chars / 3.2) + 30
+        safe_max_tokens = max(350, min(max_tokens, 3900 - est_input_tokens))
+
         payload = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            "max_tokens": safe_max_tokens,
         }
 
         try:
@@ -445,8 +450,7 @@ class VLLMAzureProvider(AIProvider):
         # Slim findings to only essential fields to stay within small context windows
         # (e.g. models loaded with max_model_len=4096). Full raw JSON with indent=2
         # for 25 findings can easily exceed 2000+ tokens on its own.
-        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status",
-                      "resource", "region", "description", "risk", "remediation", "status_extended")
+        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status", "resource", "remediation")
 
         # Separate pinned (UUID-fetched) findings from general context findings
         pinned_findings = [f for f in (relevant_findings or []) if f.get("_pinned")]
@@ -455,10 +459,11 @@ class VLLMAzureProvider(AIProvider):
         def _slim(f: dict) -> dict:
             return {k: f[k] for k in _SLIM_KEYS if k in f}
 
-        slim_pinned = [_slim(f) for f in pinned_findings[:3]]
-        slim_general = [_slim(f) for f in general_findings[:6]]
+        slim_pinned = [_slim(f) for f in pinned_findings[:2]]
+        # If user explicitly requested a specific finding, avoid cluttering context with unrelated findings
+        slim_general = [] if slim_pinned else [_slim(f) for f in general_findings[:3]]
         context_str = json.dumps(slim_general, indent=1) if slim_general else "[]"
-        prov_str = json.dumps(connected_providers, indent=1) if connected_providers else "[]"
+        prov_str = json.dumps([{"provider": p.get("provider"), "alias": p.get("alias")} for p in (connected_providers or [])[:4]], indent=1) if connected_providers else "[]"
 
         # Derive the primary cloud provider from findings, question context, or connected providers
         _primary_cloud = None
