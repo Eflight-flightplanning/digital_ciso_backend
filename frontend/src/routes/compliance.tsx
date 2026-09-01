@@ -187,9 +187,12 @@ function CompliancePage() {
     return items
       .filter((item) => {
         const id = String(item.id || item.compliance_id || "").toLowerCase();
-        const fw = String(item.framework || "").toLowerCase();
-        // Hide deprecated Oracle SaaS baseline, ITGC SOX, and SOC1 frameworks for demo
+        // Hide internal ThreatScore and deprecated frameworks so only official standards appear
         if (
+          id.includes("threatscore") ||
+          id.includes("threat_score") ||
+          fw.includes("threatscore") ||
+          fw.includes("threat score") ||
           id.includes("oracle_saas_security_baseline") ||
           id.includes("itgc_sox") ||
           id.includes("soc1_type2") ||
