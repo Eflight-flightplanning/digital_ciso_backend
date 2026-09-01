@@ -3,17 +3,17 @@
   "Name": "PCI-DSS v4.0 (Payment Card Industry) for OCI",
   "Version": "4.0",
   "Provider": "oraclecloud",
-  "Description": "Security standards for organizations handling branded credit cards across Oracle Cloud Infrastructure workloads.",
+  "Description": "Payment Card Industry Data Security Standard (PCI-DSS v4.0) requirements for securing cardholder data environments across Oracle Cloud Infrastructure (OCI).",
   "Requirements": [
     {
-      "Id": "PCI-1.2",
-      "Name": "Network Security Controls & Boundary Protection",
-      "Description": "Network security controls are configured and maintained to restrict connections to and from the cardholder data environment (CDE).",
+      "Id": "PCI-1.1",
+      "Name": "Requirement 1: Install and Maintain Network Security Controls",
+      "Description": "Deploy and maintain Network Security Groups (NSGs) and Security Lists to restrict traffic to and from the Cardholder Data Environment (CDE).",
       "Attributes": [
         {
-          "Section": "Build and Maintain a Secure Network",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "Build and Maintain a Secure Network and Systems",
+          "SubSection": "1.1 Network Security Controls (NSC)",
+          "Service": "network"
         }
       ],
       "Checks": [
@@ -23,57 +23,208 @@
       ]
     },
     {
-      "Id": "PCI-3.4",
-      "Name": "Protect Cardholder Data at Rest with Strong Cryptography",
-      "Description": "Render primary account numbers (PAN) unreadable anywhere it is stored with customer-managed encryption keys and automated rotation.",
+      "Id": "PCI-1.2",
+      "Name": "Requirement 1.2: Restrict Ingress & Egress Traffic Boundaries",
+      "Description": "Inbound and outbound traffic to and from the cardholder data environment is restricted to that which is necessary.",
+      "Attributes": [
+        {
+          "Section": "Build and Maintain a Secure Network and Systems",
+          "SubSection": "1.2 Perimeter Filtering",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted"
+      ]
+    },
+    {
+      "Id": "PCI-2.1",
+      "Name": "Requirement 2: Apply Secure Configurations to All System Components",
+      "Description": "Ensure system default accounts and passwords are changed, and disable unnecessary services and legacy metadata endpoints on compute instances.",
+      "Attributes": [
+        {
+          "Section": "Build and Maintain a Secure Network and Systems",
+          "SubSection": "2.1 System Hardening",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "PCI-3.1",
+      "Name": "Requirement 3: Protect Stored Account Data",
+      "Description": "Store account data only as long as necessary and render Primary Account Numbers (PAN) unreadable anywhere it is stored.",
       "Attributes": [
         {
           "Section": "Protect Account Data",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "3.1 Data Retention and Disposal",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_emit_object_events_enabled"
+      ]
+    },
+    {
+      "Id": "PCI-3.4",
+      "Name": "Requirement 3.4: Protect Account Data at Rest with Strong Cryptography",
+      "Description": "Render PAN unreadable using customer-managed encryption keys (CMK) across block volumes, boot volumes, and object storage.",
+      "Attributes": [
+        {
+          "Section": "Protect Account Data",
+          "SubSection": "3.4 Cryptographic Protection",
+          "Service": "kms"
         }
       ],
       "Checks": [
         "blockstorage_block_volume_encrypted_with_cmk",
-        "filestorage_file_system_encrypted_with_cmk",
-        "objectstorage_bucket_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "objectstorage_bucket_encrypted_with_cmk"
+      ]
+    },
+    {
+      "Id": "PCI-3.5",
+      "Name": "Requirement 3.5: Cryptographic Key Management & Rotation",
+      "Description": "Protect cryptographic keys used for encryption of cardholder data against disclosure and misuse with automated key rotation.",
+      "Attributes": [
+        {
+          "Section": "Protect Account Data",
+          "SubSection": "3.5 Key Management",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
         "kms_key_rotation_enabled"
       ]
     },
     {
-      "Id": "PCI-8.2",
-      "Name": "Identification and Authentication Management (MFA & Passwords)",
-      "Description": "Enforce MFA for all administrative access and configure strict password complexity, history, and expiration policies.",
+      "Id": "PCI-4.1",
+      "Name": "Requirement 4: Protect Cardholder Data with Strong Cryptography during Transmission",
+      "Description": "Ensure strong cryptography and security protocols are used when cardholder data is transmitted over open, public networks.",
       "Attributes": [
         {
-          "Section": "Identify Users and Authenticate Access",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "Protect Account Data",
+          "SubSection": "4.1 Transit Encryption",
+          "Service": "network"
         }
       ],
       "Checks": [
-        "identity_user_mfa_enabled_console_access",
-        "identity_password_policy_minimum_length_14",
-        "identity_password_policy_expires_within_365_days",
-        "identity_password_policy_prevents_reuse"
+        "network_security_group_ingress_from_internet_to_ssh_port"
       ]
     },
     {
-      "Id": "PCI-10.2",
-      "Name": "Log and Monitor All Access to System Components",
-      "Description": "Audit logging is enabled for all system components, retained for 1 year, and alerted on critical security events.",
+      "Id": "PCI-6.1",
+      "Name": "Requirement 6: Develop and Maintain Secure Systems and Software",
+      "Description": "Identify and manage security vulnerabilities using Oracle Cloud Guard and apply security patches in a timely manner.",
       "Attributes": [
         {
-          "Section": "Log and Monitor",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Section": "Maintain a Vulnerability Management Program",
+          "SubSection": "6.1 Vulnerability Identification",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled"
+      ]
+    },
+    {
+      "Id": "PCI-7.1",
+      "Name": "Requirement 7: Restrict Access to System Components and Cardholder Data",
+      "Description": "Access to system components and data is limited to only those individuals whose jobs require such access (least privilege).",
+      "Attributes": [
+        {
+          "Section": "Implement Strong Access Control Measures",
+          "SubSection": "7.1 Least Privilege Access",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists",
+        "identity_tenancy_admin_permissions_limited"
+      ]
+    },
+    {
+      "Id": "PCI-8.1",
+      "Name": "Requirement 8: Identify Users and Authenticate Access to System Components",
+      "Description": "Assign unique identification to each person with access to systems and enforce strong passwords and credential lifecycle policies.",
+      "Attributes": [
+        {
+          "Section": "Implement Strong Access Control Measures",
+          "SubSection": "8.1 User Identification",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "PCI-8.2",
+      "Name": "Requirement 8.2: Multi-Factor Authentication (MFA) Enforcement",
+      "Description": "Enforce Multi-Factor Authentication (MFA) for all administrative and console access into the cardholder data environment.",
+      "Attributes": [
+        {
+          "Section": "Implement Strong Access Control Measures",
+          "SubSection": "8.2 MFA Enforcement",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
+      ]
+    },
+    {
+      "Id": "PCI-10.1",
+      "Name": "Requirement 10: Log and Monitor All Access to System Components and Cardholder Data",
+      "Description": "Capture comprehensive audit logs, retain audit history for at least 365 days, and monitor for unauthorized changes.",
+      "Attributes": [
+        {
+          "Section": "Regularly Monitor and Test Networks",
+          "SubSection": "10.1 Audit Logging & Monitoring",
+          "Service": "audit"
         }
       ],
       "Checks": [
         "audit_log_retention_period_365_days",
-        "cloudguard_enabled",
-        "events_rule_iam_policy_changes",
-        "events_rule_security_list_changes"
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "PCI-11.1",
+      "Name": "Requirement 11: Test Security of Systems and Networks Regularly",
+      "Description": "Continuously test and verify network security perimeter controls and database exposure.",
+      "Attributes": [
+        {
+          "Section": "Regularly Monitor and Test Networks",
+          "SubSection": "11.1 Security Testing",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_default_security_list_restricts_traffic"
+      ]
+    },
+    {
+      "Id": "PCI-12.1",
+      "Name": "Requirement 12: Support Information Security with Organizational Policies",
+      "Description": "Maintain organizational security governance and backup procedures for all critical systems.",
+      "Attributes": [
+        {
+          "Section": "Maintain an Information Security Policy",
+          "SubSection": "12.1 Governance & Continuity",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_backup_enabled"
       ]
     }
   ]

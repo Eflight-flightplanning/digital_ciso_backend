@@ -1,114 +1,187 @@
 {
-  "Framework": "ISO27001-2022",
-  "Name": "ISO/IEC 27001:2022 Information Security Management for OCI",
+  "Framework": "ISO27001",
+  "Name": "ISO/IEC 27001:2022 (ISMS) for OCI",
   "Version": "2022",
   "Provider": "oraclecloud",
-  "Description": "International standard for Information Security Management Systems (ISMS) across OCI cloud governance domains.",
+  "Description": "International standard for Information Security Management Systems (ISMS) across Oracle Cloud Infrastructure (OCI).",
   "Requirements": [
     {
       "Id": "A.5.15",
-      "Name": "Access Control & IAM Governance",
-      "Description": "Access to OCI resources must be restricted in accordance with the established topic-specific policy on access control.",
+      "Name": "A.5.15 Access Control & Compartment Segregation",
+      "Description": "Rules to control physical and logical access to information and other associated assets shall be established and implemented.",
       "Attributes": [
         {
           "Section": "Organizational Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "A.5.15 Access Control",
+          "Service": "identity"
         }
       ],
       "Checks": [
-        "identity_user_mfa_enabled_console_access",
         "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists",
         "identity_tenancy_admin_permissions_limited"
       ]
     },
     {
-      "Id": "A.5.17",
-      "Name": "Authentication Information and Password Policies",
-      "Description": "Enforce minimum length of 14 characters, password expiration within 365 days, and prevent password reuse in OCI IAM.",
+      "Id": "A.5.16",
+      "Name": "A.5.16 Identity Management & Credential Lifecycle",
+      "Description": "The full lifecycle of identities shall be managed including password policies and key rotation.",
       "Attributes": [
         {
           "Section": "Organizational Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "A.5.16 Identity Management",
+          "Service": "identity"
         }
       ],
       "Checks": [
         "identity_password_policy_minimum_length_14",
-        "identity_password_policy_expires_within_365_days",
-        "identity_password_policy_prevents_reuse"
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "A.5.17",
+      "Name": "A.5.17 Authentication Information & Multi-Factor Authentication",
+      "Description": "Allocation and management of authentication information shall be controlled through MFA enforcement.",
+      "Attributes": [
+        {
+          "Section": "Organizational Controls",
+          "SubSection": "A.5.17 Authentication Information",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_mfa_enabled_console_access"
       ]
     },
     {
       "Id": "A.8.1",
-      "Name": "User Endpoint and Instance Security",
-      "Description": "Ensure compute instances enforce secure boot, disable legacy metadata endpoints (IMDSv1), and enable in-transit encryption.",
+      "Name": "A.8.1 User Endpoint Devices & Compute Hardening",
+      "Description": "Information stored on, processed by or accessible via user endpoint devices and compute instances shall be protected.",
       "Attributes": [
         {
           "Section": "Technological Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "A.8.1 User Endpoint Devices",
+          "Service": "compute"
         }
       ],
       "Checks": [
-        "compute_instance_secure_boot_enabled",
-        "compute_instance_legacy_metadata_endpoint_disabled",
-        "compute_instance_in_transit_encryption_enabled"
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "A.8.7",
+      "Name": "A.8.7 Protection Against Malware & Threat Detection",
+      "Description": "Protection against malware and security threats shall be implemented using Oracle Cloud Guard.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "SubSection": "A.8.7 Protection Against Malware",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "A.8.8",
+      "Name": "A.8.8 Management of Technical Vulnerabilities",
+      "Description": "Information about technical vulnerabilities of information systems in use shall be obtained and evaluated.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "SubSection": "A.8.8 Management of Technical Vulnerabilities",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled"
+      ]
+    },
+    {
+      "Id": "A.8.12",
+      "Name": "A.8.12 Data Leakage Prevention & Storage Security",
+      "Description": "Data leakage prevention measures shall be applied to systems, networks, and object storage buckets.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "SubSection": "A.8.12 Data Leakage Prevention",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_emit_object_events_enabled"
+      ]
+    },
+    {
+      "Id": "A.8.13",
+      "Name": "A.8.13 Information Backup & Redundancy",
+      "Description": "Backup copies of information, software and system images shall be taken and tested regularly.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "SubSection": "A.8.13 Information Backup",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_backup_enabled"
+      ]
+    },
+    {
+      "Id": "A.8.15",
+      "Name": "A.8.15 Logging & 365-Day Audit Trail Retention",
+      "Description": "Logs that record activities, exceptions, faults and other relevant events shall be produced, stored, protected and analyzed.",
+      "Attributes": [
+        {
+          "Section": "Technological Controls",
+          "SubSection": "A.8.15 Logging",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days",
+        "events_rule_cloudguard_problems"
       ]
     },
     {
       "Id": "A.8.20",
-      "Name": "Network Security & Segregation",
-      "Description": "Network security controls must protect information in networks and its supporting information processing facilities.",
+      "Name": "A.8.20 Network Security & VCN Boundary Controls",
+      "Description": "Networks and network devices shall be secured, managed and controlled to protect the information in systems and applications.",
       "Attributes": [
         {
           "Section": "Technological Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "A.8.20 Network Security",
+          "Service": "network"
         }
       ],
       "Checks": [
         "network_security_group_ingress_from_internet_to_ssh_port",
         "network_security_group_ingress_from_internet_to_rdp_port",
         "network_default_security_list_restricts_traffic",
-        "network_vcn_subnet_flow_logs_enabled"
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted"
       ]
     },
     {
       "Id": "A.8.24",
-      "Name": "Use of Cryptography & Key Management",
-      "Description": "Cryptographic controls and KMS key rotation must be utilized to protect sensitive data at rest and in transit.",
+      "Name": "A.8.24 Use of Cryptography & Key Management",
+      "Description": "Rules for the effective use of cryptography, including cryptographic key management, shall be defined and implemented.",
       "Attributes": [
         {
           "Section": "Technological Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "SubSection": "A.8.24 Use of Cryptography",
+          "Service": "kms"
         }
       ],
       "Checks": [
-        "kms_key_rotation_enabled",
+        "objectstorage_bucket_encrypted_with_cmk",
         "blockstorage_block_volume_encrypted_with_cmk",
         "blockstorage_boot_volume_encrypted_with_cmk",
-        "filestorage_file_system_encrypted_with_cmk",
-        "objectstorage_bucket_encrypted_with_cmk"
-      ]
-    },
-    {
-      "Id": "A.8.15",
-      "Name": "Logging & Monitoring",
-      "Description": "Audit logs recording user activities, exceptions, faults and information security events must be retained for 365 days.",
-      "Attributes": [
-        {
-          "Section": "Technological Controls",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
-        }
-      ],
-      "Checks": [
-        "audit_log_retention_period_365_days",
-        "cloudguard_enabled",
-        "objectstorage_bucket_logging_enabled",
-        "events_notification_topic_and_subscription_exists"
+        "kms_key_rotation_enabled"
       ]
     }
   ]

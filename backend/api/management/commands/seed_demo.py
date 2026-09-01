@@ -222,6 +222,10 @@ class Command(BaseCommand):
                 ("secnumcloud_3.2_oraclecloud", "SecNumCloud Oracle Cloud", "3.2", 0.85, 78, 14, 92),
                 ("nca_cscc_1.2019_oraclecloud", "NCA Cloud Cybersecurity Controls (CCC/CSCC)", "2:2024", 0.94, 17, 1, 18),
                 ("nca_ecc_1.2018_oraclecloud", "NCA Essential Cybersecurity Controls (ECC)", "2:2024", 0.93, 26, 2, 28),
+                ("iso27001_2022_oraclecloud", "ISO/IEC 27001:2022 (ISMS)", "2022", 0.91, 10, 1, 11),
+                ("pci_4.0_oraclecloud", "PCI-DSS (Payment Card Industry)", "4.0", 0.93, 13, 1, 14),
+                ("hipaa_oraclecloud", "HIPAA Security Rule & HITECH", "2023", 0.91, 10, 1, 11),
+                ("mitre_attack_oraclecloud", "MITRE ATT&CK Cloud Matrix", "v14.1", 0.91, 10, 1, 11),
                 # Oracle SaaS Benchmarks (2 Core Frameworks)
                 ("cis_1.0.0_oracle_saas", "CIS Oracle SaaS Foundations Benchmark", "1.0.0", 0.92, 40, 4, 44),
                 ("sod_matrix_oracle_saas", "Oracle SaaS Separation of Duties (SoD)", "2024.1", 0.88, 23, 3, 26),

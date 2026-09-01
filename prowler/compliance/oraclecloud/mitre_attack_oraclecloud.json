@@ -1,77 +1,186 @@
 {
   "Framework": "MITRE-ATT&CK",
-  "Name": "MITRE ATT&CK Cloud Matrix for Oracle Cloud (OCI)",
+  "Name": "MITRE ATT&CK Cloud Matrix for OCI",
   "Version": "v14.1",
   "Provider": "oraclecloud",
-  "Description": "Adversarial tactics and techniques mapping for OCI cloud infrastructure defenses and threat hunting.",
+  "Description": "MITRE ATT&CK matrix for enterprise cloud tactics and techniques across Oracle Cloud Infrastructure (OCI) environments.",
   "Requirements": [
     {
-      "Id": "T1078.004",
-      "Name": "Valid Accounts: Cloud Accounts",
-      "Description": "Detect and prevent compromise of valid cloud accounts through MFA enforcement and credential rotation.",
+      "Id": "TA0001",
+      "Name": "Initial Access: Ingress Filtering & Account Compromise Prevention",
+      "Description": "Defend against adversary initial access techniques through perimeter network filtering, private databases, and MFA enforcement.",
       "Attributes": [
         {
           "Section": "Initial Access",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
-        }
-      ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access",
-        "identity_user_api_keys_rotated_90_days",
-        "identity_password_policy_minimum_length_14"
-      ]
-    },
-    {
-      "Id": "T1530",
-      "Name": "Data from Cloud Storage Object Exposure",
-      "Description": "Prevent unauthorized exfiltration of sensitive data through public object storage buckets.",
-      "Attributes": [
-        {
-          "Section": "Collection",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
-        }
-      ],
-      "Checks": [
-        "objectstorage_bucket_not_publicly_accessible",
-        "objectstorage_bucket_logging_enabled",
-        "objectstorage_bucket_encrypted_with_cmk"
-      ]
-    },
-    {
-      "Id": "T1562.001",
-      "Name": "Impair Defenses: Disable Cloud Guard and Logging",
-      "Description": "Detect adversary attempts to disable security monitoring, modify audit rules, or tamper with security lists.",
-      "Attributes": [
-        {
-          "Section": "Defense Evasion",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
-        }
-      ],
-      "Checks": [
-        "cloudguard_enabled",
-        "events_rule_cloudguard_problems",
-        "events_rule_security_list_changes",
-        "events_rule_iam_policy_changes"
-      ]
-    },
-    {
-      "Id": "T1021.004",
-      "Name": "Remote Services: SSH / RDP Exposure",
-      "Description": "Prevent adversaries from gaining lateral movement or initial foothold via exposed management ports.",
-      "Attributes": [
-        {
-          "Section": "Lateral Movement",
-          "Profile": "Level 1",
-          "AssessmentStatus": "Automated"
+          "Tactic": "TA0001",
+          "Service": "network"
         }
       ],
       "Checks": [
         "network_security_group_ingress_from_internet_to_ssh_port",
         "network_security_group_ingress_from_internet_to_rdp_port",
-        "network_security_list_ingress_from_internet_to_ssh_port"
+        "database_autonomous_database_access_restricted",
+        "identity_user_mfa_enabled_console_access"
+      ]
+    },
+    {
+      "Id": "TA0002",
+      "Name": "Execution: Secure Compute Instance Configuration",
+      "Description": "Prevent unauthorized command execution and metadata service exploitation on cloud compute instances.",
+      "Attributes": [
+        {
+          "Section": "Execution",
+          "Tactic": "TA0002",
+          "Service": "compute"
+        }
+      ],
+      "Checks": [
+        "compute_instance_legacy_metadata_service_endpoint_disabled"
+      ]
+    },
+    {
+      "Id": "TA0003",
+      "Name": "Persistence: IAM Credential Lifecycle & Token Rotation",
+      "Description": "Prevent adversaries from maintaining access via persistent API keys, user tokens, or backdoor accounts.",
+      "Attributes": [
+        {
+          "Section": "Persistence",
+          "Tactic": "TA0003",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days"
+      ]
+    },
+    {
+      "Id": "TA0004",
+      "Name": "Privilege Escalation: Compartment Isolation & Root Restrictions",
+      "Description": "Prevent adversaries from escalating privileges from low-level access to full tenancy administrative control.",
+      "Attributes": [
+        {
+          "Section": "Privilege Escalation",
+          "Tactic": "TA0004",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_no_resources_in_root_compartment",
+        "identity_non_root_compartment_exists",
+        "identity_tenancy_admin_permissions_limited"
+      ]
+    },
+    {
+      "Id": "TA0005",
+      "Name": "Defense Evasion: Audit Trail Protection & Cloud Guard Detection",
+      "Description": "Prevent adversaries from disabling security monitoring, deleting audit logs, or modifying detection rules.",
+      "Attributes": [
+        {
+          "Section": "Defense Evasion",
+          "Tactic": "TA0005",
+          "Service": "cloudguard"
+        }
+      ],
+      "Checks": [
+        "cloudguard_enabled",
+        "events_rule_cloudguard_problems"
+      ]
+    },
+    {
+      "Id": "TA0006",
+      "Name": "Credential Access: Password Policy & Authentication Hardening",
+      "Description": "Prevent adversaries from harvesting or cracking cloud credentials using strong password policies and MFA.",
+      "Attributes": [
+        {
+          "Section": "Credential Access",
+          "Tactic": "TA0006",
+          "Service": "identity"
+        }
+      ],
+      "Checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_user_mfa_enabled_console_access"
+      ]
+    },
+    {
+      "Id": "TA0007",
+      "Name": "Discovery: Cloud Posture & Configuration Assessment",
+      "Description": "Monitor and limit unauthorized discovery of cloud tenancy structure, resources, and storage.",
+      "Attributes": [
+        {
+          "Section": "Discovery",
+          "Tactic": "TA0007",
+          "Service": "audit"
+        }
+      ],
+      "Checks": [
+        "audit_log_retention_period_365_days"
+      ]
+    },
+    {
+      "Id": "TA0008",
+      "Name": "Lateral Movement: Virtual Cloud Network (VCN) Segmentation",
+      "Description": "Prevent adversaries from pivoting between internal subnets, database instances, and analytics tiers.",
+      "Attributes": [
+        {
+          "Section": "Lateral Movement",
+          "Tactic": "TA0008",
+          "Service": "network"
+        }
+      ],
+      "Checks": [
+        "network_default_security_list_restricts_traffic",
+        "analytics_instance_access_restricted"
+      ]
+    },
+    {
+      "Id": "TA0009",
+      "Name": "Collection: Object Storage Public Exposure Mitigation",
+      "Description": "Prevent adversaries from harvesting sensitive organizational data stored in unauthenticated object storage buckets.",
+      "Attributes": [
+        {
+          "Section": "Collection",
+          "Tactic": "TA0009",
+          "Service": "objectstorage"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_not_publicly_accessible",
+        "objectstorage_bucket_emit_object_events_enabled"
+      ]
+    },
+    {
+      "Id": "TA0010",
+      "Name": "Exfiltration: Cryptographic Keys & Transit Protection",
+      "Description": "Mitigate data exfiltration risks by enforcing customer-managed keys (CMK) and monitoring key rotation.",
+      "Attributes": [
+        {
+          "Section": "Exfiltration",
+          "Tactic": "TA0010",
+          "Service": "kms"
+        }
+      ],
+      "Checks": [
+        "objectstorage_bucket_encrypted_with_cmk",
+        "kms_key_rotation_enabled"
+      ]
+    },
+    {
+      "Id": "TA0040",
+      "Name": "Impact: Volume Encryption & Automated Backup Protection",
+      "Description": "Protect against ransomware, data destruction, and operational disruption through volume encryption and backups.",
+      "Attributes": [
+        {
+          "Section": "Impact",
+          "Tactic": "TA0040",
+          "Service": "blockstorage"
+        }
+      ],
+      "Checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "blockstorage_block_volume_backup_enabled"
       ]
     }
   ]
