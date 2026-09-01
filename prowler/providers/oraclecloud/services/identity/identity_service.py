@@ -335,7 +335,7 @@ class Identity(OCIService):
                                     id=group.id,
                                     name=group.name,
                                     description=(
-                                        group.description
+                                        group.description or ""
                                         if hasattr(group, "description")
                                         else ""
                                     ),
@@ -430,7 +430,7 @@ class Identity(OCIService):
                                 ),
                                 compartment_id=self.audited_tenancy,
                                 matching_rule=(
-                                    dynamic_group.matching_rule
+                                    dynamic_group.matching_rule or ""
                                     if hasattr(dynamic_group, "matching_rule")
                                     else ""
                                 ),
@@ -803,7 +803,7 @@ class DynamicGroup(BaseModel):
     name: str
     description: Optional[str] = ""
     compartment_id: str
-    matching_rule: str
+    matching_rule: Optional[str] = ""
     time_created: Optional[datetime] = None
     lifecycle_state: str
     region: str
