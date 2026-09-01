@@ -226,6 +226,10 @@ class OraclecloudProvider(Provider):
     def audit_metadata(self) -> Audit_Metadata:
         return self._audit_metadata
 
+    @audit_metadata.setter
+    def audit_metadata(self, value: Audit_Metadata):
+        self._audit_metadata = value
+
     @property
     def identity(self):
         return self._identity
