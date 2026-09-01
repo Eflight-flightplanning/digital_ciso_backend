@@ -344,196 +344,6 @@ function Neo4jAttackGraphCard({
   );
 }
 
-/* ── Asset Volume Tab View ── */
-function AssetVolumeView({
-  totalAssets,
-  azureAssets,
-  awsAssets,
-  gcpAssets,
-  ociAssets,
-  oracleSaasAssets = 0,
-  resources = [],
-  findings = [],
-}: {
-  totalAssets: number;
-  azureAssets: number;
-  awsAssets: number;
-  gcpAssets: number;
-  ociAssets: number;
-  oracleSaasAssets?: number;
-  resources?: any[];
-  findings?: any[];
-}) {
-  const safeTotal = Math.max(1, totalAssets);
-  const azPct = Math.round((azureAssets / safeTotal) * 100);
-  const awsPct = Math.round((awsAssets / safeTotal) * 100);
-  const gcpPct = Math.round((gcpAssets / safeTotal) * 100);
-  const ociPct = Math.round((ociAssets / safeTotal) * 100);
-  const saasPct = Math.round((oracleSaasAssets / safeTotal) * 100);
-
-  // Shared bucketing so a resource and a finding for the same real service (e.g. "keyvault")
-  // land in the same group — this is what lets us compute a real health status per group below.
-  const classifyServiceKey = (serviceStr: string): string => {
-    const s = serviceStr.toLowerCase();
-    if (s.includes("defender") || s.includes("security") || s.includes("pricing")) return "defender";
-    if (s.includes("iam") || s.includes("role") || s.includes("authorization") || s.includes("identity")) return "iam";
-    if (s.includes("network") || s.includes("nsg") || s.includes("vnet") || s.includes("subnet") || s.includes("watcher")) return "network";
-    if (s.includes("keyvault") || s.includes("vault") || s.includes("secret")) return "keyvault";
-    if (s.includes("app") || s.includes("web") || s.includes("site")) return "app";
-    if (s.includes("vm") || s.includes("compute") || s.includes("virtualmachine") || s.includes("disk")) return "compute";
-    if (s.includes("policy")) return "policy";
-    if (s.includes("storage") || s.includes("blob") || s.includes("bucket")) return "storage";
-    return "other";
-  };
-
-  // Real per-group fail count, derived from the same findings shown elsewhere on the
-  // dashboard — a group only shows "Audited" (healthy) when it genuinely has zero real
-  // FAIL findings, instead of that label being hardcoded regardless of actual status.
-  const failCountByKey = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const f of findings) {
-      if (String(f.status || "").toUpperCase() !== "FAIL") continue;
-      const s = String(f.check_metadata?.servicename || f.service || "").toLowerCase();
-      const key = classifyServiceKey(s);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-    return counts;
-  }, [findings]);
-
-  const services = useMemo(() => {
-    if (!resources || resources.length === 0) {
-      return [];
-    }
-
-    const map = new Map<string, { name: string; icon: any; count: number; provider: string; key: string }>();
-
-    for (const r of resources) {
-      const s = String(r.service || r.service_name || r.type || "").toLowerCase();
-      const key = classifyServiceKey(s);
-      let name = "Discovered Cloud Assets";
-      let prov = String(r.provider || r.provider_type || "Azure").toUpperCase();
-      let icon = Server;
-
-      if (key === "defender") {
-        name = "Defender for Cloud & Security Posture";
-        prov = "Microsoft Defender";
-        icon = ShieldCheck;
-      } else if (key === "iam") {
-        name = "Entra ID & Identity Role Assignments";
-        prov = prov.includes("OCI") || prov.includes("ORACLE") ? "OCI Identity" : "Azure IAM / Entra ID";
-        icon = Lock;
-      } else if (key === "network") {
-        name = "Network Security Groups & VNets";
-        prov = "Azure Virtual Network";
-        icon = Globe;
-      } else if (key === "keyvault") {
-        name = "Key Vaults & Cryptographic Secrets";
-        prov = "Azure Key Vault";
-        icon = Lock;
-      } else if (key === "app") {
-        name = "App Services & Cloud Workloads";
-        prov = "Azure App Service";
-        icon = Globe;
-      } else if (key === "compute") {
-        name = "Virtual Machines & Disks";
-        prov = "Azure Compute";
-        icon = Server;
-      } else if (key === "policy") {
-        name = "OCI Tenancy IAM Policies";
-        prov = "Oracle Cloud IAM";
-        icon = Lock;
-      } else if (key === "storage") {
-        name = "Storage Accounts & Object Stores";
-        prov = "Cloud Storage";
-        icon = Database;
-      }
-
-      if (!map.has(key)) {
-        map.set(key, { name, icon, count: 0, provider: prov, key });
-      }
-      map.get(key)!.count += 1;
-    }
-
-    return Array.from(map.values())
-      .map((entry) => {
-        const fails = failCountByKey.get(entry.key) || 0;
-        return {
-          ...entry,
-          health: fails > 0 ? `${fails} Failing` : "Audited",
-          healthy: fails === 0,
-        };
-      })
-      .sort((a, b) => b.count - a.count);
-  }, [resources]);
-
-  return (
-    <div className="space-y-4 py-3">
-      {/* Cloud Distribution Bar */}
-      <div className="rounded-xl border border-border/60 bg-surface-2/40 p-4">
-        <div className="flex items-center justify-between text-xs font-semibold text-foreground mb-2">
-          <span>Multi-Cloud Asset Distribution</span>
-          <span className="font-mono text-primary">{totalAssets.toLocaleString()} Total Discovered Assets</span>
-        </div>
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-3">
-          {azureAssets > 0 && <div style={{ width: `${azPct}%` }} className="bg-sky-400" title={`Azure (${azPct}%)`} />}
-          {awsAssets > 0 && <div style={{ width: `${awsPct}%` }} className="bg-amber-400" title={`AWS (${awsPct}%)`} />}
-          {gcpAssets > 0 && <div style={{ width: `${gcpPct}%` }} className="bg-emerald-400" title={`GCP (${gcpPct}%)`} />}
-          {ociAssets > 0 && <div style={{ width: `${ociPct}%` }} className="bg-rose-400" title={`OCI (${ociPct}%)`} />}
-          {oracleSaasAssets > 0 && <div style={{ width: `${saasPct}%` }} className="bg-red-500" title={`Oracle SaaS (${saasPct}%)`} />}
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-muted-foreground">
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-400" /> Microsoft Azure ({azureAssets} · {azPct}%)</span>
-          {ociAssets > 0 && (
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-400" /> Oracle Cloud ({ociAssets} · {ociPct}%)</span>
-          )}
-          {oracleSaasAssets > 0 && (
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" /> Oracle SaaS ({oracleSaasAssets} · {saasPct}%)</span>
-          )}
-          {awsAssets > 0 ? (
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-400" /> AWS ({awsAssets} · {awsPct}%)</span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-muted-foreground/60"><span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> AWS (0)</span>
-          )}
-          {gcpAssets > 0 ? (
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Google Cloud ({gcpAssets} · {gcpPct}%)</span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-muted-foreground/60"><span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> Google Cloud (0)</span>
-          )}
-        </div>
-      </div>
-
-      {/* Services Grid */}
-      {services.length === 0 && (
-        <div className="rounded-xl border border-border/60 bg-surface-2/30 p-6 text-center text-xs text-muted-foreground">
-          No resources discovered yet for this selection. Run a scan to populate the asset inventory.
-        </div>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {services.map((svc, i) => {
-          const Icon = svc.icon;
-          return (
-            <div key={i} className="flex items-center justify-between rounded-xl border border-border bg-surface-2/30 p-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="font-semibold text-foreground">{svc.name}</div>
-                  <div className="text-[10px] text-muted-foreground">{svc.provider}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono font-bold text-foreground">{svc.count}</div>
-                <div className={`text-[10px] font-semibold ${svc.healthy ? "text-emerald-400" : "text-rose-400"}`}>{svc.health}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ── Risk Pipeline Sankey Flow Component ── */
 function RiskPipelineView({ findings, providers }: { findings: any[]; providers: any[] }) {
   const pipelineData = useMemo(() => {
@@ -1682,14 +1492,12 @@ export function DashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3.5 shrink-0">
                 <div>
                   <h3 className="font-display text-base font-bold text-foreground">
-                    {activeTab === "risk" && "Risk Pipeline & Severity Flow"}
-                    {activeTab === "radar" && "Security Posture Radar"}
-                    {activeTab === "asset" && "Multi-Cloud Asset Volume Topology"}
+                    {activeTab === "risk" ? "Risk Pipeline & Severity Flow" : "Security Posture Radar"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {activeTab === "risk" && "Flow bands connecting cloud accounts to finding severity levels"}
-                    {activeTab === "radar" && "Top 5 Compliance Standards continuous assessment coverage"}
-                    {activeTab === "asset" && "Real-time discovered resource inventory across connected clouds"}
+                    {activeTab === "risk"
+                      ? "Flow bands connecting cloud accounts to finding severity levels"
+                      : "Top 5 Compliance Standards continuous assessment coverage"}
                   </p>
                 </div>
 
@@ -1713,16 +1521,6 @@ export function DashboardPage() {
                     }`}
                   >
                     Radar Posture
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("asset")}
-                    className={`rounded-lg px-3 py-1 font-semibold transition-all cursor-pointer ${
-                      activeTab === "asset"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Asset Volume
                   </button>
                 </div>
               </div>
@@ -1759,22 +1557,6 @@ export function DashboardPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Tab 3: Asset Volume View */}
-              {activeTab === "asset" && (
-                <div className="flex-1 flex flex-col justify-between pt-2">
-                  <AssetVolumeView
-                    totalAssets={totalDiscoveredAssets}
-                    azureAssets={azureAssets}
-                    awsAssets={awsAssets}
-                    gcpAssets={gcpAssets}
-                    ociAssets={ociAssets}
-                    oracleSaasAssets={oracleSaasAssets}
-                    resources={filteredResources}
-                    findings={filteredFindings}
-                  />
                 </div>
               )}
             </div>
