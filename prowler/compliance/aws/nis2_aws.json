@@ -71,11 +71,7 @@
     {
       "Id": "1.1.2",
       "Description": "The network and information system security policy shall be reviewed and, where appropriate, updated by management bodies at least annually and when significant incidents or significant changes to operations or risks occur. The result of the reviews shall be documented.",
-      "Checks": [
-        "iam_password_policy_expires_passwords_within_90_days_or_less",
-        "iam_rotate_access_key_90_days",
-        "secretsmanager_secret_rotated_periodically"
-      ],
+      "Checks": [],
       "Attributes": [
         {
           "Section": "1 POLICY ON THE SECURITY OF NETWORK AND INFORMATION SYSTEMS (ARTICLE 21(2), POINT (A) OF DIRECTIVE (EU) 2022/2555)",

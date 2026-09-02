@@ -40,16 +40,7 @@
     {
       "Id": "1.1.2",
       "Description": "The network and information system security policy shall be reviewed and, where appropriate, updated by management bodies at least annually and when significant incidents or significant changes to operations or risks occur. The result of the reviews shall be documented.",
-      "Checks": [
-        "logging_log_metric_filter_and_alert_for_audit_configuration_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_bucket_permission_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_custom_role_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_project_ownership_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_sql_instance_configuration_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_vpc_firewall_rule_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_vpc_network_changes_enabled",
-        "logging_log_metric_filter_and_alert_for_vpc_network_route_changes_enabled"
-      ],
+      "Checks": [],
       "Attributes": [
         {
           "Section": "1 POLICY ON THE SECURITY OF NETWORK AND INFORMATION SYSTEMS (ARTICLE 21(2), POINT (A) OF DIRECTIVE (EU) 2022/2555)",

@@ -16,10 +16,7 @@
           "Service": "identity"
         }
       ],
-      "Checks": [
-        "identity_no_resources_in_root_compartment",
-        "identity_non_root_compartment_exists"
-      ]
+      "Checks": []
     },
     {
       "Id": "1-1-2",
@@ -190,9 +187,7 @@
           "Service": "cloudguard"
         }
       ],
-      "Checks": [
-        "cloudguard_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "1-5-2",
@@ -530,9 +525,7 @@
           "Service": "objectstorage"
         }
       ],
-      "Checks": [
-        "objectstorage_bucket_not_publicly_accessible"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-1-2",
@@ -616,9 +609,7 @@
           "Service": "identity"
         }
       ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-2-2",
@@ -676,9 +667,7 @@
           "Service": "compute"
         }
       ],
-      "Checks": [
-        "compute_instance_legacy_metadata_endpoint_disabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-3-2",
@@ -789,10 +778,7 @@
           "Service": "core"
         }
       ],
-      "Checks": [
-        "network_security_list_ingress_from_internet_to_ssh_port",
-        "network_security_list_ingress_from_internet_to_rdp_port"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-5-2",
@@ -908,9 +894,7 @@
           "Service": "objectstorage"
         }
       ],
-      "Checks": [
-        "objectstorage_bucket_not_publicly_accessible"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-7-2",
@@ -966,9 +950,7 @@
           "Service": "kms"
         }
       ],
-      "Checks": [
-        "kms_key_rotation_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-8-2",
@@ -1193,9 +1175,7 @@
           "Service": "audit"
         }
       ],
-      "Checks": [
-        "audit_log_retention_period_365_days"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-12-2",
@@ -1532,9 +1512,7 @@
           "Service": "cloudguard"
         }
       ],
-      "Checks": [
-        "cloudguard_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "4-2-2",

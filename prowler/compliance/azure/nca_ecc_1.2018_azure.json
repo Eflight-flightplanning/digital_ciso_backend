@@ -16,9 +16,7 @@
           "Service": "policy"
         }
       ],
-      "Checks": [
-        "policy_ensure_asc_enforcement_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "1-1-2",
@@ -190,9 +188,7 @@
           "Service": "defender"
         }
       ],
-      "Checks": [
-        "defender_ensure_defender_for_server_is_on"
-      ]
+      "Checks": []
     },
     {
       "Id": "1-5-2",
@@ -532,9 +528,7 @@
           "Service": "storage"
         }
       ],
-      "Checks": [
-        "storage_blob_public_access_level_is_disabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-1-2",
@@ -618,9 +612,7 @@
           "Service": "entra"
         }
       ],
-      "Checks": [
-        "entra_non_privileged_user_has_mfa"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-2-2",
@@ -678,9 +670,7 @@
           "Service": "vm"
         }
       ],
-      "Checks": [
-        "vm_trusted_launch_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-3-2",
@@ -793,9 +783,7 @@
           "Service": "network"
         }
       ],
-      "Checks": [
-        "network_ssh_internet_access_restricted"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-5-2",
@@ -910,9 +898,7 @@
           "Service": "storage"
         }
       ],
-      "Checks": [
-        "storage_blob_public_access_level_is_disabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-7-2",
@@ -969,9 +955,7 @@
           "Service": "keyvault"
         }
       ],
-      "Checks": [
-        "keyvault_key_rotation_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-8-2",
@@ -1088,9 +1072,7 @@
           "Service": "defender"
         }
       ],
-      "Checks": [
-        "defender_auto_provisioning_vulnerabilty_assessments_machines_on"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-10-2",
@@ -1203,9 +1185,7 @@
           "Service": "monitor"
         }
       ],
-      "Checks": [
-        "monitor_diagnostic_settings_exists"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-12-2",
@@ -1375,9 +1355,7 @@
           "Service": "app"
         }
       ],
-      "Checks": [
-        "app_ensure_http_is_redirected_to_https"
-      ]
+      "Checks": []
     },
     {
       "Id": "2-15-2",
@@ -1434,9 +1412,7 @@
           "Service": "vm"
         }
       ],
-      "Checks": [
-        "vm_backup_enabled"
-      ]
+      "Checks": []
     },
     {
       "Id": "3-1-2",
@@ -1548,9 +1524,7 @@
           "Service": "defender"
         }
       ],
-      "Checks": [
-        "defender_ensure_defender_for_server_is_on"
-      ]
+      "Checks": []
     },
     {
       "Id": "4-2-2",
