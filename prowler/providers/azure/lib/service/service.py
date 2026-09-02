@@ -71,7 +71,15 @@ class AzureService:
             list operation.
         """
         if not self.resource_groups:
-            return list(list_all_fn())
+            if callable(list_all_fn):
+                try:
+                    return list(list_all_fn())
+                except Exception as error:
+                    logger.warning(
+                        f"Subscription ID: {subscription_id} -- list_all_fn failed -- "
+                        f"{error.__class__.__name__}[{error.__traceback__.tb_lineno}]: {error}"
+                    )
+            return []
         resource_groups = self.resource_groups.get(subscription_id, [])
         if not resource_groups:
             logger.info(
@@ -81,7 +89,8 @@ class AzureService:
         output = []
         for resource_group in resource_groups:
             try:
-                output += list(list_by_rg_fn(resource_group_name=resource_group))
+                if callable(list_by_rg_fn):
+                    output += list(list_by_rg_fn(resource_group_name=resource_group))
             except Exception as error:
                 logger.warning(
                     f"Subscription ID: {subscription_id} -- Resource Group: {resource_group} -- "

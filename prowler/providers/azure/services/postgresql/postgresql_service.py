@@ -22,7 +22,7 @@ class PostgreSQL(AzureService):
                 flexible_servers.update({subscription: []})
                 list_func = getattr(client.servers, "list", None)
                 list_rg_func = getattr(client.servers, "list_by_resource_group", None)
-                if not list_func and not list_rg_func:
+                if not callable(list_func) and not callable(list_rg_func):
                     continue
                 flexible_servers_list = self.list_with_rg_scope(
                     subscription,
