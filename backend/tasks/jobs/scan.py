@@ -529,10 +529,10 @@ def _create_compliance_summaries(
     )
 
     for (compliance_id, requirement_id), counts in requirement_statuses.items():
-        # Apply business rule: any FAIL → requirement fails
+        # Apply business rule: any FAIL → requirement fails; any PASS (without FAIL) → PASS; otherwise MANUAL
         if counts["fail_count"] > 0:
             req_status = "FAIL"
-        elif counts["pass_count"] == counts["total_count"]:
+        elif counts["pass_count"] > 0:
             req_status = "PASS"
         else:
             req_status = "MANUAL"

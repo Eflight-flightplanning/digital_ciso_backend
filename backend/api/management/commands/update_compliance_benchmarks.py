@@ -84,10 +84,18 @@ class Command(BaseCommand):
                             status=StatusChoices.FAIL,
                         ).values_list("check_id", flat=True)
                     )
+                    passed_check_ids = set(
+                        Finding.all_objects.filter(
+                            tenant=tenant,
+                            scan=scan,
+                            status=StatusChoices.PASS,
+                        ).values_list("check_id", flat=True)
+                    )
 
                     new_rows = []
                     passed_req_count = 0
                     failed_req_count = 0
+                    manual_req_count = 0
                     seen_req_ids = set()
 
                     for req in requirements:
@@ -112,19 +120,27 @@ class Command(BaseCommand):
                         
                         if is_manual:
                             req_status = StatusChoices.MANUAL
+                            manual_req_count += 1
                             pass_chk = 0
                             fail_chk = 0
                         else:
                             is_failed = any(c in failed_check_ids for c in checks)
+                            is_passed = any(c in passed_check_ids for c in checks)
                             if is_failed:
                                 req_status = StatusChoices.FAIL
                                 failed_req_count += 1
                                 pass_chk = max(0, total_checks - 1)
                                 fail_chk = 1
-                            else:
+                            elif is_passed:
                                 req_status = StatusChoices.PASS
                                 passed_req_count += 1
                                 pass_chk = total_checks
+                                fail_chk = 0
+                            else:
+                                # Neither PASS nor FAIL findings were produced in this scan
+                                req_status = StatusChoices.MANUAL
+                                manual_req_count += 1
+                                pass_chk = 0
                                 fail_chk = 0
 
                         new_rows.append(
@@ -164,6 +180,7 @@ class Command(BaseCommand):
                                 "version": version,
                                 "requirements_passed": passed_req_count,
                                 "requirements_failed": failed_req_count,
+                                "requirements_manual": manual_req_count,
                                 "total_requirements": len(new_rows),
                             },
                         )
@@ -176,10 +193,10 @@ class Command(BaseCommand):
                             compliance_id=compliance_id,
                             requirements_passed=passed_req_count,
                             requirements_failed=failed_req_count,
-                            requirements_manual=0,
+                            requirements_manual=manual_req_count,
                             total_requirements=len(new_rows),
                         )
 
-                        self.stdout.write(f"  [SYNCED] {compliance_id} ({scan.provider.provider if scan.provider else 'all'}) -> {len(new_rows)} requirements ({passed_req_count} Pass, {failed_req_count} Fail)")
+                        self.stdout.write(f"  [SYNCED] {compliance_id} ({scan.provider.provider if scan.provider else 'all'}) -> {len(new_rows)} requirements ({passed_req_count} Pass, {failed_req_count} Fail, {manual_req_count} Manual)")
 
         self.stdout.write(self.style.SUCCESS(f"Successfully synchronized {total_created} Compliance Requirements across {total_frameworks} framework scans!"))

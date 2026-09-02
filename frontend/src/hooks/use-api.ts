@@ -147,7 +147,7 @@ export function useFindings(params?: Record<string, string>) {
     queryFn: async () => {
       const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
-        "page[size]": "500",
+        "page[size]": "2000",
         "filter[inserted_at.gte]": gteDate,
         ...(params || {}),
       };

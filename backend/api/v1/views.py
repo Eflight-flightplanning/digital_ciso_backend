@@ -4857,7 +4857,7 @@ class ComplianceOverviewViewSet(
 
             if item["fail_count"] > 0:
                 req_status = "FAIL"
-            elif item["pass_count"] == item["total_count"]:
+            elif item["pass_count"] > 0:
                 req_status = "PASS"
             else:
                 req_status = "MANUAL"

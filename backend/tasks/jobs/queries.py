@@ -35,9 +35,9 @@ COMPLIANCE_UPSERT_PROVIDER_SCORE_SQL = """
             (CASE
                 WHEN bool_or(cro.requirement_status = 'FAIL')
                     OVER (PARTITION BY cro.compliance_id, cro.requirement_id) THEN 'FAIL'
-                WHEN bool_or(cro.requirement_status = 'MANUAL')
-                    OVER (PARTITION BY cro.compliance_id, cro.requirement_id) THEN 'MANUAL'
-                ELSE 'PASS'
+                WHEN bool_or(cro.requirement_status = 'PASS')
+                    OVER (PARTITION BY cro.compliance_id, cro.requirement_id) THEN 'PASS'
+                ELSE 'MANUAL'
             END)::status as requirement_status,
             s.completed_at
         FROM compliance_requirements_overviews cro
@@ -76,8 +76,8 @@ COMPLIANCE_UPSERT_TENANT_SUMMARY_SQL = """
             requirement_id,
             CASE
                 WHEN bool_or(requirement_status = 'FAIL') THEN 'FAIL'
-                WHEN bool_or(requirement_status = 'MANUAL') THEN 'MANUAL'
-                ELSE 'PASS'
+                WHEN bool_or(requirement_status = 'PASS') THEN 'PASS'
+                ELSE 'MANUAL'
             END as req_status
         FROM provider_compliance_scores
         WHERE tenant_id = %s AND compliance_id = ANY(%s)

@@ -464,14 +464,20 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
 
                 <div className="mt-5 pt-3.5 border-t border-border/60 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 font-mono text-[11px] text-emerald-400">
+                    <span className="flex items-center gap-1 font-mono text-[11px] text-emerald-400" title="Passed Controls">
                       <Check className="h-3 w-3" />
                       {fw.passed}
                     </span>
-                    <span className="flex items-center gap-1 font-mono text-[11px] text-rose-400">
+                    <span className="flex items-center gap-1 font-mono text-[11px] text-rose-400" title="Violations / Failed Controls">
                       <X className="h-3 w-3" />
                       {fw.failed}
                     </span>
+                    {fw.manual > 0 && (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-indigo-400" title="Manual Audits / Resource Not Available">
+                        <FileText className="h-3 w-3" />
+                        {fw.manual}
+                      </span>
+                    )}
                   </div>
                   <span className="text-[11px] font-semibold text-primary group-hover:translate-x-0.5 transition-transform flex items-center">
                     Audit View <ChevronRight className="h-3 w-3 ml-0.5" />
@@ -580,7 +586,9 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                 </div>
                 <div>
                   <div className="font-mono text-base font-bold text-indigo-400">{selectedFramework.manual}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Manual Audits</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title="Controls requiring manual verification or where cloud resource is not deployed">
+                    Manual Audits / Resource Not Available
+                  </div>
                 </div>
               </div>
 
@@ -597,7 +605,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                         className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${modalStatusFilter === st ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
                           }`}
                       >
-                        {st}
+                        {st === "MANUAL" ? "MANUAL / N/A" : st}
                       </button>
                     ))}
                   </div>
@@ -663,7 +671,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                                   : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                               }`}
                           >
-                            {r.status || "FAIL"}
+                            {isManual ? "Manual / Resource N/A" : (r.status || "FAIL")}
                           </span>
                         </div>
                       );

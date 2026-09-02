@@ -339,7 +339,49 @@ function FindingsPage() {
     });
   }, [rawData, mutedIds, remediatedIds]);
 
-  // Pre-filter findings by selected cloud provider so that tab counts update dynamically
+  // Pre-filter findings by selected cloud provider AND compliance framework so that tab counts update dynamically
+  const scopedData = useMemo(() => {
+    return data.filter((item) => {
+      // 1. Provider filter
+      const selProv = (selectedProvider || "ALL").toUpperCase();
+      if (selProv !== "ALL") {
+        const itemProv = (item.provider || "").toUpperCase();
+        const matchesProv =
+          itemProv === selProv ||
+          (selProv === "AZURE" && (itemProv === "AZURE" || itemProv === "AZ")) ||
+          (selProv === "OCI" && (itemProv === "OCI" || itemProv === "ORACLECLOUD")) ||
+          (selProv === "ORACLE_SAAS" && (itemProv === "ORACLE_SAAS" || itemProv === "ORACLE-SAAS" || itemProv === "ERP")) ||
+          (selProv === "K8S" && (itemProv === "K8S" || itemProv === "KUBERNETES"));
+        if (!matchesProv) return false;
+      }
+
+      // 2. Compliance filter
+      if (selectedCompliance !== "All") {
+        const itemComp = item.compliance || {};
+        const checkId = (item.check_id || "").toLowerCase();
+        const hasDirectCompliance = selectedCompliance in itemComp;
+        const matchesSod =
+          selectedCompliance === "sod_matrix_oracle_saas" &&
+          (hasDirectCompliance ||
+            checkId.startsWith("erp_iam_") ||
+            checkId.includes("sod") ||
+            item.service.toLowerCase().includes("sod"));
+        const matchesCisSaas =
+          selectedCompliance === "cis_1.0.0_oracle_saas" &&
+          (hasDirectCompliance ||
+            item.provider === "ORACLE_SAAS" ||
+            checkId.startsWith("erp_"));
+
+        if (!hasDirectCompliance && !matchesSod && !matchesCisSaas) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [data, selectedProvider, selectedCompliance]);
+
+  // Provider-filtered data used specifically to populate the list of available compliance frameworks
   const providerFilteredData = useMemo(() => {
     return data.filter((item) => {
       const selProv = (selectedProvider || "ALL").toUpperCase();
@@ -390,8 +432,26 @@ function FindingsPage() {
     }
   }, [complianceOptions, selectedCompliance]);
 
+  // Pre-fill Provider and Compliance from URL query parameters if navigated from Dashboard/Compliance
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const provParam = params.get("provider");
+      const compParam = params.get("compliance") || params.get("compliance_id");
+      if (provParam) {
+        const upper = provParam.toUpperCase();
+        if (["AZURE", "OCI", "ORACLE_SAAS", "AWS", "GCP", "K8S"].includes(upper)) {
+          setSelectedProvider(upper);
+        }
+      }
+      if (compParam) {
+        setSelectedCompliance(compParam);
+      }
+    }
+  }, []);
+
   const filtered = useMemo(() => {
-    return providerFilteredData.filter((item) => {
+    return scopedData.filter((item) => {
       if (search) {
         const query = search.toLowerCase();
         const matches =
@@ -400,26 +460,6 @@ function FindingsPage() {
           item.resource.toLowerCase().includes(query) ||
           item.service.toLowerCase().includes(query);
         if (!matches) return false;
-      }
-      if (selectedCompliance !== "All") {
-        const itemComp = item.compliance || {};
-        const checkId = (item.check_id || "").toLowerCase();
-        const hasDirectCompliance = selectedCompliance in itemComp;
-        const matchesSod =
-          selectedCompliance === "sod_matrix_oracle_saas" &&
-          (hasDirectCompliance ||
-            checkId.startsWith("erp_iam_") ||
-            checkId.includes("sod") ||
-            item.service.toLowerCase().includes("sod"));
-        const matchesCisSaas =
-          selectedCompliance === "cis_1.0.0_oracle_saas" &&
-          (hasDirectCompliance ||
-            item.provider === "ORACLE_SAAS" ||
-            checkId.startsWith("erp_"));
-
-        if (!hasDirectCompliance && !matchesSod && !matchesCisSaas) {
-          return false;
-        }
       }
       const selSev = (selectedSeverity || "ALL").toLowerCase();
       if (selSev !== "all" && item.severity.toLowerCase() !== selSev) {
@@ -431,18 +471,19 @@ function FindingsPage() {
       }
       return true;
     });
-  }, [providerFilteredData, search, selectedCompliance, selectedSeverity, selectedStatus]);
+  }, [scopedData, search, selectedSeverity, selectedStatus]);
 
+  // Upper severity tabs dynamically count from scopedData (scoped by selected Provider and Compliance)
   const counts = useMemo(() => {
     return {
-      total: providerFilteredData.length,
-      critical: providerFilteredData.filter((d) => d.severity === "critical").length,
-      high: providerFilteredData.filter((d) => d.severity === "high").length,
-      medium: providerFilteredData.filter((d) => d.severity === "medium").length,
-      low: providerFilteredData.filter((d) => d.severity === "low").length,
-      muted: providerFilteredData.filter((d) => d.status === "MUTED").length,
+      total: scopedData.length,
+      critical: scopedData.filter((d) => d.severity === "critical").length,
+      high: scopedData.filter((d) => d.severity === "high").length,
+      medium: scopedData.filter((d) => d.severity === "medium").length,
+      low: scopedData.filter((d) => d.severity === "low").length,
+      muted: scopedData.filter((d) => d.status === "MUTED").length,
     };
-  }, [providerFilteredData]);
+  }, [scopedData]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
