@@ -572,6 +572,29 @@ class AIAdvisorQueryView(APIView):
             except Exception as pe:
                 logger.warning("Could not fetch connected providers for advisor: %s", pe)
 
+            # Retrieve live compliance benchmark scores for the tenant
+            compliance_scores = []
+            try:
+                from api.models import ComplianceOverview
+                co_qs = ComplianceOverview.objects.all()
+                if tenant_id:
+                    co_qs = co_qs.filter(tenant_id=tenant_id)
+                for co in co_qs:
+                    total_eval = co.requirements_passed + co.requirements_failed
+                    score = round((co.requirements_passed / max(1, total_eval)) * 100) if total_eval > 0 else 0
+                    compliance_scores.append({
+                        "framework": co.framework,
+                        "compliance_id": co.compliance_id,
+                        "version": co.version or "",
+                        "score": score,
+                        "passed": co.requirements_passed,
+                        "failed": co.requirements_failed,
+                        "manual": co.requirements_manual,
+                        "total": co.total_requirements,
+                    })
+            except Exception as ce:
+                logger.warning("Could not fetch compliance overviews for advisor: %s", ce)
+
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
                 request, clean_question, provider=provider_filter, history=history
@@ -583,6 +606,7 @@ class AIAdvisorQueryView(APIView):
                 relevant_findings=relevant_findings,
                 history=history,
                 connected_providers=connected_providers,
+                compliance_scores=compliance_scores,
             )
 
             from django.http import JsonResponse
