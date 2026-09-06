@@ -693,8 +693,8 @@ class UserViewSet(BaseUserViewset):
         """
         Returns the required permissions based on the request method.
         """
-        if self.action in ["me", "partial_update"]:
-            # No permissions required for me and partial_update requests
+        if self.action in ["me", "partial_update", "change_password"]:
+            # No permissions required for me, partial_update and change_password requests
             self.required_permissions = []
         else:
             # Require permission for the rest of the requests
@@ -745,6 +745,48 @@ class UserViewSet(BaseUserViewset):
         serializer = UserSerializer(user, context=self.get_serializer_context())
         return Response(
             data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="change-password", url_name="change_password")
+    def change_password(self, request):
+        from api.v1.serializer_utils.authentication import blacklist_user_refresh_tokens
+
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            raise NotAuthenticated("Authentication credentials were not provided.")
+
+        data = request.data
+        if isinstance(data, dict) and "data" in data and "attributes" in data["data"]:
+            payload = data["data"]["attributes"]
+        else:
+            payload = data
+
+        current_password = payload.get("current_password")
+        new_password = payload.get("new_password")
+
+        if not current_password or not new_password:
+            raise ValidationError("Both 'current_password' and 'new_password' are required.")
+
+        user_in_db = (
+            User.objects.using(MainRouter.admin_db).filter(id=user.id).first()
+            or User.objects.filter(id=user.id).first()
+            or user
+        )
+
+        if not user_in_db.check_password(current_password):
+            raise ValidationError({"detail": "Current password is incorrect."})
+
+        if len(new_password) < 8:
+            raise ValidationError({"detail": "New password must be at least 8 characters long."})
+
+        with transaction.atomic(using=MainRouter.admin_db):
+            user_in_db.set_password(new_password)
+            user_in_db.save(using=MainRouter.admin_db)
+            blacklist_user_refresh_tokens(user_in_db.id)
+
+        return Response(
+            {"detail": "Password changed successfully."},
             status=status.HTTP_200_OK,
         )
 

@@ -11,6 +11,8 @@ import {
   Mail,
   Briefcase,
   Layers,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -20,6 +22,7 @@ import {
   Dot,
 } from "@/components/ui-kit/primitives";
 import { useCurrentUser, useJiraConfig, useProviders } from "@/hooks/use-api";
+import { api } from "@/lib/api-client";
 
 export const Route = createFileRoute("/profile")({
   component: ProfilePage,
@@ -44,6 +47,8 @@ function ProfilePage() {
   const [title, setTitle] = useState(user.title || "Cloud Security Architect & Lead Administrator");
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
@@ -75,13 +80,32 @@ function ProfilePage() {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword) return;
-    setPasswordSuccess(true);
-    setCurrentPassword("");
-    setNewPassword("");
-    setTimeout(() => setPasswordSuccess(false), 3000);
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long.");
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      await api.post("/users/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setPasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err: any) {
+      setPasswordError(err?.message || "Failed to update password. Please check your current password.");
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
@@ -103,9 +127,19 @@ function ProfilePage() {
         <div className="mb-6 flex items-center justify-between rounded-xl border border-success/30 bg-success/10 p-4 text-xs font-semibold text-success shadow-sm">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Password and session tokens rotated successfully!
+            Password updated and security credentials rotated successfully!
           </span>
           <button onClick={() => setPasswordSuccess(false)} className="cursor-pointer opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {passwordError && (
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-critical/30 bg-critical/10 p-4 text-xs font-semibold text-critical shadow-sm">
+          <span className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {passwordError}
+          </span>
+          <button onClick={() => setPasswordError(null)} className="cursor-pointer opacity-60 hover:opacity-100">✕</button>
         </div>
       )}
 
@@ -251,11 +285,20 @@ function ProfilePage() {
 
               <button
                 type="submit"
-                disabled={!currentPassword || !newPassword}
+                disabled={!currentPassword || !newPassword || passwordLoading}
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-border bg-surface-2 px-5 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary transition-colors disabled:opacity-50 cursor-pointer"
               >
-                <Key className="h-3.5 w-3.5" />
-                <span>Change Password</span>
+                {passwordLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Updating Password…</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="h-3.5 w-3.5" />
+                    <span>Change Password</span>
+                  </>
+                )}
               </button>
             </form>
           </Panel>
