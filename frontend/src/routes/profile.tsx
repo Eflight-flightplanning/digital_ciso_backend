@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Key,
   Shield,
-  UserCheck,
   Cloud,
   Lock,
   Building2,
@@ -144,13 +143,6 @@ function ProfilePage() {
               <span className="font-semibold text-success flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Enforced (TOTP)
               </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground flex items-center gap-1.5">
-                <UserCheck className="h-3.5 w-3.5" /> Auth Provider:
-              </span>
-              <span className="font-semibold text-foreground">SSO / Local SAML</span>
             </div>
 
             <div className="flex justify-between items-center">
