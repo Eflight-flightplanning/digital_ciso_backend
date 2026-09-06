@@ -13,10 +13,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-1 Cybersecurity Strategy",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": []
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-1-2",
@@ -54,12 +55,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-2 Cybersecurity Management",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "identity_tenancy_admin_permissions_limited"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-2-2",
@@ -97,12 +97,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-3 Cybersecurity Policies and Procedures",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "identity_user_mfa_enabled_console_access"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-3-2",
@@ -126,12 +125,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-3 Cybersecurity Policies and Procedures",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "identity_password_policy_minimum_length_14"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-3-4",
@@ -155,12 +153,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-4 Cybersecurity Roles and Responsibilities",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "identity_user_api_keys_rotated_90_days"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-4-2",
@@ -184,10 +181,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-5 Cybersecurity Risk Management",
-          "Service": "cloudguard"
+          "Service": "governance"
         }
       ],
-      "Checks": []
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-5-2",
@@ -211,12 +209,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-5 Cybersecurity Risk Management",
-          "Service": "cloudguard"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "events_rule_cloudguard_problems"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-5-4",
@@ -240,7 +237,7 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-6 Cybersecurity in Project Management",
-          "Service": "compute"
+          "Service": "governance"
         }
       ],
       "Checks": [],
@@ -254,12 +251,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-6 Cybersecurity in Project Management",
-          "Service": "compute"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "compute_instance_legacy_metadata_endpoint_disabled"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-6-3",
@@ -423,12 +419,11 @@
         {
           "Section": "1. Cybersecurity Governance",
           "SubSection": "1-9 Cybersecurity in Human Resources",
-          "Service": "identity"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "identity_user_api_keys_rotated_90_days"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "1-9-6",
@@ -639,7 +634,8 @@
       "Checks": [
         "identity_password_policy_minimum_length_14",
         "identity_user_api_keys_rotated_90_days",
-        "identity_tenancy_admin_permissions_limited"
+        "identity_tenancy_admin_permissions_limited",
+        "identity_user_mfa_enabled_console_access"
       ]
     },
     {
@@ -694,8 +690,9 @@
           "Service": "compute"
         }
       ],
-      "Checks": [],
-      "AssessmentType": "Manual"
+      "Checks": [
+        "compute_instance_legacy_metadata_endpoint_disabled"
+      ]
     },
     {
       "Id": "2-3-4",

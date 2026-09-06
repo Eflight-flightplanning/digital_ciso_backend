@@ -13,13 +13,11 @@
         {
           "Section": "1. Cloud Cybersecurity Governance",
           "SubSection": "1.1 Governance and Compliance",
-          "Service": "organizations"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "organizations_account_part_of_organizations",
-        "account_security_contact_information_is_registered"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "CSCC-2.1",
@@ -59,7 +57,13 @@
         "s3_bucket_object_versioning",
         "rds_instance_storage_encrypted",
         "ec2_ebs_default_encryption",
-        "dynamodb_tables_kms_cmk_encryption_enabled"
+        "dynamodb_tables_kms_cmk_encryption_enabled",
+        "iam_root_mfa_enabled",
+        "iam_root_access_key_check",
+        "iam_root_hardware_mfa_enabled",
+        "iam_user_mfa_enabled_console_access",
+        "iam_policy_attached_only_to_group_or_roles",
+        "iam_aws_attached_policy_no_administrative_privileges"
       ]
     },
     {

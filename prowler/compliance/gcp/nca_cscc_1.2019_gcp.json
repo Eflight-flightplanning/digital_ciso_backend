@@ -13,13 +13,11 @@
         {
           "Section": "1. Cloud Cybersecurity Governance",
           "SubSection": "1.1 Governance and Compliance",
-          "Service": "iam"
+          "Service": "governance"
         }
       ],
-      "Checks": [
-        "iam_organization_essential_contacts_configured",
-        "iam_no_service_roles_at_project_level"
-      ]
+      "Checks": [],
+      "AssessmentType": "Manual"
     },
     {
       "Id": "CSCC-2.1",
@@ -53,7 +51,12 @@
         "storage_bucket_public_access_prevention",
         "storage_bucket_uniform_bucket_level_access_enabled",
         "storage_bucket_kms_encryption_enabled",
-        "cloudsql_instance_ssl_required"
+        "cloudsql_instance_ssl_required",
+        "iam_sa_no_administrative_privileges",
+        "iam_role_sa_enforce_separation_of_duties",
+        "iam_role_kms_enforce_separation_of_duties",
+        "iam_sa_no_user_managed_keys",
+        "iam_no_service_roles_at_project_level"
       ]
     },
     {
