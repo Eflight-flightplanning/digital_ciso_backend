@@ -12,6 +12,20 @@ logger = logging.getLogger(__name__)
 OTP_TTL_SECONDS = 300  # 5 minutes validity
 
 
+def is_mfa_enabled() -> bool:
+    """Check if MFA enforcement is enabled (default: False / disabled)."""
+    val = os.environ.get("ENABLE_MFA", "").strip().lower()
+    if val in ("true", "1", "yes", "on"):
+        return True
+    try:
+        from django.conf import settings
+        if getattr(settings, "ENABLE_MFA", False):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def get_sendgrid_config():
     """Retrieve SendGrid API key and from email dynamically."""
     api_key = os.environ.get("SENDGRID_API_KEY", "")

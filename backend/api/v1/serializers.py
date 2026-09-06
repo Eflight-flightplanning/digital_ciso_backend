@@ -205,21 +205,22 @@ class BaseTokenSerializer(serializers.Serializer):
         if user is None:
             raise ValidationError("Invalid credentials")
 
-        from api.mfa_service import generate_and_store_otp, verify_otp
+        from api.mfa_service import generate_and_store_otp, verify_otp, is_mfa_enabled
 
-        # Check MFA OTP verification
-        if not otp:
-            # First step of login: Credentials valid -> generate OTP & send email via SendGrid
-            generate_and_store_otp(email)
-            return {
-                "mfa_required": True,
-                "email": user.email,
-                "message": f"Verification code sent to {user.email}.",
-            }
+        # Check MFA OTP verification if enabled
+        if is_mfa_enabled():
+            if not otp:
+                # First step of login: Credentials valid -> generate OTP & send email via SendGrid
+                generate_and_store_otp(email)
+                return {
+                    "mfa_required": True,
+                    "email": user.email,
+                    "message": f"Verification code sent to {user.email}.",
+                }
 
-        # Step 2 of login: Verify OTP
-        if not verify_otp(email, otp):
-            raise ValidationError({"otp": ["Invalid or expired 6-digit MFA verification code."]})
+            # Step 2 of login: Verify OTP
+            if not verify_otp(email, otp):
+                raise ValidationError({"otp": ["Invalid or expired 6-digit MFA verification code."]})
 
         from api.models import Membership, Tenant, UserRoleRelationship
 

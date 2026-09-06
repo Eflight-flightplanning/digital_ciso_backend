@@ -174,8 +174,8 @@ function ProfilePage() {
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5" /> MFA Status:
               </span>
-              <span className="font-semibold text-success flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Enforced (TOTP)
+              <span className="font-semibold text-muted-foreground flex items-center gap-1">
+                Optional / Disabled
               </span>
             </div>
 
