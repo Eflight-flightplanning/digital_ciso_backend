@@ -5131,35 +5131,27 @@ class ComplianceOverviewViewSet(
         ).annotate(
             description=Max("description"),
             total_instances=Count("id"),
+            fail_count=Count("id", filter=Q(requirement_status="FAIL")),
+            pass_count=Count("id", filter=Q(requirement_status="PASS")),
             manual_count=Count("id", filter=Q(requirement_status="MANUAL")),
             passed_findings_sum=Sum("passed_findings"),
             total_findings_sum=Sum("total_findings"),
         )
 
-        passed_instances = (
-            filtered_queryset.filter(requirement_status="PASS")
-            .values("requirement_id")
-            .annotate(pass_count=Count("id"))
-        )
-
-        passed_counts = {
-            item["requirement_id"]: item["pass_count"] for item in passed_instances
-        }
-
         requirements_summary = []
         for requirement in all_requirements:
             requirement_id = requirement["requirement_id"]
-            total_instances = requirement["total_instances"]
-            passed_count = passed_counts.get(requirement_id, 0)
-            is_manual = requirement["manual_count"] == total_instances
+            fail_count = requirement["fail_count"]
+            pass_count = requirement["pass_count"]
             passed_findings = requirement["passed_findings_sum"] or 0
             total_findings = requirement["total_findings_sum"] or 0
-            if is_manual:
-                requirement_status = "MANUAL"
-            elif passed_count == total_instances:
+
+            if fail_count > 0:
+                requirement_status = "FAIL"
+            elif pass_count > 0:
                 requirement_status = "PASS"
             else:
-                requirement_status = "FAIL"
+                requirement_status = "MANUAL"
 
             requirements_summary.append(
                 {

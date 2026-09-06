@@ -373,7 +373,7 @@ class MCPToolExecutor:
             entry["total"] += 1
             if row["fail_count"] > 0:
                 entry["failed"] += 1
-            elif row["pass_count"] == row["total_count"]:
+            elif row["pass_count"] > 0:
                 entry["passed"] += 1
 
         frameworks_list = []
