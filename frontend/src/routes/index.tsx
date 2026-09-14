@@ -21,6 +21,7 @@ import {
   Code2,
   CheckCircle2,
   Play,
+  ExternalLink,
 } from "lucide-react";
 import { ShieldMark } from "@/components/brand/Logo";
 
@@ -629,18 +630,28 @@ function MarketingLandingPage() {
               { label: "Capabilities", href: "#capabilities" },
               { label: "Compliance (28)", href: "#compliance" },
               { label: "Integrations", href: "#integrations" },
-              { label: "Developer API", href: "#mcp" },
+              {
+                label: "Oracle Security Community",
+                href: "https://community.oracle.com/customerconnect/categories/applications-security",
+                external: true,
+              },
             ].map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className={`relative rounded-full px-4 py-2 text-[13.5px] font-semibold transition-all duration-200 ${
-                  isDark
+                {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                className={`relative rounded-full px-4 py-2 text-[13.5px] font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                  item.external
+                    ? isDark
+                      ? "text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+                      : "text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                    : isDark
                     ? "text-slate-300 hover:bg-white/[0.08] hover:text-white"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.external && <ExternalLink className="h-3 w-3 opacity-75" />}
               </a>
             ))}
           </nav>
@@ -1479,7 +1490,7 @@ function MarketingLandingPage() {
             <Link to="/sign-in" className="hover:text-primary transition-colors">Console Sign In</Link>
             <Link to="/sign-up" className="hover:text-primary transition-colors">Register</Link>
             <a href="#compliance" className="hover:text-primary transition-colors">28 Standards</a>
-            <a href="#mcp" className="hover:text-primary transition-colors">MCP Protocol</a>
+            <a href="https://community.oracle.com/customerconnect/categories/applications-security" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Oracle Security Community ↗</a>
             <a href={`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/reports/executive-summary`} target="_blank" className="hover:text-primary transition-colors">Executive PDF</a>
           </div>
         </div>

@@ -1296,7 +1296,20 @@ export function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {/* Oracle Applications Security Community Quick Link */}
+            <a
+              href="https://community.oracle.com/customerconnect/categories/applications-security"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500/10 via-amber-500/10 to-orange-500/10 hover:from-red-500/20 hover:via-amber-500/20 hover:to-orange-500/20 border border-amber-500/30 px-3.5 py-2 text-xs font-semibold text-foreground hover:text-amber-300 transition-all shadow-sm group cursor-pointer"
+              title="Oracle Cloud Customer Connect — Applications Security Community"
+            >
+              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="font-semibold text-amber-400">Oracle Security Community</span>
+              <ExternalLink className="h-3.5 w-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
+
             {/* Environment Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
