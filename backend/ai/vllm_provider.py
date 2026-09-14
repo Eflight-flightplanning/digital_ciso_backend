@@ -85,6 +85,25 @@ class VLLMAzureProvider(AIProvider):
         )
         self.timeout = float(os.getenv("VLLM_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT)))
 
+    def _resolve_model_name(self) -> str:
+        """Dynamically resolve the exact model ID registered in vLLM to prevent 404 model not found errors."""
+        if hasattr(self, "_active_model_id") and self._active_model_id:
+            return self._active_model_id
+        try:
+            url = f"{self.base_url}/models"
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            with httpx.Client(timeout=httpx.Timeout(connect=2.5, read=5.0)) as client:
+                res = client.get(url, headers=headers)
+                if res.is_success:
+                    data = res.json().get("data", [])
+                    if data and isinstance(data, list) and len(data) > 0 and "id" in data[0]:
+                        self._active_model_id = str(data[0]["id"])
+                        logger.info("vLLM active model dynamically auto-resolved: %s", self._active_model_id)
+                        return self._active_model_id
+        except Exception as e:
+            logger.debug("Could not auto-discover vLLM model: %s", e)
+        return self.model or DEFAULT_MODEL
+
     def _call_vllm_chat(
         self,
         system_prompt: str,
@@ -110,18 +129,25 @@ class VLLMAzureProvider(AIProvider):
 
         # Calculate dynamic token ceiling to ensure input_tokens + max_tokens <= 7800 (vLLM max_model_len is 8192)
         total_prompt_chars = sum(len(m.get("content", "")) for m in messages)
-        est_input_tokens = int(total_prompt_chars / 3.2) + 30
-        safe_max_tokens = max(500, min(max_tokens, 7800 - est_input_tokens))
+        est_input_tokens = int(total_prompt_chars / 3.0) + 50
+        if est_input_tokens > 6500:
+            # Prevent context window overflow
+            user_msg = messages[-1]["content"]
+            messages[-1]["content"] = user_msg[:18000] + "\n\n[Context truncated for model capacity]"
+            safe_max_tokens = 1200
+        else:
+            safe_max_tokens = max(500, min(max_tokens, 7800 - est_input_tokens))
 
+        active_model = self._resolve_model_name()
         payload = {
-            "model": self.model,
+            "model": active_model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": safe_max_tokens,
         }
 
         try:
-            timeout_config = httpx.Timeout(connect=3.0, read=min(self.timeout or 60.0, 60.0), write=10.0, pool=5.0)
+            timeout_config = httpx.Timeout(connect=5.0, read=min(self.timeout or 120.0, 120.0), write=15.0, pool=10.0)
             with httpx.Client(timeout=timeout_config) as client:
                 response = client.post(url, json=payload, headers=headers)
                 if response.is_error:
@@ -131,7 +157,7 @@ class VLLMAzureProvider(AIProvider):
                 raw_content = resp_json["choices"][0]["message"]["content"]
                 return self._extract_json(raw_content)
         except Exception as e:
-            logger.error("vLLM request failed to %s with model %s: %s", url, self.model, e)
+            logger.error("vLLM request failed to %s with model %s: %s", url, active_model, e)
             return {
                 "summary": f"Analysis failed: {str(e)}",
                 "error": str(e),
