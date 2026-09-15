@@ -25,8 +25,6 @@ import {
   LogOut,
   KeyRound,
   Database,
-  Globe,
-  ExternalLink,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -48,12 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  external?: boolean;
-};
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 type NavSection = { label?: string; items: NavItem[] };
 
 export const navSections: NavSection[] = [
@@ -62,12 +55,6 @@ export const navSections: NavSection[] = [
     label: "SaaS & ERP",
     items: [
       { to: "/oracle-saas", label: "Oracle Fusion SaaS", icon: Database },
-      {
-        to: "https://community.oracle.com/customerconnect/categories/applications-security",
-        label: "Oracle Security Community",
-        icon: Globe,
-        external: true,
-      },
     ],
   },
   {
@@ -192,31 +179,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
               </div>
             )}
             {section.items.map((item) => {
-              const active = !item.external && pathname === item.to;
+              const active = pathname === item.to;
               const Icon = item.icon;
-              if (item.external) {
-                return (
-                  <a
-                    key={item.to}
-                    href={item.to}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={item.label}
-                    className={cn(
-                      "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150 text-sidebar-foreground/75 hover:bg-amber-500/10 hover:text-amber-400 group",
-                      collapsed && "justify-center px-0",
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-amber-400/80 group-hover:text-amber-400" />
-                    {!collapsed && (
-                      <span className="truncate flex items-center justify-between flex-1">
-                        <span>{item.label}</span>
-                        <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 shrink-0 ml-1.5" />
-                      </span>
-                    )}
-                  </a>
-                );
-              }
               return (
                 <Link
                   key={item.to}
@@ -299,16 +263,11 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
                 value={item.label}
                 onSelect={() => {
                   setOpen(false);
-                  if (item.external) {
-                    window.open(item.to, "_blank", "noopener,noreferrer");
-                  } else {
-                    navigate({ to: item.to });
-                  }
+                  navigate({ to: item.to });
                 }}
               >
                 <item.icon className="mr-2 h-4 w-4 text-primary" />
                 {item.label}
-                {item.external && <ExternalLink className="ml-auto h-3 w-3 opacity-50" />}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -376,19 +335,6 @@ export function AppShell({
             <span className="hidden sm:inline">Search</span>
             <kbd className="mono hidden rounded border border-border px-1 text-[10px] sm:inline">⌘K</kbd>
           </button>
-          {/* Oracle Applications Security Community Quick Access Button */}
-          <a
-            href="https://community.oracle.com/customerconnect/categories/applications-security"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Oracle Cloud Customer Connect — Applications Security"
-            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 text-xs font-semibold transition-all duration-150 shadow-xs group"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span className="hidden md:inline">Oracle Security Community</span>
-            <span className="md:hidden">Oracle Community</span>
-            <ExternalLink className="h-3 w-3 opacity-80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-          </a>
           <ThemeToggle />
           <button className="relative text-muted-foreground transition-colors hover:text-foreground" aria-label="Notifications">
             <Bell className="h-4 w-4" />
