@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
 
 export const Route = createFileRoute("/compliance")({
   component: CompliancePage,
@@ -53,6 +54,33 @@ function classifyProviderLabel(complianceId: string): string {
   if (id.includes("oracle_saas")) return "ORACLE SAAS";
   if (id.includes("kubernetes") || /(^|_)k8s(_|$)/.test(id)) return "KUBERNETES";
   return "Multi-Cloud";
+}
+
+function formatFrameworkDisplayName(framework: string, complianceId: string): string {
+  const idLower = (complianceId || "").toLowerCase();
+  const fwUpper = (framework || "").toUpperCase();
+  if (fwUpper === "CIS" || fwUpper === "CIS BENCHMARK" || fwUpper.startsWith("CIS_")) {
+    if (idLower.includes("oraclecloud") || idLower.includes("oci")) {
+      return "CIS Oracle Cloud Infrastructure (OCI) Benchmark";
+    }
+    if (idLower.includes("oracle_saas") || idLower.includes("saas")) {
+      return "CIS Oracle SaaS Foundations Benchmark";
+    }
+    if (idLower.includes("azure")) {
+      return "CIS Microsoft Azure Foundations Benchmark";
+    }
+    if (idLower.includes("aws")) {
+      return "CIS AWS Foundations Benchmark";
+    }
+    if (idLower.includes("gcp")) {
+      return "CIS Google Cloud Platform Benchmark";
+    }
+    if (idLower.includes("k8s") || idLower.includes("kubernetes")) {
+      return "CIS Kubernetes Benchmark";
+    }
+    return "CIS Foundations Benchmark";
+  }
+  return framework;
 }
 
 // The underlying real compliance_id/scan-engine name is never shown to users — this
@@ -153,17 +181,20 @@ function CompliancePage() {
   const realResources = resourcesData?.items ?? [];
   const totalAssetsCount = realResources.length;
 
-  // Connected providers, deduped by provider type (one dropdown entry per cloud, not per account).
+  const { subscribedClouds, isCloudSubscribed, isComplianceSubscribed } = useSubscriptions();
+
+  // Connected providers, deduped by provider type and filtered to subscribed clouds.
   const connectedProviders = useMemo(() => {
     const list = (providersData?.items as Array<Record<string, unknown>>) || [];
     const seen = new Map<string, { value: string; alias: string }>();
     list.forEach((p) => {
       const value = String(p.provider || "").toLowerCase();
       if (!value || seen.has(value)) return;
+      if (subscribedClouds.length > 0 && !isCloudSubscribed(value)) return;
       seen.set(value, { value, alias: String(p.alias || p.name || providerDisplayName(value)) });
     });
     return Array.from(seen.values());
-  }, [providersData]);
+  }, [providersData, subscribedClouds, isCloudSubscribed]);
 
   // Real backend requires either a scan_id or a provider filter — no "give me everything" mode.
   const complianceParams = useMemo(() => {
@@ -203,42 +234,22 @@ function CompliancePage() {
         ) {
           return false;
         }
+
+        const rawCid = String(item.compliance_id || item.id || "");
+        if (!isComplianceSubscribed(rawCid)) {
+          return false;
+        }
+
         return true;
       })
       .map((item) => {
-      const passed = Number(item.requirements_passed) || 0;
-      const failed = Number(item.requirements_failed) || 0;
-      const manual = Number(item.requirements_manual) || 0;
-      const total = Number(item.total_requirements) || 0;
-      const evaluated = Math.max(1, passed + failed);
-      const score = total > 0 ? Math.round((passed / evaluated) * 100) : 0;
-      const colors = scoreColors(score, total);
-function formatFrameworkDisplayName(framework: string, complianceId: string): string {
-  const idLower = (complianceId || "").toLowerCase();
-  const fwUpper = (framework || "").toUpperCase();
-  if (fwUpper === "CIS" || fwUpper === "CIS BENCHMARK" || fwUpper.startsWith("CIS_")) {
-    if (idLower.includes("oraclecloud") || idLower.includes("oci")) {
-      return "CIS Oracle Cloud Infrastructure (OCI) Benchmark";
-    }
-    if (idLower.includes("oracle_saas") || idLower.includes("saas")) {
-      return "CIS Oracle SaaS Foundations Benchmark";
-    }
-    if (idLower.includes("azure")) {
-      return "CIS Microsoft Azure Foundations Benchmark";
-    }
-    if (idLower.includes("aws")) {
-      return "CIS AWS Foundations Benchmark";
-    }
-    if (idLower.includes("gcp")) {
-      return "CIS Google Cloud Platform Benchmark";
-    }
-    if (idLower.includes("k8s") || idLower.includes("kubernetes")) {
-      return "CIS Kubernetes Benchmark";
-    }
-    return "CIS Foundations Benchmark";
-  }
-  return framework;
-}
+        const passed = Number(item.requirements_passed) || 0;
+        const failed = Number(item.requirements_failed) || 0;
+        const manual = Number(item.requirements_manual) || 0;
+        const total = Number(item.total_requirements) || 0;
+        const evaluated = Math.max(1, passed + failed);
+        const score = total > 0 ? Math.round((passed / evaluated) * 100) : 0;
+        const colors = scoreColors(score, total);
 
       const complianceId = String(item.id ?? "");
       const rawFramework = String(item.framework || complianceId || "");

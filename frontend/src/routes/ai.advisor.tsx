@@ -39,6 +39,7 @@ import {
   useJiraIssueTypes,
   useJiraAssignees,
 } from "@/hooks/use-api";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
 
 export const Route = createFileRoute("/ai/advisor")({
   validateSearch: (search: Record<string, unknown>): { prompt?: string; provider?: string } => {
@@ -498,10 +499,17 @@ function AIAdvisorPage() {
     return userDisplayName.slice(0, 2).toUpperCase();
   }, [userDisplayName]);
 
+  const { subscribedClouds, subscribedCompliances, isCloudSubscribed } = useSubscriptions();
+
   const connectedProviders = useMemo(() => {
     const list = (providersRaw?.items as Array<Record<string, unknown>>) || [];
-    return list.map((p) => {
-      const provStr = String(p.provider || "").toUpperCase();
+    return list
+      .filter((p) => {
+        const provStr = String(p.provider || "").toLowerCase();
+        return subscribedClouds.length === 0 || isCloudSubscribed(provStr);
+      })
+      .map((p) => {
+        const provStr = String(p.provider || "").toUpperCase();
       const label =
         provStr === "ORACLECLOUD"
           ? "OCI"
@@ -768,9 +776,17 @@ ${reportContent}
                 <h3 className="font-display text-xs font-bold text-foreground">
                   Spectra AI Advisor Stream
                 </h3>
-                <span className="text-[11px] text-muted-foreground">
-                  Active Scope: <strong className="text-foreground">{providerFilter} Infrastructure</strong> · Multi-Cloud Reasoning
-                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] text-muted-foreground">
+                    Active Scope: <strong className="text-foreground">{providerFilter} Infrastructure</strong> · Multi-Cloud Reasoning
+                  </span>
+                  {subscribedCompliances.length > 0 && (
+                    <span className="hidden md:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                      <ShieldCheck className="h-3 w-3" />
+                      {subscribedCompliances.length} Standards Active
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

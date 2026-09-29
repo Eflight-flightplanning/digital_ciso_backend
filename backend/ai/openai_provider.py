@@ -194,14 +194,22 @@ class OpenAIProvider(AIProvider):
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
         connected_providers: list[dict[str, Any]] | None = None,
+        compliance_scores: list[dict[str, Any]] | None = None,
     ) -> AdvisorOutput:
+        from .prompts import build_advisor_system_prompt
+
+        dynamic_system_prompt = build_advisor_system_prompt(
+            subscribed_clouds=[p.get("provider") for p in (connected_providers or []) if p.get("provider")],
+            subscribed_compliances=[c.get("compliance_id") for c in (compliance_scores or []) if c.get("compliance_id")],
+        )
         context_str = json.dumps(relevant_findings[:35], indent=2) if relevant_findings else "[]"
         prov_str = json.dumps(connected_providers, indent=2) if connected_providers else "[]"
         user_message = f"Connected Environments:\n{prov_str}\n\nActive Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
-        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, 1500, history=history)
+        raw = self._call(dynamic_system_prompt, user_message, 1500, history=history)
         data = self._parse_json(raw)
         return AdvisorOutput(
             answer=data.get("answer", data.get("raw_text", "Analysis completed.")),
             finding_references=data.get("finding_references", []),
             confidence=float(data.get("confidence", 0.95)),
         )
+

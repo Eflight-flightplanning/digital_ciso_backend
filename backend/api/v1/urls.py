@@ -17,6 +17,14 @@ from .jira_views import (
     RemediationMetricsView,
 )
 from .report_views import ExecutiveReportView
+from .subscription_views import (
+    TenantCloudSubscriptionsView,
+    TenantComplianceSubscriptionsView,
+    AvailableCloudsView,
+    AvailableCompliancesView,
+    OnboardingSubscriptionView,
+    SubscriptionChangeRequestViewSet,
+)
 from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
 from api.v1.views import (
@@ -66,7 +74,7 @@ from api.v1.views import (
     UserViewSet,
 )
 from django.http import JsonResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.views import SpectacularRedocView, SpectacularSwaggerView
 from rest_framework_nested import routers
@@ -129,6 +137,7 @@ router.register(r"finding-ai-analyses", FindingAIAnalysisViewSet, basename="find
 router.register(r"remediation-playbooks", RemediationPlaybookViewSet, basename="remediationplaybook")
 router.register(r"remediations/executions", RemediationExecutionViewSet, basename="remediationexecution")
 router.register(r"ciso-conversations", CISOAdvisorConversationViewSet, basename="cisoadvisorconversation")
+router.register(r"subscriptions/change-requests", SubscriptionChangeRequestViewSet, basename="subscription-change-requests")
 
 
 tenants_router = routers.NestedSimpleRouter(router, r"tenants", lookup="tenant")
@@ -149,7 +158,12 @@ integrations_router.register(
 urlpatterns = [
     # White-Labeled Reports
     path("reports/executive-summary", ExecutiveReportView.as_view(), name="executive-report"),
-    path("reports/executive-summary/", ExecutiveReportView.as_view(), name="executive-report-slash"),
+    # Tenant Subscriptions & Modularity
+    re_path(r"^subscriptions/clouds/?$", TenantCloudSubscriptionsView.as_view(), name="subscription-clouds"),
+    re_path(r"^subscriptions/compliances/?$", TenantComplianceSubscriptionsView.as_view(), name="subscription-compliances"),
+    re_path(r"^subscriptions/available-clouds/?$", AvailableCloudsView.as_view(), name="subscription-available-clouds"),
+    re_path(r"^subscriptions/available-compliances/?$", AvailableCompliancesView.as_view(), name="subscription-available-compliances"),
+    re_path(r"^subscriptions/onboarding/?$", OnboardingSubscriptionView.as_view(), name="subscription-onboarding"),
     # JWT Token Authentication (Email + Password)
     path("tokens", CustomTokenObtainView.as_view(), name="token-obtain"),
     path("tokens/refresh", CustomTokenRefreshView.as_view(), name="token-refresh"),

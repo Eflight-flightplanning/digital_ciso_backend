@@ -169,6 +169,22 @@ export const authStore = {
       };
 
       this.setUser(user, accessToken);
+
+      if (typeof window !== "undefined") {
+        const initKey = `dciso_company_initialized_${user.id}`;
+        const hasInitialized = localStorage.getItem(initKey);
+        const existingProvisioning = localStorage.getItem("dciso_new_company_provisioning");
+        if (!hasInitialized && !existingProvisioning) {
+          localStorage.setItem(
+            "dciso_new_company_provisioning",
+            JSON.stringify({
+              companyName: user.company_name || user.name || "Enterprise Workspace",
+              timestamp: Date.now(),
+            })
+          );
+        }
+      }
+
       return { user };
     } catch (err: any) {
       currentAuth.isLoading = false;
@@ -181,7 +197,9 @@ export const authStore = {
     email: string,
     password: string,
     name: string,
-    company_name: string
+    company_name: string,
+    cloud_providers?: string[],
+    compliance_frameworks?: string[]
   ): Promise<User> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
@@ -190,7 +208,7 @@ export const authStore = {
     this.logout();
 
     try {
-      // 1. Create User in Backend API
+      // 1. Create User in Backend API with initial subscriptions
       const payload = {
         data: {
           type: "users",
@@ -199,6 +217,8 @@ export const authStore = {
             password,
             name,
             company_name,
+            ...(cloud_providers && cloud_providers.length > 0 ? { cloud_providers } : {}),
+            ...(compliance_frameworks && compliance_frameworks.length > 0 ? { compliance_frameworks } : {}),
           },
         },
       };
@@ -216,20 +236,35 @@ export const authStore = {
         let errDetail = "Registration failed. Please check your details.";
         try {
           const errJson = await res.json();
-          errDetail =
-            errJson?.errors?.[0]?.detail ||
-            errJson?.errors?.email?.[0] ||
-            errJson?.errors?.password?.[0] ||
-            (Array.isArray(errJson?.email) ? errJson.email[0] : null) ||
-            (Array.isArray(errJson?.password) ? errJson.password[0] : null) ||
-            errJson?.detail ||
-            errJson?.message ||
-            errDetail;
+          if (Array.isArray(errJson?.errors) && errJson.errors.length > 0) {
+            const first = errJson.errors[0];
+            errDetail = first?.detail || first?.title || JSON.stringify(first);
+          } else if (errJson?.errors && typeof errJson.errors === "object") {
+            const values = Object.values(errJson.errors).flat();
+            if (values.length > 0) errDetail = String(values[0]);
+          } else if (errJson?.detail) {
+            errDetail = errJson.detail;
+          } else if (errJson?.message) {
+            errDetail = errJson.message;
+          } else if (errJson?.email) {
+            errDetail = Array.isArray(errJson.email) ? errJson.email[0] : String(errJson.email);
+          } else if (errJson?.password) {
+            errDetail = Array.isArray(errJson.password) ? errJson.password[0] : String(errJson.password);
+          }
         } catch {}
         throw new Error(errDetail);
       }
 
       // 2. Automatically log the newly registered user into their own isolated tenant
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "dciso_new_company_provisioning",
+          JSON.stringify({
+            companyName: company_name || `${name.split(" ")[0]}'s Organization`,
+            timestamp: Date.now(),
+          })
+        );
+      }
       return (await this.signIn(email, password, undefined, name, company_name)).user!;
     } catch (err: any) {
       currentAuth.isLoading = false;

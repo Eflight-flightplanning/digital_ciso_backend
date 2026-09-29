@@ -13,6 +13,9 @@ from api.models import (
     RemediationExecution,
     JiraProjectMapping,
     JiraAssigneeCache,
+    TenantCloudSubscription,
+    TenantComplianceSubscription,
+    SubscriptionChangeRequest,
 
     AttackPathsScan,
     Finding,
@@ -460,10 +463,24 @@ class UserCreateSerializer(BaseWriteSerializer):
     password = serializers.CharField(write_only=True)
     company_name = serializers.CharField(required=False)
     role = serializers.CharField(write_only=True, required=False)
+    cloud_providers = serializers.ListField(
+        child=serializers.CharField(), required=False, write_only=True
+    )
+    compliance_frameworks = serializers.ListField(
+        child=serializers.CharField(), required=False, write_only=True
+    )
 
     class Meta:
         model = User
-        fields = ["name", "password", "email", "company_name", "role"]
+        fields = [
+            "name",
+            "password",
+            "email",
+            "company_name",
+            "role",
+            "cloud_providers",
+            "compliance_frameworks",
+        ]
 
     def validate_password(self, value):
         valid_fields = {f.name for f in User._meta.concrete_fields}
@@ -482,11 +499,73 @@ class UserCreateSerializer(BaseWriteSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
-        user = User(**validated_data)
+        cloud_providers = validated_data.pop("cloud_providers", None)
+        compliance_frameworks = validated_data.pop("compliance_frameworks", None)
+        company_name = validated_data.get("company_name", "")
 
+        user = User(**validated_data)
         validate_password(password, user=user)
         user.set_password(password)
         user.save()
+
+        # Initialize tenant, admin role, and modular subscriptions for new registration
+        from api.db_utils import rls_transaction
+        from api.models import (
+            Tenant, Membership, Role, UserRoleRelationship,
+            TenantCloudSubscription, TenantComplianceSubscription
+        )
+
+        tenant_name = company_name if company_name else f"{user.email.split('@')[0]} Organization"
+        tenant = Tenant.objects.using(MainRouter.admin_db).create(name=tenant_name)
+
+        with rls_transaction(str(tenant.id)):
+            Membership.objects.using(MainRouter.admin_db).create(
+                user=user, tenant=tenant, role=Membership.RoleChoices.OWNER
+            )
+            role = Role.objects.using(MainRouter.admin_db).create(
+                name="admin",
+                tenant_id=tenant.id,
+                manage_users=True,
+                manage_account=True,
+                manage_billing=True,
+                manage_providers=True,
+                manage_integrations=True,
+                manage_scans=True,
+                unlimited_visibility=True,
+            )
+            UserRoleRelationship.objects.using(MainRouter.admin_db).create(
+                user=user,
+                role=role,
+                tenant_id=tenant.id,
+            )
+
+            # Subscribed cloud providers (default to standard set if not provided)
+            providers_to_subscribe = cloud_providers if cloud_providers else [
+                "aws", "azure", "gcp", "oraclecloud", "kubernetes"
+            ]
+            for prov in providers_to_subscribe:
+                prov_clean = prov.strip().lower()
+                if prov_clean == "oci":
+                    prov_clean = "oraclecloud"
+                TenantCloudSubscription.objects.using(MainRouter.admin_db).update_or_create(
+                    tenant=tenant,
+                    provider_type=prov_clean,
+                    defaults={"is_active": True}
+                )
+
+            # Subscribed compliance frameworks
+            compliances_to_subscribe = compliance_frameworks if compliance_frameworks else []
+            for comp in compliances_to_subscribe:
+                comp_id = comp.strip()
+                TenantComplianceSubscription.objects.using(MainRouter.admin_db).update_or_create(
+                    tenant=tenant,
+                    framework_id=comp_id,
+                    defaults={
+                        "framework_name": comp_id,
+                        "is_active": True
+                    }
+                )
+
         return user
 
 
@@ -4811,4 +4890,103 @@ class CreateJiraTicketRequestSerializer(serializers.Serializer):
     ai_reasoning = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     evidence = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     validation_steps = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+
+
+# Tenant Modularity & Subscription Serializers
+
+class TenantCloudSubscriptionSerializer(BaseModelSerializerV1):
+    class Meta:
+        model = TenantCloudSubscription
+        fields = ["id", "provider_type", "is_active", "inserted_at", "updated_at"]
+
+    class JSONAPIMeta:
+        resource_name = "tenant-cloud-subscriptions"
+
+
+class TenantComplianceSubscriptionSerializer(BaseModelSerializerV1):
+    class Meta:
+        model = TenantComplianceSubscription
+        fields = [
+            "id",
+            "framework_id",
+            "framework_name",
+            "provider_type",
+            "is_active",
+            "inserted_at",
+            "updated_at",
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "tenant-compliance-subscriptions"
+
+
+class SubscriptionChangeRequestSerializer(BaseModelSerializerV1):
+    requested_by_email = serializers.SerializerMethodField()
+    reviewed_by_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubscriptionChangeRequest
+        fields = [
+            "id",
+            "request_type",
+            "target_value",
+            "target_display_name",
+            "status",
+            "requested_by",
+            "requested_by_email",
+            "reviewed_by",
+            "reviewed_by_email",
+            "reviewed_at",
+            "review_notes",
+            "inserted_at",
+            "updated_at",
+        ]
+
+    def get_requested_by_email(self, obj):
+        return obj.requested_by.email if obj.requested_by else None
+
+    def get_reviewed_by_email(self, obj):
+        return obj.reviewed_by.email if obj.reviewed_by else None
+
+    class JSONAPIMeta:
+        resource_name = "subscription-change-requests"
+
+
+class SubscriptionChangeRequestCreateSerializer(BaseWriteSerializer):
+    class Meta:
+        model = SubscriptionChangeRequest
+        fields = ["request_type", "target_value", "target_display_name"]
+
+    def create(self, validated_data):
+        from api.v1.subscription_views import get_request_tenant_id
+        request = self.context["request"]
+        tenant_id = getattr(request, "tenant_id", None) or get_request_tenant_id(request)
+        if not tenant_id:
+            raise ValidationError("Tenant not identified.")
+        validated_data["tenant_id"] = tenant_id
+        validated_data["requested_by_id"] = request.user.id
+        validated_data["status"] = SubscriptionChangeRequest.RequestStatus.PENDING
+        instance = SubscriptionChangeRequest(**validated_data)
+        instance.save(using=MainRouter.admin_db)
+        return instance
+
+
+class SubscriptionChangeRequestReviewSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[
+            SubscriptionChangeRequest.RequestStatus.APPROVED,
+            SubscriptionChangeRequest.RequestStatus.REJECTED,
+        ]
+    )
+    review_notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class OnboardingSubscriptionSerializer(serializers.Serializer):
+    cloud_providers = serializers.ListField(
+        child=serializers.CharField(), allow_empty=False
+    )
+    compliance_frameworks = serializers.ListField(
+        child=serializers.CharField(), allow_empty=True, required=False, default=list
+    )
+
 

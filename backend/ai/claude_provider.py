@@ -352,7 +352,13 @@ class ClaudeProvider(AIProvider):
             default=str,
         )
 
-        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, MAX_TOKENS_ADVISOR, history=history)
+        from .prompts import build_advisor_system_prompt
+
+        dynamic_system_prompt = build_advisor_system_prompt(
+            subscribed_clouds=[p.get("provider") for p in (connected_providers or []) if p.get("provider")],
+            subscribed_compliances=[c.get("compliance_id") for c in (compliance_scores or []) if c.get("compliance_id")],
+        )
+        raw = self._call(dynamic_system_prompt, user_message, MAX_TOKENS_ADVISOR, history=history)
         data = self._parse_json(raw)
 
         return AdvisorOutput(

@@ -92,6 +92,26 @@ class BaseRLSViewSet(BaseViewSet):
                 cm = nullcontext()
 
             with cm:
+                if tenant_id:
+                    from api.models import TenantCloudSubscription, TenantComplianceSubscription
+                    try:
+                        drf_request.subscribed_clouds = set(
+                            TenantCloudSubscription.objects.filter(
+                                tenant_id=tenant_id, is_active=True
+                            ).values_list("provider_type", flat=True)
+                        )
+                        drf_request.subscribed_compliances = set(
+                            TenantComplianceSubscription.objects.filter(
+                                tenant_id=tenant_id, is_active=True
+                            ).values_list("framework_id", flat=True)
+                        )
+                    except Exception:
+                        drf_request.subscribed_clouds = set()
+                        drf_request.subscribed_compliances = set()
+                else:
+                    drf_request.subscribed_clouds = set()
+                    drf_request.subscribed_compliances = set()
+
                 with transaction.atomic(using=self.db_alias):
                     # APIView.dispatch core logic
                     self.args = args
@@ -129,6 +149,22 @@ class BaseRLSViewSet(BaseViewSet):
             raise NotAuthenticated("Tenant ID is not present in token")
 
         self.request.tenant_id = tenant_id
+        if not hasattr(self.request, "subscribed_clouds"):
+            from api.models import TenantCloudSubscription, TenantComplianceSubscription
+            try:
+                self.request.subscribed_clouds = set(
+                    TenantCloudSubscription.objects.filter(
+                        tenant_id=tenant_id, is_active=True
+                    ).values_list("provider_type", flat=True)
+                )
+                self.request.subscribed_compliances = set(
+                    TenantComplianceSubscription.objects.filter(
+                        tenant_id=tenant_id, is_active=True
+                    ).values_list("framework_id", flat=True)
+                )
+            except Exception:
+                self.request.subscribed_clouds = set()
+                self.request.subscribed_compliances = set()
         return super().initial(request, *args, **kwargs)
 
     def get_serializer_context(self):

@@ -24,6 +24,7 @@ import {
   severityTone,
 } from "@/components/ui-kit/primitives";
 import { useFindings, useAnalyzeFinding } from "@/hooks/use-api";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
 
 export interface Finding {
   id: string;
@@ -326,8 +327,13 @@ function FindingsPage() {
   const [remediatingId, setRemediatingId] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<Record<string, string>>({});
 
+  const { subscribedClouds, isCloudSubscribed } = useSubscriptions();
+
   const data: Finding[] = useMemo(() => {
-    const base = rawData;
+    let base = rawData;
+    if (subscribedClouds.length > 0) {
+      base = base.filter((f) => isCloudSubscribed(f.provider || ""));
+    }
     return base.map((f) => {
       if (remediatedIds.includes(f.id)) {
         return { ...f, status: "PASS" };
@@ -337,7 +343,7 @@ function FindingsPage() {
       }
       return f;
     });
-  }, [rawData, mutedIds, remediatedIds]);
+  }, [rawData, mutedIds, remediatedIds, subscribedClouds, isCloudSubscribed]);
 
   // Pre-filter findings by selected cloud provider AND compliance framework so that tab counts update dynamically
   const scopedData = useMemo(() => {
@@ -623,13 +629,13 @@ function FindingsPage() {
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="h-9 min-w-[150px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
             >
-              <option value="All">All Providers</option>
-              <option value="AZURE">Azure</option>
-              <option value="OCI">Oracle Cloud (OCI)</option>
-              <option value="ORACLE_SAAS">Oracle SaaS / ERP</option>
-              <option value="AWS">AWS</option>
-              <option value="GCP">GCP</option>
-              <option value="K8S">Kubernetes</option>
+              <option value="All">All Subscribed Providers</option>
+              {isCloudSubscribed("azure") && <option value="AZURE">Azure</option>}
+              {isCloudSubscribed("oraclecloud") && <option value="OCI">Oracle Cloud (OCI)</option>}
+              {isCloudSubscribed("oracle_saas") && <option value="ORACLE_SAAS">Oracle SaaS / ERP</option>}
+              {isCloudSubscribed("aws") && <option value="AWS">AWS</option>}
+              {isCloudSubscribed("gcp") && <option value="GCP">GCP</option>}
+              {isCloudSubscribed("kubernetes") && <option value="K8S">Kubernetes</option>}
             </select>
 
             <select

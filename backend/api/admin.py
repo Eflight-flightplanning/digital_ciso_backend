@@ -1,9 +1,12 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 from api.models import (
     TenantLLMConfig,
     FindingAIAnalysis,
     RemediationPlaybook,
     CISOAdvisorConversation,
+    TenantCloudSubscription,
+    TenantComplianceSubscription,
+    SubscriptionChangeRequest,
 
     Tenant,
     User,
@@ -153,3 +156,62 @@ class RemediationPlaybookAdmin(admin.ModelAdmin):
 class CISOAdvisorConversationAdmin(admin.ModelAdmin):
     list_display = ["id", "tenant", "user", "question", "confidence", "model_name", "inserted_at"]
     search_fields = ["question", "answer"]
+
+
+@admin.register(TenantCloudSubscription)
+class TenantCloudSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ["id", "tenant", "provider_type", "is_active", "inserted_at"]
+    list_filter = ["provider_type", "is_active"]
+    search_fields = ["tenant__name", "provider_type"]
+
+
+@admin.register(TenantComplianceSubscription)
+class TenantComplianceSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ["id", "tenant", "framework_id", "framework_name", "provider_type", "is_active", "inserted_at"]
+    list_filter = ["provider_type", "is_active"]
+    search_fields = ["tenant__name", "framework_id", "framework_name"]
+
+
+@admin.register(SubscriptionChangeRequest)
+class SubscriptionChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ["id", "tenant", "requested_by", "request_type", "target_value", "target_display_name", "status", "inserted_at"]
+    list_filter = ["status", "request_type"]
+    search_fields = ["target_value", "target_display_name", "requested_by__email", "tenant__name"]
+    actions = ["approve_selected", "reject_selected"]
+
+    @admin.action(description="Approve selected subscription requests")
+    def approve_selected(self, request, queryset):
+        from datetime import datetime, UTC
+        for req in queryset.filter(status=SubscriptionChangeRequest.RequestStatus.PENDING):
+            req.status = SubscriptionChangeRequest.RequestStatus.APPROVED
+            req.reviewed_by = request.user
+            req.reviewed_at = datetime.now(UTC)
+            req.save()
+            val = req.target_value.strip()
+            if req.request_type == SubscriptionChangeRequest.RequestType.ADD_CLOUD:
+                cval = val.lower()
+                if cval == "oci":
+                    cval = "oraclecloud"
+                TenantCloudSubscription.objects.update_or_create(
+                    tenant=req.tenant, provider_type=cval, defaults={"is_active": True}
+                )
+            elif req.request_type == SubscriptionChangeRequest.RequestType.REMOVE_CLOUD:
+                cval = val.lower()
+                if cval == "oci":
+                    cval = "oraclecloud"
+                TenantCloudSubscription.objects.filter(tenant=req.tenant, provider_type=cval).update(is_active=False)
+            elif req.request_type == SubscriptionChangeRequest.RequestType.ADD_COMPLIANCE:
+                TenantComplianceSubscription.objects.update_or_create(
+                    tenant=req.tenant, framework_id=val, defaults={"framework_name": req.target_display_name or val, "is_active": True}
+                )
+            elif req.request_type == SubscriptionChangeRequest.RequestType.REMOVE_COMPLIANCE:
+                TenantComplianceSubscription.objects.filter(tenant=req.tenant, framework_id=val).update(is_active=False)
+
+    @admin.action(description="Reject selected subscription requests")
+    def reject_selected(self, request, queryset):
+        from datetime import datetime, UTC
+        queryset.filter(status=SubscriptionChangeRequest.RequestStatus.PENDING).update(
+            status=SubscriptionChangeRequest.RequestStatus.REJECTED,
+            reviewed_by=request.user,
+            reviewed_at=datetime.now(UTC),
+        )

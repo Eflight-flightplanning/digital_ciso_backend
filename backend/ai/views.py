@@ -556,12 +556,32 @@ class AIAdvisorQueryView(APIView):
                 except Exception:
                     pass
 
+            subscribed_clouds = set()
+            subscribed_compliances = set()
+            if tenant_id:
+                try:
+                    from api.models import TenantCloudSubscription, TenantComplianceSubscription
+                    subscribed_clouds = set(
+                        TenantCloudSubscription.objects.filter(
+                            tenant_id=tenant_id, is_active=True
+                        ).values_list("provider_type", flat=True)
+                    )
+                    subscribed_compliances = set(
+                        TenantComplianceSubscription.objects.filter(
+                            tenant_id=tenant_id, is_active=True
+                        ).values_list("framework_id", flat=True)
+                    )
+                except Exception:
+                    pass
+
             connected_providers = []
             try:
                 from api.models import Provider
                 prov_qs = Provider.objects.all()
                 if tenant_id:
                     prov_qs = prov_qs.filter(tenant_id=tenant_id)
+                if subscribed_clouds:
+                    prov_qs = prov_qs.filter(provider__in=subscribed_clouds)
                 for p in prov_qs:
                     connected_providers.append({
                         "id": str(p.id),
@@ -572,13 +592,15 @@ class AIAdvisorQueryView(APIView):
             except Exception as pe:
                 logger.warning("Could not fetch connected providers for advisor: %s", pe)
 
-            # Retrieve live compliance benchmark scores for the tenant
+            # Retrieve live compliance benchmark scores for the tenant (scoped)
             compliance_scores = []
             try:
                 from api.models import ComplianceOverview
                 co_qs = ComplianceOverview.objects.all()
                 if tenant_id:
                     co_qs = co_qs.filter(tenant_id=tenant_id)
+                if subscribed_compliances:
+                    co_qs = co_qs.filter(compliance_id__in=subscribed_compliances)
                 for co in co_qs:
                     total_eval = co.requirements_passed + co.requirements_failed
                     score = round((co.requirements_passed / max(1, total_eval)) * 100) if total_eval > 0 else 0

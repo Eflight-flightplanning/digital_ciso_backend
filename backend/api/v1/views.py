@@ -844,81 +844,139 @@ class UserViewSet(BaseUserViewset):
             )
 
         role_param = serializer.validated_data.pop("role", None)
+        cloud_providers = serializer.validated_data.pop("cloud_providers", None)
+        compliance_frameworks = serializer.validated_data.pop("compliance_frameworks", None)
+        company_name = serializer.validated_data.pop("company_name", None)
 
-        # Proceed with creating the user and membership
-        user = User.objects.db_manager(MainRouter.admin_db).create_user(
-            **serializer.validated_data
-        )
-
-        assigned_role_name = (
-            role_param
-            or request.data.get("role")
-            or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
-            or "Member"
-        )
-
-        request_tenant_id = (
-            getattr(request, "tenant_id", None)
-            or (request.auth.get("tenant_id") if isinstance(request.auth, dict) else None)
-            or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
-        )
-        if not request_tenant_id and request.user.is_authenticated:
-            admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
-            if admin_membership:
-                request_tenant_id = str(admin_membership.tenant_id)
-
-        if request.user.is_authenticated and request_tenant_id:
-            try:
-                tenant = Tenant.objects.using(MainRouter.admin_db).get(id=request_tenant_id)
-            except Tenant.DoesNotExist:
-                tenant = Tenant.objects.using(MainRouter.admin_db).create(
-                    name=f"{user.email.split('@')[0]} default tenant"
-                )
-        else:
-            tenant = (
-                invitation.tenant
-                if invitation_token
-                else Tenant.objects.using(MainRouter.admin_db).create(
-                    name=f"{user.email.split('@')[0]} default tenant"
-                )
+        with transaction.atomic(using=MainRouter.admin_db):
+            # Proceed with creating the user and membership
+            user = User.objects.db_manager(MainRouter.admin_db).create_user(
+                **serializer.validated_data
             )
 
-        if assigned_role_name in ("Admin", "Security Admin", "Administrator", "OWNER"):
-            membership_role = Membership.RoleChoices.OWNER
-        else:
-            membership_role = Membership.RoleChoices.MEMBER
+            assigned_role_name = (
+                role_param
+                or request.data.get("role")
+                or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
+                or "Admin"
+            )
 
-        Membership.objects.using(MainRouter.admin_db).create(
-            user=user, tenant=tenant, role=membership_role
-        )
+            request_tenant_id = (
+                getattr(request, "tenant_id", None)
+                or (request.auth.get("tenant_id") if isinstance(request.auth, dict) else None)
+                or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
+            )
+            if not request_tenant_id and request.user.is_authenticated:
+                admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
+                if admin_membership:
+                    request_tenant_id = str(admin_membership.tenant_id)
 
-        if invitation:
-            user_role = []
-            for role in invitation.roles.all():
-                user_role.append(
-                    UserRoleRelationship.objects.using(MainRouter.admin_db).create(
-                        user=user, role=role, tenant=invitation.tenant
+            default_org_name = company_name if company_name else f"{user.email.split('@')[0]} Organization"
+            if request.user.is_authenticated and request_tenant_id:
+                try:
+                    tenant = Tenant.objects.using(MainRouter.admin_db).get(id=request_tenant_id)
+                except Tenant.DoesNotExist:
+                    tenant = Tenant.objects.using(MainRouter.admin_db).create(
+                        name=default_org_name
+                    )
+            else:
+                tenant = (
+                    invitation.tenant
+                    if invitation_token
+                    else Tenant.objects.using(MainRouter.admin_db).create(
+                        name=default_org_name
                     )
                 )
-            invitation.state = Invitation.State.ACCEPTED
-            invitation.save(using=MainRouter.admin_db)
-        else:
-            role = Role.objects.using(MainRouter.admin_db).create(
-                name=assigned_role_name.lower(),
-                tenant_id=tenant.id,
-                manage_users=True,
-                manage_account=True,
-                manage_billing=True,
-                manage_providers=True,
-                manage_integrations=True,
-                manage_scans=True,
-                unlimited_visibility=True,
+
+            if assigned_role_name in ("Admin", "Security Admin", "Administrator", "OWNER"):
+                membership_role = Membership.RoleChoices.OWNER
+            else:
+                membership_role = Membership.RoleChoices.MEMBER
+
+            Membership.objects.using(MainRouter.admin_db).create(
+                user=user, tenant=tenant, role=membership_role
             )
-            UserRoleRelationship.objects.using(MainRouter.admin_db).create(
-                user=user,
-                role=role,
-                tenant_id=tenant.id,
-            )
+
+            if invitation:
+                user_role = []
+                for role in invitation.roles.all():
+                    user_role.append(
+                        UserRoleRelationship.objects.using(MainRouter.admin_db).create(
+                            user=user, role=role, tenant=invitation.tenant
+                        )
+                    )
+                invitation.state = Invitation.State.ACCEPTED
+                invitation.save(using=MainRouter.admin_db)
+            else:
+                role = Role.objects.using(MainRouter.admin_db).create(
+                    name=assigned_role_name.lower(),
+                    tenant_id=tenant.id,
+                    manage_users=True,
+                    manage_account=True,
+                    manage_billing=True,
+                    manage_providers=True,
+                    manage_integrations=True,
+                    manage_scans=True,
+                    unlimited_visibility=True,
+                )
+                UserRoleRelationship.objects.using(MainRouter.admin_db).create(
+                    user=user,
+                    role=role,
+                    tenant_id=tenant.id,
+                )
+
+            # Seed modular cloud and compliance subscriptions for new tenant
+            from api.models import TenantCloudSubscription, TenantComplianceSubscription
+            from api.v1.subscription_views import DEFAULT_COMPLIANCES_BY_PROVIDER
+
+            chosen_clouds = cloud_providers if cloud_providers is not None else ["azure", "oraclecloud", "aws", "gcp"]
+            for c in chosen_clouds:
+                c_norm = c.lower().strip()
+                if c_norm in ("oci", "oracle_cloud"):
+                    c_norm = "oraclecloud"
+                TenantCloudSubscription.objects.using(MainRouter.admin_db).update_or_create(
+                    tenant=tenant,
+                    provider_type=c_norm,
+                    defaults={"is_active": True},
+                )
+
+            if compliance_frameworks is not None and len(compliance_frameworks) > 0:
+                for fw_id in compliance_frameworks:
+                    fw_clean = str(fw_id).strip()
+                    p_type = None
+                    fw_lower = fw_clean.lower()
+                    if "azure" in fw_lower:
+                        p_type = "azure"
+                    elif "oci" in fw_lower or "oracle" in fw_lower:
+                        p_type = "oraclecloud"
+                    elif "aws" in fw_lower:
+                        p_type = "aws"
+                    elif "gcp" in fw_lower:
+                        p_type = "gcp"
+
+                    TenantComplianceSubscription.objects.using(MainRouter.admin_db).update_or_create(
+                        tenant=tenant,
+                        framework_id=fw_clean,
+                        defaults={
+                            "framework_name": fw_clean.replace("_", " ").title(),
+                            "provider_type": p_type,
+                            "is_active": True,
+                        },
+                    )
+            else:
+                for c in chosen_clouds:
+                    c_norm = "oraclecloud" if c.lower().strip() in ("oci", "oracle_cloud") else c.lower().strip()
+                    for item in DEFAULT_COMPLIANCES_BY_PROVIDER.get(c_norm, []):
+                        TenantComplianceSubscription.objects.using(MainRouter.admin_db).update_or_create(
+                            tenant=tenant,
+                            framework_id=item["framework_id"],
+                            defaults={
+                                "framework_name": item["framework_name"],
+                                "provider_type": item["provider_type"],
+                                "is_active": True,
+                            },
+                        )
+
         return Response(data=UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
@@ -1591,6 +1649,11 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
         else:
             # User lacks permission, filter providers based on provider groups associated with the role
             queryset = get_providers(user_roles)
+
+        subscribed_clouds = getattr(self.request, "subscribed_clouds", None)
+        if subscribed_clouds:
+            queryset = queryset.filter(provider__in=subscribed_clouds)
+
         return queryset.select_related("secret").prefetch_related("provider_groups")
 
     def get_serializer_class(self):
@@ -3852,6 +3915,10 @@ class FindingViewSet(PaginateByPkMixin, BaseRLSViewSet):
                 scan__provider__in=get_providers(user_roles)
             )
 
+        subscribed_clouds = getattr(self.request, "subscribed_clouds", None)
+        if subscribed_clouds:
+            queryset = queryset.filter(scan__provider__provider__in=subscribed_clouds)
+
         search_value = self.request.query_params.get("filter[search]", None)
         if search_value:
             search_query = SearchQuery(
@@ -4736,10 +4803,18 @@ class ComplianceOverviewViewSet(
             tenant_id=self.request.tenant_id
         )
 
-        if unlimited_visibility:
-            return base_queryset
+        if not unlimited_visibility:
+            base_queryset = base_queryset.filter(scan__provider__in=get_providers(role))
 
-        return base_queryset.filter(scan__provider__in=get_providers(role))
+        subscribed_compliances = getattr(self.request, "subscribed_compliances", None)
+        if subscribed_compliances:
+            base_queryset = base_queryset.filter(compliance_id__in=subscribed_compliances)
+
+        subscribed_clouds = getattr(self.request, "subscribed_clouds", None)
+        if subscribed_clouds:
+            base_queryset = base_queryset.filter(scan__provider__provider__in=subscribed_clouds)
+
+        return base_queryset
 
     def get_serializer_class(self):
         if hasattr(self, "response_serializer_class"):

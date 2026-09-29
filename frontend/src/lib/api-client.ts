@@ -44,6 +44,17 @@ export async function apiRequest<T = any>(
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+  if (!headers.has("X-Tenant-ID") && typeof window !== "undefined") {
+    try {
+      const storedUser = localStorage.getItem("auth_user");
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        if (u?.tenant_id) {
+          headers.set("X-Tenant-ID", u.tenant_id);
+        }
+      }
+    } catch {}
+  }
 
   let response: Response;
   try {
@@ -219,3 +230,87 @@ export function unwrapSingle<T = any>(res: any): T {
 export function unwrapMeta(res: any): Record<string, any> {
   return res?.meta || {};
 }
+
+// ─────────────────────────────────────────────────────────────
+// Tenant Modularity & Subscriptions Client
+// ─────────────────────────────────────────────────────────────
+
+export interface CloudSubscription {
+  id: string;
+  provider_type: string;
+  is_active: boolean;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface ComplianceSubscription {
+  id: string;
+  framework_id: string;
+  framework_name: string;
+  provider_type?: string | null;
+  is_active: boolean;
+  inserted_at?: string;
+  updated_at?: string;
+}
+
+export interface AvailableCloud {
+  id: string;
+  name: string;
+  shortName: string;
+  description: string;
+  icon: string;
+  category: string;
+  popular?: boolean;
+  is_subscribed?: boolean;
+}
+
+export interface AvailableCompliance {
+  id: string;
+  name: string;
+  provider: string;
+  providerName: string;
+  category: string;
+  version: string;
+  description: string;
+  is_subscribed?: boolean;
+}
+
+export interface SubscriptionChangeRequest {
+  id: string;
+  request_type: "add_cloud" | "remove_cloud" | "add_compliance" | "remove_compliance";
+  target_value: string;
+  target_display_name?: string;
+  status: "pending" | "approved" | "rejected";
+  requested_by?: string;
+  requested_by_email?: string;
+  reviewed_by?: string;
+  reviewed_by_email?: string;
+  reviewed_at?: string;
+  review_notes?: string;
+  inserted_at: string;
+}
+
+export const subscriptionsApi = {
+  getClouds: () => api.get<{ data: CloudSubscription[] }>("/subscriptions/clouds"),
+  getCompliances: () => api.get<{ data: ComplianceSubscription[] }>("/subscriptions/compliances"),
+  getAvailableClouds: () => api.get<{ data: AvailableCloud[] }>("/subscriptions/available-clouds"),
+  getAvailableCompliances: (provider?: string) =>
+    api.get<{ data: AvailableCompliance[] }>(
+      provider
+        ? `/subscriptions/available-compliances?provider=${encodeURIComponent(provider)}`
+        : "/subscriptions/available-compliances"
+    ),
+  saveOnboarding: (data: { cloud_providers: string[]; compliance_frameworks: string[] }) =>
+    api.post("/subscriptions/onboarding", data),
+  getChangeRequests: () =>
+    api.get<any>("/subscriptions/change-requests"),
+  createChangeRequest: (data: {
+    request_type: string;
+    target_value: string;
+    target_display_name?: string;
+  }) => api.post("/subscriptions/change-requests", data),
+  reviewChangeRequest: (
+    id: string,
+    data: { status: "approved" | "rejected"; review_notes?: string }
+  ) => api.patch(`/subscriptions/change-requests/${id}/review`, data),
+};
