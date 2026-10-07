@@ -4586,6 +4586,18 @@ class TenantLLMConfigSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "inserted_at", "updated_at"]
+        # Never echo the stored LLM API key back to API clients.
+        extra_kwargs = {"api_key": {"write_only": True}}
+
+    def validate_base_url(self, value):
+        if value:
+            from ai.url_safety import UnsafeURLError, validate_outbound_url
+
+            try:
+                validate_outbound_url(value)
+            except UnsafeURLError as e:
+                raise serializers.ValidationError(str(e))
+        return value
 
     class JSONAPIMeta:
         resource_name = "tenant-llm-configs"

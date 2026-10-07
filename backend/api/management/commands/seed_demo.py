@@ -24,6 +24,19 @@ from api.models import (
 )
 
 
+
+def _initial_password() -> str:
+    """Admin password from ADMIN_INITIAL_PASSWORD, else a random one printed once. Never hard-coded."""
+    import os
+    import secrets
+
+    pw = os.environ.get("ADMIN_INITIAL_PASSWORD")
+    if not pw:
+        pw = secrets.token_urlsafe(18)
+        print(f"  [!] ADMIN_INITIAL_PASSWORD not set; generated one-time admin password: {pw}")
+    return pw
+
+
 class Command(BaseCommand):
     help = "Seed demo data for Digital CISO (Tenant, User, Providers, Scans, Findings, Decisions)"
 
@@ -69,14 +82,12 @@ class Command(BaseCommand):
                 u = User.objects.create_user(
                     name=user_name,
                     email=user_email,
-                    password="Admin1234!",
+                    password=_initial_password(),
                     company_name="Pravahya Enterprise",
                 )
-                self.stdout.write(f"  [OK] Created Admin user: {user_email} / Admin1234!")
+                self.stdout.write(f"  [OK] Created Admin user: {user_email}")
             else:
-                u.set_password("Admin1234!")
-                u.save()
-                self.stdout.write(f"  [OK] Updated Admin user password: {user_email} / Admin1234!")
+                self.stdout.write(f"  [OK] Admin user exists, password left unchanged: {user_email}")
 
             # 3. Membership
             Membership.objects.get_or_create(

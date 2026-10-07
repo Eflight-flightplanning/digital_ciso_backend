@@ -40,7 +40,7 @@ from api.models import (
     StateChoices,
     Tenant,
 )
-from ai.claude_provider import get_ai_provider
+from ai.providers import get_ai_provider
 
 logger = logging.getLogger(__name__)
 

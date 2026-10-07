@@ -28,6 +28,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { apiRequest } from "@/lib/api-client";
 import {
   useJiraConfig,
   useJiraProjects,
@@ -393,7 +394,7 @@ export function OracleSaasPage() {
     totalUsers: 0,
     inactive30d: 0,
     dormant90d: 0,
-    sodCount: 17,
+    sodCount: 0,
     superuserCount: 0,
     complianceScore: 0,
   });
@@ -466,8 +467,7 @@ export function OracleSaasPage() {
   }, [executionsData]);
 
   useEffect(() => {
-    fetch("/api/v1/oracle-saas/overview")
-      .then((r) => r.json())
+    apiRequest("/oracle-saas/overview")
       .then((res) => {
         const d = res.data || res;
         if (d.kpis) {
@@ -475,9 +475,9 @@ export function OracleSaasPage() {
             totalUsers: d.kpis.total_monitored_users || 0,
             inactive30d: d.kpis.inactive_users_30d || 0,
             dormant90d: d.kpis.dormant_critical_90d || 0,
-            sodCount: d.kpis.sod_toxic_combinations || 17,
+            sodCount: d.kpis.sod_toxic_combinations ?? 0,
             superuserCount: d.kpis.superuser_roles_active || 0,
-            complianceScore: d.kpis.sox_itgc_compliance_score || 82,
+            complianceScore: d.kpis.sox_itgc_compliance_score ?? 0,
           });
         }
         if (d.sod_matrices && Array.isArray(d.sod_matrices) && d.sod_matrices.length > 0) {
@@ -489,8 +489,7 @@ export function OracleSaasPage() {
       })
       .catch((e) => console.warn("Overview fetch:", e));
 
-    fetch("/api/v1/oracle-saas/inactive-users")
-      .then((r) => r.json())
+    apiRequest("/oracle-saas/inactive-users")
       .then((res) => {
         const d = res.data || res;
         if (d.users && Array.isArray(d.users)) {
@@ -719,20 +718,15 @@ export function OracleSaasPage() {
     setIsSyncing(true);
     setSyncStatusMsg("Connecting to Oracle Fusion Pod using .env credentials & fetching live telemetry...");
     try {
-      const resp = await fetch("/api/v1/oracle-saas/sync-live", {
+      const resData = await apiRequest("/oracle-saas/sync-live", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (!resp.ok) {
-        throw new Error(`Server returned HTTP ${resp.status}`);
-      }
-      const resData = await resp.json();
       const payload = resData.data || resData;
       if (payload.users && payload.users.length > 0) {
         setUsers(payload.users);
-        const sodCount = 17;
-        const superCount = 54;
+        const sodCount = payload.sod_count ?? (payload.users.reduce((acc: number, u: any) => acc + (u.sod_conflicts?.length || 0), 0));
+        const superCount = payload.superuser_count ?? 0;
         setKpiData((prev) => ({
           ...prev,
           totalUsers: payload.count || payload.users.length,
@@ -915,7 +909,7 @@ export function OracleSaasPage() {
                     complianceImpact:
                       "Mandatory Sarbanes-Oxley (SOX) Section 404 & SOC 1 Type 2 requirement. Unmitigated toxic SoD conflicts represent severe internal control deficiencies.",
                     targetTab: "sod",
-                    tabActionLabel: `Inspect ${totalSodConflicts || 17} SoD Conflicts in Matrix →`,
+                    tabActionLabel: `Inspect ${totalSodConflicts} SoD Conflicts in Matrix →`,
                   })
                 }
                 className="text-primary font-semibold hover:underline cursor-pointer"
@@ -998,7 +992,7 @@ export function OracleSaasPage() {
         <div className="flex border-b border-border">
           {[
             { id: "dormant" as const, label: "Users & Inactivity Governance", icon: Clock, count: filteredUsers.length },
-            { id: "sod" as const, label: "Separation of Duties (SoD)", icon: ShieldAlert, count: totalSodConflicts || 17 },
+            { id: "sod" as const, label: "Separation of Duties (SoD)", icon: ShieldAlert, count: totalSodConflicts },
             { id: "superusers" as const, label: "Superuser & Consultant PAM", icon: KeyRound, count: superusers.length },
             { id: "settings" as const, label: "Pod Connection & Credentials", icon: Server },
           ].map((tab) => (
@@ -1447,7 +1441,7 @@ export function OracleSaasPage() {
                   },
                   {
                     label: "SoD Conflicts",
-                    value: (kpiData.sodCount || 17).toLocaleString(),
+                    value: (kpiData.sodCount).toLocaleString(),
                     color: "text-amber-400",
                   },
                 ].map((s) => (

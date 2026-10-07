@@ -273,7 +273,7 @@ function FindingsPage() {
           // Non-greedy capture stopping at the next sentence-boundary word, so a name
           // like "Digital-CISO-LLM" isn't swallowed along with the rest of the sentence
           // ("...has trusted launch disabled in subscription...").
-          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription|policy|domain)\s+'?([a-zA-Z0-9_\-]+(?:\s[a-zA-Z0-9_\-]+)*?)'?\s+(?:has|is|does|was|were|in\b)/i);
+          const match = statusExt.match(/(?:VM|Virtual network|Security Group|Disk|account|subscription|policy|domain)\s+'?([a-zA-Z0-9_-]+(?:\s[a-zA-Z0-9_-]+)*?)'?\s+(?:has|is|does|was|were|in\b)/i);
           if (match && match[1]) {
             resource = match[1].trim();
           } else {

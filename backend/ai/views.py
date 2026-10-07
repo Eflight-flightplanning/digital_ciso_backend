@@ -417,7 +417,7 @@ class AIDecisionCreateJiraTicketView(APIView):
         except Exception as e:
             logger.error("Create Jira ticket error: %s", e)
             return Response(
-                {"errors": [{"status": "500", "title": "Failed to create Jira ticket", "detail": str(e)}]},
+                {"errors": [{"status": "500", "title": "Failed to create Jira ticket"}]},
                 status=500,
                 content_type="application/vnd.api+json",
             )
@@ -472,7 +472,7 @@ class AIAdvisorQueryView(APIView):
             )
 
         try:
-            from ai.claude_provider import get_ai_provider
+            from ai.providers import get_ai_provider
             from ai.sanitizer import sanitizer
 
             # Sanitize question (may contain injection attempts)
@@ -548,13 +548,13 @@ class AIAdvisorQueryView(APIView):
                 or (getattr(request.user, "tenant_id", None) if hasattr(request, "user") and request.user else None)
             )
             if not tenant_id:
-                try:
-                    from api.models import Tenant
-                    t_first = Tenant.objects.first()
-                    if t_first:
-                        tenant_id = str(t_first.id)
-                except Exception:
-                    pass
+                # Never fall back to "some other tenant's" data: that leaks another customer's
+                # providers and compliance scores to this user.
+                return JsonResponse(
+                    {"errors": [{"status": "403", "title": "No tenant context for this session"}]},
+                    status=403,
+                    content_type="application/vnd.api+json",
+                )
 
             connected_providers = []
             try:
@@ -600,6 +600,8 @@ class AIAdvisorQueryView(APIView):
                 request, clean_question, provider=provider_filter, history=history
             )
 
+            fleet_stats = _fleet_stats(tenant_id)
+
             ai_provider = get_ai_provider(tenant_id=tenant_id)
             result = ai_provider.answer_advisor_query(
                 question=clean_question,
@@ -607,6 +609,7 @@ class AIAdvisorQueryView(APIView):
                 history=history,
                 connected_providers=connected_providers,
                 compliance_scores=compliance_scores,
+                fleet_stats=fleet_stats,
             )
 
             from django.http import JsonResponse
@@ -615,6 +618,46 @@ class AIAdvisorQueryView(APIView):
         except Exception as e:
             logger.error("AI Advisor query error: %s", e, exc_info=True)
             return _ai_unavailable_response()
+
+
+def _fleet_stats(tenant_id: str | None) -> dict[str, Any]:
+    """
+    Aggregate, tenant-scoped counts so the model can answer data questions ("how many critical
+    findings do I have?", "which checks fail most?") from real numbers instead of guessing.
+    Failures here must never break the advisor: return {} and carry on.
+    """
+    if not tenant_id:
+        return {}
+    try:
+        from api.db_utils import rls_transaction
+        from api.models import Finding
+        from django.db.models import Count
+
+        base = Finding.objects.filter(status="FAIL", muted=False)
+        with rls_transaction(tenant_id):
+            by_sev = {
+                (row["severity"] or "unknown"): row["n"]
+                for row in base.values("severity").annotate(n=Count("id"))
+            }
+            by_provider: dict[str, dict[str, int]] = {}
+            for row in base.values("scan__provider__provider", "severity").annotate(n=Count("id")):
+                prov = str(row["scan__provider__provider"] or "unknown")
+                by_provider.setdefault(prov, {})[str(row["severity"])] = row["n"]
+            top_checks = [
+                {"check_id": row["check_id"], "severity": row["severity"], "count": row["n"]}
+                for row in base.values("check_id", "severity").annotate(n=Count("id")).order_by("-n")[:8]
+            ]
+            total_pass = Finding.objects.filter(status="PASS", muted=False).count()
+        return {
+            "open_failures_by_severity": by_sev,
+            "open_failures_by_provider": by_provider,
+            "top_failing_checks": top_checks,
+            "total_open_failures": sum(by_sev.values()),
+            "total_passing": total_pass,
+        }
+    except Exception as e:
+        logger.warning("Could not compute fleet stats for advisor: %s", e)
+        return {}
 
 
 def _retrieve_relevant_findings(
@@ -1182,6 +1225,50 @@ def _finding_to_dict(finding: Any) -> dict[str, Any]:
 
 
 
+class AIHealthView(APIView):
+    """
+    GET /ai/health — is a live model reachable? Intended for pre-demo checks.
+
+    Returns the provider in use and whether it answered a quick probe; never exposes the
+    endpoint URL or key.
+    """
+    renderer_classes = [JSONRenderer]
+
+    def get(self, request: Request) -> Response:
+        from ai.providers import get_ai_provider
+
+        tenant_id = (
+            getattr(request, "tenant_id", None)
+            or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
+        )
+        provider = get_ai_provider(tenant_id=tenant_id)
+        reachable, model = None, None
+        probe = getattr(provider, "_resolve_model_name", None)
+        if probe:
+            import httpx
+
+            try:
+                with httpx.Client(timeout=httpx.Timeout(connect=3.0, read=5.0)) as client:
+                    res = client.get(
+                        f"{provider.base_url}/models",
+                        headers={"Authorization": f"Bearer {provider.api_key}"},
+                    )
+                reachable = res.is_success
+                if reachable:
+                    data = res.json().get("data") or []
+                    model = str(data[0]["id"]) if data else None
+            except Exception:
+                reachable = False
+        return Response(
+            {
+                "provider": type(provider).__name__,
+                "reachable": reachable,
+                "model": model,
+                "status": "ok" if reachable or reachable is None else "degraded",
+            }
+        )
+
+
 class AIReasoningProxyView(APIView):
     """
     Spectra Developer Reasoning Proxy (Qwen 3.5 9B on Azure VM).
@@ -1199,7 +1286,7 @@ class AIReasoningProxyView(APIView):
             )
 
         tenant_id = str(getattr(request, "tenant_id", "") or "")
-        from ai.claude_provider import get_ai_provider
+        from ai.providers import get_ai_provider
         provider = get_ai_provider(tenant_id=tenant_id)
 
         system_prompt = request.data.get(
@@ -1260,7 +1347,7 @@ class AIRemediationGeneratorView(APIView):
         script_type = request.data.get("script_type", "terraform").lower()
         
         from api.models import Finding, RemediationPlaybook, Tenant
-        from ai.claude_provider import get_ai_provider
+        from ai.providers import get_ai_provider
 
         tenant_id = getattr(request, "tenant_id", None)
         finding = Finding.objects.filter(id=finding_id).first()

@@ -3,6 +3,13 @@ from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+from api.auth_cookies import (
+    clear_refresh_cookie,
+    get_refresh_cookie,
+    move_refresh_to_cookie,
+    wants_cookie_auth,
+)
 import fnmatch
 import glob
 import json
@@ -368,6 +375,7 @@ class RelationshipViewSchema(JsonApiAutoSchema):
     description="Obtain a token by providing valid credentials and an optional tenant ID.",
 )
 class CustomTokenObtainView(GenericAPIView):
+    permission_classes = [permissions.AllowAny]
     throttle_scope = "token-obtain"
     resource_name = "tokens"
     serializer_class = TokenSerializer
@@ -400,10 +408,13 @@ class CustomTokenObtainView(GenericAPIView):
                     status=status.HTTP_200_OK,
                 )
 
-            return Response(
+            response = Response(
                 data={"type": "tokens", "attributes": val_data},
                 status=status.HTTP_200_OK,
             )
+            if wants_cookie_auth(request):
+                move_refresh_to_cookie(response, request)
+            return response
         except (ValidationError, serializers.ValidationError) as e:
             detail = getattr(e, "detail", str(e))
             if isinstance(detail, dict):
@@ -430,7 +441,7 @@ class CustomTokenObtainView(GenericAPIView):
         except Exception as e:
             logger.exception(f"Unexpected error in CustomTokenObtainView: {e}")
             return Response(
-                {"detail": f"Authentication failed: {str(e)}"},
+                {"detail": "Authentication failed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -442,6 +453,7 @@ class CustomTokenObtainView(GenericAPIView):
     "when a new one is issued.",
 )
 class CustomTokenRefreshView(GenericAPIView):
+    permission_classes = [permissions.AllowAny]
     resource_name = "tokens-refresh"
     serializer_class = TokenRefreshSerializer
     http_method_names = ["post"]
@@ -458,17 +470,63 @@ class CustomTokenRefreshView(GenericAPIView):
         else:
             payload = raw_data
 
+        cookie_mode = wants_cookie_auth(request)
+        if cookie_mode:
+            # Browser flow: the refresh token only ever comes from the HttpOnly cookie.
+            payload = {"refresh": get_refresh_cookie(request) or ""}
+
         serializer = TokenRefreshSerializer(data=payload)
 
         try:
             serializer.is_valid(raise_exception=True)
         except TokenError as e:
             raise InvalidToken(e.args[0])
+        except ValidationError:
+            response = Response(
+                {"detail": "Invalid or expired token."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+            if cookie_mode:
+                clear_refresh_cookie(response)
+            return response
 
-        return Response(
+        response = Response(
             data={"type": "tokens-refresh", "attributes": serializer.validated_data},
             status=status.HTTP_200_OK,
         )
+        if cookie_mode:
+            move_refresh_to_cookie(response, request)
+        return response
+
+
+@extend_schema(
+    tags=["Token"],
+    summary="Log out",
+    description="Blacklists the refresh token (from the HttpOnly cookie or request body) and clears the cookie.",
+)
+class CustomTokenLogoutView(GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    resource_name = "tokens-logout"
+    http_method_names = ["post"]
+    parser_classes = [JSONParser, JSONAPIParser]
+    filter_backends = []
+
+    def get_queryset(self):
+        return User.objects.none()
+
+    def post(self, request):
+        raw = get_refresh_cookie(request)
+        if not raw and isinstance(request.data, dict):
+            raw = request.data.get("refresh")
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()
+            except TokenError:
+                pass  # already expired/blacklisted: nothing left to revoke
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_refresh_cookie(response)
+        return response
 
 
 @extend_schema(
@@ -496,17 +554,21 @@ class CustomTokenSwitchTenantView(GenericAPIView):
         except TokenError as e:
             raise InvalidToken(e.args[0])
 
-        return Response(
+        response = Response(
             data={
                 "type": "tokens-switch-tenant",
                 "attributes": serializer.validated_data,
             },
             status=status.HTTP_200_OK,
         )
+        if wants_cookie_auth(request):
+            move_refresh_to_cookie(response, request)
+        return response
 
 
 @extend_schema(exclude=True)
 class SchemaView(SpectacularAPIView):
+    permission_classes = [permissions.AllowAny]
     serializer_class = None
 
     def get(self, request, *args, **kwargs):

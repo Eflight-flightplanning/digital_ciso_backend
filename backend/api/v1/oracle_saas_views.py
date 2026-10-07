@@ -7,7 +7,7 @@ from typing import Any
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from api.rbac.permissions import IsPlatformOperator
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -104,7 +104,7 @@ def merge_and_save_pod_users(new_records: list[dict[str, Any]]) -> list[dict[str
 
 
 class OracleSaasOverviewView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
 
     def get(self, request: Request) -> Response:
         creds = get_env_credentials()
@@ -126,7 +126,7 @@ class OracleSaasOverviewView(APIView):
         if total_users > 0:
             active_healthy = total_users - inactive_90d
             active_ratio = active_healthy / total_users
-            sod_penalty = min(20, (sod_count or 17) * 1.5)
+            sod_penalty = min(20, sod_count * 1.5)
             compliance_score = max(55, min(95, int((active_ratio * 70) + 30 - (sod_penalty * 0.5))))
         else:
             compliance_score = 82
@@ -144,7 +144,7 @@ class OracleSaasOverviewView(APIView):
                 "total_monitored_users": total_users,
                 "inactive_users_30d": inactive_30d,
                 "dormant_critical_90d": inactive_90d,
-                "sod_toxic_combinations": sod_count or 17,
+                "sod_toxic_combinations": sod_count,
                 "superuser_roles_active": superuser_count,
                 "sox_itgc_compliance_score": compliance_score,
             },
@@ -153,7 +153,7 @@ class OracleSaasOverviewView(APIView):
 
 
 class OracleSaasSyncLiveView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -223,7 +223,7 @@ class OracleSaasSyncLiveView(APIView):
 
 
 class OracleSaasInactiveSyncView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -275,7 +275,7 @@ class OracleSaasInactiveSyncView(APIView):
 
 
 class OracleSaasSyncHcmUsersView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -370,12 +370,12 @@ class OracleSaasSyncHcmUsersView(APIView):
             logger.error("Error syncing HCM users: %s", e)
             return Response({
                 "status": "ERROR",
-                "error": f"Failed to sync HCM User Accounts: {str(e)}",
+                "error": "Failed to sync HCM User Accounts. See server logs.",
             }, status=status.HTTP_502_BAD_GATEWAY)
 
 
 class OracleSaasInactiveUsersView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
 
     def get(self, request: Request) -> Response:
         days_min = int(request.query_params.get("days", 0))
@@ -390,7 +390,7 @@ class OracleSaasInactiveUsersView(APIView):
 
 
 class OracleSaasRemediateView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsPlatformOperator]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:

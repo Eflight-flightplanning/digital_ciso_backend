@@ -25,6 +25,7 @@ import {
   LogOut,
   KeyRound,
   Database,
+  ShieldCheck,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,7 @@ export const navSections: NavSection[] = [
       { to: "/findings", label: "Findings", icon: ShieldAlert },
       { to: "/compliance", label: "Compliance", icon: ClipboardCheck },
       { to: "/attack-paths", label: "Attack Paths", icon: GitBranch },
+      { to: "/trust", label: "Trust Center", icon: ShieldCheck },
     ],
   },
   {
@@ -211,18 +213,32 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       {/* User Profile Footer */}
       <div className={cn("border-t border-sidebar-border p-3", collapsed && "flex justify-center")}>
-        <Link to="/profile" className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
-            {(user?.name || "SA").slice(0, 2).toUpperCase()}
-          </span>
-          {!collapsed && (
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">{user?.name || "Security Administrator"}</span>
-              <span className="block text-[10px] text-muted-foreground">{user?.role || "CISO"}</span>
+        {user ? (
+          <Link to="/profile" className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
+              {(user.name || "U").slice(0, 2).toUpperCase()}
             </span>
-          )}
-          {!collapsed && <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
-        </Link>
+            {!collapsed && (
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold">{user.name || "Authenticated User"}</span>
+                <span className="block text-[10px] text-muted-foreground">{user.role || "Member"}</span>
+              </span>
+            )}
+            {!collapsed && <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
+          </Link>
+        ) : (
+          <Link to="/sign-in" className="flex items-center gap-2.5 text-xs text-muted-foreground hover:text-foreground">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/40 font-display text-[11px] font-semibold text-muted-foreground">
+              ?
+            </span>
+            {!collapsed && (
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">Not Signed In</span>
+                <span className="block text-[10px] text-primary">Click to sign in</span>
+              </span>
+            )}
+          </Link>
+        )}
       </div>
     </aside>
   );
@@ -292,19 +308,33 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [ready, setReady] = useState(false);
 
+  // Auth gate: nothing renders until the session is verified against the API
+  // (refresh cookie -> access token). UI-level guard only; the API enforces auth itself.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
+    let alive = true;
+    authStore.init().then((ok) => {
+      if (!alive) return;
+      if (!ok) {
         navigate({ to: "/sign-in" });
         return;
       }
-      try {
-        const raw = localStorage.getItem("auth_user");
-        if (raw) setCurrentUser(JSON.parse(raw));
-      } catch {}
-    }
+      setCurrentUser(authStore.getState().user);
+      setReady(true);
+    });
+    const unsub = authStore.subscribe((s) => {
+      if (s.isInitialized && !s.isAuthenticated) {
+        setReady(false);
+        navigate({ to: "/sign-in" });
+      } else {
+        setCurrentUser(s.user);
+      }
+    });
+    return () => {
+      alive = false;
+      unsub();
+    };
   }, [navigate]);
 
   useEffect(() => {
@@ -317,6 +347,14 @@ export function AppShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-xs text-muted-foreground">
+        Verifying session…
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -345,13 +383,13 @@ export function AppShell({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/40">
-                {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : "AD"}
+                {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : "··"}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">
-                <span className="font-bold block">{currentUser?.name || "Security Admin"}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">{currentUser?.email || "admin@securityplatform.com"}</span>
+                <span className="font-bold block">{currentUser?.name || "Account"}</span>
+                <span className="text-[10px] text-muted-foreground font-mono">{currentUser?.email || ""}</span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -362,10 +400,8 @@ export function AppShell({
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <button
-                  onClick={() => {
-                    localStorage.removeItem("access_token");
-                    localStorage.removeItem("auth_user");
-                    localStorage.removeItem("refresh_token");
+                  onClick={async () => {
+                    await authStore.signOut();
                     navigate({ to: "/sign-in" });
                   }}
                   className="flex w-full items-center px-2 py-1.5 text-xs text-critical hover:bg-critical/10 rounded cursor-pointer"

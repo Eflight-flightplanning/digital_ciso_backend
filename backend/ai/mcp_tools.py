@@ -22,7 +22,7 @@ from api.models import (
     Tenant,
     User,
 )
-from ai.claude_provider import get_ai_provider
+from ai.providers import get_ai_provider
 from ai.execution_agent import execution_agent, ExecutionPermissionError
 
 logger = logging.getLogger(__name__)

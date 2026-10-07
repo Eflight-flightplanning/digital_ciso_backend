@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any
 
 import httpx
@@ -42,6 +43,19 @@ DEFAULT_VLLM_ENDPOINT = "http://10.0.0.4:8000/v1"
 DEFAULT_MODEL = "/home/azureuser/models/qwen3.5-9b"
 DEFAULT_TIMEOUT = 180.0
 
+# Circuit breaker: once an endpoint refuses/timeouts on connect, skip it for a few seconds so a
+# down GPU VM costs one fast failure instead of two 5s connect timeouts on every chat message.
+_ENDPOINT_DOWN_UNTIL: dict[str, float] = {}
+_MODEL_ID_CACHE: dict[str, str] = {}
+_ENDPOINT_DOWN_SECONDS = 15.0
+
+_CODING_RE = re.compile(
+    r"\b(python|javascript|typescript|golang|java|c#|bash|powershell|shell script|script|snippet|"
+    r"function|regex|sql query|boto3|sdk|write (?:a|an|me)|code)\b",
+    re.IGNORECASE,
+)
+_NON_FINDING_PREFIXES = ("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS", "AZURE-TENANCY")
+
 
 class VLLMAzureProvider(AIProvider):
     """vLLM Provider running Qwen on Azure VM."""
@@ -62,6 +76,10 @@ class VLLMAzureProvider(AIProvider):
             pass
 
         raw_url = base_url.strip() if (base_url and isinstance(base_url, str) and base_url.strip()) else None
+        if raw_url:
+            from ai.url_safety import validate_outbound_url
+
+            validate_outbound_url(raw_url)  # raises UnsafeURLError (a ValueError) on SSRF-style targets
         self.base_url = (
             raw_url
             or os.getenv("VLLM_AZURE_ENDPOINT")
@@ -89,6 +107,11 @@ class VLLMAzureProvider(AIProvider):
         """Dynamically resolve the exact model ID registered in vLLM to prevent 404 model not found errors."""
         if hasattr(self, "_active_model_id") and self._active_model_id:
             return self._active_model_id
+        if self.base_url in _MODEL_ID_CACHE:
+            self._active_model_id = _MODEL_ID_CACHE[self.base_url]
+            return self._active_model_id
+        if self._endpoint_down():
+            return self.model or DEFAULT_MODEL
         try:
             url = f"{self.base_url}/models"
             headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -98,11 +121,21 @@ class VLLMAzureProvider(AIProvider):
                     data = res.json().get("data", [])
                     if data and isinstance(data, list) and len(data) > 0 and "id" in data[0]:
                         self._active_model_id = str(data[0]["id"])
+                        _MODEL_ID_CACHE[self.base_url] = self._active_model_id
                         logger.info("vLLM active model dynamically auto-resolved: %s", self._active_model_id)
                         return self._active_model_id
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            self._mark_endpoint_down()
+            logger.debug("Could not auto-discover vLLM model: %s", e)
         except Exception as e:
             logger.debug("Could not auto-discover vLLM model: %s", e)
         return self.model or DEFAULT_MODEL
+
+    def _endpoint_down(self) -> bool:
+        return _ENDPOINT_DOWN_UNTIL.get(self.base_url, 0.0) > time.monotonic()
+
+    def _mark_endpoint_down(self) -> None:
+        _ENDPOINT_DOWN_UNTIL[self.base_url] = time.monotonic() + _ENDPOINT_DOWN_SECONDS
 
     def _call_vllm_chat(
         self,
@@ -113,6 +146,8 @@ class VLLMAzureProvider(AIProvider):
         history: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Send chat completion request to vLLM OpenAI-compatible endpoint with multi-turn history."""
+        if self._endpoint_down():
+            return {"summary": "AI model temporarily unavailable.", "error": "endpoint unreachable", "_ai_unavailable": True}
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Content-Type": "application/json",
@@ -144,6 +179,9 @@ class VLLMAzureProvider(AIProvider):
             "messages": messages,
             "temperature": temperature,
             "max_tokens": safe_max_tokens,
+            # Qwen3.x otherwise emits a visible "thinking" scratchpad that gets discarded, which is what
+            # used to push answers into the canned fallback. Ask vLLM's chat template not to think.
+            "chat_template_kwargs": {"enable_thinking": False},
         }
 
         try:
@@ -157,10 +195,13 @@ class VLLMAzureProvider(AIProvider):
                 raw_content = resp_json["choices"][0]["message"]["content"]
                 return self._extract_json(raw_content)
         except Exception as e:
+            if isinstance(e, (httpx.ConnectError, httpx.ConnectTimeout)):
+                self._mark_endpoint_down()
             logger.error("vLLM request failed to %s with model %s: %s", url, active_model, e)
+            # Never return str(e) to callers: it can contain internal hostnames/IPs.
             return {
-                "summary": f"Analysis failed: {str(e)}",
-                "error": str(e),
+                "summary": "AI analysis is temporarily unavailable.",
+                "error": type(e).__name__,
                 "_ai_unavailable": True,
             }
 
@@ -477,6 +518,7 @@ class VLLMAzureProvider(AIProvider):
         history: list[dict[str, str]] | None = None,
         connected_providers: list[dict[str, Any]] | None = None,
         compliance_scores: list[dict[str, Any]] | None = None,
+        fleet_stats: dict[str, Any] | None = None,
     ) -> AdvisorOutput:
         """Answer CISO security queries using dynamic live LLM generation augmented with verified remediation templates."""
         # 0. Sanitize untrusted cloud resource data
@@ -535,6 +577,13 @@ class VLLMAzureProvider(AIProvider):
         # 4. Derive primary cloud provider and check for multi-cloud / overview query
         q_lower = (question or "").lower()
         is_overview_query = any(w in q_lower for w in ("multi-cloud", "multicloud", "briefing", "posture", "ciso", "executive", "overall", "all cloud", "across", "compare", "score", "compliance", "cis score", "sla", "readiness"))
+
+        # General coding/scripting requests must not be wrapped in cloud-remediation instructions
+        is_coding_query = bool(_CODING_RE.search(question or "")) and not slim_pinned
+        if is_coding_query:
+            is_overview_query = False
+            slim_general = []
+            context_str = "[]"
 
         _primary_cloud = None
         for f in (slim_pinned + slim_general):
@@ -596,8 +645,25 @@ class VLLMAzureProvider(AIProvider):
                 + f"\nINSTRUCTION: {remediation_instruction}\n"
             )
 
+        coding_hint = (
+            "\nThis is a general technical/coding request: answer it directly with complete, runnable code in "
+            "fenced blocks plus a brief explanation. Use the security context only where it is genuinely relevant.\n"
+            if is_coding_query else ""
+        )
+
+        fleet_str = ""
+        if fleet_stats and not is_coding_query:
+            fleet_str = (
+                "\nFleet Statistics (exact counts from the database; use these for any "
+                "'how many' / 'which' / 'top' question and do not invent numbers):\n"
+                + json.dumps(fleet_stats, indent=1)
+                + "\n"
+            )
+
         user_prompt = (
             f"Connected Environments:\n{prov_str}\n"
+            f"{fleet_str}"
+            f"{coding_hint}"
             f"{_cloud_hint}"
             f"{comp_str}"
             f"{pinned_section}\n"
@@ -608,10 +674,25 @@ class VLLMAzureProvider(AIProvider):
         data = self._call_vllm_chat(
             system_prompt=ADVISOR_SYSTEM_PROMPT,
             user_prompt=user_prompt,
-            temperature=0.1,
+            # Low temperature for grounded security answers; a little more room for code/explanations
+            temperature=0.3 if is_coding_query else 0.2,
             max_tokens=2200,
             history=history,
         )
+        if not data.get("_ai_unavailable"):
+            _first = self._clean_thinking_trace(data.get("answer", data.get("raw_text", "")).strip())
+            if not _first or len(_first) <= 35:
+                # Unusable generation (empty / scratchpad only): retry once with a lean prompt and a
+                # different temperature before giving up on the live model.
+                data = self._call_vllm_chat(
+                    system_prompt=ADVISOR_SYSTEM_PROMPT,
+                    user_prompt=f"{fleet_str}{coding_hint}\nUser Question:\n{question}",
+                    temperature=0.5,
+                    max_tokens=1800,
+                    history=history,
+                )
+        ai_unreachable = bool(data.get("_ai_unavailable"))
+        fallback_used = False
         if data.get("_ai_unavailable"):
             logger.warning(
                 "vLLM endpoint (%s) is unavailable: %s. Engaging Spectra telemetry synthesis engine.",
@@ -632,6 +713,7 @@ class VLLMAzureProvider(AIProvider):
         )) or "critical output rule:" in low_ans
 
         if not ans or len(ans) <= 35 or looks_like_reasoning:
+            fallback_used = True
             if any(k in q_lower for k in ("sox", "itgc", "nis2", "readiness", "evaluate cis", "compliance readiness", "compliance posture")):
                 ans = self._synthesize_compliance_readiness_assessment(
                     question=question,
@@ -654,13 +736,31 @@ class VLLMAzureProvider(AIProvider):
                 ans = "Hello! I am Spectra, your Autonomous AI Security Copilot. I'm ready to assist with multi-cloud security posture, compliance benchmarks, toxic attack paths, and step-by-step remediations. How can I help you today?"
             elif primary_template_block:
                 ans = f"Analysis of `{_primary_finding.get('check_title') or _primary_finding.get('check_id', 'this finding')}`:"
+            elif is_coding_query or not any(
+                not str(f.get("finding_id", "")).startswith(_NON_FINDING_PREFIXES) for f in (relevant_findings or [])
+            ):
+                # Nothing in the scan data relates to this question: do not pass off a generic
+                # posture template as an answer.
+                ans = (
+                    "I can't generate a reliable answer to this question right now because the AI model "
+                    "isn't responding, and none of your scan findings relate to it. "
+                    "Please try again in a moment."
+                )
             else:
                 ans = self._synthesize_contextual_advisory(
+                    fleet_stats=fleet_stats or {},
                     question=question,
                     findings=relevant_findings or [],
                     connected_providers=connected_providers or [],
                     compliance_scores=compliance_scores or [],
                 )
+
+        if fallback_used and not ans.startswith("Hello! I am Spectra"):
+            reason = "could not be reached" if ai_unreachable else "returned an unusable response"
+            ans = (
+                f"> ⚠️ **Live AI model unavailable** — the Digital CISO model {reason}, so this reply is a "
+                f"template summary built from your scan data, not a generated answer.\n\n{ans}"
+            )
 
         # Append the deterministic, verified remediation playbook
         if primary_template_block:
@@ -688,7 +788,8 @@ class VLLMAzureProvider(AIProvider):
         return AdvisorOutput(
             answer=ans,
             finding_references=refs,
-            confidence=float(data.get("confidence", 0.95)),
+            confidence=0.3 if fallback_used else float(data.get("confidence", 0.8)),
+            mode="fallback" if fallback_used else "live",
         )
 
     @classmethod
@@ -861,6 +962,7 @@ class VLLMAzureProvider(AIProvider):
         findings: list[dict[str, Any]],
         connected_providers: list[dict[str, Any]],
         compliance_scores: list[dict[str, Any]],
+        fleet_stats: dict[str, Any] | None = None,
     ) -> str:
         prov_list = ", ".join([p.get("alias") or p.get("provider", "").upper() for p in connected_providers]) or "Multi-Cloud Fleet"
         matching = [f for f in findings if not str(f.get("finding_id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS"))]
@@ -886,6 +988,12 @@ class VLLMAzureProvider(AIProvider):
         else:
             lines.append("No active critical policy violations were directly correlated with this specific query scope. Your security perimeter maintains active continuous assurance.")
 
+        if fleet_stats and fleet_stats.get("total_open_failures") is not None:
+            sev = fleet_stats.get("open_failures_by_severity", {})
+            lines.append(
+                f"\n**Current open failures:** {fleet_stats['total_open_failures']} "
+                + "(" + ", ".join(f"{k}: {v}" for k, v in sorted(sev.items())) + ")"
+            )
         lines.append("\n**CISO Recommendation:** Maintain automated compliance scanning and enforce least-privilege access across all cloud compartments.")
         return "\n".join(lines)
 

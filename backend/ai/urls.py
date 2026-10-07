@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     AIAdvisorQueryView,
+    AIHealthView,
     AIDecisionCreateJiraTicketView,
     AIDecisionDetailView,
     AIDecisionLogView,
@@ -64,6 +65,7 @@ ai_urlpatterns = [
         AIAdvisorQueryView.as_view(),
         name="ai-advisor-query",
     ),
+    path("health", AIHealthView.as_view(), name="ai-health"),
     path(
         "reasoning",
         AIReasoningProxyView.as_view(),

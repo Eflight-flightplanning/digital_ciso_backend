@@ -2,6 +2,8 @@
 
 An enterprise-grade, multi-tenant Cloud Security Posture Management (CSPM) and automated **Digital CISO** platform built on **Django 5.1**, **PostgreSQL** (with Row-Level Security), **Celery**, and **Qwen 3.5 (9B)** hosted on **Azure VM with vLLM**.
 
+> 🔒 **Enterprise Trust & Security Whitepaper**: For customer due diligence, compliance reviews (SOC 2, ISO 27001), and bank trust gates, read [How We Secure Digital CISO](file:///d:/security_platform/docs/HOW_WE_SECURE_DIGITAL_CISO.md).
+
 ---
 
 ## 🏗️ Architecture Overview

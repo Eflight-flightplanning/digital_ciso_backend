@@ -60,3 +60,11 @@ neo4j-install/
 *.env
 backend/.env
 frontend/.env
+# Never commit data/secrets
+backend/*.sql
+backend/api/real_pod_users.json
+.env
+*.env
+!*.env.example
+*.log
+Diagnostics_*.log

@@ -718,7 +718,7 @@ msrest==0.7.1
     #   msrestazure
 msrestazure==0.6.4.post1
     # via cartography
-multidict==6.7.1
+multidict==6.9.1
     # via
     #   aiobotocore
     #   aiohttp
@@ -866,7 +866,7 @@ pygments==2.21.0
     # via
     #   knack
     #   rich
-pyjwt==2.13.0
+pyjwt==2.15.0
     # via
     #   adal
     #   azure-cli-core
@@ -1116,7 +1116,7 @@ uritemplate==4.2.0
     # via
     #   drf-spectacular
     #   google-api-python-client
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   botocore
     #   crowdstrike-falconpy
@@ -1141,7 +1141,7 @@ websocket-client==1.9.0
     # via kubernetes
 websockets==16.1.1
     # via google-genai
-werkzeug==3.1.8
+werkzeug==3.1.9
     # via django-grip
 workos==10.2.0
     # via cartography

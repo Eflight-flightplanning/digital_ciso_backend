@@ -529,7 +529,7 @@ function extractFindingResourceAndRegion(f: any): { resourceName: string; resour
     ""
   );
 
-  let resourceUid = String(
+  const resourceUid = String(
     resObj.uid ||
     f.resource_uid ||
     meta.resource_uid ||

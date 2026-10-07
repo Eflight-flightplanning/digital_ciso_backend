@@ -12,6 +12,19 @@ from api.rls import Tenant
 from api.db_router import MainRouter
 
 
+
+def _initial_password() -> str:
+    """Admin password from ADMIN_INITIAL_PASSWORD, else a random one printed once. Never hard-coded."""
+    import os
+    import secrets
+
+    pw = os.environ.get("ADMIN_INITIAL_PASSWORD")
+    if not pw:
+        pw = secrets.token_urlsafe(18)
+        print(f"  [!] ADMIN_INITIAL_PASSWORD not set; generated one-time admin password: {pw}")
+    return pw
+
+
 class Command(BaseCommand):
     help = "Initialize Production Tenant and Admin Users without dummy findings."
 
@@ -65,14 +78,12 @@ class Command(BaseCommand):
                 u = User.objects.create_user(
                     name=user_name,
                     email=user_email,
-                    password="Admin1234!",
+                    password=_initial_password(),
                     company_name="Pravahya Enterprise",
                 )
-                self.stdout.write(self.style.SUCCESS(f"  [OK] Created Admin user: {user_email} / Admin1234!"))
+                self.stdout.write(self.style.SUCCESS(f"  [OK] Created Admin user: {user_email} (password from ADMIN_INITIAL_PASSWORD, or random: check output above)"))
             else:
-                u.set_password("Admin1234!")
-                u.save()
-                self.stdout.write(f"  [OK] Updated Admin user password: {user_email} / Admin1234!")
+                self.stdout.write(f"  [OK] Admin user exists, password left unchanged: {user_email}")
 
         # 4. Consolidate all users into the main enterprise tenant & grant RBAC permissions
         all_users = User.objects.using(MainRouter.admin_db).all()

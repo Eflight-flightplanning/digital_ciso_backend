@@ -98,7 +98,7 @@ def get_active_jira_service(tenant_id: str | None = None, raise_exception: bool 
     except Exception as e:
         logger.error(f"Failed to initialize Jira service for tenant {tenant_id}: {e}")
         if raise_exception:
-            raise ValidationError({"error": f"Failed to initialize Jira service: {str(e)}"})
+            raise ValidationError({"error": "Failed to initialize Jira service. See server logs."})
         return None
 
 
@@ -297,8 +297,9 @@ class JiraTestConnectionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
+            logger.error("Jira connection test failed: %s", e)
             return Response(
-                {"success": False, "error": str(e)},
+                {"success": False, "error": "Connection test failed. See server logs."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -308,7 +309,7 @@ class JiraProjectsView(APIView):
     GET /api/v1/jira/projects
     Retrieves available projects from Jira Cloud.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -342,7 +343,7 @@ class JiraIssueTypesView(APIView):
     GET /api/v1/jira/projects/<project_key>/issue-types
     Retrieves issue types available for the given project.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -376,7 +377,7 @@ class JiraAssigneesView(APIView):
     GET /api/v1/jira/projects/<project_key>/assignees?query=...
     Searches assignable users for a project and updates cache.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -486,7 +487,7 @@ class JiraPrioritiesView(APIView):
     GET /api/v1/jira/priorities
     Retrieves configured priorities.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -518,7 +519,6 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
     """
     queryset = RemediationExecution.objects.all()
     serializer_class = RemediationExecutionSerializer
-    permission_classes = [AllowAny]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
     filterset_fields = ["status", "project_key", "priority"]
@@ -770,7 +770,7 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
         except Exception as e:
             logger.error(f"Unexpected error during Jira ticket creation: {e}", exc_info=True)
             return Response(
-                {"error": f"Failed to create Jira ticket: {str(e)}"},
+                {"error": "Failed to create Jira ticket. See server logs."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -89,3 +89,27 @@ def get_providers(role: Role) -> QuerySet[Provider]:
     return Provider.objects.filter(
         tenant_id=tenant_id, provider_groups__in=provider_groups
     ).distinct()
+
+
+class IsPlatformOperator(BasePermission):
+    """
+    Gate for endpoints backed by server-wide credentials/data (not scoped to a tenant),
+    e.g. the Oracle Fusion pod integration. Self-registered users get their own tenant and
+    full rights inside it, so IsAuthenticated is NOT enough here.
+
+    Allowed: superusers/staff, or users whose token tenant is listed in
+    PLATFORM_OPERATOR_TENANT_IDS (comma-separated env var). Deny by default.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+        tenant_id = None
+        if request.auth is not None and hasattr(request.auth, "get"):
+            tenant_id = request.auth.get("tenant_id")
+        from django.conf import settings
+
+        return bool(tenant_id) and str(tenant_id) in settings.PLATFORM_OPERATOR_TENANT_IDS

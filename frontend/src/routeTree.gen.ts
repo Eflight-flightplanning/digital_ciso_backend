@@ -23,6 +23,7 @@ import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ScansRouteImport } from './routes/scans'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as TrustRouteImport } from './routes/trust'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as AiAdvisorRouteImport } from './routes/ai.advisor'
 import { Route as AiDecisionsRouteImport } from './routes/ai.decisions'
@@ -98,6 +99,11 @@ const SignUpRoute = SignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TrustRoute = TrustRouteImport.update({
+  id: '/trust',
+  path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/scans': typeof ScansRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/ai/advisor': typeof AiAdvisorRoute
   '/ai/decisions': typeof AiDecisionsRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/scans': typeof ScansRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/ai/advisor': typeof AiAdvisorRoute
   '/ai/decisions': typeof AiDecisionsRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/scans': typeof ScansRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/trust': typeof TrustRoute
   '/users': typeof UsersRoute
   '/ai/advisor': typeof AiAdvisorRoute
   '/ai/decisions': typeof AiDecisionsRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/scans'
     | '/sign-in'
     | '/sign-up'
+    | '/trust'
     | '/users'
     | '/ai/advisor'
     | '/ai/decisions'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/scans'
     | '/sign-in'
     | '/sign-up'
+    | '/trust'
     | '/users'
     | '/ai/advisor'
     | '/ai/decisions'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/scans'
     | '/sign-in'
     | '/sign-up'
+    | '/trust'
     | '/users'
     | '/ai/advisor'
     | '/ai/decisions'
@@ -258,6 +270,7 @@ export interface RootRouteChildren {
   ScansRoute: typeof ScansRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  TrustRoute: typeof TrustRoute
   UsersRoute: typeof UsersRoute
   AiAdvisorRoute: typeof AiAdvisorRoute
   AiDecisionsRoute: typeof AiDecisionsRoute
@@ -364,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trust': {
+      id: '/trust'
+      path: '/trust'
+      fullPath: '/trust'
+      preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/users': {
       id: '/users'
       path: '/users'
@@ -410,6 +430,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScansRoute: ScansRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  TrustRoute: TrustRoute,
   UsersRoute: UsersRoute,
   AiAdvisorRoute: AiAdvisorRoute,
   AiDecisionsRoute: AiDecisionsRoute,

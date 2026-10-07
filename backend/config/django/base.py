@@ -7,11 +7,21 @@ from config.settings.eventstream import *  # noqa
 from config.settings.partitions import *  # noqa
 from config.settings.sentry import *  # noqa
 
-SECRET_KEY = env("SECRET_KEY", default="prowler_secret_key_32_bytes_long_12345_67890")
+_INSECURE_DEFAULT_SECRET_KEY = "prowler_secret_key_32_bytes_long_12345_67890"
+# DEPLOYMENT.md documents DJANGO_SECRET_KEY; accept both names so the configured value is actually used.
+SECRET_KEY = env(
+    "SECRET_KEY", default=env("DJANGO_SECRET_KEY", default=_INSECURE_DEFAULT_SECRET_KEY)
+)
+# SECRET_KEY signs every JWT. The default is public in the repo, so refuse to start with it
+# whenever DEBUG is explicitly off (i.e. production).
+if SECRET_KEY == _INSECURE_DEFAULT_SECRET_KEY and not env.bool("DJANGO_DEBUG", default=True):
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SECRET_KEY / DJANGO_SECRET_KEY is unset: refusing to sign tokens with the public default key."
+    )
 VLLM_AZURE_ENDPOINT = env("VLLM_AZURE_ENDPOINT", default="http://10.0.0.4:8000/v1")
 VLLM_AZURE_MODEL = env("VLLM_AZURE_MODEL", default="/home/azureuser/models/qwen3.5-9b")
-ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
-ANTHROPIC_MODEL = env("ANTHROPIC_MODEL", default="qwen3.5-9b")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 TESTING = env.bool("TESTING", default=False)
 DJANGO_DELETION_BATCH_SIZE = env.int("DJANGO_DELETION_BATCH_SIZE", default=5000)
@@ -47,6 +57,9 @@ DRF_SIMPLE_API_KEY = {
     "HEADER_KEY": "HTTP_X_API_KEY",
     "FERNET_SECRET": SECRETS_ENCRYPTION_KEY,
 }
+
+# Tenants (besides staff/superusers) allowed to use server-wide integrations such as Oracle Fusion.
+PLATFORM_OPERATOR_TENANT_IDS = env.list("PLATFORM_OPERATOR_TENANT_IDS", default=[])
 
 AUTH_USER_MODEL = "api.User"
 
@@ -93,10 +106,35 @@ MIDDLEWARE = [
 
 SITE_ID = 1
 
-CORS_ALLOW_ALL_ORIGINS = True
+# Credentialed CORS must never be allow-all: any website could otherwise make
+# authenticated requests as the user and read the responses. Only the origins
+# listed here (default: the same set trusted for CSRF) may call the API from a browser.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = env.list("DJANGO_CORS_ALLOWED_ORIGINS", default=CSRF_TRUSTED_ORIGINS)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
-CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "x-api-key",
+    "x-auth-mode",
+    "x-requested-with",
+]
+
+# Refresh token lives in an HttpOnly cookie scoped to the token endpoints (see api/auth_cookies.py).
+AUTH_REFRESH_COOKIE_NAME = "dciso_refresh"
+AUTH_REFRESH_COOKIE_PATH = "/api/v1/tokens"
+# The cookie is always Secure when the request arrived over HTTPS (request.is_secure(), which
+# honours X-Forwarded-Proto from nginx). Set AUTH_COOKIE_SECURE=true to force it regardless.
+AUTH_COOKIE_SECURE = env.bool("AUTH_COOKIE_SECURE", default=False)
+SESSION_COOKIE_SECURE = AUTH_COOKIE_SECURE
+CSRF_COOKIE_SECURE = AUTH_COOKIE_SECURE
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
 ROOT_URLCONF = "config.urls"
 
@@ -120,6 +158,9 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular_jsonapi.schemas.openapi.JsonApiAutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "api.authentication.CombinedJWTOrAPIKeyAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
     ),
     "PAGE_SIZE": 10,
     "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
@@ -182,8 +223,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_MINUTES", default=15)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=env.int("JWT_REFRESH_DAYS", default=7)),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
@@ -211,7 +252,7 @@ SIMPLE_JWT = {
 
 REST_AUTH = {
     "USE_JWT": True,
-    "JWT_AUTH_HTTPONLY": False,
+    "JWT_AUTH_HTTPONLY": True,
     "JWT_AUTH_COOKIE": None,
     "JWT_AUTH_REFRESH_COOKIE": None,
 }

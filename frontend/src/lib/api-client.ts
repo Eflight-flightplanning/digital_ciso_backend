@@ -2,29 +2,24 @@
  * Digital CISO — Centralized API Client
  *
  * Connects the TanStack Start frontend to the Django 5.1 backend API.
- * Supports SimpleJWT bearer auth, dual JSON/JSON:API unwrapping, and automatic headers.
+ * Supports SimpleJWT bearer auth (in-memory access token + HttpOnly refresh cookie), dual JSON/JSON:API unwrapping, and automatic headers.
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
-export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
-}
+import { authStore } from "@/lib/auth";
 
-export function setAuthToken(token: string | null): void {
-  if (typeof window === "undefined") return;
-  if (token) {
-    localStorage.setItem("access_token", token);
-  } else {
-    localStorage.removeItem("access_token");
-  }
+/** Access token lives in memory only (see lib/auth.ts); the refresh token is an HttpOnly cookie. */
+export function getAuthToken(): string | null {
+  return authStore.getState().token;
 }
 
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // Restore the session from the refresh cookie after a page reload before the first call.
+  await authStore.init();
   const token = getAuthToken();
   const url = endpoint.startsWith("http")
     ? endpoint
@@ -59,39 +54,24 @@ export async function apiRequest<T = any>(
     throw new Error(err?.message || "Network connection failed");
   }
 
-  // Automatic token refresh on 401 Unauthorized
-  if (response.status === 401 && !(options as any)._isRetry) {
-    const storedRefresh = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
-    if (storedRefresh) {
+  // Automatic token refresh on 401 Unauthorized (refresh token travels as an HttpOnly cookie)
+  if (response.status === 401 && !headers.has("X-Retried")) {
+    const freshToken = await authStore.refresh();
+    if (freshToken) {
+      headers.set("Authorization", `Bearer ${freshToken}`);
+      headers.set("X-Retried", "1");
       try {
-        const tokenRes = await fetch(`${API_BASE}/tokens/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Accept": "application/json, application/vnd.api+json" },
-          body: JSON.stringify({ refresh: storedRefresh }),
-        });
-        if (tokenRes.ok) {
-          const tokenJson = await tokenRes.json();
-          const freshToken = tokenJson?.attributes?.access || tokenJson?.data?.attributes?.access || tokenJson?.access;
-          if (freshToken) {
-            setAuthToken(freshToken);
-            headers.set("Authorization", `Bearer ${freshToken}`);
-            response = await fetch(url, {
-              ...options,
-              headers,
-              // @ts-ignore
-              _isRetry: true,
-            });
-          }
-        }
+        response = await fetch(url, { ...options, headers });
       } catch {
-        // Fall through to redirect handler
+        // Fall through to the error handling below
       }
     }
 
-    if (!response.ok && typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      window.location.href = "/sign-in";
+    if (response.status === 401) {
+      await authStore.signOut();
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
+        window.location.href = "/sign-in";
+      }
       return { data: [], items: [], meta: {} } as unknown as T;
     }
   }

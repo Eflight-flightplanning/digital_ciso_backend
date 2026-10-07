@@ -89,9 +89,21 @@ python manage.py migrate
 # Django & Server Core
 DJANGO_SETTINGS_MODULE=config.django.devel
 DJANGO_DEBUG=False
-DJANGO_SECRET_KEY=production-secret-key-change-in-prod-xyz123!
+# REQUIRED and must be unique: generate with  python -c "import secrets;print(secrets.token_urlsafe(48))"
+# (the app refuses to start in production with it unset; never reuse a value from this document)
+DJANGO_SECRET_KEY=<generate-your-own>
+# Encrypts stored provider credentials. Defaults to a key that is public in git: generate your own with
+#   python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"
+# NOTE: changing it makes already-stored provider secrets/API keys undecryptable, so re-enter them after rotating.
+SECRETS_ENCRYPTION_KEY=<generate-your-own>
 DJANGO_ALLOWED_HOSTS=*
 CSRF_TRUSTED_ORIGINS=https://demo-digitalciso.centralindia.cloudapp.azure.com,http://localhost:3000,http://127.0.0.1:8000
+# Browser origins allowed to call the API with credentials (CORS is no longer allow-all).
+# Defaults to the CSRF list; set explicitly in prod to just your real https origin(s).
+DJANGO_CORS_ALLOWED_ORIGINS=https://demo-digitalciso.centralindia.cloudapp.azure.com
+# Session tokens: access token (kept in browser memory) and refresh token (HttpOnly cookie)
+JWT_ACCESS_MINUTES=15
+JWT_REFRESH_DAYS=7
 
 # Azure Flexible PostgreSQL (SSL Mode Require)
 POSTGRES_HOST=digitalciso.postgres.database.azure.com
@@ -316,6 +328,11 @@ server {
     return 301 https://$host$request_uri;
 }
 
+# Brute-force / abuse protection (zones live at http{} level; this file is included there)
+limit_req_zone $binary_remote_addr zone=auth_zone:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=api_zone:10m rate=20r/s;
+server_tokens off;
+
 # HTTPS Server
 server {
     listen 443 ssl http2;
@@ -327,10 +344,33 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
 
+    # Security & Search Engine Suppression Headers
+    add_header X-Robots-Tag "noindex, nofollow, nosnippet, noarchive" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # Never serve dotfiles/VCS data, DB dumps or logs even if one lands in a served directory
+    location ~ /\.(?!well-known) { deny all; }
+    location ~* \.(sql|log|bak|env|json\.bak)$ { deny all; }
+
+    # Login / registration / token refresh: strict per-IP limit (brute force, credential stuffing)
+    location ~ ^/api/v1/(tokens|users)(/refresh|/logout)?/?$ {
+        limit_req zone=auth_zone burst=5 nodelay;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
     client_max_body_size 50M;
 
     # 1. Django REST API — MUST be before the / block
     location /api/ {
+        limit_req zone=api_zone burst=40 nodelay;
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

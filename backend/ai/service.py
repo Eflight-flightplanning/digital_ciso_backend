@@ -26,7 +26,7 @@ from typing import Any
 from django.db import transaction
 
 from .cache import AIAnalysisCache, build_fingerprint
-from .claude_provider import get_ai_provider
+from .providers import get_ai_provider
 from .normalizer import compute_evidence_fingerprint, normalize_finding
 from .policy_engine import policy_engine
 from .risk_engine import risk_engine
