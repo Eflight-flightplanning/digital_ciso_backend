@@ -41,6 +41,7 @@ import {
   useCompliance,
   useComplianceRequirements,
 } from "@/hooks/use-api";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
@@ -105,13 +106,25 @@ function ReportsPage() {
   const [chapterSearch, setChapterSearch] = useState<string>("");
   const [chapterStatusFilter, setChapterStatusFilter] = useState<"ALL" | "FAIL" | "PASS" | "MANUAL">("ALL");
 
-  const findings = findingsRaw?.items ?? [];
+  const { subscribedClouds, subscribedCompliances, isCloudSubscribed, isComplianceSubscribed } = useSubscriptions();
+
+  const findings = useMemo(() => {
+    const list = findingsRaw?.items ?? [];
+    if (!subscribedClouds.length) return list;
+    return list.filter((f: any) => isCloudSubscribed(f.provider || f.provider_type || ""));
+  }, [findingsRaw, subscribedClouds, isCloudSubscribed]);
+
   const resources = resourcesRaw?.items ?? [];
 
   const connectedProviders = useMemo(() => {
     const list = (providersRaw?.items as Array<Record<string, unknown>>) || [];
-    return list.map((p) => {
-      const providerSlug = String(p.provider || "").toLowerCase();
+    return list
+      .filter((p) => {
+        const slug = String(p.provider || "").toLowerCase();
+        return !subscribedClouds.length || isCloudSubscribed(slug);
+      })
+      .map((p) => {
+        const providerSlug = String(p.provider || "").toLowerCase();
       const provStr = providerSlug.toUpperCase();
       const provType = provStr === "ORACLECLOUD" ? "OCI" : provStr;
       return {
@@ -150,7 +163,8 @@ function ReportsPage() {
           id.includes("itgc_sox") ||
           id.includes("soc1_type2") ||
           fw.includes("itgc sox") ||
-          fw.includes("soc 1 type")
+          fw.includes("soc 1 type") ||
+          !isComplianceSubscribed(String(item.compliance_id || item.id || ""))
         );
       })
       .map((item) => {

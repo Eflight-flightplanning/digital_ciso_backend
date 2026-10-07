@@ -236,6 +236,24 @@ export const authStore = {
       if (providedCompany) user.company_name = user.company_name || providedCompany;
 
       this.setUser(user, accessToken);
+
+      if (typeof window !== "undefined") {
+        try {
+          const initKey = `dciso_company_initialized_${user.id}`;
+          if (!localStorage.getItem(initKey) && !localStorage.getItem("dciso_new_company_provisioning")) {
+            localStorage.setItem(
+              "dciso_new_company_provisioning",
+              JSON.stringify({
+                companyName: user.company_name || user.name || "Enterprise Workspace",
+                timestamp: Date.now(),
+              })
+            );
+          }
+        } catch {
+          /* storage unavailable: provisioning splash is cosmetic */
+        }
+      }
+
       return { user };
     } catch (err: any) {
       currentAuth = { ...currentAuth, isLoading: false };
@@ -248,7 +266,9 @@ export const authStore = {
     email: string,
     password: string,
     name: string,
-    company_name: string
+    company_name: string,
+    cloud_providers?: string[],
+    compliance_frameworks?: string[]
   ): Promise<User> {
     currentAuth = { ...currentAuth, isLoading: true };
     emit();
@@ -260,7 +280,14 @@ export const authStore = {
       const payload = {
         data: {
           type: "users",
-          attributes: { email, password, name, company_name },
+          attributes: {
+            email,
+            password,
+            name,
+            company_name,
+            ...(cloud_providers && cloud_providers.length > 0 ? { cloud_providers } : {}),
+            ...(compliance_frameworks && compliance_frameworks.length > 0 ? { compliance_frameworks } : {}),
+          },
         },
       };
 
@@ -280,9 +307,31 @@ export const authStore = {
         } catch {
     /* best-effort: ignore */
   }
-        throw new Error(
-          extractError(errJson, "Registration failed. Please check your details.")
-        );
+        let errDetail = "Registration failed. Please check your details.";
+        if (Array.isArray(errJson?.errors) && errJson.errors.length > 0) {
+          const first = errJson.errors[0];
+          errDetail = first?.detail || first?.title || errDetail;
+        } else if (errJson?.errors && typeof errJson.errors === "object") {
+          const values = Object.values(errJson.errors).flat();
+          if (values.length > 0) errDetail = String(values[0]);
+        } else {
+          errDetail = extractError(errJson, errDetail);
+        }
+        throw new Error(errDetail);
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(
+            "dciso_new_company_provisioning",
+            JSON.stringify({
+              companyName: company_name || `${name.split(" ")[0]}'s Organization`,
+              timestamp: Date.now(),
+            })
+          );
+        } catch {
+          /* storage unavailable: provisioning splash is cosmetic */
+        }
       }
 
       // Automatically log the newly registered user into their own isolated tenant

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { WorldThreatMap } from "@/components/dashboard/WorldThreatMap";
+import { CompanyProvisioningLoader } from "@/components/dashboard/CompanyProvisioningLoader";
 import {
   useFindings,
   useProviders,
@@ -34,6 +35,8 @@ import {
   useCompliance,
   useAttackPaths,
 } from "@/hooks/use-api";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
+import { authStore } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1019,6 +1022,35 @@ function FindingsDonutChart({
 
 export function DashboardPage() {
   const navigate = useNavigate();
+
+  // Onboarding / Provisioning load time for newly registered companies
+  const [provisioningCompany, setProvisioningCompany] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("dciso_new_company_provisioning");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.companyName || "Enterprise Workspace";
+    } catch {
+      return null;
+    }
+  });
+
+  const handleProvisioningComplete = () => {
+    if (typeof window !== "undefined") {
+      const userId = authStore.getState().user?.id;
+      if (userId) {
+        try {
+          localStorage.setItem(`dciso_company_initialized_${userId}`, "true");
+        } catch {
+          /* storage unavailable: provisioning splash is cosmetic */
+        }
+      }
+      localStorage.removeItem("dciso_new_company_provisioning");
+    }
+    setProvisioningCompany(null);
+  };
+
   const { data: findingsRaw, isLoading: findingsLoading, refetch: refetchFindings } = useFindings();
   const { data: providersRaw, isLoading: providersLoading, refetch: refetchProviders } = useProviders();
   const { data: resourcesRaw } = useResources();
@@ -1042,9 +1074,32 @@ export function DashboardPage() {
     setTimeout(() => setSyncing(false), 600);
   };
 
-  // Real Database Telemetry Computations
-  const rawFindings = findingsRaw?.items ?? [];
-  const providers = (providersRaw?.items as Array<Record<string, unknown>>) ?? [];
+  const {
+    subscribedClouds,
+    subscribedCompliances,
+    isCloudSubscribed,
+    isComplianceSubscribed,
+  } = useSubscriptions();
+
+  // Real Database Telemetry Computations — filtered to active tenant subscriptions
+  const providers = useMemo(() => {
+    const list = (providersRaw?.items as Array<Record<string, unknown>>) ?? [];
+    if (!subscribedClouds.length) return list;
+    return list.filter((p: any) => {
+      const pType = String(p.provider || p.provider_type || "").toLowerCase();
+      return isCloudSubscribed(pType);
+    });
+  }, [providersRaw, subscribedClouds, isCloudSubscribed]);
+
+  const rawFindings = useMemo(() => {
+    const list = findingsRaw?.items ?? [];
+    if (!subscribedClouds.length) return list;
+    return list.filter((f: any) => {
+      const p = String(f.provider || f.provider_type || f.scan?.provider?.provider || "").toLowerCase();
+      return !p || isCloudSubscribed(p);
+    });
+  }, [findingsRaw, subscribedClouds, isCloudSubscribed]);
+
   const resources = resourcesRaw?.items ?? [];
 
   // Filter by selected provider if not ALL
@@ -1120,18 +1175,23 @@ export function DashboardPage() {
   const { data: dashboardComplianceData } = useCompliance(complianceOverviewParams);
   const realComplianceFrameworks = useMemo(() => {
     const items = (dashboardComplianceData?.items as Array<Record<string, any>>) ?? [];
-    return items.map((item) => {
-      const passed = Number(item.requirements_passed) || 0;
-      const failed = Number(item.requirements_failed) || 0;
-      const total = Number(item.total_requirements) || 0;
-      const evaluated = Math.max(1, passed + failed);
-      return {
-        id: String(item.compliance_id || item.id || "").toLowerCase(),
-        name: String(item.framework || item.title || item.id || ""),
-        score: total > 0 ? Math.round((passed / evaluated) * 100) : 0,
-      };
-    });
-  }, [dashboardComplianceData]);
+    return items
+      .filter((item) => {
+        const cid = String(item.compliance_id || item.id || "");
+        return isComplianceSubscribed(cid);
+      })
+      .map((item) => {
+        const passed = Number(item.requirements_passed) || 0;
+        const failed = Number(item.requirements_failed) || 0;
+        const total = Number(item.total_requirements) || 0;
+        const evaluated = Math.max(1, passed + failed);
+        return {
+          id: String(item.compliance_id || item.id || "").toLowerCase(),
+          name: String(item.framework || item.title || item.id || ""),
+          score: total > 0 ? Math.round((passed / evaluated) * 100) : 0,
+        };
+      });
+  }, [dashboardComplianceData, isComplianceSubscribed]);
 
   // Real live numbers from database findings
   const realPass = filteredFindings.filter((f: any) => f.status === "PASS").length;
@@ -1282,6 +1342,15 @@ export function DashboardPage() {
   const animFailCount = useCountUp(totalOpenFail, 4200, dashboardReady);
   const animMutedCount = useCountUp(totalMutedCount, 3200, dashboardReady);
 
+  if (provisioningCompany) {
+    return (
+      <CompanyProvisioningLoader
+        companyName={provisioningCompany}
+        onComplete={handleProvisioningComplete}
+      />
+    );
+  }
+
   return (
     <AppShell>
       <div className="space-y-6 pb-12">
@@ -1291,8 +1360,14 @@ export function DashboardPage() {
             <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Security Command Center
             </h1>
-            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-              Multi-cloud posture monitoring, threat correlation, and automated triage
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
+              <span>Multi-cloud posture monitoring, threat correlation, and automated triage</span>
+              {subscribedClouds.length > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 px-2 py-0.5 text-[10px] font-bold text-cyan-400">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  Tenant Subscriptions: {subscribedClouds.map((c) => c.toUpperCase()).join(" + ")}
+                </span>
+              )}
             </p>
           </div>
 

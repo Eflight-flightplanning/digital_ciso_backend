@@ -23,6 +23,7 @@ import httpx
 
 from .prompts import (
     ADVISOR_SYSTEM_PROMPT,
+    build_advisor_system_prompt,
     CORRELATION_SYSTEM_PROMPT,
     DECISION_SYSTEM_PROMPT,
     REASONING_SYSTEM_PROMPT,
@@ -671,8 +672,14 @@ class VLLMAzureProvider(AIProvider):
             f"User Question:\n{question}"
         )
 
+        # Tenant modularity: scope the advisor to the clouds/frameworks this tenant subscribed to
+        advisor_system_prompt = build_advisor_system_prompt(
+            subscribed_clouds=[p.get("provider") for p in (connected_providers or []) if p.get("provider")],
+            subscribed_compliances=[c.get("compliance_id") for c in (compliance_scores or []) if c.get("compliance_id")],
+        )
+
         data = self._call_vllm_chat(
-            system_prompt=ADVISOR_SYSTEM_PROMPT,
+            system_prompt=advisor_system_prompt,
             user_prompt=user_prompt,
             # Low temperature for grounded security answers; a little more room for code/explanations
             temperature=0.3 if is_coding_query else 0.2,
@@ -685,7 +692,7 @@ class VLLMAzureProvider(AIProvider):
                 # Unusable generation (empty / scratchpad only): retry once with a lean prompt and a
                 # different temperature before giving up on the live model.
                 data = self._call_vllm_chat(
-                    system_prompt=ADVISOR_SYSTEM_PROMPT,
+                    system_prompt=advisor_system_prompt,
                     user_prompt=f"{fleet_str}{coding_hint}\nUser Question:\n{question}",
                     temperature=0.5,
                     max_tokens=1800,

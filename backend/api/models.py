@@ -7048,4 +7048,125 @@ class JiraAssigneeCache(RowLevelSecurityProtectedModel):
         ]
 
     class JSONAPIMeta:
-        resource_name = "jira-assignees-cache"
+        resource_name = "jira-assignees-cache"
+
+
+class TenantCloudSubscription(RowLevelSecurityProtectedModel):
+    """Tracks which cloud providers a tenant has subscribed to."""
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    inserted_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    provider_type = ProviderEnumField(
+        choices=Provider.ProviderChoices.choices
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "tenant_cloud_subscriptions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "provider_type"),
+                name="unique_tenant_cloud_subscription",
+            ),
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "tenant-cloud-subscriptions"
+
+
+class TenantComplianceSubscription(RowLevelSecurityProtectedModel):
+    """Tracks which compliance frameworks a tenant has subscribed to."""
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    inserted_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    framework_id = models.CharField(max_length=150, blank=False)
+    framework_name = models.CharField(max_length=200, blank=True)
+    provider_type = ProviderEnumField(
+        choices=Provider.ProviderChoices.choices,
+        null=True, blank=True
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "tenant_compliance_subscriptions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tenant", "framework_id"),
+                name="unique_tenant_compliance_subscription",
+            ),
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "tenant-compliance-subscriptions"
+
+
+class SubscriptionChangeRequest(RowLevelSecurityProtectedModel):
+    """
+    When a user wants to add a new provider or compliance framework
+    after initial signup, a change request is created that requires
+    admin approval.
+    """
+    class RequestType(models.TextChoices):
+        ADD_CLOUD = "add_cloud", "Add Cloud Provider"
+        REMOVE_CLOUD = "remove_cloud", "Remove Cloud Provider"
+        ADD_COMPLIANCE = "add_compliance", "Add Compliance Framework"
+        REMOVE_COMPLIANCE = "remove_compliance", "Remove Compliance Framework"
+
+    class RequestStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    inserted_at = models.DateTimeField(auto_now_add=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True,
+        related_name="subscription_requests"
+    )
+    request_type = models.CharField(
+        max_length=30, choices=RequestType.choices
+    )
+    target_value = models.CharField(max_length=200)
+    target_display_name = models.CharField(max_length=200, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=RequestStatus.choices,
+        default=RequestStatus.PENDING
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="reviewed_subscription_requests"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+
+    class Meta(RowLevelSecurityProtectedModel.Meta):
+        db_table = "subscription_change_requests"
+        constraints = [
+            RowLevelSecurityConstraint(
+                field="tenant_id",
+                name="rls_on_%(class)s",
+                statements=["SELECT", "INSERT", "UPDATE", "DELETE"],
+            ),
+        ]
+
+    class JSONAPIMeta:
+        resource_name = "subscription-change-requests"
+
