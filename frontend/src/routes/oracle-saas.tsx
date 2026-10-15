@@ -42,6 +42,7 @@ import {
   Counter,
   Dot,
 } from "@/components/ui-kit/primitives";
+import { apiRequest } from "@/lib/api-client";
 
 function JiraIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   return (
@@ -345,7 +346,7 @@ const SOD_MATRICES: SodMatrix[] = [
   },
 ];
 
-export function OracleSaasPage() {
+function OracleSaasPage() {
   const [activeTab, setActiveTab] = useState<"dormant" | "sod" | "superusers" | "settings">("dormant");
   const [inactivityFilter, setInactivityFilter] = useState<number>(0);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE" | "SUSPENDED">("ALL");
@@ -466,8 +467,7 @@ export function OracleSaasPage() {
   }, [executionsData]);
 
   useEffect(() => {
-    fetch("/api/v1/oracle-saas/overview")
-      .then((r) => r.json())
+    apiRequest("/oracle-saas/overview")
       .then((res) => {
         const d = res.data || res;
         if (d.kpis) {
@@ -489,8 +489,7 @@ export function OracleSaasPage() {
       })
       .catch((e) => console.warn("Overview fetch:", e));
 
-    fetch("/api/v1/oracle-saas/inactive-users")
-      .then((r) => r.json())
+    apiRequest("/oracle-saas/inactive-users")
       .then((res) => {
         const d = res.data || res;
         if (d.users && Array.isArray(d.users)) {
@@ -604,9 +603,8 @@ export function OracleSaasPage() {
     }));
 
     try {
-      await fetch("/api/v1/oracle-saas/remediate", {
+      await apiRequest("/oracle-saas/remediate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "SUSPEND_USER",
           username: targetUsername,
@@ -719,15 +717,10 @@ export function OracleSaasPage() {
     setIsSyncing(true);
     setSyncStatusMsg("Connecting to Oracle Fusion Pod using .env credentials & fetching live telemetry...");
     try {
-      const resp = await fetch("/api/v1/oracle-saas/sync-live", {
+      const resData = await apiRequest("/oracle-saas/sync-live", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (!resp.ok) {
-        throw new Error(`Server returned HTTP ${resp.status}`);
-      }
-      const resData = await resp.json();
       const payload = resData.data || resData;
       if (payload.users && payload.users.length > 0) {
         setUsers(payload.users);
@@ -754,8 +747,8 @@ export function OracleSaasPage() {
   const handleTestConnection = async () => {
     setConnTesting(true);
     try {
-      const resp = await fetch("/api/v1/oracle-saas/overview");
-      if (resp.ok) {
+      const resp = await apiRequest("/oracle-saas/overview");
+      if (resp && !resp.error) {
         setConnSuccess(true);
       } else {
         setConnSuccess(false);
@@ -1494,9 +1487,8 @@ export function OracleSaasPage() {
                     setIsEnriching(true);
                     setEnrichResult(null);
                     try {
-                      const resp = await fetch("/api/v1/oracle-saas/sync-hcm-users", {
+                      const json = await apiRequest("/oracle-saas/sync-hcm-users", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           pod_url: podUrl,
                           username: authUsername,
@@ -1504,7 +1496,6 @@ export function OracleSaasPage() {
                           limit: 50,
                         }),
                       });
-                      const json = await resp.json();
                       const payload = json.data || json;
                       setEnrichResult({
                         enriched_count: payload.count || (payload.users ? payload.users.length : 0),
@@ -1516,9 +1507,7 @@ export function OracleSaasPage() {
                       if (payload.users && Array.isArray(payload.users)) {
                         setUsers(payload.users);
                       } else {
-                        const usersResp = await fetch("/api/v1/oracle-saas/inactive-users");
-                        const usersJson = await usersResp.json();
-                        const ud = usersJson.data || usersJson;
+                        const ud = await apiRequest("/oracle-saas/inactive-users");
                         if (ud.users && Array.isArray(ud.users)) setUsers(ud.users);
                       }
                     } catch (err: any) {

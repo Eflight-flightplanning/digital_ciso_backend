@@ -308,7 +308,7 @@ class JiraProjectsView(APIView):
     GET /api/v1/jira/projects
     Retrieves available projects from Jira Cloud.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -342,7 +342,7 @@ class JiraIssueTypesView(APIView):
     GET /api/v1/jira/projects/<project_key>/issue-types
     Retrieves issue types available for the given project.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -376,7 +376,7 @@ class JiraAssigneesView(APIView):
     GET /api/v1/jira/projects/<project_key>/assignees?query=...
     Searches assignable users for a project and updates cache.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -486,7 +486,7 @@ class JiraPrioritiesView(APIView):
     GET /api/v1/jira/priorities
     Retrieves configured priorities.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -518,7 +518,6 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
     """
     queryset = RemediationExecution.objects.all()
     serializer_class = RemediationExecutionSerializer
-    permission_classes = [AllowAny]
     parser_classes = [JSONParser, JSONAPIParser, FormParser, MultiPartParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
     filterset_fields = ["status", "project_key", "priority"]

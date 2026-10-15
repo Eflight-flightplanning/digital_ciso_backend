@@ -7,7 +7,7 @@ from typing import Any
 
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -104,7 +104,7 @@ def merge_and_save_pod_users(new_records: list[dict[str, Any]]) -> list[dict[str
 
 
 class OracleSaasOverviewView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
         creds = get_env_credentials()
@@ -153,7 +153,7 @@ class OracleSaasOverviewView(APIView):
 
 
 class OracleSaasSyncLiveView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -223,7 +223,7 @@ class OracleSaasSyncLiveView(APIView):
 
 
 class OracleSaasInactiveSyncView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -275,7 +275,7 @@ class OracleSaasInactiveSyncView(APIView):
 
 
 class OracleSaasSyncHcmUsersView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
@@ -375,7 +375,7 @@ class OracleSaasSyncHcmUsersView(APIView):
 
 
 class OracleSaasInactiveUsersView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
         days_min = int(request.query_params.get("days", 0))
@@ -390,7 +390,7 @@ class OracleSaasInactiveUsersView(APIView):
 
 
 class OracleSaasRemediateView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request: Request) -> Response:
