@@ -83,6 +83,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Digital CISO is a next-generation AI-powered cloud security operations platform with SPECTRA analysis, AEGIS decision intelligence, and PHANTOM execution.",
       },
+      { name: "robots", content: "noindex, nofollow, noarchive" },
+      { name: "googlebot", content: "noindex, nofollow, noarchive" },
       { name: "author", content: "Digital CISO" },
       { property: "og:title", content: "Digital CISO — Security Command Center" },
       {

@@ -126,7 +126,7 @@ class OracleSaasOverviewView(APIView):
         if total_users > 0:
             active_healthy = total_users - inactive_90d
             active_ratio = active_healthy / total_users
-            sod_penalty = min(20, (sod_count or 17) * 1.5)
+            sod_penalty = min(20, sod_count * 1.5)
             compliance_score = max(55, min(95, int((active_ratio * 70) + 30 - (sod_penalty * 0.5))))
         else:
             compliance_score = 82
@@ -144,7 +144,7 @@ class OracleSaasOverviewView(APIView):
                 "total_monitored_users": total_users,
                 "inactive_users_30d": inactive_30d,
                 "dormant_critical_90d": inactive_90d,
-                "sod_toxic_combinations": sod_count or 17,
+                "sod_toxic_combinations": sod_count,
                 "superuser_roles_active": superuser_count,
                 "sox_itgc_compliance_score": compliance_score,
             },

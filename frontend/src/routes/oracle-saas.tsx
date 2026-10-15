@@ -724,8 +724,8 @@ function OracleSaasPage() {
       const payload = resData.data || resData;
       if (payload.users && payload.users.length > 0) {
         setUsers(payload.users);
-        const sodCount = 17;
-        const superCount = 54;
+        const sodCount = payload.users.reduce((acc: number, u: any) => acc + (u.sod_conflicts?.length || 0), 0);
+        const superCount = payload.users.filter((u: any) => u.is_superuser).length;
         setKpiData((prev) => ({
           ...prev,
           totalUsers: payload.count || payload.users.length,

@@ -213,12 +213,12 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       <div className={cn("border-t border-sidebar-border p-3", collapsed && "flex justify-center")}>
         <Link to="/profile" className="flex items-center gap-2.5">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 font-display text-[11px] font-bold text-primary ring-1 ring-primary/30">
-            {(user?.name || "SA").slice(0, 2).toUpperCase()}
+            {(user?.name || "U").slice(0, 2).toUpperCase()}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold">{user?.name || "Security Administrator"}</span>
-              <span className="block text-[10px] text-muted-foreground">{user?.role || "CISO"}</span>
+              <span className="block truncate text-xs font-semibold">{user?.name || "Operator"}</span>
+              <span className="block text-[10px] text-muted-foreground">{user?.role || "Security"}</span>
             </span>
           )}
           {!collapsed && <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -292,6 +292,7 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -304,8 +305,13 @@ export function AppShell({
         const raw = localStorage.getItem("auth_user");
         if (raw) setCurrentUser(JSON.parse(raw));
       } catch {}
+      setIsReady(true);
     }
   }, [navigate]);
+
+  if (!isReady && typeof window !== "undefined" && !localStorage.getItem("access_token")) {
+    return null;
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
