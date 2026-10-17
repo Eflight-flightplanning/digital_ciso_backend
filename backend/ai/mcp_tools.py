@@ -224,9 +224,9 @@ class MCPToolExecutor:
         elif tool_name == "remediation_generate_playbook":
             return MCPToolExecutor._generate_playbook(arguments, tenant)
         elif tool_name == "remediation_approve_playbook":
-            return MCPToolExecutor._approve_playbook(arguments, user)
+            return MCPToolExecutor._approve_playbook(arguments, user, tenant_id)
         elif tool_name == "remediation_execute_playbook":
-            return MCPToolExecutor._execute_playbook(arguments, user)
+            return MCPToolExecutor._execute_playbook(arguments, user, tenant_id)
         elif tool_name == "ciso_advisor_query":
             return MCPToolExecutor._advisor_query(arguments, tenant_id)
         elif tool_name == "ciso_get_integrations":
@@ -400,7 +400,7 @@ class MCPToolExecutor:
     @staticmethod
     def _get_integrations(args: dict[str, Any], tenant_id) -> dict[str, Any]:
         from api.models import Integration
-        qs = Integration.objects.filter(tenant_id=tenant_id) if tenant_id else Integration.objects.all()
+        qs = Integration.objects.filter(tenant_id=tenant_id)
         items = []
         for integ in qs:
             items.append({
@@ -496,11 +496,13 @@ class MCPToolExecutor:
     def _generate_playbook(args: dict[str, Any], tenant: Tenant | None) -> dict[str, Any]:
         finding_id = args.get("finding_id")
         script_type = args.get("script_type", "terraform").lower()
-        finding = Finding.objects.filter(id=finding_id).first()
+        if tenant is None:
+            return {"error": "No tenant resolved for this request."}
+        finding = Finding.objects.filter(id=finding_id, tenant_id=tenant.id).first()
         if not finding:
             return {"error": f"Finding {finding_id} not found."}
 
-        tenant_obj = tenant or Tenant.objects.first()
+        tenant_obj = tenant
         provider = get_ai_provider(tenant_id=str(tenant_obj.id) if tenant_obj else None)
 
         system_prompt = (
@@ -540,9 +542,9 @@ class MCPToolExecutor:
         }
 
     @staticmethod
-    def _approve_playbook(args: dict[str, Any], user: User | None) -> dict[str, Any]:
+    def _approve_playbook(args: dict[str, Any], user: User | None, tenant_id) -> dict[str, Any]:
         playbook_id = args.get("playbook_id")
-        playbook = RemediationPlaybook.objects.filter(id=playbook_id).first()
+        playbook = RemediationPlaybook.objects.filter(id=playbook_id, tenant_id=tenant_id).first()
         if not playbook:
             return {"error": f"Playbook {playbook_id} not found."}
 
@@ -560,9 +562,9 @@ class MCPToolExecutor:
         }
 
     @staticmethod
-    def _execute_playbook(args: dict[str, Any], user: User | None) -> dict[str, Any]:
+    def _execute_playbook(args: dict[str, Any], user: User | None, tenant_id) -> dict[str, Any]:
         playbook_id = args.get("playbook_id")
-        playbook = RemediationPlaybook.objects.filter(id=playbook_id).first()
+        playbook = RemediationPlaybook.objects.filter(id=playbook_id, tenant_id=tenant_id).first()
         if not playbook:
             return {"error": f"Playbook {playbook_id} not found."}
 

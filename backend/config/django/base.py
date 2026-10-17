@@ -7,7 +7,25 @@ from config.settings.eventstream import *  # noqa
 from config.settings.partitions import *  # noqa
 from config.settings.sentry import *  # noqa
 
-SECRET_KEY = env("SECRET_KEY", default="prowler_secret_key_32_bytes_long_12345_67890")
+import os  # noqa: E402
+import sys  # noqa: E402
+
+from django.core.exceptions import ImproperlyConfigured  # noqa: E402
+
+_DEV_SETTINGS = os.environ.get("DJANGO_SETTINGS_MODULE", "").endswith(".devel") and env.bool(
+    "DJANGO_DEBUG", default=True
+)
+_INSECURE_DEV_KEY = "insecure-dev-only-key-do-not-use-in-production-0123456789"
+# DJANGO_SECRET_KEY is what DEPLOYMENT.md documents; SECRET_KEY kept for compatibility.
+SECRET_KEY = env("DJANGO_SECRET_KEY", default=None) or env("SECRET_KEY", default=None)
+if not SECRET_KEY:
+    if _DEV_SETTINGS or env.bool("DJANGO_DEBUG", default=False) or env.bool("TESTING", default=False):
+        SECRET_KEY = _INSECURE_DEV_KEY
+    else:
+        raise ImproperlyConfigured(
+            "DJANGO_SECRET_KEY is not set. Refusing to start with a guessable "
+            "signing key (it signs every JWT)."
+        )
 VLLM_AZURE_ENDPOINT = env("VLLM_AZURE_ENDPOINT", default="http://10.0.0.4:8000/v1")
 VLLM_AZURE_MODEL = env("VLLM_AZURE_MODEL", default="/home/azureuser/models/qwen3.5-9b")
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
@@ -23,7 +41,10 @@ ATTACK_PATHS_SCAN_INACTIVITY_THRESHOLD_MINUTES = env.int("ATTACK_PATHS_SCAN_INAC
 ATTACK_PATHS_SCAN_STALE_THRESHOLD_MINUTES = env.int("ATTACK_PATHS_SCAN_STALE_THRESHOLD_MINUTES", default=60)
 CACHE_MAX_AGE = env.int("CACHE_MAX_AGE", default=300)
 CACHE_STALE_WHILE_REVALIDATE = env.int("CACHE_STALE_WHILE_REVALIDATE", default=60)
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default=["demo-digitalciso.centralindia.cloudapp.azure.com", "localhost", "127.0.0.1"],
+)
 CSRF_TRUSTED_ORIGINS = env.list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     default=[
@@ -42,6 +63,14 @@ SECRETS_ENCRYPTION_KEY = env(
     default="ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0=",
 )
 FERNET_SECRET = SECRETS_ENCRYPTION_KEY
+if SECRETS_ENCRYPTION_KEY == "ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0=" and not _DEV_SETTINGS:
+    import warnings
+
+    warnings.warn(
+        "SECRETS_ENCRYPTION_KEY is the public default from the source tree. "
+        "Set a unique value (re-encrypt stored provider secrets when rotating).",
+        stacklevel=1,
+    )
 
 DRF_SIMPLE_API_KEY = {
     "HEADER_KEY": "HTTP_X_API_KEY",
@@ -89,14 +118,58 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "api.middleware.APILoggingMiddleware",
+    "api.middleware.AdminIPAllowlistMiddleware",
+    "api.middleware.ApiSecurityHeadersMiddleware",
 ]
 
 SITE_ID = 1
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = env.list(
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    default=[
+        "https://demo-digitalciso.centralindia.cloudapp.azure.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://localhost:8080",
+    ],
+)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
-CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "x-api-key",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+# Browser security headers / cookies
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+_HARDEN = not env.bool("DJANGO_DEBUG", default=False) and not _DEV_SETTINGS
+SESSION_COOKIE_SECURE = env.bool("DJANGO_COOKIE_SECURE", default=_HARDEN)
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", default=86400 if _HARDEN else 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", default=False)
+SECURE_REDIRECT_EXEMPT = [r"^health/"]
+
+# Sign-up controls: ``DJANGO_SIGNUP_ENABLED=False`` closes self-registration;
+# ``DJANGO_SIGNUP_ALLOWED_DOMAINS=corp.com,other.com`` restricts it by email domain.
+SIGNUP_ENABLED = env.bool("DJANGO_SIGNUP_ENABLED", default=True)
+SIGNUP_ALLOWED_DOMAINS = [
+    d.strip().lower() for d in env.list("DJANGO_SIGNUP_ALLOWED_DOMAINS", default=[]) if d.strip()
+]
+# Optional Django-admin lockdown (comma-separated IPs/CIDRs) and path.
+ADMIN_ALLOWED_IPS = env.list("DJANGO_ADMIN_ALLOWED_IPS", default=[])
+ADMIN_URL_PATH = env.str("DJANGO_ADMIN_PATH", default="admin/").lstrip("/")
 
 ROOT_URLCONF = "config.urls"
 
@@ -121,6 +194,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "api.authentication.CombinedJWTOrAPIKeyAuthentication",
     ),
+    # Default-deny: any view that forgets permission_classes requires login.
+    # Public endpoints (token obtain/refresh, sign-up, health) opt out explicitly.
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "PAGE_SIZE": 10,
     "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "drf_spectacular_jsonapi.schemas.pagination.JsonApiPageNumberPagination",
@@ -157,7 +233,11 @@ REST_FRAMEWORK = {
         "health-live": env("DJANGO_THROTTLE_HEALTH_LIVE", default="600/minute"),
         "health-ready": env("DJANGO_THROTTLE_HEALTH_READY", default="600/minute"),
         # Token-obtain endpoint. Configurable via env var (default: 50/minute).
-        "token-obtain": env("DJANGO_THROTTLE_TOKEN_OBTAIN", default="50/minute"),
+        "token-obtain": env("DJANGO_THROTTLE_TOKEN_OBTAIN", default="10/minute"),
+        "token-refresh": env("DJANGO_THROTTLE_TOKEN_REFRESH", default="60/minute"),
+        "user-signup": env("DJANGO_THROTTLE_SIGNUP", default="5/hour"),
+        "ai": env("DJANGO_THROTTLE_AI", default="60/minute"),
+        "ai-proxy": env("DJANGO_THROTTLE_AI_PROXY", default="20/minute"),
         # Custom Attack Paths query endpoint (expensive graph operation).
         "attack-paths-custom-query": env(
             "DJANGO_THROTTLE_ATTACK_PATHS_CUSTOM_QUERY", default="10/minute"
@@ -170,6 +250,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Open Source Security Platform",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
     "SCHEMA_PATH_PREFIX": "/api/v1",
     "COMPONENT_SPLIT_REQUEST": True,
 }
@@ -182,8 +263,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("DJANGO_ACCESS_TOKEN_MINUTES", default=30)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=env.int("DJANGO_REFRESH_TOKEN_DAYS", default=7)),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,

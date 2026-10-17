@@ -45,9 +45,9 @@ class HasPermissions(BasePermission):
         if not user_roles:
             from api.models import Membership
             mem = Membership.objects.using(MainRouter.admin_db).filter(user=user_obj, tenant_id=tenant_id).first()
-            if mem:
-                return True
-            return False
+            # A role-less member must not inherit every permission; only the
+            # tenant OWNER is trusted without an explicit role.
+            return bool(mem and mem.role == Membership.RoleChoices.OWNER)
 
         return all(
             any(getattr(role, permission.value, False) for role in user_roles)

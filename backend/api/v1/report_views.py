@@ -11,6 +11,8 @@ Generates executive-ready security assessment reports (HTML & JSON) with:
 from __future__ import annotations
 
 import base64
+import html as _html
+import re
 import json
 import logging
 from typing import Any
@@ -23,6 +25,8 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework_json_api.renderers import JSONRenderer as JSONAPIRenderer
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
@@ -52,6 +56,7 @@ class ExecutiveReportView(APIView):
     White-Labeled Executive Report Generator.
     Supports HTML (print-ready with PDF styles) and JSON data formats.
     """
+    permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, JSONAPIParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -86,8 +91,13 @@ class ExecutiveReportView(APIView):
         req_format = request.query_params.get("format", "").lower() or request.data.get("format", "html").lower()
         
         # Tenant & Brand Customizations
-        tenant_id = getattr(request, "tenant_id", None)
-        tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else Tenant.objects.first()
+        auth = getattr(request, "auth", None)
+        tenant_id = getattr(request, "tenant_id", None) or (
+            auth.get("tenant_id") if auth is not None and hasattr(auth, "get") else None
+        )
+        tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else None
+        if tenant is None:
+            raise PermissionDenied("No tenant associated with this credential.")
         
         company_name = (
             request.query_params.get("company_name")
@@ -234,7 +244,25 @@ class ExecutiveReportView(APIView):
         html_content = self._render_html_report(report_payload, primary_color)
         return HttpResponse(html_content, content_type="text/html; charset=utf-8")
 
+    @staticmethod
+    def _escape(value: Any) -> Any:
+        """Recursively HTML-escape every string so user/tenant/finding text
+        can never inject markup or script into the rendered report."""
+        if isinstance(value, str):
+            return _html.escape(value, quote=True)
+        if isinstance(value, dict):
+            return {k: ExecutiveReportView._escape(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [ExecutiveReportView._escape(v) for v in value]
+        return value
+
     def _render_html_report(self, data: dict[str, Any], primary_color: str) -> str:
+        if not re.fullmatch(r"#[0-9a-fA-F]{3,8}", primary_color or ""):
+            primary_color = "#0F172A"
+        logo = data.get("logo_url") or ""
+        if not re.match(r"(?i)^(https://|data:image/(png|jpeg|gif|webp);base64,)", logo):
+            data = {**data, "logo_url": ""}
+        data = self._escape(data)
         logo_html = f'<img src="{data["logo_url"]}" alt="{data["company_name"]}" style="max-height: 48px; max-width: 220px; object-fit: contain;" />' if data.get("logo_url") else DEFAULT_LOGO_SVG
 
         findings_rows = ""

@@ -2,9 +2,7 @@ from config.django.base import *  # noqa
 from config.env import env
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+# ALLOWED_HOSTS / CORS_* are defined (restrictively) in base.py; do not re-open them here.
 
 CSRF_TRUSTED_ORIGINS = env.list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",

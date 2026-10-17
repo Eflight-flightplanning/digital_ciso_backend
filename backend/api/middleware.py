@@ -1,9 +1,12 @@
+import ipaddress
 import logging
 import time
 
 from config.custom_logging import BackendLogger
 from django.core.handlers.asgi import ASGIRequest
+from django.conf import settings
 from django.db import connections
+from django.http import HttpResponseForbidden
 
 
 class CloseDBConnectionsMiddleware:
@@ -77,4 +80,53 @@ class APILoggingMiddleware:
             },
         )
 
+        return response
+
+
+class AdminIPAllowlistMiddleware:
+    """Restrict the Django admin to ``settings.ADMIN_ALLOWED_IPS`` (IPs/CIDRs).
+
+    No-op when the list is empty. Uses REMOTE_ADDR only, so make sure the
+    reverse proxy rewrites it (never trust a client-supplied X-Forwarded-For).
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.networks = []
+        for entry in getattr(settings, "ADMIN_ALLOWED_IPS", []):
+            try:
+                self.networks.append(ipaddress.ip_network(entry.strip(), strict=False))
+            except ValueError:
+                logging.getLogger(BackendLogger.API).error("Invalid ADMIN_ALLOWED_IPS entry: %r", entry)
+
+    def __call__(self, request):
+        if self.networks and request.path.startswith("/" + settings.ADMIN_URL_PATH):
+            try:
+                ip = ipaddress.ip_address(request.META.get("REMOTE_ADDR", ""))
+            except ValueError:
+                return HttpResponseForbidden()
+            if not any(ip in net for net in self.networks):
+                return HttpResponseForbidden()
+        return self.get_response(request)
+
+
+class ApiSecurityHeadersMiddleware:
+    """Locked-down CSP / caching headers for JSON API responses."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        ctype = response.get("Content-Type", "")
+        if "json" in ctype:
+            response.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+            response.setdefault("Cache-Control", "no-store")
+        elif ctype.startswith("text/html") and request.path.startswith("/api/"):
+            # e.g. the executive report: no scripts, no remote loads except images.
+            response.setdefault(
+                "Content-Security-Policy",
+                "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; "
+                "script-src 'unsafe-hashes' 'sha256-MguIPR6qNR8D3B+eAlK+bIRTZe8t3wkOY4B/56Me9FU='; frame-ancestors 'none'",
+            )
         return response

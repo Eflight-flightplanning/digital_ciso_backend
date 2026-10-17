@@ -93,7 +93,34 @@ def _json_api_list(items: list[dict[str, Any]], resource_type: str, total: int, 
     )
 
 
-class AIFindingAnalysisView(APIView):
+from rest_framework.exceptions import NotAuthenticated, PermissionDenied
+from rest_framework.permissions import IsAuthenticated
+
+
+def _request_tenant_id(request) -> str:
+    """Tenant of the authenticated caller (JWT / API-key claim). Never guessed."""
+    tid = getattr(request, "tenant_id", None)
+    auth = getattr(request, "auth", None)
+    if not tid and auth is not None and hasattr(auth, "get"):
+        tid = auth.get("tenant_id")
+    if not tid:
+        raise PermissionDenied("No tenant associated with this credential.")
+    return str(tid)
+
+
+class TenantScopedAPIView(APIView):
+    """Authenticated-only APIView; subclasses must scope queries by tenant."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "ai"
+
+    def initial(self, request, *args, **kwargs):
+        # Runs after authentication/permission checks and outside any
+        # view-level try/except, so a missing tenant is a clean 403.
+        super().initial(request, *args, **kwargs)
+        self.tenant_id = _request_tenant_id(request)
+
+class AIFindingAnalysisView(TenantScopedAPIView):
     """
     POST /ai/findings/{finding_id}/analyze
     Trigger AI analysis for a Prowler finding.
@@ -109,7 +136,7 @@ class AIFindingAnalysisView(APIView):
 
             # Fetch Prowler finding (authoritative source)
             try:
-                finding = Finding.objects.get(id=finding_id)
+                finding = Finding.objects.get(id=finding_id, tenant_id=self.tenant_id)
             except Finding.DoesNotExist:
                 return Response(
                     {
@@ -163,7 +190,7 @@ class AIFindingAnalysisView(APIView):
             return _ai_unavailable_response()
 
 
-class AIFindingAssessmentView(APIView):
+class AIFindingAssessmentView(TenantScopedAPIView):
     """
     GET /ai/findings/{finding_id}/assessment
     Retrieve cached AI assessment for a finding.
@@ -177,7 +204,7 @@ class AIFindingAssessmentView(APIView):
             from api.models import AIAssessment
             from ai.service import ai_analysis_service
 
-            assessment = AIAssessment.objects.filter(finding_id=finding_id).first()
+            assessment = AIAssessment.objects.filter(finding_id=finding_id, tenant_id=self.tenant_id).first()
             if not assessment:
                 return Response(
                     {
@@ -200,7 +227,7 @@ class AIFindingAssessmentView(APIView):
             return _ai_unavailable_response()
 
 
-class AIFindingDecisionView(APIView):
+class AIFindingDecisionView(TenantScopedAPIView):
     """
     GET /ai/findings/{finding_id}/decision
     Retrieve security decision for a finding.
@@ -214,7 +241,7 @@ class AIFindingDecisionView(APIView):
             from api.models import SecurityDecision
             from ai.service import ai_analysis_service
 
-            decision = SecurityDecision.objects.filter(finding_id=finding_id).first()
+            decision = SecurityDecision.objects.filter(finding_id=finding_id, tenant_id=self.tenant_id).first()
             if not decision:
                 return Response(
                     {"errors": [{"status": "404", "title": "No Decision", "detail": "No decision found."}]},
@@ -229,7 +256,7 @@ class AIFindingDecisionView(APIView):
             return _ai_unavailable_response()
 
 
-class AIDecisionLogView(APIView):
+class AIDecisionLogView(TenantScopedAPIView):
     """
     GET /ai/decisions — List all decisions (paginated)
     """
@@ -245,7 +272,7 @@ class AIDecisionLogView(APIView):
             page = int(request.query_params.get("page[number]", 1))
             page_size = int(request.query_params.get("page[size]", 20))
 
-            qs = SecurityDecision.objects.all().order_by("-inserted_at")
+            qs = SecurityDecision.objects.filter(tenant_id=self.tenant_id).order_by("-inserted_at")
 
             # Filters
             prio = request.query_params.get("filter[priority]")
@@ -270,7 +297,7 @@ class AIDecisionLogView(APIView):
             return _ai_unavailable_response()
 
 
-class AIDecisionDetailView(APIView):
+class AIDecisionDetailView(TenantScopedAPIView):
     """
     PATCH /ai/decisions/{decision_id} — Submit human review
     """
@@ -284,7 +311,7 @@ class AIDecisionDetailView(APIView):
             from api.models import SecurityDecision
             from ai.service import ai_analysis_service
 
-            decision = SecurityDecision.objects.filter(id=decision_id).first()
+            decision = SecurityDecision.objects.filter(id=decision_id, tenant_id=self.tenant_id).first()
             if not decision:
                 return Response(
                     {"errors": [{"status": "404", "title": "Not Found", "detail": "Decision not found."}]},
@@ -317,7 +344,7 @@ class AIDecisionDetailView(APIView):
             return _ai_unavailable_response()
 
 
-class AIDecisionCreateJiraTicketView(APIView):
+class AIDecisionCreateJiraTicketView(TenantScopedAPIView):
     """
     POST /ai/decisions/{decision_id}/jira-ticket
 
@@ -334,7 +361,7 @@ class AIDecisionCreateJiraTicketView(APIView):
             from api.db_utils import rls_transaction
             from api.models import Integration, SecurityDecision
 
-            tenant_id = getattr(request, "tenant_id", None)
+            tenant_id = self.tenant_id
             if not tenant_id:
                 return Response(
                     {"errors": [{"status": "400", "title": "No tenant resolved for this request."}]},
@@ -423,7 +450,7 @@ class AIDecisionCreateJiraTicketView(APIView):
             )
 
 
-class AIAdvisorQueryView(APIView):
+class AIAdvisorQueryView(TenantScopedAPIView):
     """
     POST /ai/advisor/query  — Ask the AI Advisor a security question
 
@@ -542,19 +569,7 @@ class AIAdvisorQueryView(APIView):
                         provider_filter = p_lower
 
             # Query tenant connected cloud providers
-            tenant_id = (
-                getattr(request, "tenant_id", None)
-                or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
-                or (getattr(request.user, "tenant_id", None) if hasattr(request, "user") and request.user else None)
-            )
-            if not tenant_id:
-                try:
-                    from api.models import Tenant
-                    t_first = Tenant.objects.first()
-                    if t_first:
-                        tenant_id = str(t_first.id)
-                except Exception:
-                    pass
+            tenant_id = _request_tenant_id(request)
 
             connected_providers = []
             try:
@@ -662,19 +677,7 @@ def _retrieve_relevant_findings(
         if history and not has_security_topic and any(k in q_lower for k in ["for that", "about that", "step by step", "explain step", "write code", "generate script", "checklist", "summarize that", "tell me more", "how to fix that", "in detail"]):
             return []
 
-        tenant_id = (
-            getattr(request, "tenant_id", None)
-            or (request.auth.get("tenant_id") if request.auth and hasattr(request.auth, "get") else None)
-            or (getattr(request.user, "tenant_id", None) if hasattr(request, "user") and request.user else None)
-        )
-        if not tenant_id:
-            try:
-                from api.models import Tenant
-                t_first = Tenant.objects.first()
-                if t_first:
-                    tenant_id = str(t_first.id)
-            except Exception:
-                pass
+        tenant_id = _request_tenant_id(request)
 
         if tenant_id:
             cm = rls_transaction(tenant_id)
@@ -1182,11 +1185,13 @@ def _finding_to_dict(finding: Any) -> dict[str, Any]:
 
 
 
-class AIReasoningProxyView(APIView):
+class AIReasoningProxyView(TenantScopedAPIView):
     """
     Spectra Developer Reasoning Proxy (Qwen 3.5 9B on Azure VM).
     Accepts arbitrary security prompts or telemetry contexts and returns structured CISO reasoning.
     """
+    throttle_scope = "ai-proxy"
+    MAX_PROMPT_CHARS = 8000
     parser_classes = [JSONParser, JSONAPIParser]
     renderer_classes = [JSONRenderer, JSONAPIRenderer]
 
@@ -1197,8 +1202,13 @@ class AIReasoningProxyView(APIView):
                 {"error": "Field 'prompt' is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not isinstance(prompt, str) or len(prompt) > self.MAX_PROMPT_CHARS:
+            return Response(
+                {"error": f"'prompt' must be a string of at most {self.MAX_PROMPT_CHARS} characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        tenant_id = str(getattr(request, "tenant_id", "") or "")
+        tenant_id = self.tenant_id
         from ai.claude_provider import get_ai_provider
         provider = get_ai_provider(tenant_id=tenant_id)
 
@@ -1226,7 +1236,7 @@ class AIReasoningProxyView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class AIRemediationTemplateCatalogView(APIView):
+class AIRemediationTemplateCatalogView(TenantScopedAPIView):
     """
     Exposes the full verified remediation template catalog (the same source of truth used by
     the AI Advisor and AIRemediationGeneratorView) as a flat check_id -> template map, so other
@@ -1252,7 +1262,7 @@ class AIRemediationTemplateCatalogView(APIView):
         return Response({"data": catalog}, status=status.HTTP_200_OK)
 
 
-class AIRemediationGeneratorView(APIView):
+class AIRemediationGeneratorView(TenantScopedAPIView):
     """
     Auto-generates Terraform / CLI remediation playbooks for a specific finding using Qwen 3.5 9B.
     """
@@ -1262,8 +1272,8 @@ class AIRemediationGeneratorView(APIView):
         from api.models import Finding, RemediationPlaybook, Tenant
         from ai.claude_provider import get_ai_provider
 
-        tenant_id = getattr(request, "tenant_id", None)
-        finding = Finding.objects.filter(id=finding_id).first()
+        tenant_id = self.tenant_id
+        finding = Finding.objects.filter(id=finding_id, tenant_id=tenant_id).first()
         if not finding:
             return Response(
                 {"error": f"Finding {finding_id} not found."},

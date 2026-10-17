@@ -90,8 +90,10 @@ python manage.py migrate
 DJANGO_SETTINGS_MODULE=config.django.devel
 DJANGO_DEBUG=False
 DJANGO_SECRET_KEY=production-secret-key-change-in-prod-xyz123!
-DJANGO_ALLOWED_HOSTS=*
-CSRF_TRUSTED_ORIGINS=https://demo-digitalciso.centralindia.cloudapp.azure.com,http://localhost:3000,http://127.0.0.1:8000
+DJANGO_ALLOWED_HOSTS=your.domain.com,localhost
+DJANGO_CORS_ALLOWED_ORIGINS=https://your.domain.com
+# Optional: DJANGO_SIGNUP_ENABLED=False, DJANGO_SIGNUP_ALLOWED_DOMAINS=corp.com, DJANGO_ADMIN_ALLOWED_IPS=203.0.113.0/24, DJANGO_ADMIN_PATH=ops-console/
+DJANGO_CSRF_TRUSTED_ORIGINS=https://demo-digitalciso.centralindia.cloudapp.azure.com,http://localhost:3000,http://127.0.0.1:8000
 
 # Azure Flexible PostgreSQL (SSL Mode Require)
 POSTGRES_HOST=digitalciso.postgres.database.azure.com

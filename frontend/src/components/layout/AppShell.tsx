@@ -29,6 +29,7 @@ import {
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { authStore } from "@/lib/auth";
+import { apiRequest } from "@/lib/api-client";
 import {
   CommandDialog,
   CommandEmpty,
@@ -294,24 +295,32 @@ export function AppShell({
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
   const [isReady, setIsReady] = useState(false);
 
+  // Server-verified session guard: a token merely existing in localStorage is
+  // not proof of login. Validate it against the API before rendering anything.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        navigate({ to: "/sign-in" });
-        return;
-      }
-      try {
-        const raw = localStorage.getItem("auth_user");
-        if (raw) setCurrentUser(JSON.parse(raw));
-      } catch {}
-      setIsReady(true);
+    let cancelled = false;
+    const deny = () => {
+      ["access_token", "refresh_token", "auth_user"].forEach((k) => localStorage.removeItem(k));
+      if (!cancelled) navigate({ to: "/sign-in" });
+    };
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      deny();
+      return;
     }
+    apiRequest<any>("/users/me", { method: "GET" })
+      .then((res) => {
+        if (cancelled) return;
+        const attrs = res?.data?.attributes ?? res?.attributes ?? res;
+        if (!res?.data?.id && !attrs?.email) return deny();
+        setCurrentUser({ name: attrs?.name, email: attrs?.email });
+        setIsReady(true);
+      })
+      .catch(deny);
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
-
-  if (!isReady && typeof window !== "undefined" && !localStorage.getItem("access_token")) {
-    return null;
-  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -323,6 +332,8 @@ export function AppShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (!isReady) return null;
 
   return (
     <div className="flex min-h-screen">

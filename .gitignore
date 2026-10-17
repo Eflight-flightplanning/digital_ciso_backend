@@ -60,3 +60,9 @@ neo4j-install/
 *.env
 backend/.env
 frontend/.env
+# Local diagnostics / dumps / env
+frontend/.env
+Diagnostics_*.log
+backend/*_output.txt
+backend/django_check.txt
+backend/*.sql

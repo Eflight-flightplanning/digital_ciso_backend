@@ -133,7 +133,7 @@ from api.models import (
     UserRoleRelationship,
 )
 from api.pagination import ComplianceOverviewPagination
-from api.rbac.permissions import Permissions, get_providers, get_role
+from api.rbac.permissions import HasPermissions, Permissions, get_providers, get_role
 from api.renderers import APIJSONRenderer, PlainTextRenderer
 from api.rls import Tenant
 from api.utils import (
@@ -368,6 +368,8 @@ class RelationshipViewSchema(JsonApiAutoSchema):
     description="Obtain a token by providing valid credentials and an optional tenant ID.",
 )
 class CustomTokenObtainView(GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
     throttle_scope = "token-obtain"
     resource_name = "tokens"
     serializer_class = TokenSerializer
@@ -423,14 +425,19 @@ class CustomTokenObtainView(GenericAPIView):
                 if ("Invalid credentials" in msg_str or "Invalid or expired" in msg_str)
                 else status.HTTP_400_BAD_REQUEST
             )
-            logger.warning("Authentication validation error (%s): %s", status_code, msg_text)
+            logger.warning(
+                "AUTH_FAILURE status=%s ip=%s reason=%s",
+                status_code,
+                request.META.get("REMOTE_ADDR", "?"),
+                msg_text,
+            )
             return Response({"detail": msg_text}, status=status_code)
         except InvalidToken as e:
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.exception(f"Unexpected error in CustomTokenObtainView: {e}")
             return Response(
-                {"detail": f"Authentication failed: {str(e)}"},
+                {"detail": "Authentication failed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -442,6 +449,9 @@ class CustomTokenObtainView(GenericAPIView):
     "when a new one is issued.",
 )
 class CustomTokenRefreshView(GenericAPIView):
+    throttle_scope = "token-refresh"
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
     resource_name = "tokens-refresh"
     serializer_class = TokenRefreshSerializer
     http_method_names = ["post"]
@@ -827,6 +837,11 @@ class UserViewSet(BaseUserViewset):
             ),
         ]
     )
+    def get_throttles(self):
+        # Tight limit on public self-registration only.
+        self.throttle_scope = "user-signup" if getattr(self, "action", None) == "create" else None
+        return super().get_throttles()
+
     def create(self, request, *args, **kwargs):
         invitation_token = request.query_params.get("invitation_token", "").strip() or None
         if invitation_token in ("F3NMFPNDZHR4Z9", "string", "undefined", "null", ""):
@@ -843,7 +858,24 @@ class UserViewSet(BaseUserViewset):
                 invitation_token, serializer.validated_data["email"]
             )
 
+        email_domain = serializer.validated_data["email"].rsplit("@", 1)[-1].lower()
+        if not request.user.is_authenticated and not invitation_token:
+            if not django_settings.SIGNUP_ENABLED:
+                raise PermissionDenied("Self-registration is disabled.")
+            if django_settings.SIGNUP_ALLOWED_DOMAINS and email_domain not in django_settings.SIGNUP_ALLOWED_DOMAINS:
+                raise PermissionDenied("Registration is not allowed for this email domain.")
+
         role_param = serializer.validated_data.pop("role", None)
+
+        # Adding a user to an existing tenant is an admin action: an ordinary
+        # authenticated member must not be able to mint admin accounts.
+        if request.user.is_authenticated:
+            _tid = (request.auth.get("tenant_id") if hasattr(request.auth, "get") else None) or getattr(request, "tenant_id", None)
+            _perm = HasPermissions()
+            request.tenant_id = _tid
+            _view = type("V", (), {"required_permissions": [Permissions.MANAGE_USERS]})()
+            if not _tid or not _perm.has_permission(request, _view):
+                raise PermissionDenied("You do not have permission to create users.")
 
         # Proceed with creating the user and membership
         user = User.objects.db_manager(MainRouter.admin_db).create_user(
