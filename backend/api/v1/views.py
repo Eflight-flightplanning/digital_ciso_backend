@@ -362,6 +362,29 @@ class RelationshipViewSchema(JsonApiAutoSchema):
         return []
 
 
+
+REFRESH_COOKIE_NAME = "dciso_refresh"
+REFRESH_COOKIE_PATH = "/api/v1/tokens"
+
+
+def _set_refresh_cookie(response, refresh_token: str) -> None:
+    """Refresh token lives only in an HttpOnly cookie: JavaScript (and so XSS)
+    can never read it, and it is only sent to the token endpoints."""
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        refresh_token,
+        max_age=int(django_settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        httponly=True,
+        secure=django_settings.SESSION_COOKIE_SECURE,
+        samesite="Strict",
+        path=REFRESH_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_cookie(response) -> None:
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH, samesite="Strict")
+
+
 @extend_schema(
     tags=["Token"],
     summary="Obtain a token",
@@ -402,10 +425,15 @@ class CustomTokenObtainView(GenericAPIView):
                     status=status.HTTP_200_OK,
                 )
 
-            return Response(
-                data={"type": "tokens", "attributes": val_data},
+            attrs = dict(val_data)
+            refresh_value = attrs.pop("refresh", None)
+            response = Response(
+                data={"type": "tokens", "attributes": attrs},
                 status=status.HTTP_200_OK,
             )
+            if refresh_value:
+                _set_refresh_cookie(response, str(refresh_value))
+            return response
         except (ValidationError, serializers.ValidationError) as e:
             detail = getattr(e, "detail", str(e))
             if isinstance(detail, dict):
@@ -468,17 +496,56 @@ class CustomTokenRefreshView(GenericAPIView):
         else:
             payload = raw_data
 
+        payload = dict(payload) if isinstance(payload, dict) else {}
+        if not payload.get("refresh"):
+            cookie_refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
+            if cookie_refresh:
+                payload["refresh"] = cookie_refresh
+
         serializer = TokenRefreshSerializer(data=payload)
 
         try:
             serializer.is_valid(raise_exception=True)
         except TokenError as e:
-            raise InvalidToken(e.args[0])
+            response = Response({"detail": str(e.args[0])}, status=status.HTTP_401_UNAUTHORIZED)
+            _clear_refresh_cookie(response)
+            return response
 
-        return Response(
-            data={"type": "tokens-refresh", "attributes": serializer.validated_data},
+        attrs = dict(serializer.validated_data)
+        rotated = attrs.pop("refresh", None)
+        response = Response(
+            data={"type": "tokens-refresh", "attributes": attrs},
             status=status.HTTP_200_OK,
         )
+        if rotated:
+            _set_refresh_cookie(response, str(rotated))
+        return response
+
+
+@extend_schema(tags=["Token"], summary="Log out: revoke the refresh token and clear its cookie")
+class CustomTokenLogoutView(GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    resource_name = "tokens-logout"
+    serializer_class = TokenRefreshSerializer
+    http_method_names = ["post"]
+    filter_backends = []
+
+    def get_queryset(self):
+        return User.objects.none()
+
+    def post(self, request):
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        raw = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()
+            except TokenError:
+                pass
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        _clear_refresh_cookie(response)
+        return response
 
 
 @extend_schema(

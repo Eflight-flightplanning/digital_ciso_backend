@@ -32,6 +32,7 @@ from api.v1.views import (
     AttackPathsScanViewSet,
     ComplianceOverviewViewSet,
     CustomTokenObtainView,
+    CustomTokenLogoutView,
     CustomTokenRefreshView,
     CustomTokenSwitchTenantView,
     FindingGroupViewSet,
@@ -153,6 +154,7 @@ urlpatterns = [
     # JWT Token Authentication (Email + Password)
     path("tokens", CustomTokenObtainView.as_view(), name="token-obtain"),
     path("tokens/refresh", CustomTokenRefreshView.as_view(), name="token-refresh"),
+    path("tokens/logout", CustomTokenLogoutView.as_view(), name="token-logout"),
     path("tokens/switch", CustomTokenSwitchTenantView.as_view(), name="token-switch"),
     path(
         "providers/secrets",

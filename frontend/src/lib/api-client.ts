@@ -7,18 +7,45 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
+// The access token lives only in memory: it is never written to localStorage, so
+// XSS cannot exfiltrate a long-lived credential. The refresh token is an
+// HttpOnly cookie the browser sends to /tokens/* and scripts cannot read.
+let accessToken: string | null = null;
+
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  return accessToken;
 }
 
 export function setAuthToken(token: string | null): void {
-  if (typeof window === "undefined") return;
-  if (token) {
-    localStorage.setItem("access_token", token);
-  } else {
-    localStorage.removeItem("access_token");
+  accessToken = token;
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+/** Exchange the HttpOnly refresh cookie for a new access token (single-flight). */
+export function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE}/tokens/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json, application/vnd.api+json" },
+      body: "{}",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const json = await res.json();
+        const token =
+          json?.attributes?.access || json?.data?.attributes?.access || json?.access || null;
+        setAuthToken(token);
+        return token as string | null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
+  return refreshInFlight;
 }
 
 export async function apiRequest<T = any>(
@@ -59,38 +86,17 @@ export async function apiRequest<T = any>(
     throw new Error(err?.message || "Network connection failed");
   }
 
-  // Automatic token refresh on 401 Unauthorized
+  // Automatic token refresh on 401 Unauthorized (refresh token is the HttpOnly cookie)
   if (response.status === 401 && !(options as any)._isRetry) {
-    const storedRefresh = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
-    if (storedRefresh) {
-      try {
-        const tokenRes = await fetch(`${API_BASE}/tokens/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Accept": "application/json, application/vnd.api+json" },
-          body: JSON.stringify({ refresh: storedRefresh }),
-        });
-        if (tokenRes.ok) {
-          const tokenJson = await tokenRes.json();
-          const freshToken = tokenJson?.attributes?.access || tokenJson?.data?.attributes?.access || tokenJson?.access;
-          if (freshToken) {
-            setAuthToken(freshToken);
-            headers.set("Authorization", `Bearer ${freshToken}`);
-            response = await fetch(url, {
-              ...options,
-              headers,
-              // @ts-ignore
-              _isRetry: true,
-            });
-          }
-        }
-      } catch {
-        // Fall through to redirect handler
-      }
+    const fresh = await refreshAccessToken();
+    if (fresh) {
+      headers.set("Authorization", `Bearer ${fresh}`);
+      response = await fetch(url, { ...options, headers });
     }
 
-    if (!response.ok && typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+    if (!response.ok && response.status === 401 && typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
+      setAuthToken(null);
+      localStorage.removeItem("auth_user");
       window.location.href = "/sign-in";
       return { data: [], items: [], meta: {} } as unknown as T;
     }

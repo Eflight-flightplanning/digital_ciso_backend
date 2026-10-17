@@ -29,7 +29,7 @@ import {
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { authStore } from "@/lib/auth";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, getAuthToken, refreshAccessToken, setAuthToken } from "@/lib/api-client";
 import {
   CommandDialog,
   CommandEmpty,
@@ -295,28 +295,26 @@ export function AppShell({
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  // Server-verified session guard: a token merely existing in localStorage is
-  // not proof of login. Validate it against the API before rendering anything.
+  // Server-verified session guard: nothing in browser storage proves a login.
+  // Obtain an access token from the HttpOnly refresh cookie (if we don't have
+  // one in memory), then confirm the session with the API before rendering.
   useEffect(() => {
     let cancelled = false;
     const deny = () => {
-      ["access_token", "refresh_token", "auth_user"].forEach((k) => localStorage.removeItem(k));
+      setAuthToken(null);
+      localStorage.removeItem("auth_user");
       if (!cancelled) navigate({ to: "/sign-in" });
     };
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      deny();
-      return;
-    }
-    apiRequest<any>("/users/me", { method: "GET" })
-      .then((res) => {
-        if (cancelled) return;
-        const attrs = res?.data?.attributes ?? res?.attributes ?? res;
-        if (!res?.data?.id && !attrs?.email) return deny();
-        setCurrentUser({ name: attrs?.name, email: attrs?.email });
-        setIsReady(true);
-      })
-      .catch(deny);
+    (async () => {
+      const token = getAuthToken() || (await refreshAccessToken());
+      if (!token) return deny();
+      const res = await apiRequest<any>("/users/me", { method: "GET" });
+      if (cancelled) return;
+      const attrs = res?.data?.attributes ?? res?.attributes ?? res;
+      if (!res?.data?.id && !attrs?.email) return deny();
+      setCurrentUser({ name: attrs?.name, email: attrs?.email });
+      setIsReady(true);
+    })().catch(deny);
     return () => {
       cancelled = true;
     };
@@ -380,9 +378,7 @@ export function AppShell({
               <DropdownMenuItem asChild>
                 <button
                   onClick={() => {
-                    localStorage.removeItem("access_token");
-                    localStorage.removeItem("auth_user");
-                    localStorage.removeItem("refresh_token");
+                    authStore.logout();
                     navigate({ to: "/sign-in" });
                   }}
                   className="flex w-full items-center px-2 py-1.5 text-xs text-critical hover:bg-critical/10 rounded cursor-pointer"

@@ -13,6 +13,7 @@ PUBLIC = (
     r"^admin",  # Django admin: redirects to its own login page
     r"^api/v1/tokens$",
     r"^api/v1/tokens/refresh$",
+    r"^api/v1/tokens/logout$",
     r"^api/v1/users$",  # POST = self-registration (throttled / domain-restricted)
     r"^api/v1/saml",
     r"^api/v1/social",

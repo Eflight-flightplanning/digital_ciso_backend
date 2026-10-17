@@ -171,6 +171,10 @@ def generate_tokens(user: User, tenant_id: str) -> dict:
     return {"access": str(access), "refresh": str(refresh)}
 
 
+LOGIN_MAX_FAILURES = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60
+
+
 class BaseTokenSerializer(serializers.Serializer):
     def custom_validate(self, attrs, social: bool = False):
         raw_email = (attrs.get("email") or "").strip()
@@ -196,13 +200,24 @@ class BaseTokenSerializer(serializers.Serializer):
                     User.objects.using(MainRouter.admin_db).filter(email__iexact=email).first()
                     or User.objects.filter(email__iexact=email).first()
                 )
-                if user_obj and user_obj.check_password(password):
+                # Only fall back for users that exist AND are active: a deactivated
+                # account must never be silently re-enabled by logging in.
+                if user_obj and user_obj.is_active and user_obj.check_password(password):
                     user = user_obj
-                    if not user.is_active:
-                        user.is_active = True
-                        user.save(using=MainRouter.admin_db)
 
-        if user is None:
+        if not social:
+            from django.core.cache import cache
+
+            lock_key = f"login_fail:{email}"
+            if user is None:
+                fails = int(cache.get(lock_key) or 0) + 1
+                cache.set(lock_key, fails, timeout=LOGIN_LOCKOUT_SECONDS)
+                raise ValidationError("Invalid credentials")
+            if int(cache.get(lock_key) or 0) >= LOGIN_MAX_FAILURES:
+                raise ValidationError("Invalid credentials")
+            if not user.is_active:
+                raise ValidationError("Invalid credentials")
+        elif user is None:
             raise ValidationError("Invalid credentials")
 
         from api.mfa_service import generate_and_store_otp, verify_otp, is_mfa_enabled

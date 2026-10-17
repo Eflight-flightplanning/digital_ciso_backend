@@ -4,6 +4,8 @@
  * Integrated directly with Django SimpleJWT tokens & User API.
  */
 
+import { setAuthToken } from "./api-client";
+
 export interface User {
   id: string;
   email: string;
@@ -26,10 +28,6 @@ const API_BASE =
   (typeof window !== "undefined" && (window as any).__API_BASE__) ||
   "/api/v1";
 
-function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
-}
 
 function getStoredUser(): User | null {
   if (typeof window === "undefined") return null;
@@ -41,13 +39,14 @@ function getStoredUser(): User | null {
   }
 }
 
-const initialToken = getStoredToken();
 const initialUser = getStoredUser();
 
 let currentAuth: AuthState = {
   user: initialUser,
-  token: initialToken,
-  isAuthenticated: !!initialToken && !!initialUser,
+  token: null,
+  // Never trust stored state: a session only counts once AppShell has verified
+  // it with the server (see the guard in components/layout/AppShell.tsx).
+  isAuthenticated: false,
   isLoading: false,
 };
 
@@ -71,11 +70,7 @@ export const authStore = {
       isLoading: false,
     };
     if (typeof window !== "undefined") {
-      if (token) {
-        localStorage.setItem("access_token", token);
-      } else {
-        localStorage.removeItem("access_token");
-      }
+      setAuthToken(token);
       if (user) {
         localStorage.setItem("auth_user", JSON.stringify(user));
       } else {
@@ -98,6 +93,7 @@ export const authStore = {
     try {
       const res = await fetch(`${API_BASE}/tokens`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json, application/vnd.api+json",
@@ -136,14 +132,9 @@ export const authStore = {
       }
 
       const accessToken = attributes?.access;
-      const refreshToken = attributes?.refresh;
 
       if (!accessToken) {
         throw new Error("No access token returned by server.");
-      }
-
-      if (typeof window !== "undefined" && refreshToken) {
-        localStorage.setItem("refresh_token", refreshToken);
       }
 
       let tokenPayload: any = {};
@@ -241,9 +232,9 @@ export const authStore = {
   logout() {
     this.setUser(null, null);
     if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
       localStorage.removeItem("auth_user");
+      // Revoke the refresh token server-side and clear its HttpOnly cookie.
+      fetch(`${API_BASE}/tokens/logout`, { method: "POST", credentials: "include" }).catch(() => {});
     }
   },
 
