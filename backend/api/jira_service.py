@@ -15,7 +15,7 @@ from cryptography.fernet import Fernet
 logger = logging.getLogger("api.jira_service")
 
 # Initialize Fernet cipher with platform secret key
-_fernet = Fernet(settings.SECRETS_ENCRYPTION_KEY.encode())
+from api.crypto import fernet as _fernet  # noqa: E402
 
 
 def encrypt_token(plain_token: str) -> str:

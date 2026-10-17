@@ -58,23 +58,31 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
-SECRETS_ENCRYPTION_KEY = env(
-    "SECRETS_ENCRYPTION_KEY",
-    default="ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0=",
-)
+# Key that encrypts provider/integration credentials stored in the database.
+# No built-in default: a key committed to source protects nothing.
+_DEV_ENCRYPTION_KEY = "kXq0m1z8vN3bR5tY7uW9aC2eG4iK6oQ8sU0wY2aB4cE="  # dev/test only
+SECRETS_ENCRYPTION_KEY = env("SECRETS_ENCRYPTION_KEY", default=None)
+if not SECRETS_ENCRYPTION_KEY:
+    if _DEV_SETTINGS or env.bool("TESTING", default=False):
+        SECRETS_ENCRYPTION_KEY = _DEV_ENCRYPTION_KEY
+    else:
+        raise ImproperlyConfigured(
+            "SECRETS_ENCRYPTION_KEY is not set. Generate one with: "
+            "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
+# Old key(s) still accepted for decryption while rotating (see api/crypto.py).
+SECRETS_ENCRYPTION_KEY_PREVIOUS = [
+    k.strip() for k in env.list("SECRETS_ENCRYPTION_KEY_PREVIOUS", default=[]) if k.strip()
+]
 FERNET_SECRET = SECRETS_ENCRYPTION_KEY
-if SECRETS_ENCRYPTION_KEY == "ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0=" and not _DEV_SETTINGS:
-    import warnings
 
-    warnings.warn(
-        "SECRETS_ENCRYPTION_KEY is the public default from the source tree. "
-        "Set a unique value (re-encrypt stored provider secrets when rotating).",
-        stacklevel=1,
-    )
-
+# Signs/encrypts tenant API keys. Kept separate so that rotating the data key does
+# not invalidate every issued API key. Defaults to the data key for compatibility;
+# set it explicitly (to the OLD value) when you rotate SECRETS_ENCRYPTION_KEY.
+API_KEY_FERNET_SECRET = env("API_KEY_FERNET_SECRET", default=SECRETS_ENCRYPTION_KEY)
 DRF_SIMPLE_API_KEY = {
     "HEADER_KEY": "HTTP_X_API_KEY",
-    "FERNET_SECRET": SECRETS_ENCRYPTION_KEY,
+    "FERNET_SECRET": API_KEY_FERNET_SECRET,
 }
 
 AUTH_USER_MODEL = "api.User"

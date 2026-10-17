@@ -92,10 +92,5 @@ REST_FRAMEWORK["DEFAULT_FILTER_BACKENDS"] = tuple(  # noqa: F405
     if "DjangoFilterBackend" not in filter_backend
 ) + ("api.filters.CustomDjangoFilterBackend",)
 
-SECRETS_ENCRYPTION_KEY = "ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0="
-FERNET_SECRET = SECRETS_ENCRYPTION_KEY
-DRF_SIMPLE_API_KEY = {
-    "HEADER_KEY": "HTTP_X_API_KEY",
-    "FERNET_SECRET": SECRETS_ENCRYPTION_KEY,
-}
+# SECRETS_ENCRYPTION_KEY / DRF_SIMPLE_API_KEY come from base.py (no hardcoded keys).
 

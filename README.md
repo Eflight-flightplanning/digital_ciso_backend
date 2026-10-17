@@ -65,8 +65,8 @@ DJANGO_DB_PASSWORD=postgres
 DJANGO_DB_NAME=prowler_db
 
 # Security & Encryption
-SECRET_KEY=your-secret-key-in-production-1234567890
-SECRETS_ENCRYPTION_KEY=ZMiYVo7m4Fbe2eXXPyrwxdJss2WSalXSv3xHBcJkPl0=
+DJANGO_SECRET_KEY=<generate: python -c "import secrets; print(secrets.token_urlsafe(64))">
+SECRETS_ENCRYPTION_KEY=<generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
 
 # Celery & Cache
 CELERY_BROKER_URL=redis://localhost:6379/0

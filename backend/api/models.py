@@ -145,7 +145,7 @@ from uuid6 import uuid7
 
 
 
-fernet = Fernet(settings.SECRETS_ENCRYPTION_KEY.encode())
+from api.crypto import fernet  # noqa: E402  (MultiFernet: supports key rotation)
 
 
 
@@ -7048,4 +7048,4 @@ class JiraAssigneeCache(RowLevelSecurityProtectedModel):
         ]
 
     class JSONAPIMeta:
-        resource_name = "jira-assignees-cache"
+        resource_name = "jira-assignees-cache"
