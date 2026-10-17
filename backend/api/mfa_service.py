@@ -13,17 +13,17 @@ OTP_TTL_SECONDS = 300  # 5 minutes validity
 
 
 def is_mfa_enabled() -> bool:
-    """Check if MFA enforcement is enabled (default: False / disabled)."""
-    val = os.environ.get("ENABLE_MFA", "").strip().lower()
-    if val in ("true", "1", "yes", "on"):
-        return True
+    """Check if MFA enforcement is enabled (default: True / enabled unless explicitly disabled)."""
+    val = os.environ.get("ENABLE_MFA")
+    if val is not None:
+        return val.strip().lower() in ("true", "1", "yes", "on")
     try:
         from django.conf import settings
-        if getattr(settings, "ENABLE_MFA", False):
-            return True
+        if hasattr(settings, "ENABLE_MFA"):
+            return bool(settings.ENABLE_MFA)
     except Exception:
         pass
-    return False
+    return True
 
 
 def get_sendgrid_config():
@@ -137,101 +137,98 @@ def send_mfa_otp_email(to_email: str, otp_code: str) -> bool:
         return False
 
 
-import tempfile
+import hmac
+import secrets
 
+MAX_OTP_ATTEMPTS = 5
 _GLOBAL_OTP_STORE = {}
 
 
-def _get_otp_filepath() -> str:
-    return os.path.join(tempfile.gettempdir(), "ciso_mfa_otps.json")
-
-
-def _save_file_otp(clean_email: str, otp_code: str, expires_at: float):
-    try:
-        fp = _get_otp_filepath()
-        data = {}
-        if os.path.exists(fp):
-            try:
-                with open(fp, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
-        data[clean_email] = {"code": str(otp_code), "expires_at": expires_at}
-        with open(fp, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except Exception as e:
-        logger.warning("Could not persist OTP to temp file: %s", e)
-
-
-def _verify_and_clear_file_otp(clean_email: str, submitted_otp: str) -> bool:
-    try:
-        fp = _get_otp_filepath()
-        if not os.path.exists(fp):
-            return False
-        with open(fp, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        entry = data.get(clean_email)
-        if entry:
-            code = str(entry.get("code", "")).strip()
-            expires_at = float(entry.get("expires_at", 0))
-            if time.time() <= expires_at and code == submitted_otp:
-                data.pop(clean_email, None)
-                with open(fp, "w", encoding="utf-8") as f:
-                    json.dump(data, f)
-                return True
-    except Exception as e:
-        logger.warning("Error reading OTP from temp file: %s", e)
-    return False
-
-
 def generate_and_store_otp(email: str) -> str:
-    """Generate a 6-digit random OTP and store it in Django cache, global store, and file store for 5 minutes."""
+    """Generate a 6-digit random OTP and store it in Django cache for 5 minutes."""
     clean_email = email.strip().lower()
-    otp_code = f"{random.randint(100000, 999999)}"
+    otp_code = f"{secrets.randbelow(900000) + 100000}"
     cache_key = f"mfa_otp:{clean_email}"
+    attempts_key = f"mfa_otp_attempts:{clean_email}"
     expires_at = time.time() + OTP_TTL_SECONDS
 
+    # Store in Django cache with TTL and reset failed attempt count
     cache.set(cache_key, otp_code, timeout=OTP_TTL_SECONDS)
+    cache.set(attempts_key, 0, timeout=OTP_TTL_SECONDS)
     _GLOBAL_OTP_STORE[clean_email] = (otp_code, expires_at)
-    _save_file_otp(clean_email, otp_code, expires_at)
 
-    print(f"\n==============================================", flush=True)
-    print(f"CISO MFA OTP CODE FOR [{clean_email}]: {otp_code}", flush=True)
-    print(f"==============================================\n", flush=True)
-    logger.info("Generated MFA OTP %s for %s", otp_code, clean_email)
+    logger.info("Generated MFA OTP challenge for %s (valid for %ds)", clean_email, OTP_TTL_SECONDS)
 
-    # Send via SendGrid
+    # Dispatch verification email via SendGrid
     send_mfa_otp_email(clean_email, otp_code)
     return otp_code
 
 
 def verify_otp(email: str, submitted_otp: str) -> bool:
-    """Verify if the submitted OTP matches the cached value, global store, or file store."""
+    """Verify if the submitted OTP matches the cached value.
+    Enforces brute-force defense: locks and discards the OTP after 5 failed attempts.
+    """
     if not submitted_otp:
         return False
 
     clean_email = email.strip().lower()
     clean_otp = submitted_otp.strip()
     cache_key = f"mfa_otp:{clean_email}"
+    attempts_key = f"mfa_otp_attempts:{clean_email}"
+
+    # Check brute-force lockout
+    failed_attempts = int(cache.get(attempts_key) or 0)
+    if failed_attempts >= MAX_OTP_ATTEMPTS:
+        cache.delete(cache_key)
+        _GLOBAL_OTP_STORE.pop(clean_email, None)
+        logger.warning(
+            "MFA verification blocked for %s: exceeded maximum allowed attempts (%d)",
+            clean_email,
+            MAX_OTP_ATTEMPTS,
+        )
+        return False
 
     cached_code = cache.get(cache_key)
-    if cached_code and str(cached_code).strip() == clean_otp:
-        cache.delete(cache_key)
-        _GLOBAL_OTP_STORE.pop(clean_email, None)
-        return True
+    valid_code = None
 
-    # Fallback to global store if multi-worker cache mismatch occurs
-    if clean_email in _GLOBAL_OTP_STORE:
+    if cached_code:
+        valid_code = str(cached_code).strip()
+    elif clean_email in _GLOBAL_OTP_STORE:
         code, expires_at = _GLOBAL_OTP_STORE[clean_email]
-        if time.time() <= expires_at and str(code).strip() == clean_otp:
+        if time.time() <= expires_at:
+            valid_code = str(code).strip()
+        else:
             _GLOBAL_OTP_STORE.pop(clean_email, None)
-            cache.delete(cache_key)
-            return True
 
-    # Fallback to file-backed cross-process store
-    if _verify_and_clear_file_otp(clean_email, clean_otp):
+    if not valid_code:
+        return False
+
+    # Constant-time comparison to prevent side-channel timing attacks
+    if hmac.compare_digest(valid_code, clean_otp):
+        cache.delete(cache_key)
+        cache.delete(attempts_key)
+        _GLOBAL_OTP_STORE.pop(clean_email, None)
+        logger.info("MFA verification successful for %s", clean_email)
+        return True
+
+    # Failed attempt: increment counter
+    failed_attempts += 1
+    cache.set(attempts_key, failed_attempts, timeout=OTP_TTL_SECONDS)
+    logger.warning(
+        "Invalid MFA OTP attempt %d/%d for %s",
+        failed_attempts,
+        MAX_OTP_ATTEMPTS,
+        clean_email,
+    )
+
+    if failed_attempts >= MAX_OTP_ATTEMPTS:
         cache.delete(cache_key)
         _GLOBAL_OTP_STORE.pop(clean_email, None)
-        return True
+        logger.warning(
+            "MFA OTP locked and invalidated for %s after %d failed attempts",
+            clean_email,
+            MAX_OTP_ATTEMPTS,
+        )
 
     return False
+
