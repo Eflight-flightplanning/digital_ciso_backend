@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "psqlextra",
     "api",
+    "nca",
     "rest_framework",
     "corsheaders",
     "drf_spectacular",

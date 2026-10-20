@@ -230,6 +230,7 @@ urlpatterns = [
     path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
     path("mcp/", MCPGatewayView.as_view(), name="mcp-gateway-v1-slash"),
     path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
+    path("nca/", include("nca.urls")),
     # Oracle Fusion SaaS Governance & Dormant User Endpoints
     path("oracle-saas/overview", OracleSaasOverviewView.as_view(), name="oracle-saas-overview"),
     path("oracle-saas/sync-live", OracleSaasSyncLiveView.as_view(), name="oracle-saas-sync-live"),

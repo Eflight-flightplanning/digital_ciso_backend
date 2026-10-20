@@ -66,3 +66,7 @@ Diagnostics_*.log
 backend/*_output.txt
 backend/django_check.txt
 backend/*.sql
+
+# NCA assessment outputs (contain tenancy identifiers) and uploaded evidence
+docs/nca/*.json
+backend/nca_evidence/

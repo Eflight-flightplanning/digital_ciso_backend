@@ -1,0 +1,237 @@
+{
+  "_description": "Platform-authored additions to the vendored Prowler NCA framework files. Prowler's own Checks arrays are used unchanged (source=framework); entries here add further OCI checks that are technically relevant to a control (source=platform-supplement). Every control remains scope=partial: automated checks can only evidence the technical portion of an NCA control, so an all-PASS automated result yields MANUAL (PARTIAL_AUTOMATION) until a reviewer approves evidence for the rest. No requirement text is invented here; only check-to-control relevance.",
+  "common": {
+    "2-2-3": {
+      "checks": [
+        "identity_password_policy_prevents_reuse",
+        "identity_password_policy_expires_within_365_days",
+        "identity_user_auth_tokens_rotated_90_days",
+        "identity_user_customer_secret_keys_rotated_90_days",
+        "identity_tenancy_admin_users_no_api_keys",
+        "identity_iam_admins_cannot_update_tenancy_admins",
+        "identity_storage_service_level_admins_scoped"
+      ],
+      "rationale": "Authentication strength, credential rotation and least-privilege administration."
+    },
+    "2-3-3": {
+      "checks": [
+        "compute_instance_secure_boot_enabled"
+      ],
+      "rationale": "Information-system hardening of compute instances."
+    },
+    "2-5-3": {
+      "checks": [
+        "database_autonomous_database_access_restricted",
+        "analytics_instance_access_restricted",
+        "integration_instance_access_restricted"
+      ],
+      "rationale": "Network exposure / access restriction of managed services."
+    },
+    "2-8-3": {
+      "checks": [
+        "blockstorage_block_volume_encrypted_with_cmk",
+        "blockstorage_boot_volume_encrypted_with_cmk",
+        "filestorage_file_system_encrypted_with_cmk",
+        "compute_instance_in_transit_encryption_enabled"
+      ],
+      "rationale": "Encryption at rest with customer-managed keys and encryption in transit."
+    },
+    "2-9-3": {
+      "checks": [
+        "objectstorage_bucket_versioning_enabled",
+        "oci_volume_backup_policy_assigned"
+      ],
+      "rationale": "Backup scope / recoverability of stored data and volumes."
+    },
+    "2-10-3": {
+      "checks": [
+        "oci_vss_host_scan_enabled"
+      ],
+      "rationale": "Periodic vulnerability scanning of compute hosts."
+    },
+    "2-12-3": {
+      "checks": [
+        "events_rule_iam_policy_changes",
+        "events_rule_iam_group_changes",
+        "events_rule_user_changes",
+        "events_rule_local_user_authentication",
+        "events_rule_identity_provider_changes",
+        "events_rule_idp_group_mapping_changes",
+        "events_rule_network_security_group_changes",
+        "events_rule_security_list_changes",
+        "events_rule_route_table_changes",
+        "events_rule_vcn_changes",
+        "events_rule_network_gateway_changes",
+        "events_notification_topic_and_subscription_exists",
+        "network_vcn_subnet_flow_logs_enabled",
+        "objectstorage_bucket_logging_enabled"
+      ],
+      "rationale": "Event logging, monitoring notifications and privileged-change alerting."
+    },
+    "2-13-3": {
+      "checks": [
+        "cloudguard_enabled"
+      ],
+      "rationale": "Threat detection / incident monitoring service enabled."
+    },
+    "3-1-3": {
+      "checks": [
+        "oci_volume_backup_policy_assigned",
+        "objectstorage_bucket_versioning_enabled"
+      ],
+      "rationale": "Recoverability of data supporting continuity of security systems."
+    },
+    "2-15-3": {
+      "checks": [
+        "oci_waf_protects_public_load_balancers",
+        "oci_lb_listeners_https_only",
+        "oci_lb_tls_policy_secure",
+        "oci_api_gateway_https_only",
+        "oci_backend_tiers_not_publicly_addressable",
+        "identity_user_mfa_enabled_console_access"
+      ],
+      "rationale": "WAF on public load balancers, HTTPS/TLS on load balancers and API gateways, back-end tiers not internet-addressable (multi-tier), and MFA for OCI console users. MFA for the web application's own end users depends on the application's identity provider and needs evidence."
+    },
+    "2-1-5": {
+      "checks": [
+        "oci_storage_classification_labels"
+      ],
+      "rationale": "Classification labels (tags) on storage resources."
+    },
+    "2-7-3": {
+      "checks": [
+        "oci_storage_classification_labels",
+        "objectstorage_bucket_not_publicly_accessible",
+        "oci_data_stores_encrypted_at_rest"
+      ],
+      "rationale": "Data classification labelling, public exposure and encryption of stored data."
+    },
+    "2-1-2": {
+      "checks": [
+        "oci_resource_inventory_available"
+      ],
+      "rationale": "Asset inventory can be produced from OCI Search."
+    },
+    "1-6-2": {
+      "checks": [
+        "oci_vss_host_scan_enabled",
+        "oci_vss_scans_recent"
+      ],
+      "rationale": "Vulnerability assessment of hosted systems."
+    },
+    "1-9-5": {
+      "checks": [
+        "oci_iam_users_inactive_90_days"
+      ],
+      "rationale": "Access hygiene indicator: active users that have not signed in for 90 days (revocation process itself needs evidence)."
+    },
+    "2-2-2": {
+      "checks": [
+        "oci_privileged_users_mfa_enabled",
+        "oci_admin_population_approved"
+      ],
+      "rationale": "Technical implementation of identity and access management for privileged accounts."
+    },
+    "2-5-2": {
+      "checks": [
+        "oci_network_no_unrestricted_ingress"
+      ],
+      "rationale": "Technical implementation of network segmentation."
+    },
+    "2-12-2": {
+      "checks": [
+        "oci_lb_logging_enabled",
+        "network_vcn_subnet_flow_logs_enabled"
+      ],
+      "rationale": "Technical implementation of event logging."
+    },
+    "2-3-2": {
+      "checks": [
+        "oci_os_patch_compliance"
+      ],
+      "rationale": "Technical implementation of system protection (patching)."
+    },
+    "2-10-2": {
+      "checks": [
+        "oci_vss_scans_recent"
+      ],
+      "rationale": "Technical implementation of vulnerability management."
+    }
+  },
+  "nca_ccc_2.2024": {
+    "2-2-T-1": {
+      "checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_user_api_keys_rotated_90_days",
+        "identity_tenancy_admin_permissions_limited",
+        "identity_tenancy_admin_users_no_api_keys",
+        "oci_privileged_users_mfa_enabled",
+        "oci_admin_population_approved",
+        "oci_iam_policy_no_overly_broad_statements"
+      ],
+      "rationale": "Tenant IAM: password strength, key rotation, admin least privilege."
+    },
+    "2-3-T-1": {
+      "checks": [
+        "compute_instance_secure_boot_enabled",
+        "compute_instance_legacy_metadata_endpoint_disabled"
+      ],
+      "rationale": "Protection of tenant compute workloads."
+    },
+    "2-4-T-1": {
+      "checks": [
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port",
+        "oci_network_no_unrestricted_ingress",
+        "oci_network_no_public_database_ports"
+      ],
+      "rationale": "Internet-exposed administrative ports in security lists."
+    },
+    "2-6-T-1": {
+      "checks": [
+        "filestorage_file_system_encrypted_with_cmk",
+        "oci_data_stores_encrypted_at_rest",
+        "oci_storage_classification_labels"
+      ],
+      "rationale": "Data-at-rest protection for file storage."
+    },
+    "2-7-T-1": {
+      "checks": [
+        "kms_key_rotation_enabled",
+        "compute_instance_in_transit_encryption_enabled"
+      ],
+      "rationale": "Tenant cryptography: key rotation and in-transit encryption."
+    },
+    "2-9-T-1": {
+      "checks": [
+        "oci_vss_host_scan_enabled"
+      ],
+      "rationale": "Vulnerability scanning of tenant hosts."
+    },
+    "2-11-T-1": {
+      "checks": [
+        "events_rule_iam_group_changes",
+        "events_rule_route_table_changes",
+        "events_rule_network_gateway_changes",
+        "events_rule_local_user_authentication",
+        "events_notification_topic_and_subscription_exists",
+        "network_vcn_subnet_flow_logs_enabled",
+        "oci_lb_logging_enabled"
+      ],
+      "rationale": "Event logs and monitoring of tenant changes."
+    },
+    "3-1-T-1": {
+      "checks": [
+        "oci_volume_backup_policy_assigned",
+        "objectstorage_bucket_versioning_enabled"
+      ],
+      "rationale": "Recoverability aspects of BCM for tenant data."
+    },
+    "2-1-T-1": {
+      "checks": [
+        "oci_resource_inventory_available"
+      ],
+      "rationale": "Asset inventory from OCI Search."
+    }
+  }
+}

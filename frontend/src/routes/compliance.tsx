@@ -11,6 +11,9 @@ import {
   Check,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { NcaWorkspace, ControlDrawer, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
+import { useQuery } from "@tanstack/react-query";
+import { ncaDownload, ncaFetch, ncaPost, qs } from "@/lib/nca-api";
 import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/compliance")({
@@ -31,6 +34,7 @@ interface FrameworkCardData {
   manual: number;
   textColor: string;
   strokeColor: string;
+  nca?: { key: string; coverage: number; error: number; notApplicable: number; manualPending: number; accounting: any; checks: any; controls: { passed: number; failed: number; manual: number; notTested: number; score: number }; controlTotal: number; unit: string };
 }
 
 // Framework category/provider labels aren't returned by the API (it only knows
@@ -147,8 +151,10 @@ function CompliancePage() {
   const [viewMode, setViewMode] = useState<"cards" | "matrix">("cards");
   const [selectedFramework, setSelectedFramework] = useState<FrameworkCardData | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [ncaFramework, setNcaFramework] = useState<string | null>(null);
+  const { data: ncaOverview } = useNcaOverview();
   const [modalSearchTerm, setModalSearchTerm] = useState("");
-  const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL">("ALL");
+  const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL" | "NOT_TESTED">("ALL");
 
   const realResources = resourcesData?.items ?? [];
   const totalAssetsCount = realResources.length;
@@ -184,10 +190,12 @@ function CompliancePage() {
   // requirement_id server-side, so passed + failed can never exceed total here.
   const dynamicFrameworks: FrameworkCardData[] = useMemo(() => {
     const items = (complianceData?.items as Array<Record<string, any>>) ?? [];
-    return items
+    const scanCards = items
       .filter((item) => {
         const id = String(item.id || item.compliance_id || "").toLowerCase();
         const fw = String(item.framework || "").toLowerCase();
+        // NCA ECC/CCC on OCI are shown from the dedicated NCA assessment (cards above the grid), not scan data
+        if (/nca_(ecc|cscc|ccc)/.test(id) && (id.includes("oraclecloud") || id.includes("oci"))) return false;
         // Hide internal ThreatScore and deprecated frameworks so only official standards appear
         if (
           id.includes("threatscore") ||
@@ -260,7 +268,52 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
         strokeColor: colors.stroke,
       };
     });
-  }, [complianceData]);
+
+    // NCA ECC/CCC on OCI come from the read-only NCA assessment and are listed like every other framework.
+    const byFramework = (ncaOverview?.latest?.summary?.by_framework ?? {}) as Record<string, any>;
+    const ncaCards: FrameworkCardData[] =
+      selectedProvider === "ALL" || selectedProvider === "oraclecloud"
+        ? Object.entries(byFramework).map(([key, d]) => {
+            const ctl = {
+              passed: d.controls.PASS,
+              failed: d.controls.FAIL,
+              manual: d.controls.MANUAL,
+              notTested: d.controls.NOT_APPLICABLE + d.controls.ERROR,
+              score: Math.round(d.controls.pass_rate_pct ?? 0),
+            };
+            const n = { total: d.controls.total, ...ctl };
+            const colors = scoreColors(n.score, n.passed + n.failed);
+            return {
+              id: key,
+              complianceId: key,
+              name: NCA_FRAMEWORK_LABEL[key] ?? key,
+              version: key.split("_").slice(-1)[0],
+              category: "Government" as const,
+              providerTarget: "OCI",
+              totalControls: n.total,
+              score: n.score,
+              passed: n.passed,
+              failed: n.failed,
+              manual: n.manual + n.notTested,
+              textColor: colors.text,
+              strokeColor: colors.stroke,
+              nca: {
+                key,
+                coverage: d.coverage.assessment_coverage_pct,
+                error: 0,
+                notApplicable: n.notTested,
+                manualPending: d.coverage.controls_awaiting_manual_evidence_or_review,
+                accounting: d.accounting,
+                checks: d.checks,
+                controls: ctl,
+                controlTotal: d.controls.total,
+                unit: key === "nca_ecc_2.2024" ? "Controls & sub-controls" : "Controls",
+              },
+            };
+          })
+        : [];
+    return [...scanCards, ...ncaCards];
+  }, [complianceData, ncaOverview, selectedProvider]);
 
   const fleetScore = useMemo(() => {
     const totals = dynamicFrameworks.reduce(
@@ -288,12 +341,56 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
     return { "filter[compliance_id]": selectedFramework.complianceId, ...complianceParams };
   }, [selectedFramework, complianceParams]);
 
-  const { data: modalRequirements, isLoading: requirementsLoading } = useComplianceRequirements(requirementsParams);
+  const { data: scanRequirements, isLoading: scanRequirementsLoading } = useComplianceRequirements(requirementsParams);
+
+  // NCA ECC/CCC on OCI: requirements come from the NCA assessment, rendered by the same modal as other frameworks.
+  const ncaAssessmentId: string | undefined = ncaOverview?.latest?.id;
+  const ncaKey = selectedFramework?.nca?.key;
+  const ncaControlsQ = useQuery({
+    enabled: !!ncaKey && !!ncaAssessmentId,
+    queryKey: ["nca", ncaAssessmentId, "modal-controls", ncaKey],
+    queryFn: () => ncaFetch(`/assessments/${ncaAssessmentId}/controls${qs({ framework: ncaKey, limit: 500 })}`),
+  });
+  const modalRequirements: Array<Record<string, any>> | undefined = ncaKey
+    ? (ncaControlsQ.data?.results ?? []).map((c: any) => ({
+        id: c.control_id,
+        description: c.name.replace(/^[\d-T]+\s*/, ""),
+        status: c.status,
+        reason: c.reason,
+        basis: c.basis,
+        manual_label: c.manual_label,
+        checks: c.checks,
+        framework: c.framework,
+      }))
+    : (scanRequirements as Array<Record<string, any>> | undefined);
+  const requirementsLoading = ncaKey ? ncaControlsQ.isLoading : scanRequirementsLoading;
+  const box = useMemo(() => {
+    if (!selectedFramework) return null;
+    const nca = selectedFramework.nca;
+    if (nca) {
+      return { total: nca.controlTotal, passed: nca.controls.passed, failed: nca.controls.failed, manual: nca.controls.manual,
+        notTested: nca.controls.notTested, score: nca.controls.score };
+    }
+    return { total: selectedFramework.totalControls, passed: selectedFramework.passed, failed: selectedFramework.failed,
+      manual: selectedFramework.manual, notTested: 0, score: selectedFramework.score };
+  }, [selectedFramework]);
+  const [ncaDrawer, setNcaDrawer] = useState<{ fw: string; id: string } | null>(null);
+  const [ncaBusy, setNcaBusy] = useState("");
 
   const filteredModalRequirements = useMemo(() => {
     const list = (modalRequirements as Array<Record<string, any>>) ?? [];
-    return list.filter((r) => {
-      if (modalStatusFilter !== "ALL" && r.status !== modalStatusFilter) return false;
+    // NCA: show results first (fail, pass, not tested) and manual controls last; stable within each group
+    const rank: Record<string, number> = { FAIL: 0, PASS: 1, ERROR: 2, NOT_APPLICABLE: 2, MANUAL: 3 };
+    const ordered = ncaKey
+      ? [...list].sort((a, b) => (rank[a.status] ?? 4) - (rank[b.status] ?? 4))
+      : list;
+    return ordered.filter((r) => {
+      if (modalStatusFilter === "MANUAL") {
+        // existing frameworks fold "resource not deployed" into MANUAL; NCA keeps them apart
+        if (r.status !== "MANUAL" && !(!ncaKey && r.status === "NOT_APPLICABLE")) return false;
+      } else if (modalStatusFilter === "NOT_TESTED") {
+        if (r.status !== "NOT_APPLICABLE" && r.status !== "ERROR") return false;
+      } else if (modalStatusFilter !== "ALL" && r.status !== modalStatusFilter) return false;
       if (modalSearchTerm.trim()) {
         const q = modalSearchTerm.toLowerCase();
         return String(r.id || "").toLowerCase().includes(q) || String(r.description || "").toLowerCase().includes(q);
@@ -332,6 +429,14 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
   };
 
   const noFrameworksYet = !complianceLoading && !complianceFetching && dynamicFrameworks.length === 0;
+
+  if (ncaFramework) {
+    return (
+      <AppShell title="Compliance & Governance" subtitle="NCA ECC & CCC controls assessed against your Oracle Cloud Infrastructure tenancy">
+        <NcaWorkspace initialFramework={ncaFramework} onBack={() => setNcaFramework(null)} />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -441,7 +546,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
             {filteredFrameworks.map((fw) => (
               <div
                 key={fw.id}
-                onClick={() => setSelectedFramework(fw)}
+                onClick={() => { setSelectedFramework(fw); }}
                 className="group relative flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/90 p-5 backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 cursor-pointer"
               >
                 <div>
@@ -455,7 +560,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                       </h3>
                       <p className="mt-0.5 text-[11px] text-muted-foreground font-mono">
                         {fw.version ? `${fw.version} · ` : ""}
-                        {fw.totalControls} Controls
+                        {fw.totalControls} {fw.nca?.unit ?? "Controls"}
                       </p>
                     </div>
                     <CircularScoreRing score={fw.score} strokeColor={fw.strokeColor} />
@@ -472,10 +577,16 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                       <X className="h-3 w-3" />
                       {fw.failed}
                     </span>
-                    {fw.manual > 0 && (
-                      <span className="flex items-center gap-1 font-mono text-[11px] text-indigo-400" title="Manual Audits / Resource Not Available">
+                    {fw.manual - (fw.nca ? fw.nca.notApplicable + fw.nca.error : 0) > 0 && (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-indigo-400" title={fw.nca ? "Manual controls" : "Manual Audits / Resource Not Available"}>
                         <FileText className="h-3 w-3" />
-                        {fw.manual}
+                        {fw.manual - (fw.nca ? fw.nca.notApplicable + fw.nca.error : 0)}
+                      </span>
+                    )}
+                    {fw.nca && fw.nca.notApplicable + fw.nca.error > 0 && (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground" title="No OCI resources: the resources this control needs do not exist (or could not be read)">
+                        <Search className="h-3 w-3" />
+                        {fw.nca.notApplicable + fw.nca.error}
                       </span>
                     )}
                   </div>
@@ -571,41 +682,65 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                 </button>
               </div>
 
-              <div className="mt-6 grid grid-cols-4 gap-3 rounded-xl border border-border bg-surface-2/40 p-4 text-center">
+              <div className={`mt-6 grid ${selectedFramework.nca ? "grid-cols-5" : "grid-cols-4"} gap-3 rounded-xl border border-border bg-surface-2/40 p-4 text-center`}>
                 <div>
-                  <div className="font-mono text-base font-bold text-foreground">{selectedFramework.score}%</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">Control Score</div>
+                  <div className="font-mono text-base font-bold text-foreground">{box?.score}%</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">Score</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-emerald-400">{selectedFramework.passed}</div>
+                  <div className="font-mono text-base font-bold text-emerald-400">{box?.passed}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Controls Passed</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-rose-400">{selectedFramework.failed}</div>
+                  <div className="font-mono text-base font-bold text-rose-400">{box?.failed}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">Violations / Failed</div>
                 </div>
                 <div>
-                  <div className="font-mono text-base font-bold text-indigo-400">{selectedFramework.manual}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title="Controls requiring manual verification or where cloud resource is not deployed">
-                    Manual Audits / Resource Not Available
+                  <div className="font-mono text-base font-bold text-indigo-400">
+                    {box?.manual}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title="Controls requiring manual verification or evidence">
+                    {selectedFramework.nca ? "Manual" : "Manual Audits / Resource Not Available"}
                   </div>
                 </div>
+                {selectedFramework.nca && (
+                  <div>
+                    <div className="font-mono text-base font-bold text-muted-foreground">{box?.notTested}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight" title="Not testable: the OCI resources this control needs do not exist in the tenancy (or could not be read)">No OCI Resources</div>
+                  </div>
+                )}
               </div>
+
+              {selectedFramework.nca && (
+                <div className="mt-2 flex justify-end gap-1.5 text-[10px]">
+                  {["csv", "json"].map((f) => (
+                    <button key={f} className="cursor-pointer rounded-md bg-surface-2 px-2 py-0.5 font-bold uppercase text-muted-foreground hover:text-foreground"
+                      onClick={() => ncaDownload(`/assessments/${ncaAssessmentId}/report${qs({ fmt: f, framework: selectedFramework.nca!.key })}`, `${selectedFramework.nca!.key}.${f}`).catch((e) => setNcaBusy(e.message))}>
+                      {f}
+                    </button>
+                  ))}
+                  <button className="cursor-pointer rounded-md bg-surface-2 px-2 py-0.5 font-bold text-muted-foreground hover:text-foreground"
+                    onClick={() => { const k = selectedFramework.nca!.key; setSelectedFramework(null); setNcaFramework(k); }}>
+                    Checks &amp; remediation →
+                  </button>
+                </div>
+              )}
+              {ncaBusy && <p className="mt-1 text-[11px] text-rose-400">{ncaBusy}</p>}
 
               <div className="mt-6 space-y-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Requirements Evaluated ({(modalRequirements ?? []).length})
+                    {ncaKey === "nca_ecc_2.2024" ? "Controls & sub-controls" : "Requirements Evaluated"} ({(modalRequirements ?? []).length})
                   </h4>
                   <div className="flex items-center gap-1.5">
-                    {(["ALL", "FAIL", "PASS", "MANUAL"] as const).map((st) => (
+                    {((selectedFramework.nca ? ["ALL", "FAIL", "PASS", "MANUAL", "NOT_TESTED"] : ["ALL", "FAIL", "PASS", "MANUAL"]) as Array<"ALL" | "FAIL" | "PASS" | "MANUAL" | "NOT_TESTED">).map((st) => (
                       <button
                         key={st}
                         onClick={() => setModalStatusFilter(st)}
                         className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${modalStatusFilter === st ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground"
                           }`}
                       >
-                        {st === "MANUAL" ? "MANUAL / N/A" : st}
+                        {st === "MANUAL" ? (selectedFramework.nca ? "MANUAL" : "MANUAL / N/A") : st === "NOT_TESTED" ? "NO OCI RESOURCES" : st}
                       </button>
                     ))}
                   </div>
@@ -643,12 +778,13 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                   ) : (
                     filteredModalRequirements.map((r: any, i: number) => {
                       const isPass = r.status === "PASS";
-                      const isManual = r.status === "MANUAL";
+                      const isManual = r.status === "MANUAL" || r.status === "NOT_APPLICABLE" || r.status === "ERROR";
 
                       return (
                         <div
                           key={`${r.id || "req"}-${i}`}
-                          className="flex items-start justify-between rounded-lg border border-border bg-surface-2/60 p-3 text-xs gap-3"
+                          onClick={selectedFramework.nca ? () => setNcaDrawer({ fw: selectedFramework.nca!.key, id: r.id }) : undefined}
+                          className={`flex items-start justify-between rounded-lg border border-border bg-surface-2/60 p-3 text-xs gap-3 ${selectedFramework.nca ? "cursor-pointer hover:border-primary/50" : ""}`}
                         >
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -671,7 +807,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                                   : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                               }`}
                           >
-                            {isManual ? "Manual / Resource N/A" : (r.status || "FAIL")}
+                            {r.status === "NOT_APPLICABLE" ? (selectedFramework.nca ? "No OCI resources" : "N/A") : r.status === "ERROR" ? "No OCI resources" : isManual ? (selectedFramework.nca ? "Manual" : "Manual / Resource N/A") : (r.status || "FAIL")}
                           </span>
                         </div>
                       );
@@ -699,6 +835,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
           </div>
         )}
       </div>
+      {ncaDrawer && <ControlDrawer fw={ncaDrawer.fw} id={ncaDrawer.id} onClose={() => setNcaDrawer(null)} />}
     </AppShell>
   );
 }

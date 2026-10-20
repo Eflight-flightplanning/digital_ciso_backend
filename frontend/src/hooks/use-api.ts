@@ -145,7 +145,7 @@ export function useFindings(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.findings(params),
     queryFn: async () => {
-      const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "2000",
         "filter[inserted_at.gte]": gteDate,
@@ -172,7 +172,7 @@ export function useResources(params?: Record<string, string>) {
   return useQuery({
     queryKey: qk.resources(params),
     queryFn: async () => {
-      const gteDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const gteDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const finalParams = {
         "page[size]": "100",
         "filter[updated_at.gte]": gteDate,

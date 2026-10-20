@@ -1,0 +1,341 @@
+{
+  "_description": "Maps rows of ecc2024_api_mapping.json (keyed by the workbook's 'API Check' text) to implemented OCI checks. coverage=full means the implemented checks fully realise the row's pass/fail condition; partial means only part of it. Rows absent here have no implemented check and are reported MANUAL / NO_AUTOMATED_CHECK (never PASS).",
+  "map": {
+    "Privileged users must use MFA": {
+      "checks": [
+        "oci_privileged_users_mfa_enabled"
+      ],
+      "coverage": "full",
+      "note": "Privileged = members of Administrators and groups granted manage all-resources in tenancy; federated users are MANUAL (verify at IdP)."
+    },
+    "Detect excessive administrative permissions": {
+      "checks": [
+        "oci_admin_population_approved",
+        "identity_tenancy_admin_permissions_limited",
+        "oci_iam_policy_no_overly_broad_statements",
+        "identity_iam_admins_cannot_update_tenancy_admins"
+      ],
+      "coverage": "full",
+      "note": "Approved admin population comes from NCA_APPROVED_ADMINS; MANUAL until configured."
+    },
+    "Detect stale access keys / long-lived credentials": {
+      "checks": [
+        "identity_user_api_keys_rotated_90_days",
+        "identity_user_auth_tokens_rotated_90_days",
+        "identity_user_customer_secret_keys_rotated_90_days",
+        "identity_user_db_passwords_rotated_90_days"
+      ],
+      "coverage": "full"
+    },
+    "Enforce password policy for human IAM users where applicable": {
+      "checks": [
+        "identity_password_policy_minimum_length_14",
+        "identity_password_policy_prevents_reuse",
+        "identity_password_policy_expires_within_365_days"
+      ],
+      "coverage": "full"
+    },
+    "Detect unrestricted inbound internet exposure": {
+      "checks": [
+        "oci_network_no_unrestricted_ingress",
+        "network_default_security_list_restricts_traffic",
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port",
+        "network_security_group_ingress_from_internet_to_rdp_port"
+      ],
+      "coverage": "full",
+      "note": "Approved public ports from NCA_APPROVED_PUBLIC_PORTS (default 80,443)."
+    },
+    "Detect unrestricted network services, protocols and ports": {
+      "checks": [
+        "oci_network_no_unrestricted_ingress",
+        "network_default_security_list_restricts_traffic",
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_ssh_port",
+        "network_security_list_ingress_from_internet_to_rdp_port",
+        "network_security_group_ingress_from_internet_to_rdp_port"
+      ],
+      "coverage": "full"
+    },
+    "Detect unrestricted SSH (22) exposure": {
+      "checks": [
+        "network_security_list_ingress_from_internet_to_ssh_port",
+        "network_security_group_ingress_from_internet_to_ssh_port"
+      ],
+      "coverage": "full"
+    },
+    "Detect unrestricted RDP (3389) exposure": {
+      "checks": [
+        "network_security_list_ingress_from_internet_to_rdp_port",
+        "network_security_group_ingress_from_internet_to_rdp_port"
+      ],
+      "coverage": "full"
+    },
+    "Detect publicly exposed database ports": {
+      "checks": [
+        "oci_network_no_public_database_ports",
+        "database_autonomous_database_access_restricted"
+      ],
+      "coverage": "full"
+    },
+    "Detect storage resources without encryption at rest": {
+      "checks": [
+        "oci_data_stores_encrypted_at_rest",
+        "oci_database_encryption_at_rest"
+      ],
+      "coverage": "full",
+      "note": "OCI encrypts all storage at rest; key type (Oracle- vs customer-managed) is recorded. Customer-managed-key checks remain at ECC control level."
+    },
+    "Check block disk/volume encryption at rest": {
+      "checks": [
+        "oci_data_stores_encrypted_at_rest"
+      ],
+      "coverage": "full",
+      "note": "OCI encrypts all volumes; customer-managed-key checks remain at ECC control level."
+    },
+    "Detect public storage buckets/containers": {
+      "checks": [
+        "objectstorage_bucket_not_publicly_accessible"
+      ],
+      "coverage": "full"
+    },
+    "Detect unencrypted network/database traffic where TLS is supported": {
+      "checks": [
+        "oci_lb_listeners_https_only",
+        "oci_lb_tls_policy_secure",
+        "compute_instance_in_transit_encryption_enabled"
+      ],
+      "coverage": "full"
+    },
+    "Check cryptographic key lifecycle configuration": {
+      "checks": [
+        "oci_kms_key_lifecycle_managed",
+        "kms_key_rotation_enabled"
+      ],
+      "coverage": "full"
+    },
+    "Check customer-managed key rotation where policy requires it": {
+      "checks": [
+        "kms_key_rotation_enabled"
+      ],
+      "coverage": "full"
+    },
+    "Check audit logging is enabled for critical cloud services": {
+      "checks": [
+        "audit_log_retention_period_365_days",
+        "oci_lb_logging_enabled",
+        "network_vcn_subnet_flow_logs_enabled",
+        "objectstorage_bucket_logging_enabled"
+      ],
+      "coverage": "full",
+      "note": "OCI Audit is always on; service logs evaluated for load balancers, VCN subnets and buckets."
+    },
+    "Check privileged and remote access events are logged": {
+      "checks": [
+        "events_rule_local_user_authentication",
+        "events_rule_iam_policy_changes",
+        "events_rule_iam_group_changes",
+        "events_rule_user_changes",
+        "events_notification_topic_and_subscription_exists"
+      ],
+      "coverage": "full",
+      "note": "OCI Audit records all console/API sign-ins and changes; Events rules alert on them."
+    },
+    "Check security log retention is at least 12 months": {
+      "checks": [
+        "audit_log_retention_period_365_days",
+        "oci_log_retention_12_months"
+      ],
+      "coverage": "full",
+      "note": "Retention threshold from NCA_LOG_RETENTION_DAYS (default 365)."
+    },
+    "Check cloud control-plane audit trail covers all regions/accounts/subscriptions": {
+      "checks": [
+        "audit_log_retention_period_365_days"
+      ],
+      "coverage": "full",
+      "note": "OCI Audit is tenancy-wide and always on; retention is verified."
+    },
+    "Check continuous monitoring coverage": {
+      "checks": [
+        "cloudguard_enabled",
+        "events_notification_topic_and_subscription_exists",
+        "events_rule_cloudguard_problems"
+      ],
+      "coverage": "partial"
+    },
+    "Check vulnerability scanning coverage": {
+      "checks": [
+        "oci_vss_host_scan_enabled",
+        "oci_vss_scans_recent"
+      ],
+      "coverage": "full",
+      "note": "Scan freshness threshold NCA_SCAN_MAX_AGE_DAYS (default 30)."
+    },
+    "Check backup coverage for critical resources": {
+      "checks": [
+        "oci_volume_backup_policy_assigned",
+        "oci_database_backup_enabled"
+      ],
+      "coverage": "full",
+      "note": "Volumes and databases."
+    },
+    "Check threat-intelligence feed integrations are configured": {
+      "checks": [
+        "cloudguard_enabled"
+      ],
+      "coverage": "partial"
+    },
+    "Detect public/cross-account/cross-tenant IAM grants": {
+      "checks": [
+        "oci_iam_no_public_or_cross_tenancy_grants"
+      ],
+      "coverage": "full"
+    },
+    "Detect IAM policies granting wildcard actions on wildcard resources": {
+      "checks": [
+        "oci_iam_policy_no_overly_broad_statements"
+      ],
+      "coverage": "full"
+    },
+    "Detect stale/inactive identities": {
+      "checks": [
+        "oci_iam_users_inactive_90_days"
+      ],
+      "coverage": "full",
+      "note": "90-day threshold."
+    },
+    "Discover all cloud resources and produce an asset inventory": {
+      "checks": [
+        "oci_resource_inventory_available"
+      ],
+      "coverage": "full",
+      "note": "OCI Search across the tenancy."
+    },
+    "Check network intrusion-prevention capability": {
+      "checks": [
+        "oci_network_firewall_deployed"
+      ],
+      "coverage": "partial",
+      "note": "Presence of OCI Network Firewall only; IPS policy content is not evaluated."
+    },
+    "Check DDoS protection for internet-facing services": {
+      "checks": [
+        "oci_waf_protects_public_load_balancers"
+      ],
+      "coverage": "full",
+      "note": "OCI applies network-layer DDoS protection to all public endpoints by default; WAF attachment is evaluated for public load balancers."
+    },
+    "Check patch compliance for compute workloads": {
+      "checks": [
+        "oci_os_patch_compliance"
+      ],
+      "coverage": "full",
+      "note": "Instances are matched to OS Management Hub by display name and region."
+    },
+    "Check WAF protection for public web applications": {
+      "checks": [
+        "oci_waf_protects_public_load_balancers"
+      ],
+      "coverage": "full",
+      "note": "Public load balancers."
+    },
+    "Check HTTPS-only exposure": {
+      "checks": [
+        "oci_lb_listeners_https_only",
+        "oci_api_gateway_https_only"
+      ],
+      "coverage": "full"
+    },
+    "Check TLS version/cipher configuration": {
+      "checks": [
+        "oci_lb_tls_policy_secure",
+        "oci_api_gateway_https_only"
+      ],
+      "coverage": "full"
+    },
+    "Check SPF record exists for corporate mail domains": {
+      "checks": [
+        "oci_dns_mail_domain_spf_dmarc"
+      ],
+      "coverage": "full",
+      "note": "Domains hosted in OCI DNS that publish an MX record."
+    },
+    "Check DMARC policy for corporate mail domains": {
+      "checks": [
+        "oci_dns_mail_domain_spf_dmarc"
+      ],
+      "coverage": "full",
+      "note": "Domains hosted in OCI DNS that publish an MX record."
+    },
+    "Check database encryption at rest": {
+      "checks": [
+        "oci_database_encryption_at_rest"
+      ],
+      "coverage": "full"
+    },
+    "Detect critical databases without point-in-time recovery where required": {
+      "checks": [
+        "oci_database_backup_enabled"
+      ],
+      "coverage": "full"
+    },
+    "Check DNS security configuration": {
+      "checks": [
+        "oci_dns_security_configuration"
+      ],
+      "coverage": "full",
+      "note": "DNSSEC state of public zones."
+    },
+    "Check vulnerability severity classification exists": {
+      "checks": [
+        "oci_cloudguard_problems_classified",
+        "oci_vss_findings_severity_classified"
+      ],
+      "coverage": "full"
+    },
+    "Check remediation SLA for critical/high vulnerabilities": {
+      "checks": [
+        "oci_cloudguard_critical_high_sla"
+      ],
+      "coverage": "full",
+      "note": "SLA 15 days (critical) / 30 days (high); override with NCA_VULN_SLA_CRITICAL_DAYS / NCA_VULN_SLA_HIGH_DAYS."
+    },
+    "Check MFA for remote/webmail access": {
+      "checks": [
+        "identity_user_mfa_enabled_console_access"
+      ],
+      "coverage": "full",
+      "note": "OCI has no webmail; evaluates MFA for console (remote) users. A third-party webmail IdP is outside OCI."
+    },
+    "Check DKIM is enabled for corporate mail domains": {
+      "checks": [
+        "oci_dns_dkim_records"
+      ],
+      "coverage": "full",
+      "note": "Probes common selectors; MANUAL if none is found (selectors are provider-specific)."
+    },
+    "Detect publicly assumable/trust relationships": {
+      "checks": [
+        "oci_iam_dynamic_groups_scoped"
+      ],
+      "coverage": "full",
+      "note": "Dynamic-group matching rules."
+    },
+    "Detect root/global administrator accounts used for routine operations": {
+      "checks": [
+        "oci_admin_not_used_for_routine_operations"
+      ],
+      "coverage": "full",
+      "note": "7 days of Audit change events by tenancy admins in the home region; approved users from NCA_APPROVED_ADMINS."
+    },
+    "Check log storage is protected from modification/deletion": {
+      "checks": [
+        "oci_log_bucket_retention_locked"
+      ],
+      "coverage": "full",
+      "note": "Log archive buckets targeted by service connectors."
+    }
+  }
+}
