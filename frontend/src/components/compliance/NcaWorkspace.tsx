@@ -715,7 +715,7 @@ export function ControlDrawer({ fw, id, onClose }: { fw: string; id: string; onC
 export function useNcaOverview() {
   return useQuery({
     queryKey: ["nca", "latest"],
-    queryFn: () => ncaFetch("/assessments/latest"),
+    queryFn: () => ncaFetch("/assessments/latest").catch(() => null),
     refetchInterval: (q) => (q.state.data?.running ? 4000 : false),
   });
 }

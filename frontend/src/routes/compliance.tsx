@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
+  X,
   Check,
   ShieldCheck,
 } from "lucide-react";
