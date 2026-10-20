@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, Play, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Download, Play, RefreshCw, ShieldCheck } from "lucide-react";
 import { Chip, Panel, PanelTitle } from "@/components/ui-kit/primitives";
 import { ncaDownload, ncaFetch, ncaPost, ncaUpload, qs } from "@/lib/nca-api";
 
 
 type Status = "PASS" | "FAIL" | "MANUAL" | "NOT_APPLICABLE" | "ERROR";
 const STATUSES: Status[] = ["FAIL", "ERROR", "MANUAL", "PASS", "NOT_APPLICABLE"];
+/** Plain-text close glyph (avoids sharing the one-letter lucide `X` export across route chunks). */
+export const CloseGlyph = ({ className }: { className?: string }) => (
+  <span aria-hidden className={className}>
+    ✕
+  </span>
+);
+
 const STATUS_TONE: Record<string, string> = {
   PASS: "success",
   FAIL: "critical",
@@ -626,7 +633,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="mb-2 flex items-center justify-between">
           <h3 className="font-display text-sm font-bold">{title}</h3>
           <button onClick={onClose}>
-            <X className="h-4 w-4" />
+            <CloseGlyph className="text-base leading-none" />
           </button>
         </div>
         {children}

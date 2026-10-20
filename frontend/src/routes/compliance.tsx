@@ -7,12 +7,11 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
-  X,
   Check,
   ShieldCheck,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { NcaWorkspace, ControlDrawer, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
+import { NcaWorkspace, ControlDrawer, CloseGlyph, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
 import { useQuery } from "@tanstack/react-query";
 import { ncaDownload, ncaFetch, ncaPost, qs } from "@/lib/nca-api";
 import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
@@ -585,7 +584,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                       {fw.passed}
                     </span>
                     <span className="flex items-center gap-1 font-mono text-[11px] text-rose-400" title="Violations / Failed Controls">
-                      <X className="h-3 w-3" />
+                      <XCircle className="h-3 w-3" />
                       {fw.failed}
                     </span>
                     {fw.manual - (fw.nca ? fw.nca.notApplicable + fw.nca.error : 0) > 0 && (
@@ -689,7 +688,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
                   }}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors cursor-pointer"
                 >
-                  <X className="h-4 w-4" />
+                  <CloseGlyph className="text-base leading-none" />
                 </button>
               </div>
 
