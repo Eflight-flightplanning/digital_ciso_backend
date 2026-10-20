@@ -20,7 +20,7 @@ import oci
 
 from .aggregate import FAIL, MANUAL, PASS
 from .native_checks import NATIVE_CHECKS, NativeContext
-from .native_checks_extra import _all, _each_comp_region, _res, _rrset, _spec
+from .native_checks_extra import _PRINCIPAL_CONDITION, _all, _each_comp_region, _res, _rrset, _spec, is_unrestricted_any_user
 
 
 def _env_list(name: str) -> list[str]:
@@ -164,8 +164,9 @@ def oci_iam_no_public_or_cross_tenancy_grants(ctx):
             ctx.add_error(exc, f"Policies {getattr(comp, 'name', comp.id)}")
             continue
         for p in policies:
-            bad = [s for s in (p.statements or []) if _PUBLIC_GRANT.match(s)
-                   or (_CROSS_TENANCY.match(s) and not re.match(r"^\s*define\s+(tenancy|group|dynamic-group|service)\b", s, re.I))]
+            bad = [s for s in (p.statements or []) if is_unrestricted_any_user(s)
+                   or (_CROSS_TENANCY.match(s) and not re.match(r"^\s*define\s+(tenancy|group|dynamic-group|service)\b", s, re.I)
+                       and not _PRINCIPAL_CONDITION.search(s))]  # endorse/admit limited to a service principal is not open access
             out.append(_res(FAIL if bad else PASS, p.id, p.name, "Policy", home, comp.id,
                             f"Policy {p.name} grants public (any-user) or cross-tenancy (endorse/admit) access: {' | '.join(bad)[:300]}" if bad
                             else f"Policy {p.name} grants no public or cross-tenancy access.", statements=bad))

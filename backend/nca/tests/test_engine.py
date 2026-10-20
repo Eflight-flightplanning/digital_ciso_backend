@@ -106,6 +106,8 @@ class BuildProviderCredentials(SimpleTestCase):
         calls = {}
 
         class P:
+            _bootstrap_region = "us-ashburn-1"
+
             def __init__(self, **kw):
                 calls.update(kw)
         fake_mod = types.SimpleNamespace(OraclecloudProvider=P)
@@ -120,6 +122,26 @@ class BuildProviderCredentials(SimpleTestCase):
         calls = self.run_build(True, self.KW)
         self.assertEqual(calls["user"], "ocid1.user")
         self.assertNotIn("oci_config_file", calls)
+
+    def test_stored_region_is_the_session_region_and_is_restored_afterwards(self):
+        seen = {}
+
+        class P:
+            _bootstrap_region = "us-ashburn-1"
+
+            def __init__(self, **kw):
+                seen["during"] = P._bootstrap_region
+                seen["kwargs"] = kw
+        fake_mod = types.SimpleNamespace(OraclecloudProvider=P)
+        kw = {**self.KW, "bootstrap_region": "uk-london-1"}
+        with mock.patch.dict("sys.modules", {"prowler.providers.oraclecloud.oraclecloud_provider": fake_mod}), \
+                mock.patch.object(engine.os.path, "isfile", return_value=False), \
+                mock.patch.object(engine, "platform_oci_credentials", return_value=(kw, "")):
+            engine.build_provider(tenant_id="t")
+        self.assertEqual(seen["during"], "uk-london-1")
+        self.assertNotIn("bootstrap_region", seen["kwargs"])   # not passed to the provider: all regions are still audited
+        self.assertIsNone(seen["kwargs"].get("region"))
+        self.assertEqual(P._bootstrap_region, "us-ashburn-1")  # global default restored
 
     def test_config_file_is_only_a_fallback(self):
         calls = self.run_build(True, None)

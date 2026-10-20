@@ -25,7 +25,7 @@ from .perms import HasPermissions, Permissions, resolve_tenant
 from . import reports
 from .aggregate import basis as _basis
 from .catalog import manual_category, FRAMEWORK_FILES, get_control, list_frameworks, load_framework
-from .engine import run_assessment
+from .hooks import start_assessment
 from .manual import finalize_controls, manual_state_for
 from .models import (
     NcaAssessment, NcaAuditLog, NcaCheckRun, NcaControlComment, NcaControlResult, NcaControlReview,
@@ -118,22 +118,11 @@ class AssessmentsView(NcaBase):
         fws = request.data.get("frameworks") or list(FRAMEWORK_FILES)
         if not isinstance(fws, list) or any(f not in FRAMEWORK_FILES for f in fws):
             return Response({"detail": f"frameworks must be a subset of {sorted(FRAMEWORK_FILES)}"}, status=400)
-        qs = NcaAssessment.objects.filter(tenant_id=tid, status="running")
-        _reap(qs)
-        if qs.exists():
-            return Response({"detail": "An assessment is already running.", "id": str(qs.first().id)}, status=409)
         provider_id = request.data.get("provider_id") or None
-        a = NcaAssessment.objects.create(tenant_id=tid, frameworks=fws, triggered_by=self.actor(request),
-                                         oci_profile="platform-provider")
+        a, started = start_assessment(tid, fws, provider_id, self.actor(request))
+        if not started:
+            return Response({"detail": "An assessment is already running.", "id": str(a.id)}, status=409)
         _audit(request, tid, "assessment.start", str(a.id), {"frameworks": fws, "mode": "read-only"})
-
-        def _bg():
-            try:
-                run_assessment(frameworks=fws, tenant_id=tid, triggered_by=a.triggered_by, assessment=a, provider_id=provider_id)
-            finally:
-                connection.close()
-
-        threading.Thread(target=_bg, name=f"nca-{a.id}", daemon=True).start()
         return Response(_assessment_dict(a), status=202)
 
 

@@ -127,9 +127,34 @@ def _oci_config_path(config_file: str | None) -> str:
     return os.path.expanduser(config_file or os.getenv("NCA_OCI_CONFIG_FILE") or "~/.oci/config")
 
 
+def _credentials_of(prov, ProviderSecret, MainRouter) -> tuple[dict | None, str]:
+    sec = ProviderSecret.all_objects.using(MainRouter.admin_db).filter(provider_id=prov.id).first()
+    if sec is None:
+        return None, "the registered OCI provider has no stored credentials"
+    try:
+        data = sec.secret
+    except Exception:  # noqa: BLE001 - cryptography.fernet.InvalidToken and friends
+        return None, ("the stored OCI credentials cannot be decrypted (the secrets encryption key differs from the one "
+                      "they were saved with); re-save the OCI provider credentials in Cloud Providers")
+    kw = {
+        "tenancy": data.get("tenancy_ocid") or data.get("tenancy") or prov.uid,
+        "user": data.get("user_ocid") or data.get("user"),
+        "fingerprint": data.get("fingerprint"),
+        "key_content": data.get("private_key") or data.get("key_content"),
+        "pass_phrase": data.get("pass_phrase") or data.get("passphrase"),
+        "bootstrap_region": (data.get("region") or "").strip() if isinstance(data.get("region"), str) else None,
+    }
+    kw = {k: v for k, v in kw.items() if v}
+    missing = sorted({"tenancy", "user", "fingerprint", "key_content"} - kw.keys())
+    if missing:
+        return None, f"the stored OCI credentials lack: {', '.join(missing)}"
+    return kw, ""
+
+
 def platform_oci_credentials(tenant_id=None, provider_id=None) -> tuple[dict | None, str]:
-    """Credentials of the OCI provider registered in the platform (the same encrypted secret the platform's own scans
-    use). Returns (kwargs, "") or (None, reason)."""
+    """Credentials of the OCI provider registered in the platform (the same encrypted secret the platform scans use).
+    With several candidate providers the most recently updated one whose credentials are usable is chosen, unless
+    provider_id names one explicitly. Returns (kwargs, "") or (None, reason)."""
     try:
         from api.db_router import MainRouter
         from api.models import Provider, ProviderSecret
@@ -139,34 +164,20 @@ def platform_oci_credentials(tenant_id=None, provider_id=None) -> tuple[dict | N
             qs = qs.filter(tenant_id=tenant_id)
         if provider_id:
             qs = qs.filter(id=provider_id)
-        providers = list(qs[:2])
+        providers = list(qs.order_by("-updated_at")[:10])
         if not providers:
             return None, "no OCI provider is registered in the platform"
-        if len(providers) > 1:
-            return None, "several OCI providers are registered; choose one (provider_id / --provider-id)"
-        prov = providers[0]
-        sec = ProviderSecret.all_objects.using(MainRouter.admin_db).filter(provider_id=prov.id).first()
-        if sec is None:
-            return None, "the registered OCI provider has no stored credentials"
-        try:
-            data = sec.secret
-        except Exception:  # noqa: BLE001 - cryptography.fernet.InvalidToken and friends
-            return None, ("the stored OCI credentials cannot be decrypted (the secrets encryption key differs from the one "
-                          "they were saved with); re-save the OCI provider credentials in Cloud Providers")
+        reasons = []
+        for prov in providers:
+            kw, reason = _credentials_of(prov, ProviderSecret, MainRouter)
+            if kw is not None:
+                if len(providers) > 1:
+                    logger.info("Several OCI providers registered; using the most recently updated usable one (%s)", prov.alias)
+                return kw, ""
+            reasons.append(f"{prov.alias or prov.uid}: {reason}")
+        return None, "; ".join(reasons)
     except Exception as exc:  # noqa: BLE001
         return None, f"platform credentials unavailable ({exc.__class__.__name__})"
-    kw = {
-        "tenancy": data.get("tenancy_ocid") or data.get("tenancy") or prov.uid,
-        "user": data.get("user_ocid") or data.get("user"),
-        "fingerprint": data.get("fingerprint"),
-        "key_content": data.get("private_key") or data.get("key_content"),
-        "pass_phrase": data.get("pass_phrase") or data.get("passphrase"),
-    }
-    kw = {k: v for k, v in kw.items() if v}
-    missing = sorted({"tenancy", "user", "fingerprint", "key_content"} - kw.keys())
-    if missing:
-        return None, f"the stored OCI credentials lack: {', '.join(missing)}"
-    return kw, ""
 
 
 def build_provider(profile: str | None = None, config_file: str | None = None, regions: list[str] | None = None,
@@ -189,7 +200,18 @@ def build_provider(profile: str | None = None, config_file: str | None = None, r
     kw, reason = platform_oci_credentials(tenant_id, provider_id)
     if kw is not None:
         logger.info("Using the OCI provider registered in the platform")
-        return OraclecloudProvider(region=regions or None, **kw)
+        kw = dict(kw)
+        # With direct credentials Prowler opens its session in a bootstrap region that defaults to us-ashburn-1. A tenancy
+        # that is not subscribed there answers 401 NotAuthenticated, so use the region stored with the provider as the
+        # session region. This does not restrict the audit: every subscribed region is still assessed.
+        bootstrap = kw.pop("bootstrap_region", None)
+        previous = OraclecloudProvider._bootstrap_region
+        if bootstrap:
+            OraclecloudProvider._bootstrap_region = bootstrap
+        try:
+            return OraclecloudProvider(region=regions or None, **kw)
+        finally:
+            OraclecloudProvider._bootstrap_region = previous
     path = _oci_config_path(None)
     if os.path.isfile(path):
         logger.warning("Platform OCI credentials not used (%s); falling back to OCI config file %s", reason, path)

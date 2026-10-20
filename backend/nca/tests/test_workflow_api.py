@@ -385,7 +385,7 @@ class ApiTests(ApiCase):
         self.assertGreaterEqual(self.c1.get(f"{self.base}/audit-log").json()["count"], 1)
 
     def test_start_assessment_validates_and_runs_in_background(self):
-        with mock.patch("nca.views.run_assessment") as run, mock.patch("nca.views.threading.Thread") as th:
+        with mock.patch("nca.hooks.run_assessment") as run, mock.patch("nca.hooks.threading.Thread") as th:
             self.assertEqual(self.c1.post(f"{self.base}/assessments", {"frameworks": ["bogus"]}, format="json").status_code, 400)
             r = self.c1.post(f"{self.base}/assessments", {"frameworks": [FW]}, format="json")
             self.assertEqual(r.status_code, 202, r.content)
@@ -402,3 +402,29 @@ class SubcontrolFilterTests(ApiCase):
         self.assertEqual(len(rows), 42)
         self.assertTrue(all(x["workbook_automation"] == "FULL" for x in rows))
         self.assertEqual(self.c1.get(f"{self.base}/assessments/{self.a.id}/subcontrols", {"limit": 200}).json()["count"], 57)
+
+
+class StartAssessmentHook(DbCase):
+    def test_starts_once_and_reports_running_one_instead_of_starting_a_second(self):
+        from nca.hooks import start_assessment
+        with mock.patch("nca.hooks.threading.Thread") as th, mock.patch("nca.hooks.run_assessment"):
+            a1, started1 = start_assessment(TENANT, ["nca_ecc_2.2024"], provider_id=None, triggered_by="scan")
+            a2, started2 = start_assessment(TENANT, ["nca_ecc_2.2024"])
+        self.assertTrue(started1)
+        self.assertFalse(started2)
+        self.assertEqual(a1.id, a2.id)
+        th.return_value.start.assert_called_once()
+
+    def test_background_failure_never_propagates(self):
+        from nca.hooks import start_assessment
+        captured = {}
+
+        class T:
+            def __init__(self, target, name, daemon):
+                captured["target"] = target
+
+            def start(self):
+                pass
+        with mock.patch("nca.hooks.threading.Thread", T), mock.patch("nca.hooks.run_assessment", side_effect=RuntimeError("boom")):
+            start_assessment(uuid.uuid4(), ["nca_ecc_2.2024"])
+            captured["target"]()   # must swallow the error (it is logged)

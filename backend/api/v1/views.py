@@ -2672,6 +2672,19 @@ class ScanViewSet(BaseRLSViewSet):
                     task_id=pre_task_id,
                 )
 
+        # Scanning an OCI provider also runs the read-only NCA ECC/CCC assessment with that provider's credentials.
+        # Best effort: it must never affect the scan itself.
+        try:
+            if provider and provider.provider == Provider.ProviderChoices.ORACLECLOUD.value:
+                from nca.hooks import start_assessment
+
+                start_assessment(
+                    self.request.tenant_id, provider_id=str(provider.id),
+                    triggered_by=getattr(request.user, "email", "") or "scan",
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not start the NCA assessment for scan %s", scan.id)
+
         self.response_serializer_class = TaskSerializer
         output_serializer = self.get_serializer(prowler_task)
 

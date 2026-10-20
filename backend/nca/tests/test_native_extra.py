@@ -70,6 +70,12 @@ class IamChecks(SimpleTestCase):
         with mock.patch.object(x, "_all", return_value=pols):
             self.assertEqual(statuses(x.oci_iam_policy_no_overly_broad_statements(ctx())), ["PASS", "FAIL", "PASS", "FAIL"])
 
+    def test_service_principal_any_user_policies_are_not_public_grants(self):
+        pols = [NS(id="1", name="cg", statements=["Allow any-user to { WLP_BOM_READ } in tenancy where all { request.principal.id = target.agent.id, request.principal.type = 'workloadprotectionagent'}"]),
+                NS(id="2", name="open", statements=["Allow any-user to read buckets in tenancy"])]
+        with mock.patch.object(x, "_all", return_value=pols):
+            self.assertEqual(statuses(x.oci_iam_policy_no_overly_broad_statements(ctx())), ["PASS", "FAIL"])
+
     def test_inactive_users(self):
         now = datetime.now(timezone.utc)
         users = [NS(id="a", name="recent", lifecycle_state="ACTIVE", last_successful_login_time=now - timedelta(days=5), time_created=now - timedelta(days=500)),

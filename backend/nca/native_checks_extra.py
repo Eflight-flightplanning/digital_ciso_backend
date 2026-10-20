@@ -210,7 +210,17 @@ def oci_instance_os_management_agent_enabled(ctx):
 
 # --------------------------------------------------------------- IAM
 
-_ANY_USER = re.compile(r"^\s*allow\s+(any-user|dynamic-group\s+\S+\s+to\s+manage\s+all-resources)", re.I)
+_ANY_USER = re.compile(r"^\s*allow\s+dynamic-group\s+\S+\s+to\s+manage\s+all-resources", re.I)
+
+_PRINCIPAL_CONDITION = re.compile(r"\bwhere\b.*\brequest\.(principal|user)\.", re.I | re.S)
+
+
+def is_unrestricted_any_user(statement: str) -> bool:
+    """`allow any-user ...` is a public grant only when nothing restricts who the principal is. Oracle's own service
+    policies (Cloud Guard agents, event rules, service connectors, ...) are written as
+    `allow any-user ... where request.principal.type = '<service>'` and are not public grants."""
+    return bool(re.match(r"^\s*allow\s+any-user\b", statement, re.I)) and not _PRINCIPAL_CONDITION.search(statement)
+
 _ALL_RES_TENANCY = re.compile(r"^\s*allow\s+group\s+(\S+)\s+to\s+manage\s+all-resources\s+in\s+tenancy\s*$", re.I)
 
 
@@ -227,7 +237,7 @@ def oci_iam_policy_no_overly_broad_statements(ctx):
             bad = []
             for st in p.statements or []:
                 m = _ALL_RES_TENANCY.match(st)
-                if _ANY_USER.match(st) or (m and m.group(1).lower() not in ("administrators", "'default'/administrators")):
+                if is_unrestricted_any_user(st) or _ANY_USER.match(st) or (m and m.group(1).lower() not in ("administrators", "'default'/administrators")):
                     bad.append(st)
             out.append(_res(FAIL if bad else PASS, p.id, p.name, "Policy", home, comp.id,
                             f"Policy {p.name} has overly broad statement(s): {' | '.join(bad)[:300]}" if bad

@@ -61,9 +61,11 @@ class Identity(SimpleTestCase):
     def test_public_and_cross_tenancy_grants(self):
         pols = [NS(id="1", name="ok", statements=["Allow group G to read buckets in tenancy", "Define tenancy Other as ocid1"]),
                 NS(id="2", name="pub", statements=["Allow any-user to read objects in tenancy"]),
-                NS(id="3", name="x", statements=["Endorse group G to read buckets in tenancy Other"])]
+                NS(id="4", name="svc", statements=["Allow any-user to use fn-function in compartment x where all {request.principal.type='serviceconnector'}"]),
+                NS(id="3", name="x", statements=["Endorse group G to read buckets in tenancy Other"]),
+                NS(id="5", name="agent", statements=["Endorse any-user to { WLP_LOG_CREATE } in any-tenancy where all { request.principal.type = 'workloadprotectionagent' }"])]
         with mock.patch.object(x, "_all", return_value=pols):
-            self.assertEqual(st(x.oci_iam_no_public_or_cross_tenancy_grants(ctx())), ["PASS", "FAIL", "FAIL"])
+            self.assertEqual(st(x.oci_iam_no_public_or_cross_tenancy_grants(ctx())), ["PASS", "FAIL", "PASS", "FAIL", "PASS"])
 
     def test_dynamic_group_without_rule_is_manual(self):
         with mock.patch.object(x, "_all", return_value=[NS(id="1", name="d", lifecycle_state="ACTIVE", matching_rule="")]):
