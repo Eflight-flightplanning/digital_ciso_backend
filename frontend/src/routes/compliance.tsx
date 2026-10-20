@@ -7,8 +7,8 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
-  X,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { NcaWorkspace, ControlDrawer, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
@@ -43,7 +43,7 @@ interface FrameworkCardData {
 function classifyCategory(name: string): FrameworkCardData["category"] {
   const n = name.toUpperCase();
   if (n.includes("GDPR") || n.includes("PRIVACY")) return "Privacy";
-  if (n.includes("NIST") || n.includes("FEDRAMP") || n.includes("ECC") || n.includes("CSCC")) return "Government";
+  if (n.includes("NIST") || n.includes("FEDRAMP") || n.includes("ECC") || n.includes("CSCC") || n.includes("CCC") || n.includes("NCA")) return "Government";
   if (n.includes("CIS") || n.includes("CLOUD") || n.includes("MITRE")) return "Cloud";
   return "Industry";
 }
@@ -194,8 +194,9 @@ function CompliancePage() {
       .filter((item) => {
         const id = String(item.id || item.compliance_id || "").toLowerCase();
         const fw = String(item.framework || "").toLowerCase();
-        // NCA ECC/CCC on OCI are shown from the dedicated NCA assessment (cards above the grid), not scan data
-        if (/nca_(ecc|cscc|ccc)/.test(id) && (id.includes("oraclecloud") || id.includes("oci"))) return false;
+        // Only hide OCI NCA scan cards if a dedicated NCA assessment has completed and provided cards
+        const hasDedicatedNca = Boolean(ncaOverview?.latest?.summary?.by_framework && Object.keys(ncaOverview.latest.summary.by_framework).length > 0);
+        if (hasDedicatedNca && /nca_(ecc|cscc|ccc)/.test(id) && (id.includes("oraclecloud") || id.includes("oci"))) return false;
         // Hide internal ThreatScore and deprecated frameworks so only official standards appear
         if (
           id.includes("threatscore") ||
@@ -443,14 +444,23 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
       title="Compliance & Governance"
       subtitle="Multi-framework regulatory alignment computed from real scan results"
       actions={
-        <button
-          onClick={handleExportEvidence}
-          disabled={dynamicFrameworks.length === 0}
-          className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Download className="h-3.5 w-3.5 text-primary" />
-          <span>{exportSuccess ? "Exported Evidence Pack!" : "Export Audit Evidence"}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setNcaFramework("nca_ecc_2.2024")}
+            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+            <span>NCA Assessment Workspace</span>
+          </button>
+          <button
+            onClick={handleExportEvidence}
+            disabled={dynamicFrameworks.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5 text-primary" />
+            <span>{exportSuccess ? "Exported Evidence Pack!" : "Export Audit Evidence"}</span>
+          </button>
+        </div>
       }
     >
       <div className="space-y-6 pb-12">
