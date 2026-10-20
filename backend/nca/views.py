@@ -122,13 +122,14 @@ class AssessmentsView(NcaBase):
         _reap(qs)
         if qs.exists():
             return Response({"detail": "An assessment is already running.", "id": str(qs.first().id)}, status=409)
+        provider_id = request.data.get("provider_id") or None
         a = NcaAssessment.objects.create(tenant_id=tid, frameworks=fws, triggered_by=self.actor(request),
-                                         oci_profile=os.getenv("NCA_OCI_PROFILE") or "DEFAULT")
+                                         oci_profile="platform-provider")
         _audit(request, tid, "assessment.start", str(a.id), {"frameworks": fws, "mode": "read-only"})
 
         def _bg():
             try:
-                run_assessment(frameworks=fws, tenant_id=tid, triggered_by=a.triggered_by, assessment=a)
+                run_assessment(frameworks=fws, tenant_id=tid, triggered_by=a.triggered_by, assessment=a, provider_id=provider_id)
             finally:
                 connection.close()
 

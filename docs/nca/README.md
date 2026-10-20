@@ -1,7 +1,9 @@
 # NCA ECC / CCC assessment for Oracle Cloud Infrastructure
 
-Read-only assessment of the OCI tenancy in `~/.oci/config` (profile `DEFAULT`, override with
-`NCA_OCI_PROFILE` / `NCA_OCI_CONFIG_FILE`) against the NCA frameworks bundled in
+Read-only assessment of the OCI tenancy registered as a provider in the platform (credentials come from the
+database, the same encrypted secret the platform scans use; `--provider-id` / `provider_id` selects one when several
+exist). When no usable provider exists it falls back to `~/.oci/config` (`NCA_OCI_CONFIG_FILE`, `NCA_OCI_PROFILE`) for
+development machines. Frameworks bundled in
 `prowler/compliance/oraclecloud/`:
 
 | key | source file | controls |

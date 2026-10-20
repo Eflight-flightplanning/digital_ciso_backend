@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { NcaWorkspace, ControlDrawer, CloseGlyph, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ncaDownload, ncaFetch, ncaPost, qs } from "@/lib/nca-api";
 import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
 
@@ -152,7 +152,12 @@ function CompliancePage() {
   const [selectedFramework, setSelectedFramework] = useState<FrameworkCardData | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
   const [ncaFramework, setNcaFramework] = useState<string | null>(null);
-  const { data: ncaOverview } = useNcaOverview();
+  const { data: ncaOverview, isError: ncaError, error: ncaErr, isLoading: ncaLoading } = useNcaOverview();
+  const ncaRun = useMutation({
+    mutationFn: () => ncaPost("/assessments", {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["nca"] }),
+  });
+  const qc = useQueryClient();
   const [modalSearchTerm, setModalSearchTerm] = useState("");
   const [modalStatusFilter, setModalStatusFilter] = useState<"ALL" | "PASS" | "FAIL" | "MANUAL" | "NOT_TESTED">("ALL");
 
@@ -537,6 +542,32 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
             </button>
           ))}
         </div>
+
+        {(selectedProvider === "ALL" || selectedProvider === "oraclecloud") && !ncaLoading && (ncaError || !ncaOverview?.latest) && (
+          <div className="rounded-2xl border border-border/80 bg-surface/90 p-4 text-xs space-y-1">
+            <p className="font-semibold text-foreground">NCA ECC &amp; CCC assessment is not showing</p>
+            {ncaError ? (
+              <p className="text-rose-400">
+                The NCA API did not answer ({(ncaErr as Error)?.message}). The backend may not have the NCA module deployed or migrated, or the request
+                is blocked before it reaches Django.
+              </p>
+            ) : ncaOverview?.running ? (
+              <p className="text-muted-foreground">An assessment is running ({Math.round(ncaOverview.running.progress)}%). Results appear when it finishes.</p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">
+                  No assessment has been run in this environment yet. Results are stored in this environment&apos;s own database, so an assessment run elsewhere
+                  (for example on a developer machine) is not visible here.
+                </p>
+                <button className="mt-1 cursor-pointer rounded-md bg-surface-2 px-3 py-1 font-semibold text-foreground hover:text-primary disabled:opacity-40"
+                  disabled={ncaRun.isPending} onClick={() => ncaRun.mutate()}>
+                  {ncaRun.isPending ? "Starting…" : "Run read-only assessment"}
+                </button>
+                {ncaRun.isError && <span className="ml-2 text-rose-400">{(ncaRun.error as Error).message}</span>}
+              </>
+            )}
+          </div>
+        )}
 
         {complianceLoading || complianceFetching ? (
           <div className="rounded-2xl border border-border/80 bg-surface/90 p-12 text-center text-sm text-muted-foreground">

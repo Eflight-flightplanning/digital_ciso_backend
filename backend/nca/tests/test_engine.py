@@ -97,3 +97,41 @@ class ExecuteChecks(SimpleTestCase):
         with mock.patch.dict(engine.NATIVE_CHECKS, {"oci_fake": spec}):
             (o,) = execute_checks(object(), ["oci_fake"])
         self.assertEqual(o.status, "ERROR")
+
+
+class BuildProviderCredentials(SimpleTestCase):
+    KW = {"tenancy": "ocid1.tenancy", "user": "ocid1.user", "fingerprint": "aa:bb", "key_content": "PEM"}
+
+    def run_build(self, file_exists, platform_kw, **kwargs):
+        calls = {}
+
+        class P:
+            def __init__(self, **kw):
+                calls.update(kw)
+        fake_mod = types.SimpleNamespace(OraclecloudProvider=P)
+        reason = "" if platform_kw else "no OCI provider is registered in the platform"
+        with mock.patch.dict("sys.modules", {"prowler.providers.oraclecloud.oraclecloud_provider": fake_mod}), \
+                mock.patch.object(engine.os.path, "isfile", return_value=file_exists), \
+                mock.patch.object(engine, "platform_oci_credentials", return_value=(platform_kw, reason)):
+            engine.build_provider(tenant_id="t", **kwargs)
+        return calls
+
+    def test_platform_database_credentials_are_used_first_even_if_a_config_file_exists(self):
+        calls = self.run_build(True, self.KW)
+        self.assertEqual(calls["user"], "ocid1.user")
+        self.assertNotIn("oci_config_file", calls)
+
+    def test_config_file_is_only_a_fallback(self):
+        calls = self.run_build(True, None)
+        self.assertIn("oci_config_file", calls)
+
+    def test_explicit_config_file_overrides_the_database(self):
+        calls = self.run_build(True, self.KW, config_file="/tmp/oci")
+        self.assertIn("oci_config_file", calls)
+        self.assertNotIn("user", calls)
+
+    def test_clear_error_when_no_credentials_anywhere(self):
+        with self.assertRaises(engine.OciCredentialsMissing) as cm:
+            self.run_build(False, None)
+        self.assertIn("No OCI credentials", str(cm.exception))
+        self.assertIn("no OCI provider is registered", str(cm.exception))

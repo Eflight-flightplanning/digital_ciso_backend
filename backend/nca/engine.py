@@ -119,15 +119,84 @@ def _enum_val(x, default: str = "") -> str:
     return str(getattr(x, "value", x)).lower()
 
 
-def build_provider(profile: str | None = None, config_file: str | None = None, regions: list[str] | None = None):
-    """Create the Prowler OCI provider from the existing OCI configuration (API key auth)."""
+class OciCredentialsMissing(Exception):
+    pass
+
+
+def _oci_config_path(config_file: str | None) -> str:
+    return os.path.expanduser(config_file or os.getenv("NCA_OCI_CONFIG_FILE") or "~/.oci/config")
+
+
+def platform_oci_credentials(tenant_id=None, provider_id=None) -> tuple[dict | None, str]:
+    """Credentials of the OCI provider registered in the platform (the same encrypted secret the platform's own scans
+    use). Returns (kwargs, "") or (None, reason)."""
+    try:
+        from api.db_router import MainRouter
+        from api.models import Provider, ProviderSecret
+
+        qs = Provider.all_objects.using(MainRouter.admin_db).filter(provider="oraclecloud", is_deleted=False)
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        if provider_id:
+            qs = qs.filter(id=provider_id)
+        providers = list(qs[:2])
+        if not providers:
+            return None, "no OCI provider is registered in the platform"
+        if len(providers) > 1:
+            return None, "several OCI providers are registered; choose one (provider_id / --provider-id)"
+        prov = providers[0]
+        sec = ProviderSecret.all_objects.using(MainRouter.admin_db).filter(provider_id=prov.id).first()
+        if sec is None:
+            return None, "the registered OCI provider has no stored credentials"
+        try:
+            data = sec.secret
+        except Exception:  # noqa: BLE001 - cryptography.fernet.InvalidToken and friends
+            return None, ("the stored OCI credentials cannot be decrypted (the secrets encryption key differs from the one "
+                          "they were saved with); re-save the OCI provider credentials in Cloud Providers")
+    except Exception as exc:  # noqa: BLE001
+        return None, f"platform credentials unavailable ({exc.__class__.__name__})"
+    kw = {
+        "tenancy": data.get("tenancy_ocid") or data.get("tenancy") or prov.uid,
+        "user": data.get("user_ocid") or data.get("user"),
+        "fingerprint": data.get("fingerprint"),
+        "key_content": data.get("private_key") or data.get("key_content"),
+        "pass_phrase": data.get("pass_phrase") or data.get("passphrase"),
+    }
+    kw = {k: v for k, v in kw.items() if v}
+    missing = sorted({"tenancy", "user", "fingerprint", "key_content"} - kw.keys())
+    if missing:
+        return None, f"the stored OCI credentials lack: {', '.join(missing)}"
+    return kw, ""
+
+
+def build_provider(profile: str | None = None, config_file: str | None = None, regions: list[str] | None = None,
+                   tenant_id=None, provider_id=None):
+    """Create the Prowler OCI provider (API-key auth only; nothing is ever written to OCI).
+
+    Credential order:
+      1. an explicitly requested config file (CLI --config-file),
+      2. the OCI provider registered in the platform for the tenant (the encrypted secret in the database),
+      3. a standard OCI config file (NCA_OCI_CONFIG_FILE or ~/.oci/config), as a fallback for development machines.
+    """
     from prowler.providers.oraclecloud.oraclecloud_provider import OraclecloudProvider
 
-    return OraclecloudProvider(
-        oci_config_file=config_file or os.getenv("NCA_OCI_CONFIG_FILE") or None,
-        profile=profile or os.getenv("NCA_OCI_PROFILE") or "DEFAULT",
-        region=regions or None,
-    )
+    def from_file(path):
+        return OraclecloudProvider(oci_config_file=path, profile=profile or os.getenv("NCA_OCI_PROFILE") or "DEFAULT",
+                                   region=regions or None)
+
+    if config_file:
+        return from_file(_oci_config_path(config_file))
+    kw, reason = platform_oci_credentials(tenant_id, provider_id)
+    if kw is not None:
+        logger.info("Using the OCI provider registered in the platform")
+        return OraclecloudProvider(region=regions or None, **kw)
+    path = _oci_config_path(None)
+    if os.path.isfile(path):
+        logger.warning("Platform OCI credentials not used (%s); falling back to OCI config file %s", reason, path)
+        return from_file(path)
+    raise OciCredentialsMissing(
+        f"No OCI credentials: the platform OCI provider cannot be used ({reason}) and there is no OCI config file at "
+        f"'{path}'. Register or re-save the OCI provider credentials in Cloud Providers (or set NCA_OCI_CONFIG_FILE).")
 
 
 def discover(provider) -> dict:
@@ -147,7 +216,10 @@ def tenant_for_tenancy(tenancy_ocid: str):
     try:
         from api.models import Provider
 
-        ids = set(Provider.all_objects.filter(provider="oraclecloud", uid=tenancy_ocid).values_list("tenant_id", flat=True))
+        from api.db_router import MainRouter
+
+        ids = set(Provider.all_objects.using(MainRouter.admin_db).filter(provider="oraclecloud", uid=tenancy_ocid)
+                  .values_list("tenant_id", flat=True))
         return ids.pop() if len(ids) == 1 else None
     except Exception:  # noqa: BLE001 - platform models unavailable (e.g. isolated tests)
         return None
@@ -263,7 +335,7 @@ def execute_checks(provider, check_ids: list[str], progress=None) -> list[CheckO
 # --------------------------------------------------------------------------- persistence + orchestration
 
 def run_assessment(frameworks: list[str] | None = None, profile: str | None = None, tenant_id=None,
-                   triggered_by: str = "cli", assessment=None, config_file: str | None = None):
+                   triggered_by: str = "cli", assessment=None, config_file: str | None = None, provider_id=None):
     """Run a full read-only assessment and persist it. Returns the NcaAssessment."""
     from django.db import transaction
 
@@ -280,7 +352,7 @@ def run_assessment(frameworks: list[str] | None = None, profile: str | None = No
 
     with _RUN_LOCK:
         try:
-            provider = build_provider(profile, config_file)
+            provider = build_provider(profile, config_file, tenant_id=assessment.tenant_id, provider_id=provider_id)
             disc = discover(provider)
             assessment.tenancy_ocid, assessment.tenancy_name = disc["tenancy_id"], disc["tenancy_name"]
             if assessment.tenant_id is None:
