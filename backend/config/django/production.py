@@ -4,6 +4,34 @@ from config.env import env
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 # ALLOWED_HOSTS / CORS_* are defined (restrictively) in base.py; do not re-open them here.
 
+# ── Shared cache (Valkey / Redis) ──────────────────────────────────────────
+# Django's default cache is LocMemCache (per-process), which breaks MFA OTP
+# verification under multi-worker Gunicorn because the worker that generates the
+# OTP is not the same worker that later verifies it.  Point CACHES at the same
+# Valkey/Redis instance Celery already uses, but on a dedicated DB (1) to avoid
+# key collisions with the Celery broker (DB 0) and eventstream (DB 2).
+from config.settings.celery import (  # noqa: E402
+    VALKEY_HOST,
+    VALKEY_PORT,
+    VALKEY_PASSWORD,
+    VALKEY_SCHEME,
+)
+
+_CACHE_REDIS_URL = (
+    f"{VALKEY_SCHEME}://"
+    + (f":{VALKEY_PASSWORD}@" if VALKEY_PASSWORD else "")
+    + f"{VALKEY_HOST}:{VALKEY_PORT}/1"
+)
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": _CACHE_REDIS_URL,
+        "TIMEOUT": 300,
+        "KEY_PREFIX": "dciso",
+    }
+}
+
 CSRF_TRUSTED_ORIGINS = env.list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     default=[

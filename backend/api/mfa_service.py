@@ -193,14 +193,17 @@ def verify_otp(email: str, submitted_otp: str) -> bool:
 
     if cached_code:
         valid_code = str(cached_code).strip()
+        logger.debug("OTP for %s found in shared Django cache", clean_email)
     elif clean_email in _GLOBAL_OTP_STORE:
         code, expires_at = _GLOBAL_OTP_STORE[clean_email]
         if time.time() <= expires_at:
             valid_code = str(code).strip()
+            logger.debug("OTP for %s found in per-process fallback store", clean_email)
         else:
             _GLOBAL_OTP_STORE.pop(clean_email, None)
 
     if not valid_code:
+        logger.warning("No valid OTP found for %s in cache or memory (process %d)", clean_email, os.getpid())
         return False
 
     # Constant-time comparison to prevent side-channel timing attacks
