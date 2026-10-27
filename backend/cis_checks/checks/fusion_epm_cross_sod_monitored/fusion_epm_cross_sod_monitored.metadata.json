@@ -1,0 +1,36 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_epm_cross_sod_monitored",
+  "CisId": "5.3.2",
+  "CheckTitle": "Ensure SoD Across Fusion and EPM Is Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.3",
+  "SubSectionName": "Application Business User Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion_epm",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "EPM Cloud access (EPM Automate, Service Administrator)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Users holding conflicting combinations across Fusion and EPM (for example an EPM reconciliation superuser who can also enter journals) should be monitored.",
+  "Risk": "Cross-application conflicts let one person both transact and reconcile.",
+  "AuditProcedure": [
+    "Identify users with conflicting combinations across both applications.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 4601-4615."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments or monitor the users' transactions.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": ""
+}

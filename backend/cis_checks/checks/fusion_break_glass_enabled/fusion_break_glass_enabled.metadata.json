@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_break_glass_enabled",
+  "CisId": "1.8",
+  "CheckTitle": "Ensure Oracle Break Glass for Fusion Cloud Service Is Enabled",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "oci_subscription",
+  "RequiredAccess": [
+    "Oracle Cloud subscription management (My Services)"
+  ],
+  "Description": "Oracle Break Glass gives the customer approval control over Oracle personnel access to the Fusion database and middleware tiers.",
+  "Risk": "Without it, privileged Oracle support access is not subject to customer approval for each activity.",
+  "AuditProcedure": [
+    "My Services > Subscriptions > Fusion Cloud Service: Break Glass status is Enabled.",
+    "Approvers are defined and access logs are retained."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Activate Break Glass through subscription management, define approvers and enable notifications."
+    ]
+  },
+  "DefaultValue": "Disabled; must be purchased and activated.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/get-started/subscriptions-cloud/mmocs/oracle-break-glass-fusion-cloud-service.html"
+  ],
+  "CisControlsV8": [
+    "6.2",
+    "6.7"
+  ],
+  "Notes": ""
+}

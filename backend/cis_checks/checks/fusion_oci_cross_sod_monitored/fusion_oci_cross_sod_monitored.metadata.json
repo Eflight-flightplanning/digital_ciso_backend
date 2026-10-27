@@ -1,0 +1,36 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_oci_cross_sod_monitored",
+  "CisId": "5.3.3",
+  "CheckTitle": "Ensure SoD Across Fusion and OCI Is Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.3",
+  "SubSectionName": "Application Business User Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion_oci",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Users holding conflicting combinations across Fusion and OCI (for example OCI service administrator and Fusion security administrator) should be monitored.",
+  "Risk": "Combined infrastructure and application privileges allow changes that bypass both sets of controls.",
+  "AuditProcedure": [
+    "Identify users with conflicting combinations across Fusion and OCI.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 4651-4654."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments or monitor the users' transactions.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": ""
+}

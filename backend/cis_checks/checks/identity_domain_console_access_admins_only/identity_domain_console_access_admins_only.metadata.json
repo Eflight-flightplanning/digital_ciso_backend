@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_console_access_admins_only",
+  "CisId": "1.5",
+  "CheckTitle": "Ensure OCI Console Access Is Restricted to Administrative Accounts",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)"
+  ],
+  "Description": "Only designated administrative accounts should be able to sign in to the OCI Console: non-admin users have the console password capability disabled and the console sign-on policy allows only administrative groups.",
+  "Risk": "The OCI Console gives broad administrative reach; every extra account that can use it widens the attack surface.",
+  "AuditProcedure": [
+    "Domains > Users: for non-admin users, 'Can use Console password' is unchecked.",
+    "Domains > Security > Sign-on policies: a rule allows console access only for administrative groups, followed by a deny rule for everyone else."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Uncheck 'Can use Console password' for non-admin users.",
+      "Add a console sign-on rule for the admin group and a default deny rule; test with an admin and a non-admin account."
+    ]
+  },
+  "DefaultValue": "New users can use the console password by default.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/Identity/users/edit-users-capabilities.htm",
+    "https://docs.oracle.com/en/learn/access-to-oci-console/index.html"
+  ],
+  "CisControlsV8": [
+    "5.4",
+    "5.6"
+  ],
+  "Notes": "Administrators are users holding an identity domain admin app role or belonging to a group listed in ADMIN_GROUPS."
+}

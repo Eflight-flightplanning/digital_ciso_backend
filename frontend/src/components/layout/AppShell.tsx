@@ -47,7 +47,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+// newTab: open in a new browser tab (the Oracle SaaS CIS dashboard runs full-screen there).
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; newTab?: boolean };
 type NavSection = { label?: string; items: NavItem[] };
 
 export const navSections: NavSection[] = [
@@ -55,7 +56,7 @@ export const navSections: NavSection[] = [
   {
     label: "SaaS & ERP",
     items: [
-      { to: "/oracle-saas", label: "Oracle Fusion SaaS", icon: Database },
+      { to: "/oracle-saas-cis", label: "Oracle Fusion SaaS", icon: Database, newTab: true },
     ],
   },
   {
@@ -186,7 +187,9 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                 <Link
                   key={item.to}
                   to={item.to}
-                  title={item.label}
+                  target={item.newTab ? "_blank" : undefined}
+                  rel={item.newTab ? "noopener" : undefined}
+                  title={item.newTab ? `${item.label} (opens in a new tab)` : item.label}
                   className={cn(
                     "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150",
                     active
@@ -264,7 +267,8 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
                 value={item.label}
                 onSelect={() => {
                   setOpen(false);
-                  navigate({ to: item.to });
+                  if (item.newTab) window.open(item.to, "_blank", "noopener");
+                  else navigate({ to: item.to });
                 }}
               >
                 <item.icon className="mr-2 h-4 w-4 text-primary" />

@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_integrations_use_oauth",
+  "CisId": "1.10",
+  "CheckTitle": "Ensure All API Based Integrations Use OAuth Authentication",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Assessor review (the automated check is switched off)"
+  ],
+  "Description": "API integrations should authenticate with OAuth 2.0 clients registered in the identity domain, not with Basic Authentication or long-lived static passwords.",
+  "Risk": "Static credentials can be replayed, cannot be scoped and are hard to revoke.",
+  "AuditProcedure": [
+    "Review SOAP/REST integrations in Fusion and Oracle Integration Cloud.",
+    "Confirm integration clients are OAuth clients in the identity domain and no Basic Auth credentials are in use.",
+    "Check Fusion audit logs and identity domain logs for Basic Auth requests."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Register an OAuth client per integration with only the required scopes, move integrations to tokens and revoke Basic Auth credentials."
+    ]
+  },
+  "DefaultValue": "OAuth is supported but Basic Authentication is not blocked.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/applications-common/25d/oaext/configure-oauth.html"
+  ],
+  "CisControlsV8": [
+    "16.11"
+  ],
+  "Notes": "Manual control. An automated check exists in the code but is switched off; the assessor reviews this control with the audit procedure."
+}

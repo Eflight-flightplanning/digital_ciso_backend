@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode, useMemo } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -34,7 +34,9 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+// TanStack Router types the thrown value as unknown; normalise it to an Error for display and reporting.
+function ErrorComponent({ error: thrown, reset }: { error: unknown; reset: () => void }) {
+  const error = useMemo(() => (thrown instanceof Error ? thrown : new Error(String(thrown))), [thrown]);
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -105,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Space+Grotesk:wght@300..700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Space+Grotesk:wght@300..700&family=Figtree:wght@400;500;600;700&family=Marcellus&display=swap",
       },
       {
         rel: "stylesheet",

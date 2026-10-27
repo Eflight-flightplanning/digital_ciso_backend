@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "oci_logging_pipelines_monitored",
+  "CisId": "3.5",
+  "CheckTitle": "Ensure Logging Pipelines are Monitored for Failures to Prevent Silent Loss of Audit Events",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "3",
+  "SectionName": "Logging and Monitoring",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "oci_logging",
+  "RequiredAccess": [
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "Log export and ingestion pipelines (such as Service Connector Hub) should have alarms for failures and periods with no events.",
+  "Risk": "A silently broken pipeline leaves gaps in audit data that nobody notices.",
+  "AuditProcedure": [
+    "Connector Hub monitoring enabled; OCI Monitoring alarms for connector errors and delays routed to administrators; alarm history shows tests detected."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Create alarms on pipelines, add 'no events' alerts in the SIEM, route them to on-call and test."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/service-connector-hub/overview.htm"
+  ],
+  "CisControlsV8": [
+    "8.3",
+    "8.9"
+  ],
+  "Notes": ""
+}

@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "psqlextra",
     "api",
     "nca",
+    "oracle_cis",
     "rest_framework",
     "corsheaders",
     "drf_spectacular",

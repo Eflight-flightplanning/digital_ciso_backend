@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_substantial_access_assignments_monitored",
+  "CisId": "5.1.2",
+  "CheckTitle": "Ensure Assignments of Substantial Access to Fusion Users Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.1",
+  "SubSectionName": "IT Administrator Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion pod HCM REST with Basic Auth (Connections page): userAccounts with userAccountRoles"
+  ],
+  "Description": "Assignments of privileges that change application behaviour, create or approve transactions or expose sensitive data should be monitored.",
+  "Risk": "Such privileges remove the usual separation of duties and oversight.",
+  "AuditProcedure": [
+    "Review assignments (for example HDL logs).",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 4085, 4096, 4097, 9361."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments or monitor the users' transactions.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": "Reads every Fusion user's role assignments from the HCM REST API. Substantial access = HCM Data Loader / integration-specialist and IT security roles (CIS examples 4085, 4096, 4097, 9361), matched by role name; SUBSTANTIAL_ROLE_PATTERNS overrides the list. FAIL when such a role was granted in the last ROLE_REVIEW_DAYS (default 30); otherwise PASS, with holders listed for review."
+}

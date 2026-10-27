@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_network_perimeters_configured",
+  "CisId": "2.1",
+  "CheckTitle": "Ensure Network Perimeters are Configured in IAM or the Identity Provider",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)"
+  ],
+  "Description": "Network perimeters restrict sign-in to trusted IP ranges. Upgraded environments configure them in the identity domain and attach them to sign-on policies; otherwise the external IdP must enforce equivalent rules.",
+  "Risk": "Without location restrictions at sign-in, stolen credentials work from anywhere.",
+  "AuditProcedure": [
+    "Domains > Security > Network perimeters: at least one perimeter with authorised ranges, referenced by sign-on policy rules.",
+    "With an external IdP: confirm conditional access restricts sign-in to approved ranges."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Create a perimeter with approved ranges and reference it in sign-on rules (or configure conditional access in the IdP)."
+    ]
+  },
+  "DefaultValue": "No network perimeters are configured.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/Identity/networkperimeters/overview.htm"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

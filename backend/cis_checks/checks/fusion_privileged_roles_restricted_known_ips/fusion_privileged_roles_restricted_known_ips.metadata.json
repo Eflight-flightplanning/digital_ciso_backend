@@ -1,0 +1,39 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_privileged_roles_restricted_known_ips",
+  "CisId": "1.6",
+  "CheckTitle": "Ensure Privileged and Administrative Roles Are Restricted to Known IP Addresses",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)"
+  ],
+  "Description": "With Location-Based Access Control enabled, privileged roles such as IT Security Manager and Application Implementation Consultant must not have 'Enable Role for Access from All IP Addresses' selected.",
+  "Risk": "Privileged roles usable from any network can be abused from untrusted locations with stolen credentials.",
+  "AuditProcedure": [
+    "Confirm LBAC is enabled.",
+    "Security Console > Roles > open each privileged role > Administration tab.",
+    "Confirm 'Enable Role for Access from All IP Addresses' is not selected."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Clear 'Enable Role for Access from All IP Addresses' on privileged roles.",
+      "Test access from a trusted and an untrusted IP."
+    ]
+  },
+  "DefaultValue": "Not accessible from all IPs by default once LBAC is enabled.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/overview-of-location-based-access.html"
+  ],
+  "CisControlsV8": [
+    "5.4"
+  ],
+  "Notes": ""
+}

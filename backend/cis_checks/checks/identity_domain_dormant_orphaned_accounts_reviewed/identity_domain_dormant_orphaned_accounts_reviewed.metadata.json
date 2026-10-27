@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_dormant_orphaned_accounts_reviewed",
+  "CisId": "1.14",
+  "CheckTitle": "Ensure Dormant Accounts and Orphaned Identities Are Reviewed and Disabled",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Fusion pod REST with Basic Auth (ORACLE_FUSION_*), to run the ESS Inactive Users Report",
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)"
+  ],
+  "Description": "Accounts unused for a defined period (for example 90 days) and accounts with no owner or assignment should be reviewed at least quarterly and disabled.",
+  "Risk": "Forgotten accounts remain usable but unmonitored.",
+  "AuditProcedure": [
+    "Generate user activity reports; identify accounts without sign-in for 90 days and accounts without roles, groups or owners.",
+    "Confirm they were reviewed and disabled where appropriate."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Set a dormancy threshold, schedule quarterly reviews and disable confirmed dormant or orphaned accounts."
+    ]
+  },
+  "DefaultValue": "No review or disabling is enforced.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/manage-hcm-user-accounts.html"
+  ],
+  "CisControlsV8": [
+    "5.3"
+  ],
+  "Notes": "Uses the Fusion Inactive Users Report (ESS AseInactiveUsersJob) when ORACLE_FUSION_* is set, as security_platform does; otherwise the identity domain lastSuccessfulLoginDate. Dormant identity domain administrators are flagged as privileged. Accounts with no group are listed for review."
+}

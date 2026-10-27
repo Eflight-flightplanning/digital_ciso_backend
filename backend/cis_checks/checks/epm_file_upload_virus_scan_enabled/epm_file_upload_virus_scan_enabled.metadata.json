@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "epm_file_upload_virus_scan_enabled",
+  "CisId": "4.4",
+  "CheckTitle": "Ensure Uploaded Files Are Scanned for Viruses and Restricted by Extension Policy",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "epm",
+  "RequiredAccess": [
+    "EPM Cloud access (EPM Automate, Service Administrator)"
+  ],
+  "Description": "EPM pre-upload virus scanning (setVirusScanOnFileUploads) should be on, and risky file extensions blocked.",
+  "Risk": "Uploads are a path for malware and scripts into the environment.",
+  "AuditProcedure": [
+    "'epmautomate getVirusScanOnFileUploads' returns true; an EICAR test upload is rejected; extension exceptions are documented."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Run 'epmautomate setVirusScanOnFileUploads true', define an extension policy and test."
+    ]
+  },
+  "DefaultValue": "Disabled (false).",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/enterprise-performance-management-common/cepma/epm_auto_set_virus_scan_onfile_uploads.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": ""
+}

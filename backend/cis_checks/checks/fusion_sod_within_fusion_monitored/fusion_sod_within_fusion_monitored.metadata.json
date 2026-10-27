@@ -1,0 +1,35 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_sod_within_fusion_monitored",
+  "CisId": "5.3.1",
+  "CheckTitle": "Ensure SoD Within Fusion Is Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.3",
+  "SubSectionName": "Application Business User Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Users holding conflicting combinations of Fusion privileges (for example creating suppliers and creating payments) should be monitored.",
+  "Risk": "Conflicting privileges allow one person to complete a fraudulent transaction end to end.",
+  "AuditProcedure": [
+    "Identify users with conflicting combinations in the Security Console.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 4051-4073, 5800, 5810, 5892, 5980, 6080, 6390, 6410."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments or monitor the users' transactions.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": ""
+}

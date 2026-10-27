@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_console_restricted_trusted_networks",
+  "CisId": "2.2",
+  "CheckTitle": "Ensure OCI Console Access Is Restricted to Trusted Networks",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)",
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "OCI Console sign-in should be allowed only from trusted networks (VPN or private endpoints) through network sources / perimeters referenced in the console sign-on policy, with no rule allowing any network.",
+  "Risk": "Unrestricted console access from any IP lets compromised credentials reach the administrative console.",
+  "AuditProcedure": [
+    "Domains > Security > Sign-on policies: console rules reference a trusted network; no rule allows console access from any network.",
+    "Identity & Security > Network sources: only approved IPs, CIDRs or VCN subnets."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Define the trusted network, add a console rule limited to it and a default deny; keep a break-glass account."
+    ]
+  },
+  "DefaultValue": "Public access is allowed.",
+  "References": [
+    "https://docs.oracle.com/en/learn/access-to-oci-console/index.html",
+    "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/managingnetworksources.htm"
+  ],
+  "CisControlsV8": [
+    "5.4",
+    "12.3"
+  ],
+  "Notes": "Evaluates the identity domain side (console sign-on policy and network perimeters). Tenancy-level IAM network sources need OCI access."
+}

@@ -1,0 +1,39 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_privileged_access_certified_periodically",
+  "CisId": "1.7",
+  "CheckTitle": "Ensure Privileged Access is Certified Periodically",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Review users' roles and data access periodically: monthly for IT administrators and quarterly for everyone else.",
+  "Risk": "Users accumulate roles as their responsibilities change, leaving unintended abilities in place.",
+  "AuditProcedure": [
+    "Tools > Scheduled Processes: run and review the User and Role Access Audit Report and User Role Membership Report.",
+    "Or run Access Certification campaigns in Risk Management."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove roles that are no longer justified, or keep them and monitor the transactions they allow.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "No periodic review is enforced by default.",
+  "References": [
+    "https://community.oracle.com/customerconnect/discussion/551382/digitize-access-certification-workflows"
+  ],
+  "CisControlsV8": [
+    "6.2"
+  ],
+  "Notes": ""
+}

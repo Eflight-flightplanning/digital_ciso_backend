@@ -1,0 +1,43 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_mfa_enforced_all_users",
+  "CisId": "1.2",
+  "CheckTitle": "Ensure MFA is Enforced for All SaaS Users",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)"
+  ],
+  "Description": "Every SaaS user should need a second factor to sign in. Native enforcement through identity domain sign-on policies works after the identity upgrade to OCI IAM; otherwise MFA must be enforced in the external identity provider. Phishing-resistant factors are preferred over SMS or email OTP.",
+  "Risk": "Without MFA a stolen or reused password is enough to sign in.",
+  "AuditProcedure": [
+    "Determine whether the environment uses OCI IAM natively or an external IdP.",
+    "On OCI IAM: Security Console > User Categories > Two-Factor Authentication shows MFA enabled for all categories; sign-on policy rules require MFA.",
+    "With an external IdP: confirm MFA is enforced there for all users.",
+    "Test a sign-in with a standard user and confirm an MFA prompt."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable MFA for all user categories (or in the external IdP).",
+      "Communicate enrollment and confirm enrollment via My Profile > Manage Secure Verification.",
+      "Test sign-ins to confirm MFA is consistently prompted."
+    ]
+  },
+  "DefaultValue": "Not enforced for all SaaS users after the identity upgrade; not natively available before it.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/usingmfa.htm",
+    "https://docs.oracle.com/en/cloud/saas/applications-common/25d/faser/enable-multifactor-authentication.html"
+  ],
+  "CisControlsV8": [
+    "6.3",
+    "6.5"
+  ],
+  "Notes": "Every identity domain user who can use a console password must have MFA activated (mfaStatus ENROLLED), using the OCI identity check for console MFA. Inactive accounts that fail are counted separately."
+}

@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_api_basic_auth_blocked",
+  "CisId": "1.9",
+  "CheckTitle": "Ensure Basic Authentication Is Blocked for SOAP and REST API Integrations",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Oracle SaaS Operations service request records",
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)"
+  ],
+  "Description": "Basic Authentication should be disabled for Fusion SOAP and REST APIs (through a service request) so that only OAuth, JWT or SAML are accepted, with monitoring for attempted Basic Auth use.",
+  "Risk": "Basic Auth sends reusable credentials with every call and cannot be scoped or revoked like tokens.",
+  "AuditProcedure": [
+    "Find the service request asking Oracle to disable Basic Auth and Oracle's confirmation.",
+    "Attempt an API call with Basic Auth and confirm it fails; confirm OAuth works."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Migrate integrations to OAuth/JWT, then raise a service request to disable Basic Auth and test every API."
+    ]
+  },
+  "DefaultValue": "Basic Authentication is not blocked by default.",
+  "References": [
+    "https://blogs.oracle.com/cloud-infrastructure/post/secure-api-access-in-oracle-fusion-applications"
+  ],
+  "CisControlsV8": [
+    "16.11"
+  ],
+  "Notes": ""
+}

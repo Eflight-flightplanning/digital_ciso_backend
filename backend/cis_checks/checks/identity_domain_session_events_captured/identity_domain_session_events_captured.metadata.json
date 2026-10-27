@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_session_events_captured",
+  "CisId": "3.1",
+  "CheckTitle": "Ensure Fusion Applications Login, Logout and Session Events are Captured, Exported, and Forwarded to Central Logging",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "3",
+  "SectionName": "Logging and Monitoring",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "partial",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)",
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "All authentication lifecycle events (successful and failed sign-ins, sign-outs, session creation and termination) should be captured, exported to OCI Audit/Logging and forwarded to a SIEM for retention and alerting.",
+  "Risk": "Without these events, account compromise, brute force and session misuse go undetected.",
+  "AuditProcedure": [
+    "Confirm the Fusion audit export to OCI Logging or Object Storage is configured.",
+    "Search for recent session events (sign-in success/failure, sign-out, session created).",
+    "Confirm the Service Connector Hub pipeline to the SIEM is operational."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Configure the audit export and an ingestion pipeline (Logging > Connector Hub > Streaming/SIEM)."
+    ]
+  },
+  "DefaultValue": "Events are recorded internally; export and forwarding are not configured.",
+  "References": [
+    "https://www.ateam-oracle.com/post/methods-and-ways-to-extract-session-information-using-oci-audit-and-integrate-into-external-systems"
+  ],
+  "CisControlsV8": [
+    "8.2",
+    "8.5"
+  ],
+  "Notes": "Automated part: whether the identity domain records each lifecycle event. Export and SIEM forwarding need OCI access."
+}

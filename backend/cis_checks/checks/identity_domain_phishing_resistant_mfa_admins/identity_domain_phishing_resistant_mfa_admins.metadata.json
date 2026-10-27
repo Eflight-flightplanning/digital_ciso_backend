@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_phishing_resistant_mfa_admins",
+  "CisId": "1.3",
+  "CheckTitle": "Ensure Phishing-Resistant MFA Is Enforced for SaaS Administrators and Privileged Accounts",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Assessor review (the automated check is switched off)"
+  ],
+  "Description": "Administrators and privileged accounts should authenticate with phishing-resistant factors (FIDO2/WebAuthn security keys, passkeys or passwordless). SMS and email OTP should be disabled for them.",
+  "Risk": "Privileged accounts are high-value targets; OTP-style factors can be phished or relayed.",
+  "AuditProcedure": [
+    "Determine whether the environment uses OCI IAM natively or an external IdP for MFA.",
+    "Security Console > User Categories > Two-Factor Authentication: privileged categories have MFA enabled with only phishing-resistant factors.",
+    "Without the upgrade: confirm the external IdP enforces it for privileged accounts.",
+    "Test a sign-in with a privileged account."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable MFA for administrator/privileged categories and allow only phishing-resistant factors.",
+      "Have administrators enroll a FIDO2 key or passkey and remove weaker factors from their accounts."
+    ]
+  },
+  "DefaultValue": "Not enforced by default after the identity upgrade.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/usingmfa.htm"
+  ],
+  "CisControlsV8": [
+    "6.3"
+  ],
+  "Notes": "Manual control. An automated check exists in the code but is switched off; the assessor reviews this control with the audit procedure."
+}

@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_access_control_list_enabled",
+  "CisId": "2.3",
+  "CheckTitle": "Ensure Access to Fusion is restricted via Access Control List (ACL)",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "oci_fusion",
+  "RequiredAccess": [
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "The Fusion environment's ACL should allow only trusted public IPs, CIDR ranges or OCI VCNs, with no overly broad entries such as 0.0.0.0/0.",
+  "Risk": "Without an ACL the application is reachable from the whole internet, enabling brute force and credential stuffing.",
+  "AuditProcedure": [
+    "OCI Console > Fusion environment > network settings: ACL enabled with only trusted entries and documented exceptions.",
+    "Test from an unlisted IP to confirm it is blocked."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable the ACL, add trusted ranges/VCNs, remove broad entries and document exceptions."
+    ]
+  },
+  "DefaultValue": "No ACL is enabled.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/fusion-applications/network-setup.htm"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

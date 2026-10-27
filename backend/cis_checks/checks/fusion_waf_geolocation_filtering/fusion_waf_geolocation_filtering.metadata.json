@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_waf_geolocation_filtering",
+  "CisId": "2.5",
+  "CheckTitle": "Ensure Geolocation Filtering with WAF for SaaS is enforced",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion_waf",
+  "RequiredAccess": [
+    "Oracle SaaS Operations service request records"
+  ],
+  "Description": "WAF for SaaS geolocation filtering should allow only the countries or regions where legitimate users are, enabled through a service request.",
+  "Risk": "Traffic from irrelevant regions reaches the application unfiltered.",
+  "AuditProcedure": [
+    "Find the service request enabling geolocation filtering; confirm the allowed/blocked regions; test from a blocked region."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Raise a service request with the allowed/blocked regions and verify enforcement."
+    ]
+  },
+  "DefaultValue": "Disabled.",
+  "References": [
+    "https://blogs.oracle.com/cloud-infrastructure/post/expand-fusion-cloud-security-ipbased-filtering-2"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

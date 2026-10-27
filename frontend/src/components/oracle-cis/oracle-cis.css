@@ -1,0 +1,115 @@
+/*
+ * CIS Oracle SaaS assessment tab: the standalone Oracle SaaS CIS dashboard's theme, scoped to .ocis.
+ * Dark by default like the platform; html.light switches it to light (the platform's theme toggle).
+ * Utilities use an oc- prefix (text-oc-ink, border-oc-line, ...) so they never collide with the platform's tokens.
+ */
+@theme inline {
+  --color-oc-bg: var(--oc-bg);
+  --color-oc-canvas: var(--oc-canvas);
+  --color-oc-bg-alt: var(--oc-bg-alt);
+  --color-oc-card: var(--oc-card);
+  --color-oc-ink: var(--oc-ink);
+  --color-oc-ink-soft: var(--oc-ink-soft);
+  --color-oc-line: var(--oc-line);
+  --color-oc-red: var(--oc-red);
+  --color-oc-red-deep: var(--oc-red-deep);
+  --color-oc-gold: var(--oc-gold);
+  --shadow-oc-raised: var(--oc-shadow);
+}
+
+.ocis {
+  /* dark (platform default) */
+  --oc-bg: #141317; --oc-canvas: #141317; --oc-bg-alt: #1c1a20; --oc-ink: #f1ede6; --oc-ink-soft: #aaa4ad; --oc-line: #2f2c34;
+  --oc-red: #e2364f; --oc-red-deep: #c8102e; --oc-gold: #d2ad72; --oc-card: #1f1d23;
+  --oc-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --oc-btn-fill: #c8102e; --oc-btn-hover: #9e0b23;
+  --chip-pass-bg: #15301f;  --chip-pass-ink: #8fe0aa;  --chip-pass-line: #2c5a3c;
+  --chip-fail-bg: #3d1219;  --chip-fail-ink: #ffb3bd;  --chip-fail-line: #ff9aa8;
+  --chip-manual-bg: #16283b; --chip-manual-ink: #a9cdf2; --chip-manual-line: #2f4e70;
+  --chip-na-bg: #2b2930;    --chip-na-ink: #cfcbd4;    --chip-na-line: #45424b;
+  --st-pass: #3dab67; --st-fail: #bf2f48; --st-manual: #4a8fe0; --st-na: #6f6a76; --st-none: #3a3640;
+
+  /* names the ported components use in inline styles and charts */
+  --ink: var(--oc-ink); --ink-soft: var(--oc-ink-soft); --line: var(--oc-line); --card: var(--oc-card);
+  --bg: var(--oc-bg); --bg-alt: var(--oc-bg-alt); --red: var(--oc-red); --gold: var(--oc-gold);
+
+  color-scheme: dark;
+  background: var(--oc-canvas);
+  color: var(--oc-ink);
+  font-family: "Figtree", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.light .ocis {
+  --oc-bg: #ffffff; --oc-canvas: #f4f3f1; --oc-bg-alt: #f6f3ee; --oc-ink: #1b1a1f; --oc-ink-soft: #5d5a63; --oc-line: #e6e0d7;
+  --oc-red: #c8102e; --oc-red-deep: #9e0b23; --oc-gold: #b48a4a; --oc-card: #ffffff;
+  --oc-shadow: 0 8px 24px -12px rgba(20, 10, 15, 0.25);
+  --oc-btn-fill: #c8102e; --oc-btn-hover: #9e0b23;
+  --chip-pass-bg: #e3f3e8;  --chip-pass-ink: #1d6b3a;  --chip-pass-line: #b7dcc4;
+  --chip-fail-bg: #fbe8eb;  --chip-fail-ink: #8f1426;  --chip-fail-line: #8f1426;
+  --chip-manual-bg: #e4edf7; --chip-manual-ink: #24507f; --chip-manual-line: #bcd0e6;
+  --chip-na-bg: #eeedf0;    --chip-na-ink: #4f4c55;    --chip-na-line: #d4d1d8;
+  --st-pass: #2f8a50; --st-fail: #a3192f; --st-manual: #2b6cb8; --st-na: #8d8993; --st-none: #d9d4cc;
+  color-scheme: light;
+}
+
+.ocis h1, .ocis h2, .ocis h3, .ocis h4 {
+  font-family: "Figtree", "Segoe UI", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--oc-ink);
+}
+.ocis .font-display { font-family: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ocis :focus-visible { outline: 2px solid var(--oc-gold); outline-offset: 2px; }
+
+.ocis .btn-primary, .ocis .btn-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  font-weight: 500; font-size: 0.875rem; line-height: 1.25rem; border-radius: 0.375rem;
+  padding: 0.5rem 0.875rem; white-space: nowrap; transition: background-color 0.15s;
+}
+.ocis .btn-primary { color: #fff; background: var(--oc-btn-fill); }
+.ocis .btn-primary:not(:disabled):hover { background: var(--oc-btn-hover); }
+.ocis .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.ocis .btn-outline { background: var(--oc-card); color: var(--oc-ink); border: 1px solid var(--oc-line); }
+.ocis .btn-outline:not(:disabled):hover { background: var(--oc-bg-alt); }
+.ocis .btn-outline:disabled { opacity: 0.45; cursor: not-allowed; }
+.ocis .btn-small { padding: 0.375rem 0.625rem; font-size: 0.75rem; line-height: 1rem; }
+.ocis .text-link { font-weight: 500; color: var(--oc-red); }
+.ocis .text-link:hover { text-decoration: underline; }
+.ocis .card { background: var(--oc-card); border: 1px solid var(--oc-line); border-radius: 0.375rem; color: var(--oc-ink); }
+.ocis .card-raised { background: var(--oc-card); border: 1px solid var(--oc-line); border-radius: 0.375rem; box-shadow: var(--oc-shadow); }
+.ocis .eyebrow { font-weight: 500; font-size: 0.75rem; color: var(--oc-ink-soft); }
+.ocis .field {
+  background: var(--oc-card); border: 1px solid var(--oc-line); border-radius: 0.375rem;
+  padding: 0.375rem 0.625rem; font-size: 0.875rem; color: var(--oc-ink);
+}
+.ocis .field:focus { outline: none; box-shadow: 0 0 0 2px var(--oc-gold); }
+.ocis .chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; border-radius: 9999px; border: 1px solid;
+  padding: 0.125rem 0.5rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+}
+.ocis .chip-PASS { background: var(--chip-pass-bg); color: var(--chip-pass-ink); border-color: var(--chip-pass-line); }
+.ocis .chip-FAIL { background: var(--chip-fail-bg); color: var(--chip-fail-ink); border-color: var(--chip-fail-line); }
+.ocis .chip-MANUAL { background: var(--chip-manual-bg); color: var(--chip-manual-ink); border-color: var(--chip-manual-line); }
+.ocis .chip-NA { background: var(--chip-na-bg); color: var(--chip-na-ink); border-color: var(--chip-na-line); }
+.ocis .badge {
+  display: inline-flex; align-items: center; gap: 0.25rem; border-radius: 0.25rem; border: 1px solid var(--oc-line);
+  background: var(--oc-bg-alt); padding: 0.125rem 0.5rem; font-size: 11px; font-weight: 600; color: var(--oc-ink-soft); white-space: nowrap;
+}
+
+/* Print the report only (Report sets body.ocis-printing while printing), always in the light palette. */
+@media print {
+  body.ocis-printing * { visibility: hidden; }
+  body.ocis-printing .ocis-report, body.ocis-printing .ocis-report * { visibility: visible; }
+  body.ocis-printing .ocis-report { position: absolute; inset: 0 auto auto 0; width: 100%; }
+  body.ocis-printing .ocis {
+    --oc-bg: #fff; --oc-canvas: #fff; --oc-bg-alt: #f6f3ee; --oc-ink: #1b1a1f; --oc-ink-soft: #5d5a63; --oc-line: #d8d2c8; --oc-card: #fff;
+    --chip-pass-bg: #e3f3e8; --chip-pass-ink: #1d6b3a; --chip-pass-line: #1d6b3a;
+    --chip-fail-bg: #fbe8eb; --chip-fail-ink: #8f1426; --chip-fail-line: #8f1426;
+    --chip-manual-bg: #e4edf7; --chip-manual-ink: #24507f; --chip-manual-line: #24507f;
+    --chip-na-bg: #eeedf0; --chip-na-ink: #4f4c55; --chip-na-line: #4f4c55;
+    background: #fff;
+  }
+  .ocis .no-print { display: none !important; }
+  .ocis tr { break-inside: avoid; }
+}

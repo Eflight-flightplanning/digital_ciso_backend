@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_hcm_security_profile_changes_monitored",
+  "CisId": "4.1.2",
+  "CheckTitle": "Ensure Configuration Changes to HCM Security Profile Setups Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": "4.1",
+  "SubSectionName": "Security Configuration Changes",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Changes to HCM security profiles, which grant access to sets of people or payroll data, should be audited and reviewed.",
+  "Risk": "A profile change takes effect immediately for every holder and can expose sensitive HCM data.",
+  "AuditProcedure": [
+    "Enable auditing for data roles and security profiles; review Audit Reports.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 60008-60011, 60015, 60016."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Restore the intended profile settings.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not audited.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/human-resources/faqbs/security-profiles.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": ""
+}

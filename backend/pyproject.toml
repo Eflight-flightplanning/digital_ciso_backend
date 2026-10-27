@@ -51,7 +51,7 @@ dependencies = [
     "colorama>=0.4.6",
     "cryptography>=50.0.0",
     "defusedxml>=0.7.1",
-    "django==5.1.*",
+    "django>=5.2.17,<5.3",
     "django-celery-beat==2.9.*",
     "django-celery-results==2.6.*",
     "django-cors-headers==4.4.*",
@@ -61,8 +61,8 @@ dependencies = [
     "django-guid==3.5.*",
     "django-postgres-extra==2.0.*",
     "django-silk>=5.5.2",
-    "djangorestframework==3.15.*",
-    "djangorestframework-jsonapi==7.0.*",
+    "djangorestframework>=3.18.2,<3.19",
+    "djangorestframework-jsonapi>=8.1,<9",
     "djangorestframework-simplejwt==5.5.*",
     "drf-nested-routers==0.95.*",
     "drf-simple-apikey==2.2.*",
@@ -84,3 +84,23 @@ dependencies = [
     "markdown>=3.10.3",
     "py-ocsf-models>=0.10.0",
 ]
+
+[tool.uv]
+# Minimum versions of transitive dependencies with published vulnerabilities (pip-audit, 27 Oct 2026).
+# azure-cli-core is raised so that paramiko 2.x (vulnerable, no longer needed by azure-cli-core) drops out.
+constraint-dependencies = [
+    "aiohttp>=3.14.4",
+    "azure-cli-core>=2.91",
+    "certifi>=2026.10.19",
+    "filelock>=4.2.1",
+    "httpx2>=2.12.0",
+    "multidict>=6.9.1",
+    "oauthlib>=4.0.0",
+    "opentelemetry-api>=1.45.1",
+    "pillow>=13.0.0",
+    "pyjwt>=2.15.0",
+    "setuptools>=84.1.0",
+    "urllib3>=2.8.0",
+    "werkzeug>=3.1.9",
+]
+
