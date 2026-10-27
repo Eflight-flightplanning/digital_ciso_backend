@@ -1,0 +1,35 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_it_superuser_role_changes_monitored",
+  "CisId": "4.3",
+  "CheckTitle": "Ensure Configuration Changes to Roles Built for IT Superusers Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "partial",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion pod HCM REST with Basic Auth (ORACLE_FUSION_*): userAccounts with userAccountRoles",
+    "Fusion Cloud Applications Risk Management (Advanced Controls) for continuous monitoring"
+  ],
+  "Description": "Assignments of IT superuser roles such as Application Implementation Consultant should be monitored.",
+  "Risk": "These roles can fundamentally change application behaviour.",
+  "AuditProcedure": [
+    "Inspect the role's assignments in the Security Console.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Example: control 60024."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments, or monitor the assigned users' transactions.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": "Reads every Fusion user's role assignments from the HCM REST API (as security_platform does). FAIL when active accounts hold Application Implementation Consultant; otherwise lists IT superuser holders and assignments made in the last ROLE_REVIEW_DAYS (default 30) for review. Role patterns can be overridden with SUPERUSER_ROLE_PATTERNS."
+}

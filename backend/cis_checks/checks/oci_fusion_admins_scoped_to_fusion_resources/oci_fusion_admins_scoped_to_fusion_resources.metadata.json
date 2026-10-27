@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "oci_fusion_admins_scoped_to_fusion_resources",
+  "CisId": "1.4",
+  "CheckTitle": "Ensure Fusion Applications Administrators Have Access Only to Fusion Applications Resources",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "oci_iam",
+  "RequiredAccess": [
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "OCI IAM policies for Fusion Applications administrator groups should grant only the fusion-applications-family resource type, with no tenancy-wide or unrelated service permissions.",
+  "Risk": "Broader grants let SaaS administrators change compute, network or storage resources they do not manage.",
+  "AuditProcedure": [
+    "Identity & Security > Policies: review policies for groups containing Fusion administrators.",
+    "Confirm they use fusion-applications-family and contain no 'manage all-resources' or unrelated resource types.",
+    "Confirm the Console navigation for those administrators shows only Fusion Applications."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove policies granting non-Fusion services to the Fusion admin group.",
+      "Use 'Allow group FusionAdmins to manage fusion-applications-family in tenancy' (and 'read' for viewers)."
+    ]
+  },
+  "DefaultValue": "No access until policies are created; careless scoping can grant broad tenancy permissions.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/fusion-applications/managing-access.htm#iam-resource-type"
+  ],
+  "CisControlsV8": [
+    "5.4",
+    "6.7"
+  ],
+  "Notes": ""
+}

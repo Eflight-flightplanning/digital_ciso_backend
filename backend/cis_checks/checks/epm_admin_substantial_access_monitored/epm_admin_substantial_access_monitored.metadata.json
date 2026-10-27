@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "epm_admin_substantial_access_monitored",
+  "CisId": "5.1.3",
+  "CheckTitle": "Ensure Assignments of Substantial Access to EPM Administrators Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.1",
+  "SubSectionName": "IT Administrator Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "epm",
+  "RequiredAccess": [
+    "EPM Cloud access (EPM Automate, Service Administrator)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Assignments of EPM roles that expose sensitive account and financial data should be monitored.",
+  "Risk": "Broad EPM roles let users view sensitive data without oversight.",
+  "AuditProcedure": [
+    "Identify EPM roles with sensitive privileges and inspect their assignments.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 4608, 4616."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Remove unwanted assignments and confirm data-handling compliance."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": ""
+}

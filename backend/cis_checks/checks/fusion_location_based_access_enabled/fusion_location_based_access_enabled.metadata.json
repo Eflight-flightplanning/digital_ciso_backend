@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_location_based_access_enabled",
+  "CisId": "2.4",
+  "CheckTitle": "Ensure Location-Based Access Control (LBAC) is enabled",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)"
+  ],
+  "Description": "LBAC restricts Fusion UI and API sign-ins to registered IP ranges; other networks get only limited access.",
+  "Risk": "Valid credentials can otherwise be used from untrusted networks.",
+  "AuditProcedure": [
+    "Security Console > Location Based Access: 'Enable Location Based Access' is selected with valid allowlist entries.",
+    "IT Security Manager role is public to avoid lockout; test from allowed and disallowed IPs."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable LBAC, add trusted ranges (including the administrator's IP), mark IT Security Manager as public and test."
+    ]
+  },
+  "DefaultValue": "LBAC is disabled.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/human-resources/ochus/overview-of-location-based-access.html"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

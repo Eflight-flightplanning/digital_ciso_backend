@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_erp_sod_transactions_monitored",
+  "CisId": "5.3.4",
+  "CheckTitle": "Ensure Fusion ERP Transactions Allowed by SoD Violations Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.3",
+  "SubSectionName": "Application Business User Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "ERP transactions completed by the same user on both sides of an SoD conflict should be monitored.",
+  "Risk": "These transactions are where SoD conflicts turn into losses.",
+  "AuditProcedure": [
+    "Review the transactions in Reports and Analytics.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 40001-40017."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Reverse the transaction where possible and fix the configuration that allowed it."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": ""
+}

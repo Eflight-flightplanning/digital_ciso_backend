@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_waf_ip_filtering",
+  "CisId": "2.6",
+  "CheckTitle": "Ensure IP-Based Filtering with WAF for SaaS is Enforced",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion_waf",
+  "RequiredAccess": [
+    "Oracle SaaS Operations service request records"
+  ],
+  "Description": "WAF for SaaS IP filtering should allow only trusted public IPs or CIDR ranges, enabled through a service request.",
+  "Risk": "Without it the application is exposed to scanning and brute force from any address.",
+  "AuditProcedure": [
+    "Find the service request enabling IP filtering; confirm the allowlist has no broad ranges such as 0.0.0.0/0; test from allowed and disallowed IPs."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Raise a service request with approved ranges, remove broad entries and verify UI and API access."
+    ]
+  },
+  "DefaultValue": "Disabled.",
+  "References": [
+    "https://blogs.oracle.com/cloud-infrastructure/post/expand-fusion-cloud-security-ipbased-filtering-2"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

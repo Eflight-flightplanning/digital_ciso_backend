@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_unused_business_setups_disabled",
+  "CisId": "4.2.2",
+  "CheckTitle": "Ensure Unused Business Setups Are Disabled",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": "4.2",
+  "SubSectionName": "High Risk Business Transactions & User Actions",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Unused ledgers, suppliers, customers and similar setups should be inactivated, or their use monitored.",
+  "Risk": "Unused setups can be used to post misleading journals or route payments.",
+  "AuditProcedure": [
+    "Identify setups with no transactions in Reports and Analytics.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 30009, 32003, 33004."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Inactivate the setup, or monitor its use.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/financials/25d/facsf/implement-general-ledger.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": ""
+}

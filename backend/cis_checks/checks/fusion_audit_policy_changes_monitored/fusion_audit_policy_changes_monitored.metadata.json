@@ -1,0 +1,36 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_audit_policy_changes_monitored",
+  "CisId": "4.1.1",
+  "CheckTitle": "Ensure Changes to Audit Policy Settings Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": "4.1",
+  "SubSectionName": "Security Configuration Changes",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion pod with Basic Auth (Connection page): audit data for Audit Policies"
+  ],
+  "Description": "Audit policies that record changes to material Fusion configuration should stay enabled, and any change to them should be reviewed.",
+  "Risk": "Disabling an audit policy, changing a setting and re-enabling the policy hides unauthorised configuration changes.",
+  "AuditProcedure": [
+    "Tools > Audit Reports with Product = Audit Policies for the review period.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Example: control 60019."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Re-enable the policy (Setup and Maintenance > Manage Audit Policies).",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Changes to audit policies are always recorded.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/applications-common/25c/facia/audit-policies.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": "Tested by the tool from the Fusion pod. Could not complete (MANUAL) until the pod connection works and the audit API is confirmed."
+}

@@ -1,0 +1,34 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_ghost_employees_monitored",
+  "CisId": "5.3.7",
+  "CheckTitle": "Ensure Potential Ghost Employees Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "5",
+  "SectionName": "Application Access Control",
+  "SubSection": "5.3",
+  "SubSectionName": "Application Business User Separation of Duties (SoD)",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "partial",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion pod HCM REST with Basic Auth (ORACLE_FUSION_*): userAccounts with userAccountRoles",
+    "Fusion payroll and time-card reports for transaction review"
+  ],
+  "Description": "Employees paid without evidence of work (payroll entries without time entries) should be monitored.",
+  "Risk": "Ghost employees are a classic payroll fraud.",
+  "AuditProcedure": [
+    "Identify payroll entries without time or other evidence of work.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 50003, 50004."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Terminate the employment or monitor the user and the hiring managers' transactions."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [],
+  "CisControlsV8": [],
+  "Notes": "Reads every Fusion user's role assignments from the HCM REST API. FAIL when an active user holds a hiring role together with a payroll/payment or time-card role (the access behind CIS example controls 50003/50004 and security_platform's HR Specialist + Payroll Manager SoD rule). Payroll transactions without evidence of work are not visible here."
+}

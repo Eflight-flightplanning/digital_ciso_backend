@@ -1,0 +1,40 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_bi_otbi_audit_enabled",
+  "CisId": "3.3",
+  "CheckTitle": "Ensure to enable Audit on BI Publisher and OTBI Activity (Execution, Modification, and Usage Analytics)",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "3",
+  "SectionName": "Logging and Monitoring",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)"
+  ],
+  "Description": "Audit BI Publisher and OTBI report execution, catalog changes and access-control changes, and centralise the data.",
+  "Risk": "Reports can read and export large amounts of sensitive data without a trace.",
+  "AuditProcedure": [
+    "BI Publisher Runtime Configuration: 'Enable SQL session trace' is True.",
+    "Tools > Audit Reports for Oracle Business Intelligence events; OTBI usage/performance subject areas enabled.",
+    "Data reaches a SIEM or central log store."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable the settings above and export BI/OTBI audit data to a central store."
+    ]
+  },
+  "DefaultValue": "Partially disabled.",
+  "References": [
+    "https://www.ateam-oracle.com/post/methods-to-extract-audit-monitoring-data-from-fusion-applications"
+  ],
+  "CisControlsV8": [
+    "3.14",
+    "8.2",
+    "8.5"
+  ],
+  "Notes": ""
+}

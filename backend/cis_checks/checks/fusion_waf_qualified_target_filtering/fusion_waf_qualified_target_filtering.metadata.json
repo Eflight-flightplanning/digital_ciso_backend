@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_waf_qualified_target_filtering",
+  "CisId": "2.7",
+  "CheckTitle": "Ensure Qualified Target Filtering with WAF for SaaS is Enforced",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "2",
+  "SectionName": "Networking",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion_waf",
+  "RequiredAccess": [
+    "Oracle SaaS Operations service request records"
+  ],
+  "Description": "Qualified Target Filtering applies different WAF rules per module, so internal modules are restricted while external portals (Supplier Portal, Candidate Experience) stay reachable.",
+  "Risk": "One rule for every module either over-exposes internal modules or blocks external users.",
+  "AuditProcedure": [
+    "Find the service request; review which modules are covered and the rules for each; test each module from allowed and disallowed sources."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Raise a service request listing modules and their restrictions, review Oracle's implementation and test."
+    ]
+  },
+  "DefaultValue": "Disabled.",
+  "References": [
+    "https://blogs.oracle.com/cloud-infrastructure/post/waf-saas-supports-fusion-supplier-portal-security"
+  ],
+  "CisControlsV8": [
+    "4.4",
+    "12.3"
+  ],
+  "Notes": ""
+}

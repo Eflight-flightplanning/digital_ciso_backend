@@ -1,0 +1,37 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_payment_setup_changes_monitored",
+  "CisId": "4.2.1",
+  "CheckTitle": "Ensure Changes to Payment Setups Are Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": "4.2",
+  "SubSectionName": "High Risk Business Transactions & User Actions",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
+    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+  ],
+  "Description": "Changes to payment methods and bank account setups should be audited and reviewed.",
+  "Risk": "A changed payment setup can redirect payments, which are hard to recover.",
+  "AuditProcedure": [
+    "Enable audit policies for payment setup attributes and review Audit Reports.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Examples: 60002, 60005, 60007."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Restore the intended setup.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/financials/25d/facsf/how-you-implement-payables-and-payments.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": ""
+}

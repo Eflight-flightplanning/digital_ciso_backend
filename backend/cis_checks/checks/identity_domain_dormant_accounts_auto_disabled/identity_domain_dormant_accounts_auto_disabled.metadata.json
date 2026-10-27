@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "identity_domain_dormant_accounts_auto_disabled",
+  "CisId": "1.13",
+  "CheckTitle": "Ensure Dormant Accounts and Orphaned Identities Are Automatically Detected and Disabled",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "1",
+  "SectionName": "Identity and Access Management",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "identity_domain",
+  "RequiredAccess": [
+    "Fusion pod REST with Basic Auth (ORACLE_FUSION_*), to run the ESS Inactive Users Report",
+    "Identity domain REST API (read-only admin app role, e.g. Audit Administrator + Security Administrator)"
+  ],
+  "Description": "Identity governance policies should automatically flag and disable accounts with no sign-in for a defined period or without role assignments or owners.",
+  "Risk": "Manual clean-up is inconsistent; automated disabling closes the window for misuse of forgotten accounts.",
+  "AuditProcedure": [
+    "Confirm governance policies detect dormant and orphaned accounts.",
+    "Review policy logs for disabling actions; confirm exceptions are documented."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Configure governance tooling to disable accounts inactive for more than 90 days, with documented exceptions for service accounts."
+    ]
+  },
+  "DefaultValue": "Not enforced.",
+  "References": [
+    "https://docs.oracle.com/en-us/iaas/Content/identity/domains/managing.htm"
+  ],
+  "CisControlsV8": [
+    "5.3"
+  ],
+  "Notes": "Automated with the same dormant-account data as 1.14 (Fusion Inactive Users Report, identity domain fallback). FAIL when accounts stay active after the inactivity threshold, which shows they are not disabled automatically. With no dormant accounts the result is MANUAL: the assessor confirms the governance policy and its logs."
+}

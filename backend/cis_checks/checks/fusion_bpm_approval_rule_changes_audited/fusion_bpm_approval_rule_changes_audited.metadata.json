@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_bpm_approval_rule_changes_audited",
+  "CisId": "3.4",
+  "CheckTitle": "Ensure BPM Approval Rule and Workflow Configuration Changes Are Audited",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "3",
+  "SectionName": "Logging and Monitoring",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion Applications Security Console / Audit Reports (IT Security Manager)"
+  ],
+  "Description": "Changes to BPM approval rules and SOA workflow configuration should be audited and reviewed.",
+  "Risk": "Untracked approval-rule changes can bypass approval hierarchies and separation of duties.",
+  "AuditProcedure": [
+    "Setup and Maintenance > Manage Audit Policies: SOA/BPM audit enabled (Doc ID 2053746.1).",
+    "Audit data available and forwarded centrally; recent changes match change requests."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Enable SOA/BPM auditing, route rule changes through change management and review them regularly."
+    ]
+  },
+  "DefaultValue": "Disabled.",
+  "References": [
+    "https://www.ateam-oracle.com/post/methods-to-extract-audit-monitoring-data-from-fusion-applications"
+  ],
+  "CisControlsV8": [
+    "8",
+    "8.5"
+  ],
+  "Notes": ""
+}

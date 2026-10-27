@@ -1,0 +1,38 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "epm_audit_data_exported",
+  "CisId": "3.2",
+  "CheckTitle": "Ensure EPM Audit Data is Exported and Centrally Stored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "3",
+  "SectionName": "Logging and Monitoring",
+  "SubSection": null,
+  "SubSectionName": null,
+  "ProfileLevel": "L2",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "none",
+  "ServiceName": "epm",
+  "RequiredAccess": [
+    "EPM Cloud access (EPM Automate, Service Administrator)",
+    "OCI tenancy access (IAM policies, Fusion environment settings, Logging, Monitoring)"
+  ],
+  "Description": "EPM audit data (sign-ins, administrative actions, configuration changes) should be exported regularly and stored centrally, for example in Object Storage.",
+  "Risk": "Audit data kept only in EPM is limited by its retention and can be lost.",
+  "AuditProcedure": [
+    "Confirm scheduled EPM audit exports are active, contain the expected fields and land in external storage."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Automate export (for example EPM Automate access log downloads), store it externally and test the pipeline."
+    ]
+  },
+  "DefaultValue": "Audit data stays in EPM.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/enterprise-performance-management-common/cgsad/integration_with_custom_siem_tools.html"
+  ],
+  "CisControlsV8": [
+    "8.5",
+    "8.9"
+  ],
+  "Notes": ""
+}

@@ -1,0 +1,36 @@
+{
+  "Provider": "oracle_saas",
+  "CheckID": "fusion_unused_custom_roles_disabled",
+  "CisId": "4.1.3",
+  "CheckTitle": "Ensure Unused Custom Roles Are Disabled or Monitored",
+  "Benchmark": "CIS Oracle SaaS Cloud Applications Benchmark v1.0.0",
+  "Section": "4",
+  "SectionName": "Application Configuration Management",
+  "SubSection": "4.1",
+  "SubSectionName": "Security Configuration Changes",
+  "ProfileLevel": "L1",
+  "CisAssessmentStatus": "Manual",
+  "Automation": "automated",
+  "ServiceName": "fusion",
+  "RequiredAccess": [
+    "Fusion pod with Basic Auth (Connections page): SCIM Roles or HCM REST roles, and userAccounts with userAccountRoles"
+  ],
+  "Description": "Custom roles not assigned to anyone should be inactivated, or their assignment and use monitored.",
+  "Risk": "An unused role can be assigned quietly and used for unintended actions.",
+  "AuditProcedure": [
+    "Identify custom roles with no user assignments in the Security Console.",
+    "Automated alternative: deploy the matching Transaction/Access Controls in Fusion Cloud Applications Risk Management so changes start an investigation workflow. Example: control 80001."
+  ],
+  "Remediation": {
+    "Steps": [
+      "Inactivate the role, or keep it and monitor its use.",
+      "Review the affected transactions in Tools > Reports and Analytics, or monitor them continuously with Risk Management Transaction Controls."
+    ]
+  },
+  "DefaultValue": "Not monitored.",
+  "References": [
+    "https://docs.oracle.com/en/cloud/saas/human-resources/faqas/what-s-the-security-console.html"
+  ],
+  "CisControlsV8": [],
+  "Notes": "Automated: custom roles (code not starting with ORA_, duty roles left out) with no user assignment fail. Whether role use is monitored in Risk Management (control 80001) is for the assessor to confirm."
+}
