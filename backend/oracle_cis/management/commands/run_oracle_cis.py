@@ -2,6 +2,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError
 
+from api.tenant_scope import tenant_scope
 from oracle_cis import services
 
 
@@ -12,11 +13,12 @@ class Command(BaseCommand):
         parser.add_argument("--tenant", required=True, help="Tenant id (UUID)")
 
     def handle(self, *args, **opts):
-        try:
-            run = services.start_run(opts["tenant"], user="command", trigger="command")
-        except IntegrityError as exc:
-            raise CommandError("An assessment is already running for this tenant.") from exc
-        run = services.execute_run(run.id)
+        with tenant_scope(opts["tenant"]):
+            try:
+                run = services.start_run(opts["tenant"], user="command", trigger="command")
+            except IntegrityError as exc:
+                raise CommandError("An assessment is already running for this tenant.") from exc
+            run = services.execute_run(run.id)
         c = run.counts
         self.stdout.write(
             f"Run {run.id} {run.status}: {c.get('tested', 0)} controls tested by the tool (PASS {c.get('PASS', 0)}, "

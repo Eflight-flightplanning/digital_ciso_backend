@@ -21,6 +21,9 @@ import { ShieldMark } from "@/components/brand/Logo";
 import { authStore } from "@/lib/auth";
 
 export const Route = createFileRoute("/sign-up")({
+  validateSearch: (search: Record<string, unknown>): { invitation_token?: string } => ({
+    invitation_token: typeof search.invitation_token === "string" ? search.invitation_token : undefined,
+  }),
   component: SignUpPage,
 });
 
@@ -53,13 +56,18 @@ function SignUpPage() {
     });
   };
 
+  const { invitation_token: invitationToken } = Route.useSearch();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      await authStore.signUp(email, password, name, org);
-      navigate({ to: "/dashboard" });
+      if (!invitationToken) {
+        throw new Error("Access is by invitation. Please open the link in your invitation.");
+      }
+      await authStore.signUp(email, password, name, org, invitationToken);
+      navigate({ to: "/sign-in" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       setError(msg);
@@ -150,15 +158,15 @@ function SignUpPage() {
             <div className={`border-b pb-4 ${isDark ? "border-white/10" : "border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-950"}`}>
-                  Create Organization Account
+                  Accept Your Invitation
                 </h2>
                 <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${isDark ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" : "bg-cyan-50 border-cyan-300 text-cyan-700"}`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                  Instant Deploy
+                  Invitation Only
                 </span>
               </div>
               <p className={`mt-1 text-xs ${isDark ? "text-slate-400" : "text-slate-600 font-medium"}`}>
-                Deploy autonomous AI security across your cloud infrastructure
+                Create your account, then set up your authenticator app at sign-in
               </p>
             </div>
 

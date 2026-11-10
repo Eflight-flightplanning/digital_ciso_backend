@@ -7,36 +7,57 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
-// The access token lives only in memory: it is never written to localStorage, so
-// XSS cannot exfiltrate a long-lived credential. The refresh token is an
-// HttpOnly cookie the browser sends to /tokens/* and scripts cannot read.
-let accessToken: string | null = null;
+let accessToken: string | null =
+  typeof window !== "undefined"
+    ? localStorage.getItem("access_token") || sessionStorage.getItem("access_token")
+    : null;
 
 export function getAuthToken(): string | null {
+  if (!accessToken && typeof window !== "undefined") {
+    accessToken = localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
+  }
   return accessToken;
 }
 
 export function setAuthToken(token: string | null): void {
   accessToken = token;
+  if (typeof window !== "undefined") {
+    if (token) {
+      localStorage.setItem("access_token", token);
+      sessionStorage.setItem("access_token", token);
+    } else {
+      localStorage.removeItem("access_token");
+      sessionStorage.removeItem("access_token");
+    }
+  }
 }
 
 let refreshInFlight: Promise<string | null> | null = null;
 
-/** Exchange the HttpOnly refresh cookie for a new access token (single-flight). */
+/** Exchange the HttpOnly refresh cookie or stored refresh token for a new access token (single-flight). */
 export function refreshAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return Promise.resolve(null);
   if (!refreshInFlight) {
+    const storedRefresh = localStorage.getItem("refresh_token") || sessionStorage.getItem("refresh_token");
+    const body = storedRefresh ? JSON.stringify({ refresh: storedRefresh }) : "{}";
+
     refreshInFlight = fetch(`${API_BASE}/tokens/refresh`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json", Accept: "application/json, application/vnd.api+json" },
-      body: "{}",
+      body,
     })
       .then(async (res) => {
         if (!res.ok) return null;
         const json = await res.json();
         const token =
           json?.attributes?.access || json?.data?.attributes?.access || json?.access || null;
+        const newRefresh =
+          json?.attributes?.refresh || json?.data?.attributes?.refresh || json?.refresh || null;
+        if (newRefresh && typeof window !== "undefined") {
+          localStorage.setItem("refresh_token", newRefresh);
+          sessionStorage.setItem("refresh_token", newRefresh);
+        }
         setAuthToken(token);
         return token as string | null;
       })
@@ -52,7 +73,17 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getAuthToken();
+  let token = getAuthToken();
+
+  // If no token in memory/storage, but user has an active session indicator, refresh first to avoid unnecessary 401
+  const hasUserSession =
+    typeof window !== "undefined" &&
+    (!!localStorage.getItem("auth_user") || !!localStorage.getItem("refresh_token") || !!sessionStorage.getItem("refresh_token"));
+
+  if (!token && hasUserSession && !endpoint.includes("/tokens")) {
+    token = await refreshAccessToken();
+  }
+
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${API_BASE}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
@@ -86,17 +117,19 @@ export async function apiRequest<T = any>(
     throw new Error(err?.message || "Network connection failed");
   }
 
-  // Automatic token refresh on 401 Unauthorized (refresh token is the HttpOnly cookie)
+  // Automatic token refresh on 401 Unauthorized (refresh token is the HttpOnly cookie or stored refresh token)
   if (response.status === 401 && !(options as any)._isRetry) {
     const fresh = await refreshAccessToken();
     if (fresh) {
       headers.set("Authorization", `Bearer ${fresh}`);
-      response = await fetch(url, { ...options, headers });
+      response = await fetch(url, { ...options, headers, _isRetry: true } as any);
     }
 
     if (!response.ok && response.status === 401 && typeof window !== "undefined" && !window.location.pathname.startsWith("/sign-in")) {
       setAuthToken(null);
       localStorage.removeItem("auth_user");
+      localStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("refresh_token");
       window.location.href = "/sign-in";
       return { data: [], items: [], meta: {} } as unknown as T;
     }

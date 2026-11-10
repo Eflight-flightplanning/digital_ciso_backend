@@ -1,3 +1,4 @@
+from .client_report_views import ClientReportFileView, ClientReportsView
 from .oracle_saas_views import (
     OracleSaasOverviewView,
     OracleSaasInactiveSyncView,
@@ -230,6 +231,9 @@ urlpatterns = [
     path("mcp", MCPGatewayView.as_view(), name="mcp-gateway-v1"),
     path("mcp/", MCPGatewayView.as_view(), name="mcp-gateway-v1-slash"),
     path("ai/", include((ai_urlpatterns, "ai"), namespace="ai")),
+    path("client-reports", ClientReportsView.as_view(), name="client-reports"),
+    path("client-reports/<str:kind>/<str:run_id>/<str:name>", ClientReportFileView.as_view(), name="client-report-file"),
+    path("", include("client_store.urls")),
     path("nca/", include("nca.urls")),
     path("oracle-cis/", include("oracle_cis.urls")),
     # Oracle Fusion SaaS Governance & Dormant User Endpoints

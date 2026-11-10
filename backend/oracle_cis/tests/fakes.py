@@ -8,12 +8,28 @@ from cis_checks.idcs_client import IdcsError
 class FakeFusion:
     """Stands in for FusionClient. configured=False means "no Fusion pod", so the IDCS fallback is used."""
 
-    def __init__(self, records=None, configured=True, error=None, roles=None, catalogue=None):
+    def __init__(self, records=None, configured=True, error=None, roles=None, catalogue=None, payments=None, banks=None):
         self.records = records or []
         self.configured = configured
         self.error = error
         self.assignments = roles or []
         self.catalogue = catalogue  # None: the pod has no role catalogue (HTTP 404)
+        self.payments = payments  # None: personalPaymentMethods not available (HTTP 404)
+        self.banks = banks  # None: no Financials access (HTTP 403)
+
+    def payment_methods(self):
+        from cis_checks.fusion_client import FusionError
+
+        if self.payments is None:
+            raise FusionError("GET /hcmRestApi/resources/11.13.18.05/personalPaymentMethods returned HTTP 404", 404)
+        return list(self.payments), "/hcmRestApi/resources/11.13.18.05/personalPaymentMethods"
+
+    def external_bank_accounts(self):
+        from cis_checks.fusion_client import FusionError
+
+        if self.banks is None:
+            raise FusionError("GET /fscmRestApi/resources/11.13.18.05/externalBankAccounts returned HTTP 403", 403)
+        return list(self.banks), "/fscmRestApi/resources/11.13.18.05/externalBankAccounts"
 
     def user_roles(self):
         return self.assignments

@@ -829,8 +829,9 @@ def _retrieve_relevant_findings(
             )
             if is_saas_query:
                 try:
-                    from api.v1.oracle_saas_views import load_real_pod_users, SOD_TOXIC_MATRICES
-                    saas_users = load_real_pod_users()
+                    from api.v1.oracle_saas_views import SOD_TOXIC_MATRICES
+                    from oracle_cis.pod_users import load_pod_users
+                    saas_users = load_pod_users(_request_tenant_id(request))
                     if saas_users:
                         # Filter relevant users based on question keywords
                         relevant_saas_users = []

@@ -1,6 +1,7 @@
 from math import isfinite
 from uuid import UUID
 
+from api.tenant_scope import bind_tenant
 from api.db_router import MainRouter
 from api.models import TenantAPIKey, TenantAPIKeyManager
 from cryptography.fernet import InvalidToken
@@ -120,6 +121,15 @@ class CombinedJWTOrAPIKeyAuthentication(BaseAuthentication):
     api_key_auth = TenantAPIKeyAuthentication()
 
     def authenticate(self, request: Request) -> tuple[object, dict] | None:
+        result = self._authenticate(request)
+        if result is not None:
+            _, auth = result
+            tenant_id = auth.get("tenant_id") if hasattr(auth, "get") else None
+            if tenant_id:
+                bind_tenant(tenant_id, auth.get("sub"))
+        return result
+
+    def _authenticate(self, request: Request) -> tuple[object, dict] | None:
         auth_header = request.headers.get("Authorization", "")
 
         # Prioritize JWT authentication if both are present

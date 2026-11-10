@@ -84,6 +84,8 @@ DRF_SIMPLE_API_KEY = {
     "HEADER_KEY": "HTTP_X_API_KEY",
     "FERNET_SECRET": API_KEY_FERNET_SECRET,
 }
+# drf_simple_apikey reads this name.
+DRF_API_KEY = DRF_SIMPLE_API_KEY
 
 AUTH_USER_MODEL = "api.User"
 
@@ -100,6 +102,7 @@ INSTALLED_APPS = [
     "psqlextra",
     "api",
     "nca",
+    "client_store",
     "oracle_cis",
     "rest_framework",
     "corsheaders",
@@ -117,6 +120,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "api.tenant_scope.TenantScopeMiddleware",
     "api.middleware.CloseDBConnectionsMiddleware",
     "django_guid.middleware.guid_middleware",
     "django.middleware.security.SecurityMiddleware",
@@ -171,9 +175,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", default=False)
 SECURE_REDIRECT_EXEMPT = [r"^health/"]
 
-# Sign-up controls: ``DJANGO_SIGNUP_ENABLED=False`` closes self-registration;
-# ``DJANGO_SIGNUP_ALLOWED_DOMAINS=corp.com,other.com`` restricts it by email domain.
-SIGNUP_ENABLED = env.bool("DJANGO_SIGNUP_ENABLED", default=True)
+# Sign-up is by invitation only. ``DJANGO_SIGNUP_ENABLED=True`` opens self-registration;
+# ``DJANGO_SIGNUP_ALLOWED_DOMAINS=corp.com,other.com`` then restricts it by email domain.
+SIGNUP_ENABLED = env.bool("DJANGO_SIGNUP_ENABLED", default=False)
 SIGNUP_ALLOWED_DOMAINS = [
     d.strip().lower() for d in env.list("DJANGO_SIGNUP_ALLOWED_DOMAINS", default=[]) if d.strip()
 ]
@@ -331,3 +335,13 @@ def label_postgres_connections(databases: dict) -> None:
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Client files: "local" keeps a folder per client, "azure" a private Blob Storage container per client.
+# Azure signs in with the app's managed identity. Never add a storage key, connection string or SAS token.
+CLIENT_STORAGE_BACKEND = env("CLIENT_STORAGE_BACKEND", default="local")
+AZURE_STORAGE_ACCOUNT_URL = env("AZURE_STORAGE_ACCOUNT_URL", default="")
+AZURE_STORAGE_MANAGED_IDENTITY_CLIENT_ID = env("AZURE_STORAGE_MANAGED_IDENTITY_CLIENT_ID", default="")
+# Set these three to give each client its own encryption scope and Key Vault key.
+AZURE_STORAGE_KEY_VAULT_URL = env("AZURE_STORAGE_KEY_VAULT_URL", default="")
+AZURE_STORAGE_SUBSCRIPTION_ID = env("AZURE_STORAGE_SUBSCRIPTION_ID", default="")
+AZURE_STORAGE_RESOURCE_GROUP = env("AZURE_STORAGE_RESOURCE_GROUP", default="")

@@ -141,6 +141,31 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     };
   }, []);
 
+  const userRoleStr = String(user?.role || "").toLowerCase();
+  const isAdmin = userRoleStr.includes("admin") || userRoleStr.includes("owner");
+  const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
+
+  const visibleSections = useMemo(() => {
+    return navSections
+      .map((section) => {
+        if (section.label === "SaaS & ERP" && !canAccessSaaS) {
+          return null;
+        }
+        const items = section.items.filter((item) => {
+          if (item.to === "/oracle-saas-cis" && !canAccessSaaS) {
+            return false;
+          }
+          if ((item.to === "/users" || item.to === "/integrations") && !isAdmin) {
+            return false;
+          }
+          return true;
+        });
+        if (items.length === 0) return null;
+        return { ...section, items };
+      })
+      .filter(Boolean) as NavSection[];
+  }, [userRoleStr, isAdmin, canAccessSaaS]);
+
   return (
     <aside
       className={cn(
@@ -173,7 +198,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       {/* Nav List - lowered with generous top padding and relaxed item gaps */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-2.5 pt-5 pb-5">
-        {navSections.map((section, si) => (
+        {visibleSections.map((section, si) => (
           <div key={si} className={cn(si > 0 && "mt-4 border-t border-sidebar-border/60 pt-3.5")}>
             {section.label && !collapsed && (
               <div className="section-label px-2.5 pb-2 text-[10px] tracking-wider text-muted-foreground/80 font-bold uppercase">
@@ -254,12 +279,30 @@ function Breadcrumbs() {
 
 function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
   const navigate = useNavigate();
+  const user = authStore.getState().user;
+  const userRoleStr = String(user?.role || "").toLowerCase();
+  const isAdmin = userRoleStr.includes("admin") || userRoleStr.includes("owner");
+  const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
+
+  const visibleSections = navSections
+    .map((section) => {
+      if (section.label === "SaaS & ERP" && !canAccessSaaS) return null;
+      const items = section.items.filter((item) => {
+        if (item.to === "/oracle-saas-cis" && !canAccessSaaS) return false;
+        if ((item.to === "/users" || item.to === "/integrations") && !isAdmin) return false;
+        return true;
+      });
+      if (items.length === 0) return null;
+      return { ...section, items };
+    })
+    .filter(Boolean) as NavSection[];
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Search findings, resources, pages…" />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
-        {navSections.map((s, i) => (
+        {visibleSections.map((s, i) => (
           <CommandGroup key={i} heading={s.label ?? "Overview"}>
             {s.items.map((item) => (
               <CommandItem
@@ -307,6 +350,10 @@ export function AppShell({
     const deny = () => {
       setAuthToken(null);
       localStorage.removeItem("auth_user");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
       if (!cancelled) navigate({ to: "/sign-in" });
     };
     (async () => {

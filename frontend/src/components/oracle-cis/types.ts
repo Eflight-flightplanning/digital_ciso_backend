@@ -142,7 +142,7 @@ export interface RemediationInfo {
   jira_comment_error?: string | null;
 }
 
-export type IdentityKind = "dormant" | "active" | "ghost";
+export type IdentityKind = "dormant" | "active" | "ghost" | "payment";
 
 export interface IdentityRow {
   id: number;
@@ -162,7 +162,7 @@ export interface IdentityPage {
   total: number;
   page: number;
   page_size: number;
-  counts: { dormant?: number; active?: number; ghost?: number };
+  counts: { dormant?: number; active?: number; ghost?: number; payment?: number };
   summary?: IdentitySummary;
   jira_configured: boolean;
   remediation_live: boolean;

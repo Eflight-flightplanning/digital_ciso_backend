@@ -7,7 +7,7 @@ personal data, so they are left alone.
 import ipaddress
 import re
 
-USER_KEYS = {"user", "username", "user_name", "actor", "actorname", "actor_name", "principal", "email"}
+USER_KEYS = {"user", "username", "user_name", "actor", "actorname", "actor_name", "principal", "email", "owner_user", "by", "changed_by"}
 IP_KEYS = {"client_ip", "clientip", "ip", "source_ip", "sourceip"}
 EMAIL_RE = re.compile(r"\b([A-Za-z0-9._%+-]{1,64})@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b")
 

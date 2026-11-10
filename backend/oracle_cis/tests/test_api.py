@@ -222,12 +222,42 @@ class CountsTests(ApiCase):
         run = self.start_run()  # no Fusion pod: the pod controls could not complete (MANUAL with a flag)
         counts = services.effective_counts(run)
         self.assertEqual(counts["PASS"] + counts["FAIL"] + counts["MANUAL"], 44)
-        self.assertEqual(counts["not_completed"], 5)
+        self.assertEqual(counts["not_completed"], 6)
         self.assertLessEqual(counts["manual_controls"], counts["MANUAL"])  # a tested control can be partly evidenced (MANUAL)
-        self.assertEqual(counts["tested"], 13)
-        for cid in ("4.1.1", "4.1.3", "4.3", "5.1.2", "5.3.7"):
+        self.assertEqual(counts["tested"], 14)
+        for cid in ("4.1.1", "4.1.3", "4.2.1", "4.3", "5.1.2", "5.3.7"):
             r = run.results.get(control_id=cid)
             self.assertEqual(r.status, "MANUAL", cid)
             self.assertIn("automated_check_failed", r.flags, cid)
             self.assertNotIn("requires_other_access", r.flags, cid)
         self.assertEqual(run.results.get(control_id="3.2").status, "MANUAL")
+
+
+class PaymentDeltaApiTests(ApiCase):
+    def test_second_run_lists_payment_changes(self):
+        from oracle_cis.models import OcisSnapshot
+
+        payments = [{"PersonNumber": "100", "PersonalPaymentMethodId": "PM1", "BankName": "Bank A", "BankAccountNumber": "GB001111"}]
+        fusion = FakeFusion(roles=[], payments=payments)
+        with mock.patch("oracle_cis.connections.fusion_client", lambda tid: fusion):
+            first = self.start_run()
+            self.assertIn("baseline recorded", first.results.get(control_id="4.2.1").reason)
+            self.assertEqual(OcisSnapshot.objects.filter(tenant_id=TENANT, name="payment_methods").count(), 1)
+            fusion.payments = [{**payments[0], "BankAccountNumber": "GB009999"}]
+            second = self.start_run()
+        self.assertEqual(second.results.get(control_id="4.2.1").status, "FAIL")
+        listed = self.client.get("/api/v1/oracle-cis/identities?kind=payment").json()
+        self.assertEqual(listed["total"], 1)
+        self.assertEqual(listed["results"][0]["details"]["change"], "changed")
+        self.assertNotIn("GB009999", str(listed))
+
+    def test_failed_pod_read_keeps_previous_snapshot(self):
+        from oracle_cis.models import OcisSnapshot
+
+        fusion = FakeFusion(roles=[], payments=[{"PersonNumber": "1", "BankAccountNumber": "X1"}])
+        with mock.patch("oracle_cis.connections.fusion_client", lambda tid: fusion):
+            self.start_run()
+            fusion.payments = None  # the pod read fails on the second run
+            self.start_run()
+        self.assertEqual(OcisSnapshot.objects.filter(tenant_id=TENANT).count(), 1)
+

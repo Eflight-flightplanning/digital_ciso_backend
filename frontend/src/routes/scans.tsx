@@ -22,7 +22,7 @@ import {
   Chip,
   Dot,
 } from "@/components/ui-kit/primitives";
-import { useScans, useLaunchScan, useProviders, useScanDelta } from "@/hooks/use-api";
+import { useScans, useLaunchScan, useProviders, useScanDelta, useCurrentUser } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/scans")({
   component: ScansPage,
@@ -143,6 +143,21 @@ function ScansPage() {
   const activeScanStartedAt = (activeRunningScan?.raw as Record<string, unknown> | undefined)?.started_at as string | undefined;
   const activeScanElapsedSeconds = useElapsedSeconds(activeRunningScan ? activeScanStartedAt : null);
 
+  const { data: currentUserRaw } = useCurrentUser();
+  const currentUser = (currentUserRaw as Record<string, any>) || {};
+  const userRoleStr = String(
+    currentUser.role ||
+    (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("auth_user") || "{}")?.role : "") ||
+    ""
+  ).toLowerCase();
+  const isAdmin =
+    Boolean(currentUser.is_superuser) ||
+    Boolean(currentUser.is_staff) ||
+    userRoleStr.includes("admin") ||
+    userRoleStr.includes("owner");
+  const isReadOnly = !isAdmin && (userRoleStr.includes("auditor") || userRoleStr.includes("viewer") || userRoleStr.includes("read-only"));
+  const canManageScans = isAdmin || (!isReadOnly && userRoleStr.includes("member"));
+
   const providers = (apiProviders?.items || []) as Array<Record<string, any>>;
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
@@ -158,6 +173,10 @@ function ScansPage() {
   }, [providers, selectedProviderId]);
 
   const handleLaunchScan = async () => {
+    if (!canManageScans) {
+      setErrorMsg("Read-only accounts cannot trigger scans.");
+      return;
+    }
     if (!selectedProviderId && providers.length === 0) {
       setErrorMsg("Please connect a cloud provider first.");
       return;
@@ -196,13 +215,15 @@ function ScansPage() {
             <RefreshCw className="h-3.5 w-3.5" />
             <span>Refresh</span>
           </button>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
-          >
-            <Zap className="h-3.5 w-3.5" />
-            <span>Launch Assessment</span>
-          </button>
+          {canManageScans && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="inline-flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-lg bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95 cursor-pointer"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span>Launch Assessment</span>
+            </button>
+          )}
         </div>
       }
     >

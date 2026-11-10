@@ -64,10 +64,7 @@ def resolve_tenant(request) -> Tenant | None:
         if m and m.tenant:
             return m.tenant
 
-    tenant = Tenant.objects.first()
-    if not tenant:
-        tenant = Tenant.objects.create(name="Default Organization")
-    return tenant
+    return None  # no client: callers refuse, never fall back to someone else's
 
 
 def get_active_jira_service(tenant_id: str | None = None, raise_exception: bool = True) -> JiraService | None:

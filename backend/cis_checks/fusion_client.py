@@ -31,6 +31,10 @@ log = logging.getLogger(__name__)
 
 ESS_REQUESTS = "/ess/rest/scheduler/v1/requests"
 USER_ACCOUNTS = "/hcmRestApi/resources/11.13.18.05/userAccounts"
+# Payment setups for CIS 4.2.1 (paths can be overridden per pod).
+PAYMENT_METHODS = "/hcmRestApi/resources/11.13.18.05/personalPaymentMethods"
+EXTERNAL_BANK_ACCOUNTS = "/fscmRestApi/resources/11.13.18.05/externalBankAccounts"
+
 # Role catalogue for CIS 4.1.3, tried in order: Fusion SCIM Roles, then the HCM REST roles resource.
 # FUSION_ROLES_PATH points at one specific resource instead.
 ROLE_SOURCES = ["/hcmRestApi/scim/Roles", "/hcmRestApi/resources/11.13.18.05/roles"]
@@ -246,6 +250,28 @@ class FusionClient:
             if not body.get("hasMore") or not items:
                 return roles
             offset += len(items)
+
+    def rest_items(self, path):
+        """Every item of a Fusion REST collection (limit/offset paging, onlyData)."""
+        items, offset = [], 0
+        sep = "&" if "?" in path else "?"
+        while True:
+            body = self._request("GET", f"{path}{sep}limit=500&offset={offset}&onlyData=true")
+            page = body.get("items") or []
+            items += page
+            if not body.get("hasMore") or not page:
+                return items
+            offset += len(page)
+
+    def payment_methods(self):
+        """Employees' personal payment methods (HCM REST personalPaymentMethods): (raw items, path)."""
+        path = os.environ.get("FUSION_PAYMENT_METHODS_PATH", "").strip() or PAYMENT_METHODS
+        return self.rest_items(path), path
+
+    def external_bank_accounts(self):
+        """Supplier and other external bank accounts (Financials REST externalBankAccounts): (raw items, path)."""
+        path = os.environ.get("FUSION_BANK_ACCOUNTS_PATH", "").strip() or EXTERNAL_BANK_ACCOUNTS
+        return self.rest_items(path), path
 
     # ---- remediation (the same two actions security_platform offers) ----
 

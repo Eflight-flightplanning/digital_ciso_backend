@@ -220,7 +220,13 @@ def enqueue_scan_execution_on_commit(
                     tenant_id, str(scan.provider_id)
                 )
 
-        threading.Thread(target=_run_scan_thread, daemon=True).start()
+        def _run_scan_in_scope():
+            from api.tenant_scope import tenant_scope
+
+            with tenant_scope(tenant_id):
+                _run_scan_thread()
+
+        threading.Thread(target=_run_scan_in_scope, daemon=True).start()
 
     transaction.on_commit(_dispatch)
 
@@ -431,6 +437,7 @@ def _perform_scan_complete_tasks(tenant_id: str, scan_id: str, provider_id: str)
             reset_ephemeral_resource_findings_count_task.si(
                 tenant_id=tenant_id, scan_id=scan_id
             ),
+            save_scan_report_task.si(tenant_id=tenant_id, scan_id=scan_id),
         ),
         group(
             # Use optimized task that generates both reports with shared queries
@@ -684,6 +691,15 @@ def perform_scheduled_scan_task(self, tenant_id: str, provider_id: str):
             next_scan_datetime=next_scan_datetime,
         )
         _dispatch_next_queued_provider_scan_best_effort(tenant_id, provider_id)
+
+
+@shared_task(name="scan-client-report", queue="overview")
+def save_scan_report_task(tenant_id: str, scan_id: str):
+    from api.client_reports import save_scan
+    from api.tenant_scope import tenant_scope
+
+    with tenant_scope(tenant_id):
+        return save_scan(tenant_id, scan_id)
 
 
 @shared_task(name="scan-summary", queue="overview")

@@ -158,12 +158,25 @@ def generate_tokens(user: User, tenant_id: str) -> dict:
     # Set the tenant_id
     refresh["tenant_id"] = tenant_id
 
+    # Set roles claim into refresh and access token
+    from api.db_router import MainRouter
+    roles = list(user.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id).values_list("name", flat=True))
+    if not roles:
+        from api.models import Membership
+        mem = Membership.objects.using(MainRouter.admin_db).filter(user=user, tenant_id=tenant_id).first()
+        if mem and mem.role == Membership.RoleChoices.OWNER:
+            roles = ["Owner"]
+        else:
+            roles = ["Member"]
+    refresh["roles"] = roles
+
     # Set the nbf (not before) claim to the iat (issued at) claim. At this moment, simplejwt does not provide a
     # way to set the nbf claim
     refresh.payload["nbf"] = refresh["iat"]
 
     # Get the access token
     access = refresh.access_token
+    access["roles"] = roles
 
     if settings.SIMPLE_JWT["UPDATE_LAST_LOGIN"]:
         update_last_login(None, user)
@@ -220,22 +233,23 @@ class BaseTokenSerializer(serializers.Serializer):
         elif user is None:
             raise ValidationError("Invalid credentials")
 
-        from api.mfa_service import generate_and_store_otp, verify_otp, is_mfa_enabled
+        from api.mfa_service import mfa_service
 
         # Check MFA OTP verification if enabled
-        if is_mfa_enabled():
+        if mfa_service.is_enabled():
             if not otp:
-                # First step of login: Credentials valid -> generate OTP & send email via SendGrid
-                generate_and_store_otp(email)
-                return {
-                    "mfa_required": True,
-                    "email": user.email,
-                    "message": f"Verification code sent to {user.email}.",
-                }
+                # Credentials valid: ask for the code, or set up the authenticator first
+                return mfa_service.generate_challenge(user)
 
-            # Step 2 of login: Verify OTP
-            if not verify_otp(email, otp):
-                raise ValidationError({"otp": ["Invalid or expired 6-digit MFA verification code."]})
+            # Step 2 of login: verify the code with atomic replay prevention and rate limiting
+            client_ip = None
+            request = self.context.get("request")
+            if request and hasattr(request, "META"):
+                client_ip = request.META.get("REMOTE_ADDR")
+
+            success, err_msg = mfa_service.verify_totp(user, otp, client_ip=client_ip)
+            if not success:
+                raise ValidationError({"otp": [err_msg or "Invalid or expired 6-digit MFA verification code."]})
 
         from api.models import Membership, Tenant, UserRoleRelationship
 
@@ -260,15 +274,8 @@ class BaseTokenSerializer(serializers.Serializer):
                 if rel:
                     tenant_id = str(rel.tenant_id)
                 else:
-                    tenant = Tenant.objects.using(MainRouter.admin_db).first() or Tenant.objects.first()
-                    if not tenant:
-                        tenant = Tenant.objects.using(MainRouter.admin_db).create(
-                            name=f"{user.email.split('@')[0]} default tenant"
-                        )
-                    Membership.objects.using(MainRouter.admin_db).get_or_create(
-                        user=user, tenant=tenant, defaults={"role": Membership.RoleChoices.OWNER}
-                    )
-                    tenant_id = str(tenant.id)
+                    # Never attach an unassigned user to an existing client.
+                    raise ValidationError("Your account is not linked to a client.")
 
         return generate_tokens(user, tenant_id)
 
@@ -407,6 +414,23 @@ class UserSerializer(BaseModelSerializerV1):
     roles = SerializerMethodResourceRelatedField(
         many=True, read_only=True, source="roles", method_name="get_roles"
     )
+    role = serializers.SerializerMethodField()
+
+    def get_role(self, instance) -> str:
+        tenant_id = self.context.get("tenant_id")
+        if not tenant_id:
+            request = self.context.get("request")
+            tenant_id = getattr(request, "tenant_id", None)
+        if tenant_id:
+            from api.db_router import MainRouter
+            from api.models import Membership
+            mem = Membership.objects.using(MainRouter.admin_db).filter(user=instance, tenant_id=tenant_id).first()
+            if mem and mem.role == Membership.RoleChoices.OWNER:
+                return "Owner"
+            role_obj = instance.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id).first()
+            if role_obj:
+                return role_obj.name
+        return "Member"
 
     class Meta:
         model = User
@@ -416,6 +440,7 @@ class UserSerializer(BaseModelSerializerV1):
             "email",
             "company_name",
             "date_joined",
+            "role",
             "memberships",
             "roles",
         ]
@@ -497,11 +522,63 @@ class UserCreateSerializer(BaseWriteSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop("password")
+        role_name = validated_data.pop("role", None)
         user = User(**validated_data)
 
         validate_password(password, user=user)
         user.set_password(password)
         user.save()
+
+        # Link to Tenant and Role if context has tenant_id
+        request = self.context.get("request")
+        tenant_id = getattr(request, "tenant_id", None) if request else None
+        if not tenant_id and request and getattr(request, "auth", None) and hasattr(request.auth, "get"):
+            tenant_id = request.auth.get("tenant_id")
+
+        if tenant_id:
+            from api.models import Membership, Role, UserRoleRelationship
+            from api.db_router import MainRouter
+
+            is_admin = (role_name or "").lower() == "admin"
+            Membership.objects.using(MainRouter.admin_db).update_or_create(
+                user=user,
+                tenant_id=tenant_id,
+                defaults={"role": Membership.RoleChoices.OWNER if is_admin else Membership.RoleChoices.MEMBER},
+            )
+            if role_name:
+                role = Role.objects.using(MainRouter.admin_db).filter(
+                    tenant_id=tenant_id, name__iexact=role_name
+                ).first() or Role.objects.using(MainRouter.admin_db).filter(
+                    tenant_id=tenant_id, name__icontains=role_name
+                ).first()
+                if not role:
+                    r_lower = role_name.lower()
+                    is_adm = "admin" in r_lower or "owner" in r_lower
+                    is_auditor = (
+                        "auditor" in r_lower
+                        or "viewer" in r_lower
+                        or "read-only" in r_lower
+                        or "readonly" in r_lower
+                    )
+                    can_manage_scans = not is_auditor
+                    role = Role.objects.using(MainRouter.admin_db).create(
+                        tenant_id=tenant_id,
+                        name=role_name,
+                        unlimited_visibility=is_adm,
+                        manage_users=is_adm,
+                        manage_account=is_adm,
+                        manage_billing=is_adm,
+                        manage_providers=is_adm,
+                        manage_integrations=is_adm,
+                        manage_scans=is_adm or can_manage_scans,
+                    )
+                if role:
+                    UserRoleRelationship.objects.using(MainRouter.admin_db).update_or_create(
+                        user=user,
+                        tenant_id=tenant_id,
+                        defaults={"role": role},
+                    )
+
         return user
 
 

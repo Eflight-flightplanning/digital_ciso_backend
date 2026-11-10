@@ -6,6 +6,7 @@ Every query is filtered on the caller's tenant. Permissions (platform RBAC):
   manage_integrations  raise Jira tickets
 """
 import csv
+import io
 import json
 import os
 import threading
@@ -132,7 +133,7 @@ class RunsView(OcisBase):
             return Response({"detail": "An assessment is already running.", "running_id": running.id if running else None},
                             status=http.HTTP_409_CONFLICT)
         if RUN_IN_THREAD:
-            threading.Thread(target=services.execute_run_in_thread, args=(run.id,), daemon=True).start()
+            threading.Thread(target=services.execute_run_in_thread, args=(run.id, tid), daemon=True).start()
         else:
             services.execute_run(run.id)
         return Response({"id": run.id}, status=http.HTTP_202_ACCEPTED)
@@ -177,32 +178,39 @@ def export_rows(run, reveal):
     return rows
 
 
+def export_csv(run, reveal):
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=EXPORT_FIELDS, extrasaction="ignore")
+    writer.writeheader()
+    for row in export_rows(run, reveal):
+        writer.writerow({**row, "flags": ";".join(row["flags"])})
+    return out.getvalue()
+
+
+def export_payload(run, reveal):
+    return {
+        "benchmark": services.BENCHMARK,
+        "severity_note": services.SEVERITY_LABEL,
+        "run": run_summary(run),
+        "masked": not reveal,
+        "results": export_rows(run, reveal),
+    }
+
+
 class RunExportCsvView(OcisBase):
     def get(self, request, pk):
         run = self.run_or_404(request, pk)
-        rows = export_rows(run, self.wants_reveal(request))
         response = HttpResponse(content_type="text/csv; charset=utf-8")
         response["Content-Disposition"] = f'attachment; filename="cis-oracle-saas-run-{run.id}.csv"'
         response.write("﻿")  # Excel-friendly BOM
-        writer = csv.DictWriter(response, fieldnames=EXPORT_FIELDS, extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({**row, "flags": ";".join(row["flags"])})
+        response.write(export_csv(run, self.wants_reveal(request)))
         return response
 
 
 class RunExportJsonView(OcisBase):
     def get(self, request, pk):
         run = self.run_or_404(request, pk)
-        reveal = self.wants_reveal(request)
-        payload = {
-            "benchmark": services.BENCHMARK,
-            "severity_note": services.SEVERITY_LABEL,
-            "run": run_summary(run),
-            "masked": not reveal,
-            "results": export_rows(run, reveal),
-        }
-        response = JsonResponse(payload, json_dumps_params={"indent": 2})
+        response = JsonResponse(export_payload(run, self.wants_reveal(request)), json_dumps_params={"indent": 2})
         response["Content-Disposition"] = f'attachment; filename="cis-oracle-saas-run-{run.id}.json"'
         return response
 
@@ -353,8 +361,9 @@ def history_for(tenant_id, kind, usernames):
 
 def identity_data(f, reveal, tickets, remediations):
     details = f.details if reveal else mask(f.details)
-    if not reveal and details.get("person_number"):
-        details["person_number"] = f"***{str(details['person_number'])[-4:]}"
+    for k in ("person_number", "owner"):  # person numbers: last 4 only unless revealed
+        if not reveal and details.get(k):
+            details[k] = f"***{str(details[k])[-4:]}"
     rem = remediations.get(f.username, [])
     executed = next((r for r in rem if r["status"] == OcisRemediation.EXECUTED), None)
     return {
@@ -399,6 +408,8 @@ class IdentitiesView(OcisBase):
             rows = [f for f in rows if f.details.get("privileged")]
         if kind == OcisIdentity.DORMANT:
             rows.sort(key=lambda f: (not f.details.get("privileged"), -(f.details.get("days_inactive") or 0)))
+        elif kind == OcisIdentity.PAYMENT:
+            rows.sort(key=lambda f: (not f.details.get("risky"), f.details.get("change") != "changed", f.username))
         elif kind == OcisIdentity.ACTIVE:
             rows.sort(key=lambda f: (not f.details.get("privileged"), f.details.get("days_inactive") if f.details.get("days_inactive") is not None else 10**6))
 
@@ -436,6 +447,17 @@ def ticket_text(f, action_request=None):
             f"(last sign-in: {d.get('last_sign_in') or 'never'}).",
             "Privileged account." if d.get("privileged") else "",
             "Required action: confirm whether the account is still needed; if not, suspend it (keeps the audit trail).",
+        ]
+    elif f.kind == OcisIdentity.PAYMENT:
+        what = {"added": "was added", "removed": "was removed", "changed": f"changed ({', '.join(d.get('fields_changed', []))})"}.get(d.get("change"), "changed")
+        summary = f"[Oracle SaaS Payments] {d.get('setup', 'Payment setup')} {d.get('change', 'changed')}: {f.username}"
+        before = d.get("before") or {}
+        lines = [
+            f"CIS Oracle SaaS 4.2.1: {d.get('setup', 'payment setup')} '{d.get('label') or ''}' for '{f.username}' {what} since the previous assessment run.",
+            f"Now: bank {d.get('bank') or '-'}, account {d.get('last4') or '-'}." + (f" Before: bank {before.get('bank') or '-'}, account {before.get('last4') or '-'}." if before else ""),
+            f"Last updated by {d.get('by')} on {d.get('updated')}." if d.get("by") else "",
+            "The person holds roles that can change payment setups." if d.get("owner_holds_payment_role") else "",
+            "Required action: confirm the change was requested and authorised; if not, restore the previous payment setup and review the payments made since.",
         ]
     else:
         roles = ", ".join(d.get("payroll_roles", []) + d.get("timecard_roles", []))

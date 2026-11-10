@@ -25,6 +25,9 @@ from .perms import HasPermissions, Permissions, resolve_tenant
 from . import reports
 from .aggregate import basis as _basis
 from .catalog import manual_category, FRAMEWORK_FILES, get_control, list_frameworks, load_framework
+from api.client_reports import record_file
+from api.client_storage import get_storage
+
 from .hooks import start_assessment
 from .manual import finalize_controls, manual_state_for
 from .models import (
@@ -392,16 +395,18 @@ class EvidenceView(NcaBase):
                 return Response({"detail": f"File type {ext or '(none)'} not allowed."}, status=400)
             if f.size > MAX_EVIDENCE_BYTES:
                 return Response({"detail": "File exceeds 10 MB."}, status=400)
-            base = Path(getattr(settings, "NCA_EVIDENCE_DIR", Path(settings.BASE_DIR) / "nca_evidence")) / str(tid)
-            base.mkdir(parents=True, exist_ok=True)
             safe = re.sub(r"[^A-Za-z0-9._-]", "_", Path(f.name).name)[:100]
-            dest = base / f"{ev.id}_{safe}"
             h = hashlib.sha256()
-            with open(dest, "wb") as out:
+
+            def hashed_chunks():
                 for chunk in f.chunks():
                     h.update(chunk)
-                    out.write(chunk)
-            ev.file_name, ev.file_path, ev.file_sha256 = safe, str(dest), h.hexdigest()
+                    yield chunk
+
+            key = get_storage().save(tid, "evidence", safe, hashed_chunks())
+            ev.file_name, ev.file_path, ev.file_sha256 = safe, key, h.hexdigest()
+            record_file(tid, key, name=safe, size=f.size, sha256=h.hexdigest(), content_type=f.content_type or "",
+                        category="evidence", by=self.actor(request))
         ev.save()
         _audit(request, tid, "evidence.submit", f"{framework}:{control_id}", {"evidence_id": str(ev.id), "title": title})
         _refresh_latest(tid)
@@ -412,9 +417,10 @@ class EvidenceDownloadView(NcaBase):
     def get(self, request, evidence_id):
         tid = self.tenant_id(request)
         ev = NcaManualEvidence.objects.filter(pk=evidence_id, tenant_id=tid).first()
-        if not ev or not ev.file_path or not os.path.isfile(ev.file_path):
+        storage = get_storage()
+        if not ev or not ev.file_path or not storage.exists(tid, ev.file_path):
             return Response({"detail": "Not found."}, status=404)
-        resp = FileResponse(open(ev.file_path, "rb"), as_attachment=True, filename=ev.file_name)
+        resp = FileResponse(storage.open(tid, ev.file_path), as_attachment=True, filename=ev.file_name)
         resp["X-Content-Type-Options"] = "nosniff"
         return resp
 

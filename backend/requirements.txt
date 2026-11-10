@@ -316,6 +316,7 @@ cron-descriptor==1.4.5
 crowdstrike-falconpy==1.6.5
     # via cartography
 cryptography==50.0.0
+segno==1.6.6
     # via
     #   backend (pyproject.toml)
     #   adal

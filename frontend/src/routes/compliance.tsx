@@ -14,7 +14,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { NcaWorkspace, ControlDrawer, CloseGlyph, REASON_TEXT, BASIS_LABEL, useNcaOverview, NCA_FRAMEWORK_LABEL } from "@/components/compliance/NcaWorkspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ncaDownload, ncaFetch, ncaPost, qs } from "@/lib/nca-api";
-import { useCompliance, useComplianceRequirements, useProviders, useResources } from "@/hooks/use-api";
+import { useCompliance, useComplianceRequirements, useProviders, useResources, useCurrentUser } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/compliance")({
   component: CompliancePage,
@@ -142,6 +142,50 @@ function FleetCircularGauge({ score }: { score: number }) {
 }
 
 function CompliancePage() {
+  const { data: currentUserRaw } = useCurrentUser();
+  const currentUser = (currentUserRaw as Record<string, any>) || {};
+  const userRoleStr = String(
+    currentUser.role ||
+    (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("auth_user") || "{}")?.role : "") ||
+    ""
+  ).toLowerCase();
+  const isAdmin =
+    Boolean(currentUser.is_superuser) ||
+    Boolean(currentUser.is_staff) ||
+    userRoleStr.includes("admin") ||
+    userRoleStr.includes("owner");
+
+  // Dynamic Role Provider & Framework Resolution
+  const allowedProviderTypes = useMemo(() => {
+    if (isAdmin || userRoleStr.includes("all")) return null;
+    const detected: string[] = [];
+    if (userRoleStr.includes("azure")) detected.push("azure");
+    if (userRoleStr.includes("oci") || userRoleStr.includes("oraclecloud")) detected.push("oraclecloud");
+    if (userRoleStr.includes("oracle_saas") || userRoleStr.includes("saas") || userRoleStr.includes("fusion")) detected.push("oracle_saas");
+    if (userRoleStr.includes("aws")) detected.push("aws");
+    if (userRoleStr.includes("gcp") || userRoleStr.includes("google")) detected.push("gcp");
+    if (userRoleStr.includes("kubernetes") || userRoleStr.includes("k8s")) detected.push("kubernetes");
+    return detected.length > 0 ? detected : null;
+  }, [isAdmin, userRoleStr]);
+
+  const allowedFrameworkScope = useMemo(() => {
+    if (isAdmin || userRoleStr.includes("all")) return null;
+    if (userRoleStr.includes("cis")) return "cis";
+    if (userRoleStr.includes("nca") || userRoleStr.includes("ecc") || userRoleStr.includes("ccc")) return "nca";
+    if (userRoleStr.includes("soc2") || userRoleStr.includes("soc")) return "soc2";
+    if (userRoleStr.includes("pci")) return "pci";
+    if (userRoleStr.includes("iso")) return "iso";
+    if (userRoleStr.includes("hipaa")) return "hipaa";
+    if (userRoleStr.includes("nist")) return "nist";
+    return null;
+  }, [isAdmin, userRoleStr]);
+
+  const canViewNca = useMemo(() => {
+    const frameworkOk = !allowedFrameworkScope || allowedFrameworkScope === "nca";
+    const cloudOk = !allowedProviderTypes || allowedProviderTypes.includes("oraclecloud");
+    return frameworkOk && cloudOk;
+  }, [allowedFrameworkScope, allowedProviderTypes]);
+
   const { data: providersData } = useProviders();
   const { data: resourcesData } = useResources();
 
@@ -171,14 +215,27 @@ function CompliancePage() {
     list.forEach((p) => {
       const value = String(p.provider || "").toLowerCase();
       if (!value || seen.has(value)) return;
+      if (allowedProviderTypes && !allowedProviderTypes.includes(value)) return;
       seen.set(value, { value, alias: String(p.alias || p.name || providerDisplayName(value)) });
     });
     return Array.from(seen.values());
-  }, [providersData]);
+  }, [providersData, allowedProviderTypes]);
 
   // Real backend requires either a scan_id or a provider filter — no "give me everything" mode.
   const complianceParams = useMemo(() => {
     const params: Record<string, string> = {};
+    if (allowedProviderTypes && allowedProviderTypes.length === 1) {
+      params["filter[provider_type]"] = allowedProviderTypes[0];
+      return params;
+    }
+    if (allowedProviderTypes && allowedProviderTypes.length > 1) {
+      if (selectedProvider !== "ALL" && allowedProviderTypes.includes(selectedProvider)) {
+        params["filter[provider_type]"] = selectedProvider;
+      } else {
+        params["filter[provider_type__in]"] = allowedProviderTypes.join(",");
+      }
+      return params;
+    }
     if (selectedProvider === "ALL") {
       if (connectedProviders.length === 0) return undefined;
       params["filter[provider_type__in]"] = connectedProviders.map((p) => p.value).join(",");
@@ -186,7 +243,7 @@ function CompliancePage() {
       params["filter[provider_type]"] = selectedProvider;
     }
     return params;
-  }, [selectedProvider, connectedProviders]);
+  }, [selectedProvider, connectedProviders, allowedProviderTypes]);
 
   const { data: complianceData, isLoading: complianceLoading, isFetching: complianceFetching } =
     useCompliance(complianceParams);
@@ -276,9 +333,14 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
     });
 
     // NCA ECC/CCC on OCI come from the read-only NCA assessment and are listed like every other framework.
+    const hasOciConnected = connectedProviders.some(
+      (p) => p.value === "oraclecloud" || p.value === "oci"
+    );
     const byFramework = (ncaOverview?.latest?.summary?.by_framework ?? {}) as Record<string, any>;
     const ncaCards: FrameworkCardData[] =
-      selectedProvider === "ALL" || selectedProvider === "oraclecloud"
+      canViewNca &&
+      hasOciConnected &&
+      (selectedProvider === "ALL" || selectedProvider === "oraclecloud")
         ? Object.entries(byFramework).map(([key, d]) => {
             const ctl = {
               passed: d.controls.PASS,
@@ -318,8 +380,29 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
             };
           })
         : [];
-    return [...scanCards, ...ncaCards];
-  }, [complianceData, ncaOverview, selectedProvider]);
+    let allFrameworks = [...scanCards, ...ncaCards];
+    if (allowedProviderTypes) {
+      allFrameworks = allFrameworks.filter((f) => {
+        const target = (f.providerTarget || "").toLowerCase();
+        const cid = f.complianceId.toLowerCase();
+        const fname = f.name.toLowerCase();
+        return allowedProviderTypes.some(
+          (p) => target.includes(p) || cid.includes(p) || fname.includes(p) ||
+                 (p === "oraclecloud" && (target === "oci" || target.includes("oracle"))) ||
+                 (p === "azure" && target === "azure") ||
+                 (p === "oracle_saas" && (target.includes("saas") || target.includes("fusion") || cid.includes("saas")))
+        );
+      });
+    }
+    if (allowedFrameworkScope) {
+      allFrameworks = allFrameworks.filter((f) => {
+        const cid = f.complianceId.toLowerCase();
+        const fname = f.name.toLowerCase();
+        return cid.includes(allowedFrameworkScope) || fname.includes(allowedFrameworkScope);
+      });
+    }
+    return allFrameworks;
+  }, [complianceData, ncaOverview, selectedProvider, connectedProviders, allowedProviderTypes, allowedFrameworkScope, canViewNca]);
 
   const fleetScore = useMemo(() => {
     const totals = dynamicFrameworks.reduce(
@@ -450,13 +533,15 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
       subtitle="Multi-framework regulatory alignment computed from real scan results"
       actions={
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setNcaFramework("nca_ecc_2.2024")}
-            className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span>NCA Assessment Workspace</span>
-          </button>
+          {canViewNca && (
+            <button
+              onClick={() => setNcaFramework("nca_ecc_2.2024")}
+              className="inline-flex items-center gap-2 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 hover:border-primary/50 transition-all shadow-sm active:scale-95"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span>NCA Assessment Workspace</span>
+            </button>
+          )}
           <button
             onClick={handleExportEvidence}
             disabled={dynamicFrameworks.length === 0}
@@ -543,7 +628,7 @@ function formatFrameworkDisplayName(framework: string, complianceId: string): st
           ))}
         </div>
 
-        {(selectedProvider === "ALL" || selectedProvider === "oraclecloud") && !ncaLoading && (ncaError || !ncaOverview?.latest) && (
+        {canViewNca && (selectedProvider === "ALL" || selectedProvider === "oraclecloud") && !ncaLoading && (ncaError || !ncaOverview?.latest) && (
           <div className="rounded-2xl border border-border/80 bg-surface/90 p-4 text-xs space-y-1">
             <p className="font-semibold text-foreground">NCA ECC &amp; CCC assessment is not showing</p>
             {ncaError ? (

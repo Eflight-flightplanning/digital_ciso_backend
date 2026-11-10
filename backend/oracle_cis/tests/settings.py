@@ -1,7 +1,10 @@
 """Minimal Django settings so the oracle_cis tests run on in-memory SQLite without PostgreSQL / the full platform.
 Run:  python -m django test oracle_cis --settings=oracle_cis.tests.settings
 """
+import tempfile
+
 SECRET_KEY = "oracle-cis-tests"
+CLIENT_FILES_DIR = tempfile.mkdtemp(prefix="oracle-cis-tests-")
 DEBUG = False
 USE_TZ = True
 ALLOWED_HOSTS = ["*"]

@@ -218,6 +218,7 @@ export default function Identities() {
           ["dormant", "Dormant accounts", d?.counts.dormant],
           ["active", "Active users", d?.counts.active],
           ["ghost", "Potential ghost employees", d?.counts.ghost],
+          ["payment", "Payment setup changes", d?.counts.payment],
         ] as const).map(([k, label, n]) => (
           <button
             key={k}
@@ -254,7 +255,7 @@ export default function Identities() {
             </label>
           </>
         )}
-        {kind !== "ghost" && (
+        {(kind === "dormant" || kind === "active") && (
           <label
             className="flex items-center gap-2 pb-2 text-sm"
             title="Only accounts that hold an identity domain administrator role (for example Identity Domain Administrator or Security Administrator)"
@@ -273,15 +274,23 @@ export default function Identities() {
           <>
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm">
-                {kind === "dormant" ? "Dormant accounts (CIS 1.14)" : kind === "active" ? "Active users" : "Potential ghost employees (CIS 5.3.7)"}
+                {kind === "dormant"
+                  ? "Dormant accounts (CIS 1.14)"
+                  : kind === "active"
+                  ? "Active users"
+                  : kind === "payment"
+                  ? "Payment setup changes since the previous run (CIS 4.2.1)"
+                  : "Potential ghost employees (CIS 5.3.7)"}
               </h2>
-              <span className="text-sm text-oc-ink-soft">{d.total.toLocaleString()} accounts</span>
+              <span className="text-sm text-oc-ink-soft">{d.total.toLocaleString()} {kind === "payment" ? "changes" : "accounts"}</span>
             </div>
             <p className="mb-4 max-w-[820px] text-sm text-oc-ink-soft">
               {kind === "dormant"
                 ? "Active accounts nobody has signed in to for 90 days or more. Unused accounts can be taken over without anyone noticing: suspend the ones no longer needed."
                 : kind === "active"
                 ? "Accounts that signed in within the last 90 days. Shown for completeness: these are in use and need no action unless they also appear in another finding."
+                : kind === "payment"
+                ? "Employee payment methods and supplier bank accounts that were added, changed or removed since the previous assessment run (today's snapshot compared with the last one). A changed bank account can redirect pay or supplier payments: confirm each change was requested and authorised. New payment methods alone (new hires) are listed for review; account numbers show only the last 4 characters."
                 : "Users who can both hire a person and pay them (payroll or time-card approval). One person with both could create a fake employee and collect the pay. This is a risk, not proof of fraud: revoke one side of the access, or document why both are needed and have the payroll reviewed."}
             </p>
             <div className="overflow-x-auto">
@@ -289,7 +298,14 @@ export default function Identities() {
                 <thead>
                   <tr className="border-b border-oc-line text-xs font-medium text-oc-ink-soft">
                     <th className="py-2 pr-3 font-medium">Account</th>
-                    {kind !== "ghost" ? (
+                    {kind === "payment" ? (
+                      <>
+                        <th className="py-2 pr-3 font-medium">Change</th>
+                        <th className="py-2 pr-3 font-medium">Now</th>
+                        <th className="py-2 pr-3 font-medium">Before</th>
+                        <th className="py-2 pr-3 font-medium">Last updated</th>
+                      </>
+                    ) : kind !== "ghost" ? (
                       <>
                         <th className="py-2 pr-3 font-medium">Days inactive</th>
                         <th className="py-2 pr-3 font-medium">Last sign-in</th>
@@ -312,8 +328,26 @@ export default function Identities() {
                       <td className="py-3 pr-3">
                         <span className="font-semibold">{row.username}</span>
                         {row.details.privileged && <span className="badge ml-2">Privileged</span>}
+                        {kind === "payment" && <span className="block text-xs text-oc-ink-soft">{row.details.setup}</span>}
                       </td>
-                      {kind !== "ghost" ? (
+                      {kind === "payment" ? (
+                        <>
+                          <td className="py-3 pr-3">
+                            <span className={`badge ${row.details.risky ? "!text-[var(--chip-fail-ink)]" : ""}`}>
+                              {row.details.change === "changed" ? `Changed: ${(row.details.fields_changed ?? []).join(", ")}` : row.details.change === "added" ? "Added" : "Removed"}
+                            </span>
+                            {row.details.owner_holds_payment_role && <span className="badge mt-1">Holds payment-setup roles</span>}
+                          </td>
+                          <td className="py-3 pr-3 text-xs">{row.details.change === "removed" ? "-" : `${row.details.bank ?? "-"} ${row.details.last4 ?? ""}`}</td>
+                          <td className="py-3 pr-3 text-xs text-oc-ink-soft">
+                            {row.details.before ? `${row.details.before.bank ?? "-"} ${row.details.before.last4 ?? ""}` : row.details.change === "removed" ? `${row.details.bank ?? "-"} ${row.details.last4 ?? ""}` : "-"}
+                          </td>
+                          <td className="py-3 pr-3 text-xs text-oc-ink-soft">
+                            {row.details.updated ?? "-"}
+                            {row.details.by ? ` by ${row.details.by}` : ""}
+                          </td>
+                        </>
+                      ) : kind !== "ghost" ? (
                         <>
                           <td className="py-3 pr-3 font-display text-sm text-oc-ink">{row.details.days_inactive ?? "-"}</td>
                           <td className="py-3 pr-3 text-oc-ink-soft">{row.details.last_sign_in ?? "never"}</td>

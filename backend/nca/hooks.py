@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 
 from django.db import connection
 
+from api.client_reports import save_assessment
+from api.tenant_scope import tenant_scope
+
 from .catalog import FRAMEWORK_FILES
 from .engine import run_assessment
 from .models import NcaAssessment
@@ -36,8 +39,12 @@ def start_assessment(tenant_id, frameworks=None, provider_id=None, triggered_by=
 
     def _bg():
         try:
-            run_assessment(frameworks=frameworks, tenant_id=tenant_id, triggered_by=triggered_by, assessment=a,
-                           provider_id=provider_id)
+            with tenant_scope(tenant_id):
+                run_assessment(frameworks=frameworks, tenant_id=tenant_id, triggered_by=triggered_by, assessment=a,
+                               provider_id=provider_id)
+                a.refresh_from_db()
+                if a.status == NcaAssessment.Status.COMPLETED:
+                    save_assessment(a)
         except Exception:  # noqa: BLE001
             logger.exception("Background NCA assessment crashed")
         finally:

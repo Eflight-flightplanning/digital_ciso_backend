@@ -1,6 +1,6 @@
 from rest_framework.parsers import JSONParser
 from rest_framework_json_api.parsers import JSONParser as JSONAPIParser
-from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework.exceptions import ValidationError, AuthenticationFailed, PermissionDenied
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 import fnmatch
@@ -133,7 +133,13 @@ from api.models import (
     UserRoleRelationship,
 )
 from api.pagination import ComplianceOverviewPagination
-from api.rbac.permissions import HasPermissions, Permissions, get_providers, get_role
+from api.rbac.permissions import (
+    HasPermissions,
+    Permissions,
+    get_providers,
+    get_role,
+    is_admin_or_owner,
+)
 from api.renderers import APIJSONRenderer, PlainTextRenderer
 from api.rls import Tenant
 from api.utils import (
@@ -426,7 +432,7 @@ class CustomTokenObtainView(GenericAPIView):
                 )
 
             attrs = dict(val_data)
-            refresh_value = attrs.pop("refresh", None)
+            refresh_value = attrs.get("refresh")
             response = Response(
                 data={"type": "tokens", "attributes": attrs},
                 status=status.HTTP_200_OK,
@@ -512,7 +518,7 @@ class CustomTokenRefreshView(GenericAPIView):
             return response
 
         attrs = dict(serializer.validated_data)
-        rotated = attrs.pop("refresh", None)
+        rotated = attrs.get("refresh")
         response = Response(
             data={"type": "tokens-refresh", "attributes": attrs},
             status=status.HTTP_200_OK,
@@ -1021,6 +1027,20 @@ class UserViewSet(BaseUserViewset):
         return Response(data=UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
+        if not request.user or not request.user.is_authenticated:
+            raise PermissionDenied("Authentication required to remove users.")
+
+        if not getattr(request.user, "is_superuser", False) and not getattr(request.user, "is_staff", False):
+            tenant_id = getattr(request, "tenant_id", None)
+            role = None
+            if tenant_id:
+                try:
+                    role = get_role(request.user, tenant_id)
+                except Exception:
+                    pass
+            if not role or not getattr(role, Permissions.MANAGE_USERS.value, False):
+                raise PermissionDenied("You do not have permission to remove users.")
+
         user_instance = self.get_object()
         if request.user.is_authenticated and user_instance.email.lower() == request.user.email.lower():
             raise ValidationError("You cannot remove your own active administrator account while logged in.")
@@ -1684,12 +1704,14 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
 
     def get_queryset(self):
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        if user_roles.unlimited_visibility:
-            # User has unlimited visibility, return all providers
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
+            # Administrators have full visibility over all providers
             queryset = Provider.objects.filter(tenant_id=self.request.tenant_id)
         else:
-            # User lacks permission, filter providers based on provider groups associated with the role
+            # Filter providers based on dynamically detected provider scope or provider groups
             queryset = get_providers(user_roles)
+
         return queryset.select_related("secret").prefetch_related("provider_groups")
 
     def get_serializer_class(self):
@@ -1784,8 +1806,10 @@ class ProviderViewSet(DisablePaginationMixin, BaseRLSViewSet):
 
             def _bg_cleanup():
                 try:
+                    from api.tenant_scope import tenant_scope
                     from tasks.jobs.deletion import delete_provider
-                    delete_provider(tenant_id, str(pk))
+                    with tenant_scope(tenant_id):
+                        delete_provider(tenant_id, str(pk))
                 except Exception:
                     pass
 
@@ -2023,12 +2047,14 @@ class ScanViewSet(BaseRLSViewSet):
 
     def get_queryset(self):
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        if user_roles.unlimited_visibility:
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
             # User has unlimited visibility, return all scans
             queryset = Scan.objects.filter(tenant_id=self.request.tenant_id)
         else:
-            # User lacks permission, filter providers based on provider groups associated with the role
+            # Filter scans based on dynamically detected provider scope or provider groups
             queryset = Scan.objects.filter(provider__in=get_providers(user_roles))
+
         return queryset.select_related("provider", "task")
 
     def get_serializer_class(self):
@@ -2976,9 +3002,9 @@ class AttackPathsScanViewSet(BaseRLSViewSet):
             provider__provider__iexact="oracle_saas"
         )
 
-        if user_roles.unlimited_visibility:
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
             queryset = base_queryset
-
         else:
             queryset = base_queryset.filter(provider__in=get_providers(user_roles))
 
@@ -3333,11 +3359,12 @@ class ResourceViewSet(PaginateByPkMixin, BaseRLSViewSet):
 
     def get_queryset(self):
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        if user_roles.unlimited_visibility:
-            # User has unlimited visibility, return all scans
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
+            # User has unlimited visibility, return all resources
             queryset = Resource.all_objects.filter(tenant_id=self.request.tenant_id)
         else:
-            # User lacks permission, filter providers based on provider groups associated with the role
+            # Scoped user: filter resources based on dynamically detected provider scope
             queryset = Resource.all_objects.filter(
                 tenant_id=self.request.tenant_id, provider__in=get_providers(user_roles)
             )
@@ -3955,13 +3982,16 @@ class FindingViewSet(PaginateByPkMixin, BaseRLSViewSet):
     def get_queryset(self):
         tenant_id = self.request.tenant_id
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        if user_roles.unlimited_visibility:
+        role_name = (getattr(user_roles, "name", "") or "").lower()
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
             # User has unlimited visibility, return all findings
             queryset = Finding.all_objects.filter(tenant_id=tenant_id)
         else:
-            # User lacks permission, filter findings based on provider groups associated with the role
+            # Scoped user: filter findings based on dynamically detected provider scope
             queryset = Finding.all_objects.filter(
-                scan__provider__in=get_providers(user_roles)
+                tenant_id=tenant_id,
+                scan__provider__in=get_providers(user_roles),
             )
 
         search_value = self.request.query_params.get("filter[search]", None)
@@ -4840,6 +4870,7 @@ class ComplianceOverviewViewSet(
             return ComplianceRequirementOverview.objects.none()
 
         role = get_role(self.request.user, self.request.tenant_id)
+        role_name = (getattr(role, "name", "") or "").lower()
         unlimited_visibility = getattr(
             role, Permissions.UNLIMITED_VISIBILITY.value, False
         )
@@ -4848,10 +4879,43 @@ class ComplianceOverviewViewSet(
             tenant_id=self.request.tenant_id
         )
 
-        if unlimited_visibility:
-            return base_queryset
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or unlimited_visibility
+        if is_admin:
+            queryset = base_queryset
+        else:
+            queryset = base_queryset.filter(scan__provider__in=get_providers(role))
 
-        return base_queryset.filter(scan__provider__in=get_providers(role))
+        if not is_admin:
+            if "cis" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="cis") | Q(compliance_id__icontains="cis")
+                )
+            elif "nca" in role_name or "ecc" in role_name or "ccc" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="nca") | Q(framework__icontains="ecc") | Q(framework__icontains="ccc") |
+                    Q(compliance_id__icontains="nca") | Q(compliance_id__icontains="ecc")
+                )
+            elif "soc2" in role_name or "soc 2" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="soc") | Q(compliance_id__icontains="soc")
+                )
+            elif "pci" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="pci") | Q(compliance_id__icontains="pci")
+                )
+            elif "iso" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="iso") | Q(compliance_id__icontains="iso")
+                )
+            elif "hipaa" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="hipaa") | Q(compliance_id__icontains="hipaa")
+                )
+            elif "nist" in role_name:
+                queryset = queryset.filter(
+                    Q(framework__icontains="nist") | Q(compliance_id__icontains="nist")
+                )
+        return queryset
 
     def get_serializer_class(self):
         if hasattr(self, "response_serializer_class"):
@@ -4873,6 +4937,7 @@ class ComplianceOverviewViewSet(
     def _compliance_summaries_queryset(self, scan_id):
         """Return pre-aggregated summaries constrained by RBAC visibility."""
         role = get_role(self.request.user, self.request.tenant_id)
+        role_name = (getattr(role, "name", "") or "").lower()
         unlimited_visibility = getattr(
             role, Permissions.UNLIMITED_VISIBILITY.value, False
         )
@@ -4881,11 +4946,38 @@ class ComplianceOverviewViewSet(
             scan_id=scan_id,
         )
 
-        if not unlimited_visibility:
-            providers = Provider.all_objects.filter(
-                provider_groups__in=role.provider_groups.all()
-            ).distinct()
-            summaries = summaries.filter(scan__provider__in=providers)
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or unlimited_visibility
+        if not is_admin:
+            summaries = summaries.filter(scan__provider__in=get_providers(role))
+            if "cis" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="cis") | Q(compliance_id__icontains="cis")
+                )
+            elif "nca" in role_name or "ecc" in role_name or "ccc" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="nca") | Q(framework__icontains="ecc") | Q(framework__icontains="ccc") |
+                    Q(compliance_id__icontains="nca") | Q(compliance_id__icontains="ecc")
+                )
+            elif "soc2" in role_name or "soc 2" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="soc") | Q(compliance_id__icontains="soc")
+                )
+            elif "pci" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="pci") | Q(compliance_id__icontains="pci")
+                )
+            elif "iso" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="iso") | Q(compliance_id__icontains="iso")
+                )
+            elif "hipaa" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="hipaa") | Q(compliance_id__icontains="hipaa")
+                )
+            elif "nist" in role_name:
+                summaries = summaries.filter(
+                    Q(framework__icontains="nist") | Q(compliance_id__icontains="nist")
+                )
 
         return summaries
 
@@ -4922,13 +5014,23 @@ class ComplianceOverviewViewSet(
 
     def _latest_scan_ids_for_provider_filters(self):
         role = get_role(self.request.user, self.request.tenant_id)
+        role_name = (getattr(role, "name", "") or "").lower()
         scans = Scan.all_objects.filter(
             tenant_id=self.request.tenant_id,
             state=StateChoices.COMPLETED,
         )
 
-        if not getattr(role, Permissions.UNLIMITED_VISIBILITY.value, False):
-            scans = scans.filter(provider__in=get_providers(role))
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(role, Permissions.UNLIMITED_VISIBILITY.value, False)
+        if is_admin:
+            pass
+        else:
+            scoped_scans = scans.filter(provider__in=get_providers(role))
+            if not scoped_scans.exists():
+                scoped_scans = Scan.all_objects.filter(
+                    tenant_id=self.request.tenant_id,
+                    provider__in=get_providers(role),
+                )
+            scans = scoped_scans
 
         provider_filters = self._extract_provider_filters_from_params(
             validate_uuids=True,
@@ -5591,10 +5693,13 @@ class OverviewViewSet(ProviderFilterParamsMixin, BaseRLSViewSet):
 
     def get_queryset(self):
         role = get_role(self.request.user, self.request.tenant_id)
-        providers = get_providers(role)
-
-        if not role.unlimited_visibility:
-            self.allowed_providers = providers
+        role_name = (getattr(role, "name", "") or "").lower()
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(role, "unlimited_visibility", False)
+        if is_admin:
+            # Administrators see all providers and summaries
+            pass
+        else:
+            self.allowed_providers = get_providers(role)
 
         tenant_id = self.request.tenant_id
 
@@ -6822,13 +6927,16 @@ class IntegrationJiraViewSet(BaseRLSViewSet):
     def get_queryset(self):
         tenant_id = self.request.tenant_id
         user_roles = get_role(self.request.user, self.request.tenant_id)
-        if user_roles.unlimited_visibility:
+        role_name = (getattr(user_roles, "name", "") or "").lower()
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(user_roles, "unlimited_visibility", False)
+        if is_admin:
             # User has unlimited visibility, return all findings
             queryset = Finding.all_objects.filter(tenant_id=tenant_id)
         else:
-            # User lacks permission, filter findings based on provider groups associated with the role
+            # Scoped user: filter findings based on dynamically detected provider scope
             queryset = Finding.all_objects.filter(
-                scan__provider__in=get_providers(user_roles)
+                tenant_id=tenant_id,
+                scan__provider__in=get_providers(user_roles),
             )
 
         return queryset
@@ -7565,9 +7673,13 @@ class FindingGroupViewSet(JsonApiFilterMixin, BaseRLSViewSet):
         """Get the base FindingGroupDailySummary queryset with RLS filtering."""
         tenant_id = self.request.tenant_id
         role = get_role(self.request.user, self.request.tenant_id)
+        role_name = (getattr(role, "name", "") or "").lower()
         queryset = FindingGroupDailySummary.objects.filter(tenant_id=tenant_id)
 
-        if not role.unlimited_visibility:
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(role, "unlimited_visibility", False)
+        if is_admin:
+            pass
+        else:
             queryset = queryset.filter(provider__in=get_providers(role))
 
         return queryset
@@ -7575,13 +7687,15 @@ class FindingGroupViewSet(JsonApiFilterMixin, BaseRLSViewSet):
     def _get_finding_queryset(self):
         """Get the Finding queryset for resources drill-down (with RBAC)."""
         role = get_role(self.request.user, self.request.tenant_id)
-        providers = get_providers(role)
-
         tenant_id = self.request.tenant_id
         queryset = Finding.all_objects.filter(tenant_id=tenant_id)
 
         # Apply RBAC provider filtering
-        if not role.unlimited_visibility:
+        is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(role, "unlimited_visibility", False)
+        if is_admin:
+            pass
+        else:
+            providers = get_providers(role)
             queryset = queryset.filter(scan__provider_id__in=providers)
 
         return queryset
@@ -7891,7 +8005,12 @@ class FindingGroupViewSet(JsonApiFilterMixin, BaseRLSViewSet):
             )
             # Scope to the user's providers, mirroring get_queryset(), so titles
             # are read only from providers the user can see.
-            if not role.unlimited_visibility:
+            is_admin = is_admin_or_owner(self.request.user, self.request.tenant_id) or getattr(role, "unlimited_visibility", False)
+            if is_admin:
+                pass
+            elif "azure" in (getattr(role, "name", "") or "").lower():
+                summaries = summaries.filter(provider__provider__iexact="azure")
+            elif not role.unlimited_visibility:
                 summaries = summaries.filter(provider__in=get_providers(role))
             metadata_by_check = {
                 item["check_id"]: item
@@ -8937,6 +9056,22 @@ class RemediationPlaybookViewSet(BaseRLSViewSet):
     ordering_fields = ["inserted_at", "approved_at", "executed_at"]
     ordering = ["-inserted_at"]
 
+    def _ensure_can_modify(self, request, action_name="modify"):
+        if not request.user or not request.user.is_authenticated:
+            raise PermissionDenied(f"Authentication required to {action_name} remediation playbooks.")
+        if getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False):
+            return
+        tenant_id = getattr(request, "tenant_id", None)
+        if tenant_id:
+            try:
+                role = get_role(request.user, tenant_id)
+                if not getattr(role, Permissions.MANAGE_SCANS.value, False) and not getattr(role, Permissions.MANAGE_PROVIDERS.value, False):
+                    raise PermissionDenied(f"Read-only accounts cannot {action_name} remediation playbooks.")
+            except PermissionDenied:
+                raise
+            except Exception:
+                pass
+
     @extend_schema(
         summary="Approve remediation playbook for execution (Human-In-The-Loop)",
         description="Authorizes the Execution Agent to apply the remediation script against cloud infrastructure.",
@@ -8944,6 +9079,7 @@ class RemediationPlaybookViewSet(BaseRLSViewSet):
     )
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
+        self._ensure_can_modify(request, "approve")
         playbook = self.get_object()
         from django.utils import timezone as django_tz
 
@@ -8966,6 +9102,7 @@ class RemediationPlaybookViewSet(BaseRLSViewSet):
     )
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
+        self._ensure_can_modify(request, "reject")
         playbook = self.get_object()
         user = request.user if request.user.is_authenticated else None
         reason = request.data.get("reason", "Rejected by administrator during human review.")
@@ -8986,6 +9123,7 @@ class RemediationPlaybookViewSet(BaseRLSViewSet):
     )
     @action(detail=True, methods=["post"], url_path="execute")
     def execute(self, request, pk=None):
+        self._ensure_can_modify(request, "execute")
         playbook = self.get_object()
         from ai.execution_agent import execution_agent, ExecutionPermissionError
 

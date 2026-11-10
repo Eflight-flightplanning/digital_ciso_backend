@@ -86,7 +86,12 @@ export const authStore = {
     otp?: string,
     providedName?: string,
     providedCompany?: string
-  ): Promise<{ user?: User; mfa_required?: boolean; message?: string }> {
+  ): Promise<{
+    user?: User;
+    mfa_required?: boolean;
+    mfa_setup?: { secret: string; qr_code: string };
+    message?: string;
+  }> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
 
@@ -127,14 +132,23 @@ export const authStore = {
         listeners.forEach((l) => l(currentAuth));
         return {
           mfa_required: true,
-          message: attributes.message || `Verification code sent to ${email}.`,
+          mfa_setup: attributes.mfa_setup_required
+            ? { secret: attributes.secret, qr_code: attributes.qr_code }
+            : undefined,
+          message: attributes.message,
         };
       }
 
       const accessToken = attributes?.access;
+      const refreshToken = attributes?.refresh;
 
       if (!accessToken) {
         throw new Error("No access token returned by server.");
+      }
+
+      if (typeof window !== "undefined" && refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
+        sessionStorage.setItem("refresh_token", refreshToken);
       }
 
       let tokenPayload: any = {};
@@ -172,8 +186,9 @@ export const authStore = {
     email: string,
     password: string,
     name: string,
-    company_name: string
-  ): Promise<User> {
+    company_name: string,
+    invitationToken: string
+  ): Promise<void> {
     currentAuth.isLoading = true;
     listeners.forEach((l) => l(currentAuth));
 
@@ -194,7 +209,7 @@ export const authStore = {
         },
       };
 
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await fetch(`${API_BASE}/users?invitation_token=${encodeURIComponent(invitationToken)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/vnd.api+json",
@@ -220,8 +235,9 @@ export const authStore = {
         throw new Error(errDetail);
       }
 
-      // 2. Automatically log the newly registered user into their own isolated tenant
-      return (await this.signIn(email, password, undefined, name, company_name)).user!;
+      // 2. The new user signs in next, where they set up their authenticator
+      currentAuth.isLoading = false;
+      listeners.forEach((l) => l(currentAuth));
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));
@@ -233,6 +249,10 @@ export const authStore = {
     this.setUser(null, null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("auth_user");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
       // Revoke the refresh token server-side and clear its HttpOnly cookie.
       fetch(`${API_BASE}/tokens/logout`, { method: "POST", credentials: "include" }).catch(() => {});
     }

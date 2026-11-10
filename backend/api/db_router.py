@@ -2,7 +2,7 @@ from contextvars import ContextVar
 
 from django.conf import settings
 
-ALLOWED_APPS = ("django", "authtoken", "silk", "nca")
+ALLOWED_APPS = ("django", "authtoken", "silk")
 
 _read_db_alias = ContextVar("read_db_alias", default=None)
 

@@ -1,11 +1,15 @@
 """Running assessments and computing what the UI shows (counts, ordering, comparisons). Tenant-scoped."""
+import hashlib
 import json
 import logging
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
 
+from django.conf import settings
 from django.db import close_old_connections, transaction
+
+from api.tenant_scope import tenant_scope
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -15,7 +19,7 @@ from cis_checks.context import prepare
 from cis_checks.registry import load_checks, load_metadata
 
 from . import connections
-from .models import OcisIdentity, OcisResult, OcisRun, Status
+from .models import OcisIdentity, OcisResult, OcisRun, OcisSnapshot, Status
 from .status import AUTOMATED_CHECK_FAILED, REQUIRES_OTHER_ACCESS, normalize_status
 
 log = logging.getLogger(__name__)
@@ -94,7 +98,11 @@ def execute_run(run_id, api=None, fusion=None):
     run = OcisRun.objects.get(pk=run_id)
     try:
         api = api or connections.idcs_client(run.tenant_id)
-        ctx = {"fusion_client": fusion or connections.fusion_client(run.tenant_id)}
+        ctx = {
+            "fusion_client": fusion or connections.fusion_client(run.tenant_id),
+            "fingerprint_key": fingerprint_key(),
+            "snapshot_previous": previous_snapshots(run.tenant_id),
+        }
         try:
             if api.configured:
                 prepare(api, ctx)
@@ -116,6 +124,7 @@ def execute_run(run_id, api=None, fusion=None):
             _store(run, check, raw)
 
         save_identities(run, ctx)
+        save_snapshots(run, ctx)
         run.status = OcisRun.FINISHED
     except Exception as exc:
         log.exception("Oracle CIS run %s failed", run_id)
@@ -124,6 +133,10 @@ def execute_run(run_id, api=None, fusion=None):
     run.finished_at = timezone.now()
     run.counts = effective_counts(run)
     run.save(update_fields=["status", "finished_at", "counts", "error"])
+    if run.status == OcisRun.FINISHED:
+        from api.client_reports import save_oracle_run
+
+        save_oracle_run(run)
     return run
 
 
@@ -144,15 +157,44 @@ def save_identities(run, ctx):
         name = d.get("user") or ""
         rows.append(OcisIdentity(run=run, tenant_id=run.tenant_id, kind=OcisIdentity.ACTIVE, control_id="1.14", username=name,
                                  guid=guids.get(name.lower()) or "", details={k: v for k, v in d.items() if k != "user"}))
+    for c in ctx.get("payment_changes_all") or []:
+        name = c.get("owner_user") or c.get("owner") or c.get("label") or ""
+        rows.append(OcisIdentity(run=run, tenant_id=run.tenant_id, kind=OcisIdentity.PAYMENT, control_id="4.2.1", username=str(name),
+                                 details={k: v for k, v in c.items() if k not in ("hash", "key")}))
     for g in ctx.get("ghost_all") or []:
         rows.append(OcisIdentity(run=run, tenant_id=run.tenant_id, kind=OcisIdentity.GHOST, control_id="5.3.7", username=g.get("user") or "",
                                  guid=g.get("guid") or "", details={k: v for k, v in g.items() if k not in ("user", "guid")}))
     OcisIdentity.objects.bulk_create(rows, batch_size=500)
 
 
-def execute_run_in_thread(run_id):
+def fingerprint_key():
+    """Key for the payment-setup fingerprints (HMAC), derived from the server's secret key."""
+    return hashlib.sha256(b"oracle-cis-fingerprint:" + settings.SECRET_KEY.encode()).digest()
+
+
+def previous_snapshots(tenant_id):
+    """The latest snapshot of each kind for the tenant, from earlier runs: {name: data, "_taken_at": iso}."""
+    out = {}
+    for name in ("payment_methods", "bank_accounts"):
+        snap = OcisSnapshot.objects.filter(tenant_id=tenant_id, name=name).first()
+        if snap is not None:
+            out[name] = snap.data
+            if name == "payment_methods":
+                out["_taken_at"] = snap.taken_at.isoformat()
+    return out
+
+
+def save_snapshots(run, ctx):
+    """Keep this run's snapshots for the next comparison. Only kinds actually read this run are saved, so a run that
+    could not reach the pod leaves the previous snapshot in place."""
+    for name, data in (ctx.get("snapshot_current") or {}).items():
+        OcisSnapshot.objects.create(run=run, tenant_id=run.tenant_id, name=name, data=data)
+
+
+def execute_run_in_thread(run_id, tenant_id):
     try:
-        execute_run(run_id)
+        with tenant_scope(tenant_id):
+            execute_run(run_id)
     finally:
         close_old_connections()
 

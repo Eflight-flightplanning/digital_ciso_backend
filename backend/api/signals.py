@@ -1,16 +1,19 @@
+import logging
+
 from api.db_utils import delete_related_daily_task
 from api.models import (
     LighthouseProviderConfiguration,
     LighthouseTenantConfiguration,
     Membership,
     Provider,
+    Tenant,
     TenantAPIKey,
     User,
 )
 from celery import states
 from celery.signals import before_task_publish
 from config.celery import celery_app
-from django.db.models.signals import post_delete, pre_delete
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from django_celery_results.backends.database import DatabaseBackend
 
@@ -32,6 +35,29 @@ def create_task_result_on_publish(sender=None, headers=None, **kwargs):  # noqa:
 before_task_publish.connect(
     create_task_result_on_publish, dispatch_uid="create_task_result_on_publish"
 )
+
+
+@receiver(post_save, sender=Tenant)
+def create_client_storage(sender, instance, created, **kwargs):  # noqa: F841
+    # A storage problem must not stop onboarding: the container is also made on the first upload.
+    if created:
+        try:
+            from client_store.service import provision
+
+            provision(instance.id)
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("Could not create a client's storage")
+
+
+@receiver(post_delete, sender=Tenant)
+def delete_client_storage(sender, instance, **kwargs):  # noqa: F841
+    # Offboarding: the client's files, container and key go with the client.
+    from client_store.service import deprovision
+
+    try:
+        deprovision(instance.id)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("Could not delete storage for client %s", instance.id)
 
 
 @receiver(post_delete, sender=Provider)

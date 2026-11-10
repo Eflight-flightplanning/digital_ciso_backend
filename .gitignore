@@ -70,3 +70,5 @@ backend/*.sql
 # NCA assessment outputs (contain tenancy identifiers) and uploaded evidence
 docs/nca/*.json
 backend/nca_evidence/
+backend/client_files/
+backend/logs/

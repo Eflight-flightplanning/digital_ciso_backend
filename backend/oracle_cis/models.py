@@ -70,7 +70,9 @@ class OcisIdentity(models.Model):
     DORMANT = "dormant"
     ACTIVE = "active"  # signed in within the dormancy threshold (the rest of the accounts 1.14 evaluated)
     GHOST = "ghost"
-    KINDS = [(DORMANT, "Dormant account"), (ACTIVE, "Active account"), (GHOST, "Potential ghost employee")]
+    PAYMENT = "payment"  # a payment setup change detected since the previous run (4.2.1)
+    KINDS = [(DORMANT, "Dormant account"), (ACTIVE, "Active account"), (GHOST, "Potential ghost employee"),
+             (PAYMENT, "Payment setup change")]
 
     run = models.ForeignKey(OcisRun, related_name="identities", on_delete=models.CASCADE)
     tenant_id = models.UUIDField(db_index=True)
@@ -134,3 +136,38 @@ class OcisJiraTicket(models.Model):
     class Meta:
         db_table = "oracle_cis_jira_ticket"
         ordering = ["-created_at"]
+
+
+class OcisSnapshot(models.Model):
+    """A run's snapshot of something checked by outcome delta (4.2.1 payment setups), compared on the next run.
+
+    Payment snapshots hold fingerprints only: bank, last 4 characters and a keyed hash of each account, never the
+    full account number.
+    """
+
+    run = models.ForeignKey(OcisRun, related_name="snapshots", on_delete=models.CASCADE)
+    tenant_id = models.UUIDField(db_index=True)
+    name = models.CharField(max_length=40)  # payment_methods | bank_accounts
+    taken_at = models.DateTimeField(default=timezone.now)
+    data = models.JSONField(default=dict)
+
+    class Meta:
+        db_table = "oracle_cis_snapshot"
+        ordering = ["-taken_at"]
+        indexes = [models.Index(fields=["tenant_id", "name", "-taken_at"])]
+
+
+class OcisPodUser(models.Model):
+    """One user in a client's Oracle Fusion system, as last synced. Replaces real_pod_users.json."""
+
+    id = models.BigAutoField(primary_key=True)
+    tenant_id = models.UUIDField(db_index=True)
+    username = models.CharField(max_length=255)
+    position = models.PositiveIntegerField(default=0)
+    data = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "oracle_cis_pod_user"
+        ordering = ["position"]
+        constraints = [models.UniqueConstraint(fields=["tenant_id", "username"], name="oracle_cis_pod_user_once")]

@@ -26,6 +26,7 @@ function SignInPage() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaSetup, setMfaSetup] = useState<{ secret: string; qr_code: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,25 +57,12 @@ function SignInPage() {
       const res = await authStore.signIn(email, password, mfaRequired ? otp : undefined);
       if (res.mfa_required) {
         setMfaRequired(true);
+        setMfaSetup(res.mfa_setup ?? null);
       } else if (res.user) {
         navigate({ to: "/dashboard" });
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Authentication failed";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (!email || !password) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await authStore.signIn(email, password);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not resend OTP";
       setError(msg);
     } finally {
       setLoading(false);
@@ -168,7 +156,9 @@ function SignInPage() {
               </div>
               <p className={`mt-1 text-xs ${isDark ? "text-slate-400" : "text-slate-600 font-medium"}`}>
                 {mfaRequired
-                  ? `Enter the 6-digit MFA OTP sent to ${email}`
+                  ? mfaSetup
+                    ? "Scan this code with an authenticator app such as Microsoft or Google Authenticator"
+                    : "Enter the 6-digit code from your authenticator app"
                   : "Enter authorized security credentials to proceed"}
               </p>
             </div>
@@ -244,19 +234,26 @@ function SignInPage() {
                 </>
               ) : (
                 <>
+                  {mfaSetup && (
+                    <div className="flex flex-col items-center gap-2">
+                      <img
+                        src={mfaSetup.qr_code}
+                        alt="Authenticator setup QR code"
+                        className="h-44 w-44 rounded-lg bg-white p-2"
+                      />
+                      <p className={`text-[11px] ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                        Can't scan it? Enter this key in the app:
+                      </p>
+                      <code className={`break-all text-center text-[11px] font-mono ${isDark ? "text-cyan-300" : "text-slate-900"}`}>
+                        {mfaSetup.secret}
+                      </code>
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className={`font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                         6-Digit MFA Verification Code
                       </label>
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={loading}
-                        className="text-[11px] text-cyan-400 hover:underline font-semibold cursor-pointer disabled:opacity-50"
-                      >
-                        Resend Code
-                      </button>
                     </div>
                     <div className="relative">
                       <Lock className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-cyan-400" : "text-cyan-600"}`} />
@@ -278,7 +275,7 @@ function SignInPage() {
                     <div className="mt-2 text-[11px] flex justify-end">
                       <button
                         type="button"
-                        onClick={() => { setMfaRequired(false); setOtp(""); }}
+                        onClick={() => { setMfaRequired(false); setMfaSetup(null); setOtp(""); }}
                         className="text-slate-400 hover:text-white underline cursor-pointer"
                       >
                         Change Email
@@ -324,11 +321,8 @@ function SignInPage() {
           {/* Sign Up Link */}
           <div className="mt-5 text-center text-xs">
             <span className={isDark ? "text-slate-400" : "text-slate-600 font-medium"}>
-              Don't have an enterprise account?{" "}
+              Access is by invitation only.
             </span>
-            <Link to="/sign-up" className="font-bold text-primary hover:underline">
-              Register Organization
-            </Link>
           </div>
         </div>
       </main>

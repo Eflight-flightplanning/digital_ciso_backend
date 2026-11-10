@@ -55,6 +55,40 @@ class HasPermissions(BasePermission):
         )
 
 
+def is_admin_or_owner(user: User, tenant_id: str) -> bool:
+    """
+    Check if a user is an administrator or owner in the given tenant.
+    Superusers, staff, tenant owners, and users with unlimited_visibility
+    or admin/owner roles return True.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+    try:
+        from api.models import Membership
+        mem = (
+            Membership.objects.using(MainRouter.admin_db)
+            .filter(user=user, tenant_id=tenant_id)
+            .first()
+        )
+        if mem and mem.role == Membership.RoleChoices.OWNER:
+            return True
+    except Exception:
+        pass
+    try:
+        roles = list(user.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id))
+        for r in roles:
+            if getattr(r, "unlimited_visibility", False):
+                return True
+            r_name = (getattr(r, "name", "") or "").lower()
+            if "admin" in r_name or "owner" in r_name:
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def get_role(user: User, tenant_id: str) -> Role:
     """
     Retrieve the role assigned to the given user in the specified tenant.
@@ -64,6 +98,28 @@ def get_role(user: User, tenant_id: str) -> Role:
     """
     role = user.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id).first()
     if role is None:
+        from api.models import Membership
+        mem = (
+            Membership.objects.using(MainRouter.admin_db)
+            .filter(user=user, tenant_id=tenant_id)
+            .first()
+        )
+        if mem and mem.role == Membership.RoleChoices.OWNER:
+            admin_role = (
+                Role.objects.using(MainRouter.admin_db)
+                .filter(tenant_id=tenant_id, name__iexact="admin")
+                .first()
+            )
+            if admin_role:
+                return admin_role
+            return Role(
+                name="Admin",
+                tenant_id=tenant_id,
+                unlimited_visibility=True,
+                manage_users=True,
+                manage_scans=True,
+                manage_providers=True,
+            )
         raise PermissionDenied("User has no role in this tenant.")
     return role
 
@@ -72,20 +128,69 @@ def get_providers(role: Role) -> QuerySet[Provider]:
     """
     Return a distinct queryset of Providers accessible by the given role.
 
-    If the role has no associated provider groups, an empty queryset is returned.
-
-    Args:
-        role: A Role instance.
-
-    Returns:
-        A QuerySet of Provider objects filtered by the role's provider groups.
-        If the role has no provider groups, returns an empty queryset.
+    Resolution order:
+    1. If the role has associated provider groups, return providers within those groups.
+    2. If the role has unlimited_visibility or is an admin/owner role, return all providers.
+    3. Dynamically detect cloud provider tokens in role name (azure, oraclecloud/oci, oracle_saas, aws, gcp, kubernetes, etc.).
+    4. If 'all' is explicitly in the role name, return all providers in the tenant.
+    5. If no matches or provider groups, return empty queryset.
     """
     tenant_id = role.tenant_id
-    provider_groups = role.provider_groups.all()
-    if not provider_groups.exists():
-        return Provider.objects.none()
+    role_name = (getattr(role, "name", "") or "").lower()
 
-    return Provider.objects.filter(
-        tenant_id=tenant_id, provider_groups__in=provider_groups
-    ).distinct()
+    # 1. Provider groups association
+    provider_groups = role.provider_groups.all()
+    if provider_groups.exists():
+        return Provider.objects.filter(
+            tenant_id=tenant_id, provider_groups__in=provider_groups
+        ).distinct()
+
+    # 2. Unlimited visibility / admin / all clouds
+    if (
+        getattr(role, "unlimited_visibility", False)
+        or "admin" in role_name
+        or "owner" in role_name
+        or "all clouds" in role_name
+        or "all providers" in role_name
+        or "fleet" in role_name
+    ):
+        return Provider.objects.filter(tenant_id=tenant_id)
+
+    # 3. Dynamic cloud provider detection from role name
+    detected_providers = []
+    if "azure" in role_name:
+        detected_providers.append("azure")
+    if "oci" in role_name or "oraclecloud" in role_name:
+        detected_providers.append("oraclecloud")
+    if "oracle_saas" in role_name or "saas" in role_name or "fusion" in role_name:
+        detected_providers.append("oracle_saas")
+    if "aws" in role_name:
+        detected_providers.append("aws")
+    if "gcp" in role_name or "google" in role_name:
+        detected_providers.append("gcp")
+    if "kubernetes" in role_name or "k8s" in role_name:
+        detected_providers.append("kubernetes")
+    if "github" in role_name:
+        detected_providers.append("github")
+    if "m365" in role_name:
+        detected_providers.append("m365")
+    if "mongodbatlas" in role_name:
+        detected_providers.append("mongodbatlas")
+    if "iac" in role_name:
+        detected_providers.append("iac")
+    if "alibabacloud" in role_name or "alibaba" in role_name:
+        detected_providers.append("alibabacloud")
+    if "cloudflare" in role_name:
+        detected_providers.append("cloudflare")
+
+    if detected_providers:
+        return Provider.objects.filter(
+            tenant_id=tenant_id,
+            provider__in=detected_providers,
+        ).distinct()
+
+    # 4. Explicit 'all' in role name (e.g. 'All Clouds Read-Only Auditor')
+    if "all" in role_name:
+        return Provider.objects.filter(tenant_id=tenant_id)
+
+    return Provider.objects.none()

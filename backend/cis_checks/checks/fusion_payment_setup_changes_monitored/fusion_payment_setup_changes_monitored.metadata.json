@@ -10,11 +10,10 @@
   "SubSectionName": "High Risk Business Transactions & User Actions",
   "ProfileLevel": "L1",
   "CisAssessmentStatus": "Manual",
-  "Automation": "none",
+  "Automation": "automated",
   "ServiceName": "fusion",
   "RequiredAccess": [
-    "Fusion Applications Security Console / Audit Reports (IT Security Manager)",
-    "Fusion Cloud Applications Risk Management (Advanced Controls)"
+    "Fusion pod with Basic Auth (Connection page): HCM REST personalPaymentMethods and userAccounts; optionally Financials REST externalBankAccounts"
   ],
   "Description": "Changes to payment methods and bank account setups should be audited and reviewed.",
   "Risk": "A changed payment setup can redirect payments, which are hard to recover.",
@@ -33,5 +32,5 @@
     "https://docs.oracle.com/en/cloud/saas/financials/25d/facsf/how-you-implement-payables-and-payments.html"
   ],
   "CisControlsV8": [],
-  "Notes": ""
+  "Notes": "Automated by outcome delta: each run snapshots employee payment methods (and supplier bank accounts when readable) and compares with the previous run. Only the last 4 characters and a keyed hash of account numbers are stored. Run the assessment daily. Whether audit policies / Risk Management controls are enabled stays with the assessor."
 }

@@ -7049,3 +7049,17 @@ class JiraAssigneeCache(RowLevelSecurityProtectedModel):
 
     class JSONAPIMeta:
         resource_name = "jira-assignees-cache"
+
+
+class UserMfa(models.Model):
+    """A user's authenticator app. The shared secret is encrypted at rest."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name="mfa")
+    secret = models.BinaryField()
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    last_step = models.BigIntegerField(null=True, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "user_mfa"

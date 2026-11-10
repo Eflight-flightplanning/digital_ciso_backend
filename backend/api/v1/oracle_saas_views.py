@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 from typing import Any
 
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from api.v1.jira_views import resolve_tenant
+from oracle_cis.pod_users import load_pod_users, merge_pod_users, save_pod_users
 from api.oracle_fusion_client import (
     OracleFusionClient,
     SOD_TOXIC_MATRICES,
@@ -19,8 +21,6 @@ from api.oracle_fusion_client import (
 )
 
 logger = logging.getLogger(__name__)
-
-REAL_USERS_CACHE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "real_pod_users.json")
 
 
 def get_env_credentials() -> dict[str, str]:
@@ -60,47 +60,12 @@ def get_env_credentials() -> dict[str, str]:
     return creds
 
 
-def load_real_pod_users() -> list[dict[str, Any]]:
-    if os.path.exists(REAL_USERS_CACHE_PATH):
-        try:
-            with open(REAL_USERS_CACHE_PATH, "r", encoding="utf-8-sig") as fp:
-                data = json.load(fp)
-                if data and isinstance(data, list):
-                    return data
-        except Exception as e:
-            logger.warning("Could not read real_pod_users.json: %s", e)
-    return []
-
-
-def merge_and_save_pod_users(new_records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    existing = load_real_pod_users()
-    user_map = {u.get("username", "").upper(): dict(u) for u in existing if u.get("username")}
-
-    for rec in new_records:
-        uname = rec.get("username", "").upper()
-        if not uname:
-            continue
-        if uname in user_map:
-            prev = user_map[uname]
-            for k, v in rec.items():
-                if k == "id":
-                    continue  # preserve existing ID; reassigned below
-                if v not in (None, "", [], 0) or k not in prev:
-                    prev[k] = v
-        else:
-            user_map[uname] = rec
-
-    # Always reassign sequential IDs after merge to prevent collisions
-    merged = list(user_map.values())
-    for seq, user in enumerate(merged, start=1):
-        user["id"] = f"USR-HCM-{seq:04d}"
-
-    try:
-        with open(REAL_USERS_CACHE_PATH, "w", encoding="utf-8") as fp:
-            json.dump(merged, fp, indent=2)
-    except Exception as e:
-        logger.warning("Could not write real_pod_users.json: %s", e)
-    return merged
+def request_tenant_id(request):
+    """The signed-in user's client. There is no shared fallback: no client, no data."""
+    tenant = resolve_tenant(request)
+    if tenant is None:
+        raise PermissionDenied("Your account is not linked to a client.")
+    return tenant.id
 
 
 class OracleSaasOverviewView(APIView):
@@ -108,7 +73,7 @@ class OracleSaasOverviewView(APIView):
 
     def get(self, request: Request) -> Response:
         creds = get_env_credentials()
-        users = load_real_pod_users()
+        users = load_pod_users(request_tenant_id(request))
 
         total_users = len(users) if users else 0
         inactive_30d = len([u for u in users if u.get("days_inactive", 0) >= 30])
@@ -207,9 +172,9 @@ class OracleSaasSyncLiveView(APIView):
                 sync_details.append(f"Pod API note: {str(e)}")
 
         if extracted_users:
-            merge_and_save_pod_users(extracted_users)
+            merge_pod_users(request_tenant_id(request), extracted_users)
 
-        all_users = load_real_pod_users()
+        all_users = load_pod_users(request_tenant_id(request))
 
         return Response({
             "status": "SUCCESS",
@@ -256,12 +221,12 @@ class OracleSaasInactiveSyncView(APIView):
             extracted_users = client.download_and_decode_report(report_job_id)
         except Exception as e:
             logger.warning("Live ESS job sync notice: %s", e)
-            extracted_users = load_real_pod_users()
+            extracted_users = load_pod_users(request_tenant_id(request))
 
         if extracted_users:
-            merge_and_save_pod_users(extracted_users)
+            merge_pod_users(request_tenant_id(request), extracted_users)
 
-        all_users = load_real_pod_users()
+        all_users = load_pod_users(request_tenant_id(request))
         filtered_users = [u for u in all_users if u.get("days_inactive", 0) >= days]
 
         return Response({
@@ -356,9 +321,9 @@ class OracleSaasSyncHcmUsersView(APIView):
                 })
 
             if enriched_users:
-                merge_and_save_pod_users(enriched_users)
+                merge_pod_users(request_tenant_id(request), enriched_users)
 
-            all_users = load_real_pod_users()
+            all_users = load_pod_users(request_tenant_id(request))
 
             return Response({
                 "status": "SUCCESS",
@@ -379,7 +344,7 @@ class OracleSaasInactiveUsersView(APIView):
 
     def get(self, request: Request) -> Response:
         days_min = int(request.query_params.get("days", 0))
-        users = load_real_pod_users()
+        users = load_pod_users(request_tenant_id(request))
         if days_min > 0:
             users = [u for u in users if u.get("days_inactive", 0) >= days_min]
 
@@ -421,16 +386,12 @@ class OracleSaasRemediateView(APIView):
             payload = None
 
         if action == "SUSPEND_USER" and (username or user_guid):
-            users = load_real_pod_users()
+            users = load_pod_users(request_tenant_id(request))
             for u in users:
                 if (username and u.get("username", "").upper() == username.upper()) or (user_guid and u.get("guid") == user_guid):
                     u["is_suspended"] = True
                     u["status"] = "SUSPENDED"
-            try:
-                with open(REAL_USERS_CACHE_PATH, "w", encoding="utf-8") as fp:
-                    json.dump(users, fp, indent=2)
-            except Exception as e:
-                logger.warning("Could not update real_pod_users.json on remediation: %s", e)
+            save_pod_users(request_tenant_id(request), users)
 
         execution_result = {
             "status": "STAGED_REMEDIATION_READY",

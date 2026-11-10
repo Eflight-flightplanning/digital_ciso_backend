@@ -913,10 +913,16 @@ export function useRemediationMetrics() {
   return useQuery({
     queryKey: qk.remediationMetrics(),
     queryFn: async () => {
-      const res = await api.get("/remediations/metrics", { jsonApi: false });
-      return res as RemediationMetrics;
+      try {
+        const res = await api.get("/remediations/metrics", { jsonApi: false });
+        return res as RemediationMetrics;
+      } catch (err: any) {
+        if (err?.status === 401 || err?.status === 403) return null;
+        throw err;
+      }
     },
     staleTime: 15 * 1000,
+    retry: false,
   });
 }
 
