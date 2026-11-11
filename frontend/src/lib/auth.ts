@@ -90,6 +90,8 @@ export const authStore = {
     user?: User;
     mfa_required?: boolean;
     mfa_setup?: { secret: string; qr_code: string };
+    password_change_required?: boolean;
+    temp_token?: string;
     message?: string;
   }> {
     currentAuth.isLoading = true;
@@ -126,6 +128,16 @@ export const authStore = {
 
       const data = await res.json();
       const attributes = data?.data?.attributes || data;
+
+      if (attributes?.password_change_required) {
+        currentAuth.isLoading = false;
+        listeners.forEach((l) => l(currentAuth));
+        return {
+          password_change_required: true,
+          temp_token: attributes.temp_token,
+          message: attributes.message,
+        };
+      }
 
       if (attributes?.mfa_required) {
         currentAuth.isLoading = false;
@@ -175,6 +187,68 @@ export const authStore = {
 
       this.setUser(user, accessToken);
       return { user };
+    } catch (err: any) {
+      currentAuth.isLoading = false;
+      listeners.forEach((l) => l(currentAuth));
+      throw err;
+    }
+  },
+
+  async firstLoginPasswordChange(
+    email: string,
+    tempToken: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{
+    mfa_required: boolean;
+    mfa_setup?: { secret: string; qr_code: string };
+    message?: string;
+  }> {
+    currentAuth.isLoading = true;
+    listeners.forEach((l) => l(currentAuth));
+
+    try {
+      const res = await fetch(`${API_BASE}/tokens/first-login-password-change`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json, application/vnd.api+json",
+        },
+        body: JSON.stringify({
+          email,
+          temp_token: tempToken,
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        let errDetail = "Failed to update password.";
+        try {
+          const errJson = await res.json();
+          errDetail =
+            errJson?.detail ||
+            errJson?.message ||
+            errJson?.errors?.[0]?.detail ||
+            errDetail;
+        } catch {}
+        throw new Error(errDetail);
+      }
+
+      const data = await res.json();
+      const attributes = data?.data?.attributes || data?.attributes || data;
+
+      currentAuth.isLoading = false;
+      listeners.forEach((l) => l(currentAuth));
+
+      return {
+        mfa_required: true,
+        mfa_setup: attributes.mfa_setup_required || attributes.secret
+          ? { secret: attributes.secret, qr_code: attributes.qr_code }
+          : undefined,
+        message: attributes.message,
+      };
     } catch (err: any) {
       currentAuth.isLoading = false;
       listeners.forEach((l) => l(currentAuth));

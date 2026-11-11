@@ -227,6 +227,7 @@ class TestMFAServiceAndSecurityControls(unittest.TestCase):
         self.mock_user = MagicMock()
         self.mock_user.pk = "00000000-0000-0000-0000-000000000001"
         self.mock_user.email = "auditor@eflight.aero"
+        self.mock_user.must_change_password = False
 
         self.mock_record = MagicMock()
         self.mock_record.user = self.mock_user
@@ -235,6 +236,11 @@ class TestMFAServiceAndSecurityControls(unittest.TestCase):
         self.mock_record.last_step = None
         self.mock_record.failed_attempts = 0
         self.mock_record.locked_until = None
+
+        self.atomic_patch = patch("django.db.transaction.atomic")
+        self.mock_atomic = self.atomic_patch.start()
+        self.mock_atomic.return_value.__enter__.return_value = None
+        self.addCleanup(self.atomic_patch.stop)
 
     def tearDown(self):
         from django.core.cache import cache
@@ -467,6 +473,7 @@ class TestTOTPAPIFlow(unittest.TestCase):
 
         mock_user = MagicMock()
         mock_user.is_active = True
+        mock_user.must_change_password = False
         mock_user.email = "ciso@eflight.aero"
         mock_user.pk = "00000000-0000-0000-0000-000000000001"
         mock_auth.return_value = mock_user
@@ -499,6 +506,7 @@ class TestTOTPAPIFlow(unittest.TestCase):
 
         mock_user = MagicMock()
         mock_user.is_active = True
+        mock_user.must_change_password = False
         mock_user.email = "ciso@eflight.aero"
         mock_user.pk = "00000000-0000-0000-0000-000000000001"
         mock_auth.return_value = mock_user
@@ -528,6 +536,7 @@ class TestTOTPAPIFlow(unittest.TestCase):
 
         mock_user = MagicMock()
         mock_user.is_active = True
+        mock_user.must_change_password = False
         mock_user.email = "ciso@eflight.aero"
         mock_user.pk = "00000000-0000-0000-0000-000000000001"
         mock_auth.return_value = mock_user
@@ -552,6 +561,90 @@ class TestTOTPAPIFlow(unittest.TestCase):
             self.assertEqual(response.data["type"], "tokens")
             self.assertIn("access", response.data["attributes"])
             self.assertIn("refresh", response.data["attributes"])
+
+    @patch("api.v1.serializers.authenticate")
+    def test_first_login_intercepted_for_mandatory_password_change(self, mock_auth):
+        """When user has must_change_password=True, login halts and returns password-change-required."""
+        import json
+        from rest_framework.test import APIRequestFactory
+        from api.v1.views import CustomTokenObtainView
+
+        mock_user = MagicMock()
+        mock_user.is_active = True
+        mock_user.must_change_password = True
+        mock_user.email = "onboarded@eflight.aero"
+        mock_user.pk = "00000000-0000-0000-0000-000000000099"
+        mock_user.id = mock_user.pk
+        mock_auth.return_value = mock_user
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/v1/tokens",
+            data=json.dumps({"email": "onboarded@eflight.aero", "password": "InitialTempPassword123!"}),
+            content_type="application/json",
+        )
+        view = CustomTokenObtainView.as_view()
+        response = view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["type"], "password-change-required")
+        attrs = response.data["attributes"]
+        self.assertTrue(attrs["password_change_required"])
+        self.assertIn("temp_token", attrs)
+        self.assertNotIn("qr_code", attrs)  # QR code must NOT be leaked before password change
+
+    @patch("django.db.transaction.atomic")
+    @patch("django.contrib.auth.password_validation.validate_password")
+    @patch("api.v1.views.User")
+    @patch("api.mfa_service.mfa_service.generate_challenge")
+    def test_first_login_password_change_succeeds_and_returns_mfa_qr(self, mock_challenge, mock_user_cls, mock_validate, mock_atomic):
+        """Updating password with valid temp_token and current password clears must_change_password and returns QR code."""
+        import json
+        from django.core.signing import TimestampSigner
+        from rest_framework.test import APIRequestFactory
+        from api.v1.views import FirstLoginPasswordChangeView
+
+        test_uid = "00000000-0000-0000-0000-000000000099"
+        signer = TimestampSigner(salt="initial_pwd_change")
+        signed_temp_token = signer.sign(test_uid)
+
+        mock_user = MagicMock()
+        mock_user.id = test_uid
+        mock_user.is_active = True
+        mock_user.email = "onboarded@eflight.aero"
+        mock_user.check_password.return_value = True
+        mock_user_cls.objects.using.return_value.filter.return_value.first.return_value = mock_user
+        mock_user_cls.objects.filter.return_value.first.return_value = mock_user
+
+        mock_challenge.return_value = {
+            "mfa_required": True,
+            "mfa_setup_required": True,
+            "secret": "JBSWY3DPEHPK3PXP",
+            "qr_code": "data:image/svg+xml;utf8,<svg></svg>",
+        }
+
+        factory = APIRequestFactory()
+        request = factory.post(
+            "/api/v1/tokens/first-login-password-change",
+            data=json.dumps({
+                "email": "onboarded@eflight.aero",
+                "temp_token": signed_temp_token,
+                "current_password": "InitialTempPassword123!",
+                "new_password": "BrandNewPermanentPassword2026!",
+            }),
+            content_type="application/json",
+        )
+        view = FirstLoginPasswordChangeView.as_view()
+        response = view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["type"], "mfa-challenge")
+        attrs = response.data["attributes"]
+        self.assertTrue(attrs["password_changed"])
+        self.assertIn("qr_code", attrs)
+        self.assertEqual(attrs["secret"], "JBSWY3DPEHPK3PXP")
+        mock_user.set_password.assert_called_with("BrandNewPermanentPassword2026!")
+        self.assertFalse(mock_user.must_change_password)
 
 
 if __name__ == "__main__":

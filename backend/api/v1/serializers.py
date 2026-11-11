@@ -233,6 +233,18 @@ class BaseTokenSerializer(serializers.Serializer):
         elif user is None:
             raise ValidationError("Invalid credentials")
 
+        # Intercept if user is required to change their temporary password first
+        if getattr(user, "must_change_password", False):
+            from django.core.signing import TimestampSigner
+            signer = TimestampSigner(salt="initial_pwd_change")
+            temp_token = signer.sign(str(user.id))
+            return {
+                "password_change_required": True,
+                "email": user.email,
+                "temp_token": temp_token,
+                "message": "You must change your temporary password before proceeding to Authenticator setup.",
+            }
+
         from api.mfa_service import mfa_service
 
         # Check MFA OTP verification if enabled
@@ -527,6 +539,7 @@ class UserCreateSerializer(BaseWriteSerializer):
 
         validate_password(password, user=user)
         user.set_password(password)
+        user.must_change_password = True
         user.save()
 
         # Link to Tenant and Role if context has tenant_id

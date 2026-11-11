@@ -790,13 +790,15 @@ export function UsersPage() {
               </div>
 
               <div>
-                <label className="section-label mb-1.5 block font-semibold text-foreground">Create Password *</label>
+                <label className="section-label mb-1.5 block font-semibold text-foreground">
+                  Initial Temporary Password *
+                </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     required
-                    minLength={6}
-                    placeholder="Set user login password"
+                    minLength={8}
+                    placeholder="Set temporary password for first login"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-surface-2 pl-3 pr-10 text-foreground outline-none focus:border-primary"
@@ -809,6 +811,9 @@ export function UsersPage() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  The user will be required to change this password on their first login, after which they will receive their Authenticator QR code to activate MFA.
+                </p>
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">

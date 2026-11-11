@@ -425,6 +425,11 @@ class CustomTokenObtainView(GenericAPIView):
                 raise InvalidToken(e.args[0])
 
             val_data = serializer.validated_data
+            if val_data.get("password_change_required"):
+                return Response(
+                    data={"type": "password-change-required", "attributes": val_data},
+                    status=status.HTTP_200_OK,
+                )
             if val_data.get("mfa_required"):
                 return Response(
                     data={"type": "mfa-challenge", "attributes": val_data},
@@ -474,6 +479,94 @@ class CustomTokenObtainView(GenericAPIView):
                 {"detail": "Authentication failed."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class FirstLoginPasswordChangeView(GenericAPIView):
+    """Handles forced password change on first login using temporary signed token.
+
+    Upon successful password update, clears must_change_password and returns the
+    MFA setup QR code challenge so the user can scan it into Microsoft or Google Authenticator.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_scope = "token-obtain"
+    http_method_names = ["post"]
+    parser_classes = [JSONParser, JSONAPIParser]
+
+    def post(self, request):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+        from api.mfa_service import mfa_service
+
+        raw_data = request.data
+        if isinstance(raw_data, dict) and "data" in raw_data and "attributes" in raw_data["data"]:
+            payload = raw_data["data"]["attributes"]
+        else:
+            payload = raw_data
+
+        email = (payload.get("email") or "").strip().lower()
+        temp_token = (payload.get("temp_token") or "").strip()
+        current_password = payload.get("current_password") or ""
+        new_password = payload.get("new_password") or ""
+
+        if not email or not temp_token or not current_password or not new_password:
+            return Response(
+                {"detail": "email, temp_token, current_password, and new_password are all required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        signer = TimestampSigner(salt="initial_pwd_change")
+        try:
+            user_id = signer.unsign(temp_token, max_age=900)  # 15 minutes validity
+        except SignatureExpired:
+            return Response(
+                {"detail": "Password change session expired. Please sign in again."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except BadSignature:
+            return Response(
+                {"detail": "Invalid temporary password session token."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user = (
+            User.objects.using(MainRouter.admin_db).filter(id=user_id, email__iexact=email).first()
+            or User.objects.filter(id=user_id, email__iexact=email).first()
+        )
+        if not user or not user.is_active:
+            return Response({"detail": "User account not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(current_password):
+            return Response({"detail": "The current temporary password entered is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password == current_password:
+            return Response({"detail": "New password cannot be the same as the temporary password."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user=user)
+        except Exception as ve:
+            detail = getattr(ve, "messages", str(ve))
+            return Response({"detail": detail[0] if isinstance(detail, list) else str(detail)}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic(using=MainRouter.admin_db):
+            user.set_password(new_password)
+            user.must_change_password = False
+            user.save(using=MainRouter.admin_db)
+
+        # Generate the MFA Authenticator QR code challenge!
+        challenge = mfa_service.generate_challenge(user)
+        return Response(
+            data={
+                "type": "mfa-challenge",
+                "attributes": {
+                    **challenge,
+                    "password_changed": True,
+                    "message": "Password changed successfully! Scan this QR code with Microsoft Authenticator or Google Authenticator to activate MFA.",
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 @extend_schema(

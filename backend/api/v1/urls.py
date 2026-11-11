@@ -33,6 +33,7 @@ from api.v1.views import (
     AttackPathsScanViewSet,
     ComplianceOverviewViewSet,
     CustomTokenObtainView,
+    FirstLoginPasswordChangeView,
     CustomTokenLogoutView,
     CustomTokenRefreshView,
     CustomTokenSwitchTenantView,
@@ -154,6 +155,7 @@ urlpatterns = [
     path("reports/executive-summary/", ExecutiveReportView.as_view(), name="executive-report-slash"),
     # JWT Token Authentication (Email + Password)
     path("tokens", CustomTokenObtainView.as_view(), name="token-obtain"),
+    path("tokens/first-login-password-change", FirstLoginPasswordChangeView.as_view(), name="token-first-login-password-change"),
     path("tokens/refresh", CustomTokenRefreshView.as_view(), name="token-refresh"),
     path("tokens/logout", CustomTokenLogoutView.as_view(), name="token-logout"),
     path("tokens/switch", CustomTokenSwitchTenantView.as_view(), name="token-switch"),
