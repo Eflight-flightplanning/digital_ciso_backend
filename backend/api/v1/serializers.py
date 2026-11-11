@@ -592,6 +592,18 @@ class UserCreateSerializer(BaseWriteSerializer):
                         defaults={"role": role},
                     )
 
+        if password:
+            try:
+                from api.email_service import send_welcome_user_email
+                send_welcome_user_email(
+                    to_email=user.email,
+                    name=getattr(user, "name", ""),
+                    password=password,
+                    request=request,
+                )
+            except Exception as e:
+                logger.warning(f"Could not send welcome email to {user.email}: {e}")
+
         return user
 
 

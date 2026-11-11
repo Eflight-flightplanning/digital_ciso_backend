@@ -1123,6 +1123,24 @@ class UserViewSet(BaseUserViewset):
                 role=role,
                 tenant_id=tenant.id,
             )
+
+        # Dispatch welcome email with credentials & instructions via SendGrid
+        raw_password = (
+            request.data.get("password")
+            or (request.data.get("data", {}).get("attributes", {}).get("password") if isinstance(request.data, dict) else None)
+        )
+        if raw_password:
+            try:
+                from api.email_service import send_welcome_user_email
+                send_welcome_user_email(
+                    to_email=user.email,
+                    name=getattr(user, "name", ""),
+                    password=raw_password,
+                    request=request,
+                )
+            except Exception as e:
+                logger.warning(f"Could not send welcome email to {user.email}: {e}")
+
         return Response(data=UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
