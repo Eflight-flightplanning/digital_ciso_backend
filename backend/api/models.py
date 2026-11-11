@@ -331,7 +331,7 @@ class User(AbstractBaseUser):
 
     is_active = models.BooleanField(default=True)
 
-    must_change_password = models.BooleanField(default=False)
+    must_change_password = models.BooleanField(default=True)
 
     date_joined = models.DateTimeField(auto_now_add=True, editable=False)
 

@@ -68,7 +68,7 @@ function SignInPage() {
       if (res.password_change_required) {
         setTempToken(res.temp_token || "");
         setStep("change_password");
-        setSuccessInfo("Initial login verified. You must set your permanent password before setting up Authenticator.");
+        setSuccessInfo("Initial login verified. Please create your new password to proceed.");
       } else if (res.mfa_required) {
         setStep("mfa");
         setMfaSetup(res.mfa_setup ?? null);
@@ -97,7 +97,7 @@ function SignInPage() {
       return;
     }
     if (newPassword === password) {
-      setError("New password cannot be identical to the temporary password.");
+      setError("New password cannot be identical to your current password.");
       return;
     }
 
@@ -209,7 +209,7 @@ function SignInPage() {
               <div className="flex items-center justify-between">
                 <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-950"}`}>
                   {step === "login" && "Sign In to Console"}
-                  {step === "change_password" && "Set Your Permanent Password"}
+                  {step === "change_password" && "Create New Password"}
                   {step === "mfa" && (mfaSetup ? "Set Up Authenticator App" : "MFA Verification Required")}
                 </h2>
                 <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${
@@ -220,14 +220,14 @@ function SignInPage() {
                     : (isDark ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-emerald-50 border-emerald-300 text-emerald-700")
                 }`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                  {step === "login" && "Step 1 of 3"}
-                  {step === "change_password" && "Step 2 of 3 • Required"}
-                  {step === "mfa" && (mfaSetup ? "Step 3 of 3 • Scan QR" : "Step 2 of 2")}
+                  {step === "login" && "Step 1"}
+                  {step === "change_password" && "Step 2 • Password Update"}
+                  {step === "mfa" && (mfaSetup ? "Step 3 • Scan QR" : "MFA Verification")}
                 </span>
               </div>
               <p className={`mt-1.5 text-xs ${isDark ? "text-slate-400" : "text-slate-600 font-medium"}`}>
-                {step === "login" && "Enter your email and initial password provided by the administrator"}
-                {step === "change_password" && "Your initial password is temporary. Create your own secure password to proceed"}
+                {step === "login" && "Enter your email and password to access your account"}
+                {step === "change_password" && "Create your new secure password to proceed"}
                 {step === "mfa" && (
                   mfaSetup
                     ? "Scan this QR code with Microsoft Authenticator or Google Authenticator to activate MFA"
@@ -279,7 +279,7 @@ function SignInPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className={`font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                      Password (Temporary or Permanent)
+                      Password
                     </label>
                   </div>
                   <div className="relative">
@@ -335,13 +335,13 @@ function SignInPage() {
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-300">
                   <p className="font-semibold">Security Requirement:</p>
                   <p className="mt-0.5 text-slate-300">
-                    Your account was provisioned with a temporary password. Choose a new, secret password to protect your identity.
+                    Your account requires a new password. Choose a new, secret password to protect your account.
                   </p>
                 </div>
 
                 <div>
                   <label className={`mb-1.5 block font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                    New Permanent Password
+                    New Password
                   </label>
                   <div className="relative">
                     <KeyRound className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
@@ -373,7 +373,7 @@ function SignInPage() {
 
                 <div>
                   <label className={`mb-1.5 block font-bold uppercase tracking-wider text-[11px] ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                    Confirm Permanent Password
+                    Confirm New Password
                   </label>
                   <div className="relative">
                     <Lock className={`absolute top-3 left-3.5 h-4 w-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
@@ -511,12 +511,7 @@ function SignInPage() {
             </div>
           </div>
 
-          {/* Sign Up Link */}
-          <div className="mt-5 text-center text-xs">
-            <span className={isDark ? "text-slate-400" : "text-slate-600 font-medium"}>
-              Access is by invitation only.
-            </span>
-          </div>
+
         </div>
       </main>
 

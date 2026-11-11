@@ -1045,9 +1045,14 @@ class UserViewSet(BaseUserViewset):
                 raise PermissionDenied("You do not have permission to create users.")
 
         # Proceed with creating the user and membership
+        create_kwargs = dict(serializer.validated_data)
+        create_kwargs["must_change_password"] = True
         user = User.objects.db_manager(MainRouter.admin_db).create_user(
-            **serializer.validated_data
+            **create_kwargs
         )
+        if not user.must_change_password:
+            user.must_change_password = True
+            user.save(using=MainRouter.admin_db, update_fields=["must_change_password"])
 
         assigned_role_name = (
             role_param
