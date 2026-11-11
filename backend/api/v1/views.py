@@ -475,8 +475,9 @@ class CustomTokenObtainView(GenericAPIView):
             return Response({"detail": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.exception(f"Unexpected error in CustomTokenObtainView: {e}")
+            detail_msg = str(e) if settings.DEBUG else "Authentication failed."
             return Response(
-                {"detail": "Authentication failed."},
+                {"detail": f"Authentication failed: {detail_msg}" if detail_msg != "Authentication failed." else detail_msg},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -123,6 +123,7 @@ export const authStore = {
             errJson?.message ||
             errDetail;
         } catch {}
+        console.error(`[auth] Sign-in failed (HTTP ${res.status}):`, errDetail);
         throw new Error(errDetail);
       }
 
@@ -233,6 +234,7 @@ export const authStore = {
             errJson?.errors?.[0]?.detail ||
             errDetail;
         } catch {}
+        console.error(`[auth] Sign-in failed (HTTP ${res.status}):`, errDetail);
         throw new Error(errDetail);
       }
 
@@ -306,6 +308,7 @@ export const authStore = {
             errJson?.message ||
             errDetail;
         } catch {}
+        console.error(`[auth] Sign-in failed (HTTP ${res.status}):`, errDetail);
         throw new Error(errDetail);
       }
 
