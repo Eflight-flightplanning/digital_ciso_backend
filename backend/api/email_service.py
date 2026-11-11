@@ -112,3 +112,4 @@ Digital CISO Security
     except Exception as e:
         logger.error("Failed to send welcome email to %s via SendGrid: %s", to_email, e)
         return False
+

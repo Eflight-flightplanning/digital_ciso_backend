@@ -1037,12 +1037,28 @@ class UserViewSet(BaseUserViewset):
         # Adding a user to an existing tenant is an admin action: an ordinary
         # authenticated member must not be able to mint admin accounts.
         if request.user.is_authenticated:
-            _tid = (request.auth.get("tenant_id") if hasattr(request.auth, "get") else None) or getattr(request, "tenant_id", None)
-            _perm = HasPermissions()
+            _tid = (
+                getattr(request, "tenant_id", None)
+                or (request.auth.get("tenant_id") if hasattr(request.auth, "get") else None)
+                or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
+            )
+            if not _tid:
+                admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
+                if admin_membership:
+                    _tid = str(admin_membership.tenant_id)
+
             request.tenant_id = _tid
+            _perm = HasPermissions()
             _view = type("V", (), {"required_permissions": [Permissions.MANAGE_USERS]})()
-            if not _tid or not _perm.has_permission(request, _view):
-                raise PermissionDenied("You do not have permission to create users.")
+            is_super = getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False)
+            if not is_super:
+                is_owner = False
+                if _tid:
+                    mem = Membership.objects.using(MainRouter.admin_db).filter(user=request.user, tenant_id=_tid).first()
+                    if mem and mem.role == Membership.RoleChoices.OWNER:
+                        is_owner = True
+                if not is_owner and (not _tid or not _perm.has_permission(request, _view)):
+                    raise PermissionDenied("You do not have permission to create users.")
 
         # Proceed with creating the user and membership
         create_kwargs = dict(serializer.validated_data)
@@ -1107,21 +1123,38 @@ class UserViewSet(BaseUserViewset):
             invitation.state = Invitation.State.ACCEPTED
             invitation.save(using=MainRouter.admin_db)
         else:
-            role = Role.objects.using(MainRouter.admin_db).create(
-                name=assigned_role_name.lower(),
-                tenant_id=tenant.id,
-                manage_users=True,
-                manage_account=True,
-                manage_billing=True,
-                manage_providers=True,
-                manage_integrations=True,
-                manage_scans=True,
-                unlimited_visibility=True,
-            )
-            UserRoleRelationship.objects.using(MainRouter.admin_db).create(
+            role = Role.objects.using(MainRouter.admin_db).filter(
+                tenant_id=tenant.id, name__iexact=assigned_role_name
+            ).first() or Role.objects.using(MainRouter.admin_db).filter(
+                tenant_id=tenant.id, name__icontains=assigned_role_name
+            ).first()
+
+            if not role:
+                r_lower = assigned_role_name.lower()
+                is_adm = "admin" in r_lower or "owner" in r_lower
+                is_auditor = (
+                    "auditor" in r_lower
+                    or "viewer" in r_lower
+                    or "read-only" in r_lower
+                    or "readonly" in r_lower
+                )
+                can_manage_scans = not is_auditor
+                role = Role.objects.using(MainRouter.admin_db).create(
+                    tenant_id=tenant.id,
+                    name=assigned_role_name,
+                    unlimited_visibility=is_adm,
+                    manage_users=is_adm,
+                    manage_account=is_adm,
+                    manage_billing=is_adm,
+                    manage_providers=is_adm,
+                    manage_integrations=is_adm,
+                    manage_scans=is_adm or can_manage_scans,
+                )
+
+            UserRoleRelationship.objects.using(MainRouter.admin_db).update_or_create(
                 user=user,
-                role=role,
                 tenant_id=tenant.id,
+                defaults={"role": role},
             )
 
         # Dispatch welcome email with credentials & instructions via SendGrid

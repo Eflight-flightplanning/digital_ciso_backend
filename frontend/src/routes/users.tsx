@@ -288,7 +288,7 @@ export function UsersPage() {
       };
 
       setLocalUsers((prev) => [...prev, newUserObj]);
-      setSuccessMsg(`User ${newName} successfully created with role "${chosenRole}"!`);
+      setSuccessMsg(`User ${newName} successfully created! Credentials and setup instructions have been emailed to ${newEmail}.`);
       
       // Invalidate API queries to refresh backend user list
       queryClient.invalidateQueries({ queryKey: qk.users() });
@@ -301,26 +301,15 @@ export function UsersPage() {
         setNewName("");
         setNewPassword("");
         setSuccessMsg(null);
-      }, 1200);
+      }, 1500);
     } catch (err: any) {
-      const newUserObj = {
-        email: newEmail,
-        name: newName,
-        role: chosenRole,
-        lastLogin: "Created Just Now",
-        status: "Active",
-      };
-      setLocalUsers((prev) => [...prev, newUserObj]);
-      setSuccessMsg(`User account for ${newName} created!`);
-      
-      setTimeout(() => {
-        setSubmitting(false);
-        setModalOpen(false);
-        setNewEmail("");
-        setNewName("");
-        setNewPassword("");
-        setSuccessMsg(null);
-      }, 1200);
+      const msg =
+        err?.response?.data?.errors?.[0]?.detail ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to create user account. Please check the email address or credentials.";
+      setErrorMsg(msg);
+      setSubmitting(false);
     }
   };
 
@@ -791,14 +780,14 @@ export function UsersPage() {
 
               <div>
                 <label className="section-label mb-1.5 block font-semibold text-foreground">
-                  Initial Temporary Password *
+                  Initial Password *
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     required
                     minLength={8}
-                    placeholder="Set temporary password for first login"
+                    placeholder="Set initial password for account (min 8 characters)"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="h-9 w-full rounded-lg border border-border bg-surface-2 pl-3 pr-10 text-foreground outline-none focus:border-primary"
@@ -812,7 +801,7 @@ export function UsersPage() {
                   </button>
                 </div>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  The user will be required to change this password on their first login, after which they will receive their Authenticator QR code to activate MFA.
+                  Credentials and instructions will be emailed to the user via SendGrid. They will be prompted to change their password on first login and complete 2FA setup.
                 </p>
               </div>
 
