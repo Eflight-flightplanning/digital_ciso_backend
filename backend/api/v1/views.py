@@ -492,8 +492,14 @@ class FirstLoginPasswordChangeView(GenericAPIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
     throttle_scope = "token-obtain"
+    resource_name = "tokens"
+    serializer_class = TokenSerializer
     http_method_names = ["post"]
     parser_classes = [JSONParser, JSONAPIParser]
+    filter_backends = []
+
+    def get_queryset(self):
+        return User.objects.none()
 
     def post(self, request):
         from django.contrib.auth.password_validation import validate_password
@@ -539,7 +545,22 @@ class FirstLoginPasswordChangeView(GenericAPIView):
             return Response({"detail": "User account not found or inactive."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not user.check_password(current_password):
-            return Response({"detail": "The current temporary password entered is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+            # If the user already changed the password in a prior attempt (e.g. initial render retry),
+            # check if new_password matches and gracefully return the MFA challenge
+            if user.check_password(new_password):
+                challenge = mfa_service.generate_challenge(user)
+                return Response(
+                    data={
+                        "type": "mfa-challenge",
+                        "attributes": {
+                            **challenge,
+                            "password_changed": True,
+                            "message": "Password updated successfully! Scan this QR code with Microsoft Authenticator or Google Authenticator to activate MFA.",
+                        },
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            return Response({"detail": "The current password entered is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
 
         if new_password == current_password:
             return Response({"detail": "New password cannot be the same as the temporary password."}, status=status.HTTP_400_BAD_REQUEST)
