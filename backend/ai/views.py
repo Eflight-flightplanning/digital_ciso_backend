@@ -119,6 +119,8 @@ class TenantScopedAPIView(APIView):
         # view-level try/except, so a missing tenant is a clean 403.
         super().initial(request, *args, **kwargs)
         self.tenant_id = _request_tenant_id(request)
+        if not getattr(request, "tenant_id", None):
+            request.tenant_id = self.tenant_id
 
 class AIFindingAnalysisView(TenantScopedAPIView):
     """
@@ -368,6 +370,35 @@ class AIDecisionCreateJiraTicketView(TenantScopedAPIView):
                     status=400,
                     content_type="application/vnd.api+json",
                 )
+
+            # Enforce RBAC: Read-Only / Auditor accounts cannot dispatch Jira remediation tickets.
+            from api.rbac.permissions import is_admin_or_owner, get_role, Permissions
+            tenant_str = str(tenant_id)
+            if not is_admin_or_owner(request.user, tenant_str):
+                user_has_perm = False
+                try:
+                    role = get_role(request.user, tenant_str)
+                    role_name = (getattr(role, "name", "") or "").lower()
+                    is_auditor = any(k in role_name for k in ("auditor", "read-only", "readonly", "viewer"))
+                    if not is_auditor and getattr(role, Permissions.MANAGE_INTEGRATIONS.value, False):
+                        user_has_perm = True
+                except Exception:
+                    user_has_perm = False
+
+                if not user_has_perm:
+                    return Response(
+                        {
+                            "errors": [
+                                {
+                                    "status": "403",
+                                    "title": "Permission Denied",
+                                    "detail": "Read-only auditor accounts are not permitted to dispatch Jira remediation tickets.",
+                                }
+                            ]
+                        },
+                        status=403,
+                        content_type="application/vnd.api+json",
+                    )
 
             with rls_transaction(tenant_id):
                 decision = SecurityDecision.objects.filter(

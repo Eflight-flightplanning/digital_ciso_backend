@@ -535,6 +535,27 @@ class RemediationExecutionViewSet(BaseRLSViewSet):
         """
         tenant = resolve_tenant(request)
         tenant_id = tenant.id if tenant else None
+
+        # Enforce RBAC: Read-Only / Auditor accounts cannot dispatch Jira remediation tickets.
+        from api.rbac.permissions import is_admin_or_owner, get_role, Permissions
+        tenant_str = str(tenant_id) if tenant_id else None
+        if not is_admin_or_owner(request.user, tenant_str):
+            user_has_perm = False
+            try:
+                role = get_role(request.user, tenant_str)
+                role_name = (getattr(role, "name", "") or "").lower()
+                is_auditor = any(k in role_name for k in ("auditor", "read-only", "readonly", "viewer"))
+                if not is_auditor and getattr(role, Permissions.MANAGE_INTEGRATIONS.value, False):
+                    user_has_perm = True
+            except Exception:
+                user_has_perm = False
+
+            if not user_has_perm:
+                return Response(
+                    {"detail": "Permission Denied: Read-only auditor accounts are not permitted to dispatch Jira remediation tickets."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         serializer = CreateJiraTicketRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

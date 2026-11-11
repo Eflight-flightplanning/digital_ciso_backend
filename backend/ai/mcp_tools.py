@@ -232,7 +232,7 @@ class MCPToolExecutor:
         elif tool_name == "ciso_get_integrations":
             return MCPToolExecutor._get_integrations(arguments, tenant_id)
         elif tool_name == "ciso_trigger_integration_sync":
-            return MCPToolExecutor._trigger_sync(arguments, tenant_id)
+            return MCPToolExecutor._trigger_sync(arguments, user, tenant_id)
         else:
             raise ValueError(f"Unknown MCP tool: '{tool_name}'")
 
@@ -418,8 +418,29 @@ class MCPToolExecutor:
         }
 
     @staticmethod
-    def _trigger_sync(args: dict[str, Any], tenant_id) -> dict[str, Any]:
+    def _trigger_sync(args: dict[str, Any], user: User | None, tenant_id) -> dict[str, Any]:
         from api.models import Integration
+
+        # Enforce RBAC: Read-Only / Auditor accounts cannot dispatch Jira remediation tickets.
+        if user and tenant_id:
+            from api.rbac.permissions import is_admin_or_owner, get_role, Permissions
+            tenant_str = str(tenant_id)
+            if not is_admin_or_owner(user, tenant_str):
+                user_has_perm = False
+                try:
+                    role = get_role(user, tenant_str)
+                    role_name = (getattr(role, "name", "") or "").lower()
+                    is_auditor = any(k in role_name for k in ("auditor", "read-only", "readonly", "viewer"))
+                    if not is_auditor and getattr(role, Permissions.MANAGE_INTEGRATIONS.value, False):
+                        user_has_perm = True
+                except Exception:
+                    user_has_perm = False
+
+                if not user_has_perm:
+                    return {
+                        "status": "error",
+                        "error": "Permission Denied: Read-only auditor accounts are not permitted to dispatch Jira tickets.",
+                    }
 
         itype = args.get("integration_type", "jira")
 
@@ -544,6 +565,20 @@ class MCPToolExecutor:
     @staticmethod
     def _approve_playbook(args: dict[str, Any], user: User | None, tenant_id) -> dict[str, Any]:
         playbook_id = args.get("playbook_id")
+
+        # Enforce RBAC: Read-Only / Auditor accounts cannot approve playbooks.
+        if user and tenant_id:
+            from api.rbac.permissions import is_admin_or_owner, get_role
+            tenant_str = str(tenant_id)
+            if not is_admin_or_owner(user, tenant_str):
+                try:
+                    role = get_role(user, tenant_str)
+                    role_name = (getattr(role, "name", "") or "").lower()
+                    if any(k in role_name for k in ("auditor", "read-only", "readonly", "viewer")):
+                        return {"error": "Permission Denied: Read-only auditor accounts cannot approve remediation playbooks."}
+                except Exception:
+                    pass
+
         playbook = RemediationPlaybook.objects.filter(id=playbook_id, tenant_id=tenant_id).first()
         if not playbook:
             return {"error": f"Playbook {playbook_id} not found."}

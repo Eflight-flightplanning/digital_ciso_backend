@@ -62,6 +62,27 @@ class RemediationExecutionAgent:
         self.validate_approval(playbook)
 
         tenant = playbook.tenant
+
+        # Enforce RBAC: Read-Only / Auditor accounts cannot dispatch Jira remediation tickets.
+        if executed_by and tenant:
+            from api.rbac.permissions import is_admin_or_owner, get_role, Permissions
+            tenant_str = str(tenant.id)
+            if not is_admin_or_owner(executed_by, tenant_str):
+                user_has_perm = False
+                try:
+                    role = get_role(executed_by, tenant_str)
+                    role_name = (getattr(role, "name", "") or "").lower()
+                    is_auditor = any(k in role_name for k in ("auditor", "read-only", "readonly", "viewer"))
+                    if not is_auditor and getattr(role, Permissions.MANAGE_INTEGRATIONS.value, False):
+                        user_has_perm = True
+                except Exception:
+                    user_has_perm = False
+
+                if not user_has_perm:
+                    raise ExecutionPermissionError(
+                        "Permission Denied: Read-only auditor accounts are not permitted to dispatch Jira remediation tickets."
+                    )
+
         integration = Integration.objects.filter(
             tenant=tenant,
             integration_type=Integration.IntegrationChoices.JIRA,

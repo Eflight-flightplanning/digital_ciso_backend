@@ -58,6 +58,7 @@ import {
   useSyncJiraExecutionStatus,
   useSyncAllJiraExecutions,
   useRemediationMetrics,
+  useCurrentUser,
   RemediationExecutionRecord,
 } from "@/hooks/use-api";
 
@@ -593,9 +594,24 @@ function AIDecisionsPage() {
   const { data: verifiedTemplates } = useRemediationTemplates();
   const { data: executionsRaw, refetch: refetchExecutions } = useRemediationExecutions();
   const { data: metricsRaw, refetch: refetchMetrics } = useRemediationMetrics();
+  const { data: currentUserRaw } = useCurrentUser();
   const { data: jiraConfig } = useJiraConfig();
   const { data: projectsData } = useJiraProjects();
   const { data: prioritiesData } = useJiraPriorities();
+
+  const currentUser = (currentUserRaw as Record<string, any>) || {};
+  const userRoleStr = String(
+    currentUser.role ||
+    (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("auth_user") || "{}")?.role : "") ||
+    ""
+  ).toLowerCase();
+  const isAdmin =
+    Boolean(currentUser.is_superuser) ||
+    Boolean(currentUser.is_staff) ||
+    userRoleStr.includes("admin") ||
+    userRoleStr.includes("owner");
+  const isReadOnly = !isAdmin && (userRoleStr.includes("auditor") || userRoleStr.includes("viewer") || userRoleStr.includes("read-only") || userRoleStr.includes("readonly"));
+  const canDispatchJira = !isReadOnly;
 
   const createTicketMutation = useCreateJiraRemediationTicket();
   const syncStatusMutation = useSyncJiraExecutionStatus();
@@ -807,6 +823,7 @@ function AIDecisionsPage() {
 
   // Handle Opening Ticket Creation Modal
   const handleOpenCreateTicket = (item: FindingRemediationItem) => {
+    if (!canDispatchJira) return;
     setCustomSummary(`Fix ${item.check_id.replace(/_/g, " ")} on ${item.resource_name}`);
     setSelectedProject(jiraConfig?.default_project || (projectsData?.items?.[0]?.key || "SEC"));
     setSelectedIssueType(jiraConfig?.default_issue_type || "Task");
@@ -816,7 +833,7 @@ function AIDecisionsPage() {
 
   // Handle Ticket Creation Submit
   const handleConfirmCreateTicket = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem || !canDispatchJira) return;
 
     try {
       const payload = {
@@ -1216,7 +1233,7 @@ function AIDecisionsPage() {
                         <RefreshCw className={`h-3.5 w-3.5 ${syncStatusMutation.isPending ? "animate-spin text-primary" : ""}`} />
                       </button>
                     </div>
-                  ) : (
+                  ) : canDispatchJira ? (
                     <button
                       type="button"
                       onClick={() => handleOpenCreateTicket(selectedItem)}
@@ -1224,6 +1241,19 @@ function AIDecisionsPage() {
                     >
                       <Ticket className="h-4 w-4" />
                       <span>Dispatch Jira Ticket</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Read-Only Auditor: Ticket dispatch is restricted to Admins and Security Analysts."
+                      className="inline-flex items-center gap-2 rounded-xl bg-muted/60 px-4 py-2.5 text-xs font-semibold text-muted-foreground border border-border/50 cursor-not-allowed opacity-80"
+                    >
+                      <Ticket className="h-4 w-4 text-muted-foreground" />
+                      <span>Dispatch Jira Ticket</span>
+                      <span className="rounded bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
+                        Read-Only
+                      </span>
                     </button>
                   )}
                 </div>
@@ -1662,11 +1692,17 @@ function AIDecisionsPage() {
               <button
                 type="button"
                 onClick={handleConfirmCreateTicket}
-                disabled={createTicketMutation.isPending}
+                disabled={createTicketMutation.isPending || !canDispatchJira}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
               >
                 <Send className={`h-3.5 w-3.5 ${createTicketMutation.isPending ? "animate-spin" : ""}`} />
-                <span>{createTicketMutation.isPending ? "Publishing to Jira..." : "Authorize & Create Ticket"}</span>
+                <span>
+                  {createTicketMutation.isPending
+                    ? "Publishing to Jira..."
+                    : !canDispatchJira
+                    ? "Read-Only: Restricted"
+                    : "Authorize & Create Ticket"}
+                </span>
               </button>
             </div>
           </div>
