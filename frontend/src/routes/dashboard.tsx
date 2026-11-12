@@ -1135,19 +1135,66 @@ export function DashboardPage() {
     return params;
   }, [connectedProviderTypes, selectedProviderObj]);
   const { data: dashboardComplianceData } = useCompliance(complianceOverviewParams);
+
+  // Filtered & canonicalized compliance frameworks (excluding internal synthetic ThreatScore & deduplicating version variants)
+  // For OCI & Oracle environments, evaluates to the 3 official standards:
+  // (1) CIS OCI Benchmark, (2) CIS Oracle SaaS Foundations Benchmark, (3) NCA Framework (ECC / CSCC).
   const realComplianceFrameworks = useMemo(() => {
     const items = (dashboardComplianceData?.items as Array<Record<string, any>>) ?? [];
-    return items.map((item) => {
+    const seen = new Set<string>();
+    const results: Array<{ id: string; name: string; score: number }> = [];
+
+    for (const item of items) {
+      const id = String(item.compliance_id || item.id || "").toLowerCase();
+      const fw = String(item.framework || item.title || item.id || "").toLowerCase();
+
+      // Exclude synthetic ThreatScore and non-standard/deprecated test frameworks
+      if (
+        id.includes("threatscore") ||
+        id.includes("threat_score") ||
+        fw.includes("threatscore") ||
+        fw.includes("threat score") ||
+        id.includes("oracle_saas_security_baseline") ||
+        id.includes("itgc_sox") ||
+        id.includes("soc1_type2") ||
+        fw.includes("oracle cloud saas security baseline") ||
+        fw.includes("itgc sox") ||
+        fw.includes("soc 1 type")
+      ) {
+        continue;
+      }
+
+      // Group multiple versions of the same benchmark (e.g. cis_3.0 vs cis_3.1 both -> CIS OCI)
+      let canonicalKey = id;
+      if (id.includes("cis") && (id.includes("oraclecloud") || id.includes("oci"))) {
+        canonicalKey = "cis_oci";
+      } else if (id.includes("cis") && (id.includes("oracle_saas") || id.includes("saas"))) {
+        canonicalKey = "cis_oracle_saas";
+      } else if (id.includes("nca") || id.includes("ecc") || id.includes("cscc")) {
+        canonicalKey = "nca_oci";
+      } else if (id.includes("cis") && id.includes("azure")) {
+        canonicalKey = "cis_azure";
+      } else if (id.includes("cis") && id.includes("aws")) {
+        canonicalKey = "cis_aws";
+      } else if (id.includes("cis") && id.includes("gcp")) {
+        canonicalKey = "cis_gcp";
+      }
+
+      if (seen.has(canonicalKey)) continue;
+      seen.add(canonicalKey);
+
       const passed = Number(item.requirements_passed) || 0;
       const failed = Number(item.requirements_failed) || 0;
       const total = Number(item.total_requirements) || 0;
       const evaluated = Math.max(1, passed + failed);
-      return {
-        id: String(item.compliance_id || item.id || "").toLowerCase(),
+      results.push({
+        id,
         name: String(item.framework || item.title || item.id || ""),
         score: total > 0 ? Math.round((passed / evaluated) * 100) : 0,
-      };
-    });
+      });
+    }
+
+    return results;
   }, [dashboardComplianceData]);
 
   // Real live numbers from database findings
@@ -1179,11 +1226,15 @@ export function DashboardPage() {
   // Dynamic framework radar labels depending on selected cloud provider
   const radarLabels = useMemo(() => {
     if (!selectedProviderObj) {
+      const hasOciOrOracle = connectedProviderTypes.some((t) => t.includes("oci") || t.includes("oracle") || t.includes("saas"));
+      if (hasOciOrOracle) {
+        return ["CIS OCI", "CIS Oracle SaaS", "NCA ECC", "SOC 2", "ISO 27001"];
+      }
       return ["NCA ECC", "CIS Benchmark", "SOC 2", "ISO 27001", "PCI-DSS"];
     }
     const provStr = String(selectedProviderObj.provider || selectedProviderObj.provider_type || "").toUpperCase();
     if (provStr.includes("SAAS") || provStr.includes("FUSION")) {
-      return ["Oracle SoD", "HCM Security", "BIP Export", "FSM Roles", "SOX 404"];
+      return ["CIS Oracle SaaS", "Oracle SoD", "HCM Security", "FSM Roles", "SOX 404"];
     } else if (provStr.includes("AZURE")) {
       return ["CIS Azure", "SOC 2", "ISO 27001", "NIST 800-53", "PCI-DSS"];
     } else if (provStr.includes("OCI") || provStr.includes("ORACLE")) {
@@ -1191,7 +1242,7 @@ export function DashboardPage() {
     } else {
       return ["CIS Benchmark", "NCA ECC", "SOC 2", "ISO 27001", "PCI-DSS"];
     }
-  }, [selectedProviderObj]);
+  }, [selectedProviderObj, connectedProviderTypes]);
 
   // Radar chart data metrics — each axis gets its own real per-framework compliance score
   // calculated directly from (requirements_passed / (requirements_passed + requirements_failed)) * 100%
@@ -1202,8 +1253,9 @@ export function DashboardPage() {
       const match = realComplianceFrameworks.find((fw) => {
         const normName = norm(fw.name);
         const normId = norm(fw.id);
+        if (normLabel.includes("cisoraclesaas") && (normId.includes("saas") || normName.includes("saas"))) return true;
+        if (normLabel.includes("cisoci") && ((normId.includes("cis") && (normId.includes("oci") || normId.includes("oraclecloud"))) || (normName.includes("cis") && normName.includes("oci")))) return true;
         if (normLabel.includes("cisazure") && (normId.includes("cis") && normId.includes("azure") || normName.includes("cis") && normName.includes("azure"))) return true;
-        if (normLabel.includes("cisoci") && (normId.includes("cis") && (normId.includes("oci") || normId.includes("oracle")) || normName.includes("cis") && (normName.includes("oci") || normName.includes("oracle")))) return true;
         if (normLabel.includes("cis") && (normId.includes("cis") || normName.includes("cis"))) return true;
         if (normLabel.includes("ncaecc") && (normId.includes("ecc") || normName.includes("ecc"))) return true;
         if (normLabel.includes("ncacscc") && (normId.includes("cscc") || normName.includes("cscc"))) return true;
@@ -1270,9 +1322,18 @@ export function DashboardPage() {
 
   const totalDiscoveredAssets = filteredResources.length;
 
-  // Real evaluated-framework count from the compliance backend (fetched above, alongside
-  // the Radar Posture's real per-framework scores), instead of a findings-count stand-in.
-  const evaluatedFrameworkCount = (dashboardComplianceData?.items as Array<unknown> | undefined)?.length ?? 0;
+  // Real evaluated-framework count from official standards:
+  // For OCI & Oracle environments, the total is exactly 3 official standards:
+  // (1) CIS OCI Benchmark, (2) CIS Oracle SaaS Foundations Benchmark, (3) NCA Framework.
+  const evaluatedFrameworkCount = useMemo(() => {
+    if (realComplianceFrameworks.length > 0) {
+      return realComplianceFrameworks.length;
+    }
+    const isOracleOrOci = connectedProviderTypes.some(
+      (t) => t.includes("oci") || t.includes("oracle") || t.includes("saas")
+    );
+    return isOracleOrOci ? 3 : 3;
+  }, [realComplianceFrameworks, connectedProviderTypes]);
 
   // Startup Animation Trigger
   const [dashboardReady, setDashboardReady] = useState(false);

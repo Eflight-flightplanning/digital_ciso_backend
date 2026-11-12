@@ -786,6 +786,50 @@ def _oracle_saas_scope(tenant_id: str | None, question: str) -> dict[str, Any]:
             idl.append(f"{superusers} IT superuser role holders")
         head.append("Identities: " + ", ".join(idl) + ".")
 
+        # Connection state (configured or not; never the values), so the model does not
+        # guess that MANUAL controls mean missing credentials.
+        try:
+            from oracle_cis import connections as ocis_conn
+
+            conn = ocis_conn.resolved(tenant_id)
+            idcs_ok = all(conn[k][0] for k in ("idcs_base", "idcs_client_id", "idcs_client_secret"))
+            fusion_ok = all(conn[k][0] for k in ("fusion_pod_url", "fusion_username", "fusion_password"))
+            head.append(
+                "Connections: identity domain (IDCS) " + ("configured" if idcs_ok else "NOT configured")
+                + "; Fusion pod " + ("configured" if fusion_ok else "NOT configured") + "."
+            )
+        except Exception as ce:
+            logger.debug("Oracle SaaS connection state for Spectra unavailable: %s", ce)
+
+        # Why controls are MANUAL: by design (need access the tool does not use) vs. a check
+        # that could not run (with its error).
+        from oracle_cis.status import AUTOMATED_CHECK_FAILED
+
+        by_access: dict[str, list[str]] = {}
+        not_run = []
+        for r in results:
+            if r.status != "MANUAL":
+                continue
+            if ocis.is_manual_control(r):
+                m = re.search(r"Needs:\s*(.+?)(?:\s*\(|\.\s|\.$|$)", r.reason or "")
+                by_access.setdefault(m.group(1).strip() if m else "assessor review", []).append(r.control_id)
+            elif AUTOMATED_CHECK_FAILED in (r.flags or []):
+                why = re.sub(r"\s+", " ", str(mask(r.reason or r.raw_status)))[:160]
+                not_run.append(f"- {r.control_id} {r.title}: {why}")
+        if by_access or not_run:
+            lines = ["## Why controls are MANUAL"]
+            if by_access:
+                lines.append(
+                    f"{sum(len(v) for v in by_access.values())} are manual by design in this benchmark: the tool cannot "
+                    "check them, an assessor does, using access the tool does not have. This is not a missing or wrong "
+                    "credential. By the access they need:"
+                )
+                lines += [f"- {k}: {len(v)} ({', '.join(v)})" for k, v in sorted(by_access.items(), key=lambda kv: -len(kv[1]))]
+            if not_run:
+                lines.append(f"{len(not_run)} are automated checks that could not run this time, so they show as MANUAL:")
+                lines += not_run
+            head.append("\n".join(lines))
+
         def line(r, with_reason=False):
             s = f"- {r.control_id} [{(r.severity or '').upper()}] {r.title} | {r.section_name} | L{r.level[-1:] or '?'} | {r.status}"
             if ocis.is_manual_control(r):

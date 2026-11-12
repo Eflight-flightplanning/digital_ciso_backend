@@ -23,7 +23,8 @@ import {
   Row,
   severityTone,
 } from "@/components/ui-kit/primitives";
-import { useFindings, useAnalyzeFinding } from "@/hooks/use-api";
+import { useFindings, useAnalyzeFinding, useProviders } from "@/hooks/use-api";
+import { frameworkInScope, roleFrameworkScope } from "@/lib/role-scope";
 
 export interface Finding {
   id: string;
@@ -159,6 +160,16 @@ function extractFindingProvider(f: any): string {
   if (checkId.startsWith("k8s_")) return "K8S";
 
   return p || "AZURE";
+}
+
+/** A finding's provider label as a dropdown value (AZURE, OCI, ORACLE_SAAS, AWS, GCP, K8S). */
+function normalizeProvider(p: string): string {
+  const u = (p || "").toUpperCase();
+  if (u === "AZ") return "AZURE";
+  if (u === "ORACLECLOUD") return "OCI";
+  if (u === "ORACLE-SAAS" || u === "ERP") return "ORACLE_SAAS";
+  if (u === "KUBERNETES") return "K8S";
+  return u;
 }
 
 function FindingsPage() {
@@ -314,6 +325,29 @@ function FindingsPage() {
     return [];
   }, [apiFindings]);
 
+  // Filter options follow the role: the provider list comes from the API (already limited to
+  // the role's clouds) and the framework list from the framework the role is scoped to.
+  const { data: providersData } = useProviders();
+  const frameworkScope = useMemo(() => roleFrameworkScope(), []);
+  const providerOptions = useMemo(() => {
+    const labels: Record<string, [string, string]> = {
+      azure: ["AZURE", "Azure"],
+      oraclecloud: ["OCI", "Oracle Cloud (OCI)"],
+      oracle_saas: ["ORACLE_SAAS", "Oracle SaaS / ERP"],
+      aws: ["AWS", "AWS"],
+      gcp: ["GCP", "GCP"],
+      kubernetes: ["K8S", "Kubernetes"],
+    };
+    const seen = new Map<string, string>();
+    for (const p of (providersData?.items as Array<Record<string, any>> | undefined) ?? []) {
+      const type = String(p.provider ?? p.attributes?.provider ?? "").toLowerCase();
+      const opt = labels[type];
+      if (opt && !seen.has(opt[0])) seen.set(opt[0], opt[1]);
+    }
+    return Array.from(seen, ([value, label]) => ({ value, label }));
+  }, [providersData]);
+  const allowedProviderValues = useMemo(() => new Set(providerOptions.map((o) => o.value)), [providerOptions]);
+
   const [mutedIds, setMutedIds] = useState<string[]>([]);
   const [remediatedIds, setRemediatedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -327,7 +361,16 @@ function FindingsPage() {
   const [analysisStatus, setAnalysisStatus] = useState<Record<string, string>>({});
 
   const data: Finding[] = useMemo(() => {
-    const base = rawData;
+    // Never show a provider or framework outside the role's scope.
+    const base = rawData.filter((f) => {
+      if (providersData && !allowedProviderValues.has(normalizeProvider(f.provider))) return false;
+      if (frameworkScope) {
+        const keys = Object.keys(f.compliance || {});
+        const saasCis = frameworkScope === "cis" && normalizeProvider(f.provider) === "ORACLE_SAAS";
+        if (!saasCis && !keys.some((k) => frameworkInScope(k, frameworkScope))) return false;
+      }
+      return true;
+    });
     return base.map((f) => {
       if (remediatedIds.includes(f.id)) {
         return { ...f, status: "PASS" };
@@ -337,7 +380,7 @@ function FindingsPage() {
       }
       return f;
     });
-  }, [rawData, mutedIds, remediatedIds]);
+  }, [rawData, mutedIds, remediatedIds, providersData, allowedProviderValues, frameworkScope]);
 
   // Pre-filter findings by selected cloud provider AND compliance framework so that tab counts update dynamically
   const scopedData = useMemo(() => {
@@ -403,8 +446,9 @@ function FindingsPage() {
   // when Oracle SaaS is selected, exclusively display CIS Oracle SaaS and SoD Matrix.
   const complianceOptions = useMemo(() => {
     const selProv = (selectedProvider || "ALL").toUpperCase();
+    const inScope = (keys: string[]) => keys.filter((k) => frameworkInScope(k, frameworkScope));
     if (selProv === "ORACLE_SAAS" || selProv === "ORACLE-SAAS" || selProv === "ERP") {
-      return ["cis_1.0.0_oracle_saas", "sod_matrix_oracle_saas"];
+      return inScope(["cis_1.0.0_oracle_saas", "sod_matrix_oracle_saas"]);
     }
 
     const set = new Set<string>();
@@ -413,22 +457,36 @@ function FindingsPage() {
         set.add(key);
       }
     }
-    if (selProv === "ALL") {
+    if (selProv === "ALL" && allowedProviderValues.has("ORACLE_SAAS")) {
       set.add("cis_1.0.0_oracle_saas");
       set.add("sod_matrix_oracle_saas");
     }
-    return Array.from(set).sort((a, b) => {
+    return inScope(Array.from(set)).sort((a, b) => {
       const nameA = formatComplianceFrameworkName(a);
       const nameB = formatComplianceFrameworkName(b);
       return nameA.localeCompare(nameB);
     });
-  }, [providerFilteredData, selectedProvider]);
+  }, [providerFilteredData, selectedProvider, frameworkScope, allowedProviderValues]);
 
   // If the provider filter changes and the previously selected framework no longer
   // appears in the data, fall back to "All" rather than silently filtering to nothing.
   useEffect(() => {
     if (selectedCompliance !== "All" && !complianceOptions.includes(selectedCompliance)) {
       setSelectedCompliance("All");
+    }
+  }, [complianceOptions, selectedCompliance]);
+
+  // With a single option there is no "All": select it. Drop a selection the role cannot use.
+  useEffect(() => {
+    if (providerOptions.length === 1 && selectedProvider !== providerOptions[0].value) {
+      setSelectedProvider(providerOptions[0].value);
+    } else if (selectedProvider !== "All" && providersData && !allowedProviderValues.has(selectedProvider.toUpperCase())) {
+      setSelectedProvider("All");
+    }
+  }, [providerOptions, allowedProviderValues, providersData, selectedProvider]);
+  useEffect(() => {
+    if (complianceOptions.length === 1 && selectedCompliance !== complianceOptions[0]) {
+      setSelectedCompliance(complianceOptions[0]);
     }
   }, [complianceOptions, selectedCompliance]);
 
@@ -440,7 +498,7 @@ function FindingsPage() {
       const compParam = params.get("compliance") || params.get("compliance_id");
       if (provParam) {
         const upper = provParam.toUpperCase();
-        if (["AZURE", "OCI", "ORACLE_SAAS", "AWS", "GCP", "K8S"].includes(upper)) {
+        if (["AZURE", "OCI", "ORACLE_SAAS", "AWS", "GCP", "K8S"].includes(upper) && (!providersData || allowedProviderValues.has(upper))) {
           setSelectedProvider(upper);
         }
       }
@@ -623,13 +681,12 @@ function FindingsPage() {
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="h-9 min-w-[150px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
             >
-              <option value="All">All Providers</option>
-              <option value="AZURE">Azure</option>
-              <option value="OCI">Oracle Cloud (OCI)</option>
-              <option value="ORACLE_SAAS">Oracle SaaS / ERP</option>
-              <option value="AWS">AWS</option>
-              <option value="GCP">GCP</option>
-              <option value="K8S">Kubernetes</option>
+              {providerOptions.length !== 1 && <option value="All">All Providers</option>}
+              {providerOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
 
             <select
@@ -638,7 +695,7 @@ function FindingsPage() {
               className="h-9 min-w-[220px] rounded-lg border border-border bg-surface-2/70 px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:border-primary/40 focus:border-primary cursor-pointer"
               title="Filter by compliance framework"
             >
-              <option value="All">All Compliance Frameworks</option>
+              {complianceOptions.length !== 1 && <option value="All">All Compliance Frameworks</option>}
               {complianceOptions.map((c) => (
                 <option key={c} value={c}>
                   {formatComplianceFrameworkName(c)}

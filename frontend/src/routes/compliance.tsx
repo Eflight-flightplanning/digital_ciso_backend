@@ -15,6 +15,7 @@ import { NcaWorkspace, ControlDrawer, CloseGlyph, REASON_TEXT, BASIS_LABEL, useN
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ncaDownload, ncaFetch, ncaPost, qs } from "@/lib/nca-api";
 import { useCompliance, useComplianceRequirements, useProviders, useResources, useCurrentUser } from "@/hooks/use-api";
+import { roleFrameworkScope } from "@/lib/role-scope";
 
 export const Route = createFileRoute("/compliance")({
   component: CompliancePage,
@@ -181,17 +182,11 @@ function CompliancePage() {
     return visible.length > 0 ? visible : null;
   }, [isAdmin, userRoleStr]);
 
-  const allowedFrameworkScope = useMemo(() => {
-    if (isAdmin || userRoleStr.includes("all")) return null;
-    if (userRoleStr.includes("cis")) return "cis";
-    if (userRoleStr.includes("nca") || userRoleStr.includes("ecc") || userRoleStr.includes("ccc")) return "nca";
-    if (userRoleStr.includes("soc2") || userRoleStr.includes("soc")) return "soc2";
-    if (userRoleStr.includes("pci")) return "pci";
-    if (userRoleStr.includes("iso")) return "iso";
-    if (userRoleStr.includes("hipaa")) return "hipaa";
-    if (userRoleStr.includes("nist")) return "nist";
-    return null;
-  }, [isAdmin, userRoleStr]);
+  // "All Clouds CIS ..." is scoped to CIS: "all" there is about clouds, not frameworks.
+  const allowedFrameworkScope = useMemo(
+    () => (isAdmin ? null : roleFrameworkScope(userRoleStr)),
+    [isAdmin, userRoleStr],
+  );
 
   const canViewNca = useMemo(() => {
     const frameworkOk = !allowedFrameworkScope || allowedFrameworkScope === "nca";
