@@ -562,9 +562,22 @@ class AIAdvisorQueryView(TenantScopedAPIView):
             if any(k in q_lower for k in ("okta", "okta user", "okta application")):
                 detected_provs.append("okta")
 
+            _body = request.data if isinstance(request.data, dict) else {}
+            _attrs0 = _body.get("data", {}).get("attributes", {}) if isinstance(_body.get("data"), dict) else {}
+            scope_name = str(_attrs0.get("scope") or _body.get("scope") or "").strip().lower() or None
+            if scope_name not in (None, "oracle_saas"):
+                return Response(
+                    {"errors": [{"status": "400", "title": "Bad Request", "detail": "unknown scope"}]},
+                    status=400,
+                    content_type="application/vnd.api+json",
+                )
+
             # Question natural language takes highest precedence:
             provider_filter = None
-            if len(detected_provs) == 1 and not any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
+            if scope_name:
+                # Embedded in a product dashboard: never leave that product, whatever the question names.
+                provider_filter = scope_name
+            elif len(detected_provs) == 1 and not any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
                 provider_filter = detected_provs[0]
             elif len(detected_provs) > 1 or any(m in q_lower for m in ("multi-cloud", "multicloud", "all cloud", "across", "both", "overall", "compare", "posture")):
                 provider_filter = None
@@ -622,28 +635,52 @@ class AIAdvisorQueryView(TenantScopedAPIView):
             compliance_scores = []
             try:
                 from api.models import ComplianceOverview
-                co_qs = ComplianceOverview.objects.all()
+                co_qs = ComplianceOverview.objects.select_related("scan__provider").order_by("-inserted_at")
                 if tenant_id:
                     co_qs = co_qs.filter(tenant_id=tenant_id)
-                for co in co_qs:
-                    total_eval = co.requirements_passed + co.requirements_failed
-                    score = round((co.requirements_passed / max(1, total_eval)) * 100) if total_eval > 0 else 0
-                    compliance_scores.append({
+                # One entry per (provider, framework) from its latest scan, regions summed.
+                # Every historical scan and region used to be sent, so the same framework
+                # appeared many times with different numbers.
+                latest_scan: dict[tuple, Any] = {}
+                agg: dict[tuple, dict[str, Any]] = {}
+                for co in co_qs[:2000]:
+                    prov = co.scan.provider.provider if (co.scan and co.scan.provider) else ""
+                    key = (prov, co.compliance_id)
+                    latest_scan.setdefault(key, co.scan_id)
+                    if latest_scan[key] != co.scan_id:
+                        continue
+                    a = agg.setdefault(key, {
+                        "provider": prov,
                         "framework": co.framework,
                         "compliance_id": co.compliance_id,
                         "version": co.version or "",
-                        "score": score,
-                        "passed": co.requirements_passed,
-                        "failed": co.requirements_failed,
-                        "manual": co.requirements_manual,
-                        "total": co.total_requirements,
+                        "passed": 0, "failed": 0, "manual": 0, "total": 0,
                     })
+                    a["passed"] += co.requirements_passed or 0
+                    a["failed"] += co.requirements_failed or 0
+                    a["manual"] += co.requirements_manual or 0
+                    a["total"] = max(a["total"], co.total_requirements or 0)
+                for a in agg.values():
+                    evaluated = a["passed"] + a["failed"]
+                    a["score"] = round(a["passed"] / evaluated * 100) if evaluated else 0
+                    compliance_scores.append(a)
             except Exception as ce:
                 logger.warning("Could not fetch compliance overviews for advisor: %s", ce)
 
+            scope = None
+            if scope_name == "oracle_saas":
+                connected_providers = [p for p in connected_providers if p["provider"] == "oracle_saas"]
+                # Only frameworks the scanner actually evaluated: the rest are 0% with every
+                # requirement manual (e.g. M365 / Kubernetes frameworks), which reads as a failure.
+                compliance_scores = [
+                    s for s in compliance_scores
+                    if s.get("provider") == "oracle_saas" and (s.get("passed", 0) + s.get("failed", 0)) > 0
+                ]
+                scope = _oracle_saas_scope(tenant_id, clean_question)
+
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
-                request, clean_question, provider=provider_filter, history=history
+                request, clean_question, provider=provider_filter, history=history, scope=scope_name
             )
 
             ai_provider = get_ai_provider(tenant_id=tenant_id)
@@ -653,6 +690,7 @@ class AIAdvisorQueryView(TenantScopedAPIView):
                 history=history,
                 connected_providers=connected_providers,
                 compliance_scores=compliance_scores,
+                scope=scope,
             )
 
             from django.http import JsonResponse
@@ -663,12 +701,105 @@ class AIAdvisorQueryView(TenantScopedAPIView):
             return _ai_unavailable_response()
 
 
+_CIS_STOP = {
+    "what", "which", "how", "the", "and", "for", "are", "our", "with", "about", "show", "tell", "give", "does",
+    "have", "has", "this", "that", "from", "any", "all", "can", "you", "why", "should", "fix", "control",
+    "controls", "cis", "oracle", "saas", "fusion", "failing", "failed", "fail", "pass", "passed", "status",
+    "risk", "risks", "findings", "finding", "list", "explain", "please", "assessment", "benchmark", "score",
+}
+
+
+def _oracle_saas_scope(tenant_id: str | None, question: str) -> dict[str, Any]:
+    """Context for the Spectra panel of the Oracle SaaS dashboard: the latest CIS assessment.
+
+    Usernames and e-mail addresses in check reasons are masked before they reach the model.
+    """
+    scope: dict[str, Any] = {"scope": "oracle_saas", "label": "Oracle Fusion SaaS", "sections": [], "matched": False}
+    if not tenant_id:
+        return scope
+    try:
+        from oracle_cis import services as ocis
+        from oracle_cis.masking import mask
+        from oracle_cis.models import OcisRun
+
+        run = OcisRun.objects.filter(tenant_id=tenant_id, status=OcisRun.FINISHED).order_by("-started_at").first()
+        if not run:
+            scope["sections"].append(
+                "## CIS Oracle SaaS assessment\nNo CIS assessment has finished for this organisation yet."
+            )
+            scope["fallback"] = "No CIS Oracle SaaS assessment has finished yet."
+            return scope
+
+        c = ocis.effective_counts(run)
+        score = round(c["PASS"] / c["assessed"] * 100) if c.get("assessed") else 0
+        results = sorted(run.results.all(), key=ocis.sort_key)
+        ident = ocis.identity_summary(run)
+        superusers = ident.get("superusers")
+        if isinstance(superusers, (list, tuple, set, dict)):
+            superusers = len(superusers)
+
+        head = [
+            "## CIS Oracle SaaS Cloud Applications Benchmark v1.0.0: latest assessment",
+            f"Run #{run.pk}, finished {run.finished_at:%Y-%m-%d %H:%M} UTC"
+            + (f", identity domain {run.tenant_name}" if run.tenant_name else "") + ".",
+            f"Controls: {c['total']} total, {c['PASS']} PASS, {c['FAIL']} FAIL, {c['MANUAL']} MANUAL "
+            f"({c['manual_controls']} are checked by an assessor, not the tool; {c['not_completed']} could not be tested). "
+            f"Score {score}% = PASS / (PASS + FAIL).",
+            "This is the assessment this dashboard shows. A 'CIS Oracle SaaS' entry under Compliance scores, if any, "
+            "comes from the platform scanner, which uses different checks, so the two scores differ: say which one you quote.",
+        ]
+        idl = [f"{ident['monitored']} accounts monitored", f"{ident['dormant']} dormant"]
+        if ident.get("threshold_days"):
+            idl[-1] += f" (no sign-in for {ident['threshold_days']}+ days)"
+        idl.append(f"{ident['dormant_privileged']} dormant with privileged roles")
+        idl.append(f"{ident['ghost']} potential ghost employees" if ident.get("ghost") is not None else "ghost-employee check not completed")
+        if superusers is not None:
+            idl.append(f"{superusers} IT superuser role holders")
+        head.append("Identities: " + ", ".join(idl) + ".")
+
+        def line(r, with_reason=False):
+            s = f"- {r.control_id} [{(r.severity or '').upper()}] {r.title} | {r.section_name} | L{r.level[-1:] or '?'} | {r.status}"
+            if ocis.is_manual_control(r):
+                s += " (assessor-checked)"
+            if with_reason and r.reason:
+                reason = re.sub(r"\s+", " ", str(mask(r.reason)))[:300]
+                s += "\n  reason: " + reason
+            return s
+
+        words = [w for w in re.findall(r"[a-z0-9][a-z0-9_.\-]{2,}", question.lower()) if w not in _CIS_STOP]
+        ids = set(re.findall(r"\b\d+(?:\.\d+){1,2}\b", question))
+        scored = []
+        for r in results:
+            text = f"{r.title} {r.section_name} {r.check_id}".lower()
+            hits = sum(1 for w in words if w in text) + (5 if r.control_id in ids else 0)
+            if hits:
+                scored.append((-hits, 0 if r.status == "FAIL" else 1, ocis.sort_key(r), r))
+        matched = [x[-1] for x in sorted(scored, key=lambda x: x[:3])][:8]
+        scope["matched"] = bool(matched)
+
+        sections = ["\n".join(head)]
+        if matched:
+            sections.append("## CIS controls that match the question\n" + "\n".join(line(r, True) for r in matched))
+        failing = [r for r in results if r.status == "FAIL" and r not in matched]
+        if failing:
+            sections.append("## Other failing CIS controls\n" + "\n".join(line(r) for r in failing[:30]))
+        scope["sections"] = sections
+        scope["fallback"] = (
+            f"**CIS Oracle SaaS assessment (run #{run.pk}):** {c['PASS']} PASS, {c['FAIL']} FAIL, {c['MANUAL']} MANUAL; score {score}%."
+            + ("\n\n**Matching controls:**\n" + "\n".join(f"- {r.control_id} {r.title}: **{r.status}**" for r in matched) if matched else "")
+        )
+    except Exception as e:  # never let the assessment context break the answer
+        logger.warning("Oracle SaaS CIS context for Spectra failed: %s", e)
+    return scope
+
+
 def _retrieve_relevant_findings(
     request: Request,
     question: str,
     limit: int = 35,
     provider: str | None = None,
     history: list[dict[str, str]] | None = None,
+    scope: str | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve relevant findings from DB for AI Advisor context.
 
@@ -727,7 +858,7 @@ def _retrieve_relevant_findings(
             matching_ids = set()
             matching_findings = []
 
-            def _serialize_finding(f, pinned: bool = False):
+            def _serialize_finding(f, pinned: bool = False, relevance: str = "match"):
                 meta = f.check_metadata or {}
                 first_resource = f.resources.first()
                 res_name = (
@@ -808,6 +939,7 @@ def _retrieve_relevant_findings(
                 }
                 if pinned:
                     result["_pinned"] = True  # signal to the LLM prompt formatter
+                result["_relevance"] = "pinned" if pinned else relevance
                 return result
 
             # 1. Directly resolve any UUIDs found in the question from the database
@@ -853,10 +985,10 @@ def _retrieve_relevant_findings(
                     })
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
-            is_saas_query = (
+            is_saas_query = scope == "oracle_saas" or (
                 (provider is None or provider == "oracle_saas")
                 and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes", "github", "m365")
-                and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "curtis", "alan", "mandy", "oracle erp"))
+                and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "superuser", "dormant", "oracle erp"))
             )
             if is_saas_query:
                 try:
@@ -892,9 +1024,9 @@ def _retrieve_relevant_findings(
                             "severity": "CRITICAL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "MEDIUM",
                             "status": "FAIL" if any(u.get("is_superuser") or u.get("sod_conflicts") for u in relevant_saas_users) else "PASS",
                             "status_extended": f"Total Monitored SaaS Users: {len(saas_users)}. Active Accounts: {len([u for u in saas_users if u.get('days_inactive', 0) < 30 and not u.get('is_suspended')])}, Dormant: {len([u for u in saas_users if u.get('days_inactive', 0) >= 30])}, Superusers/PAM: {len([u for u in saas_users if u.get('is_superuser')])}, SoD Toxic Combinations: {sum(len(u.get('sod_conflicts', [])) for u in saas_users)}. Inspected Users: {', '.join(u.get('username') for u in relevant_saas_users[:5])}.",
-                            "remediation": "Enforce MFA via Oracle Identity Cloud Service (IDCS) / OCI IAM Domain Conditional Access Policy, decouple conflicting SoD roles, and quarantine unused PAM accounts.",
+                            "remediation": "",
                             "provider": "oracle_saas",
-                            "resource": {"name": "Oracle Fusion Cloud Pod (fa-etar-dev13)"},
+                            "resource": {"name": "Oracle Fusion SaaS pod"},
                         })
                 except Exception as s_err:
                     logger.debug("SaaS telemetry inclusion error: %s", s_err)
@@ -908,22 +1040,25 @@ def _retrieve_relevant_findings(
             if is_oci_query:
                 try:
                     from api.models import Provider, Resource
-                    oci_prov = Provider.objects.filter(provider="oraclecloud").first()
-                    tenancy_ocid = (oci_prov.uid if oci_prov else "") or "ocid1.tenancy.oc1..aaaaaaaakgt7vtkpicqhxaxa2zs6qsiz7acdoot5jnylrzhvltdto2qrls7a"
-                    oci_res_count = Resource.objects.filter(provider__provider="oraclecloud").count()
-
-                    matching_findings.append({
-                        "finding_id": "OCI-TENANCY-ARCHITECTURE-SUMMARY",
-                        "uid": f"oraclecloud-tenancy-{tenancy_ocid[-12:]}",
-                        "check_id": "oraclecloud_tenancy_governance",
-                        "check_title": "OCI Tenancy Architecture & Security Zone Governance",
-                        "severity": "HIGH",
-                        "status": "FAIL",
-                        "status_extended": f"Active Tenancy OCID: {tenancy_ocid}. Total Monitored OCI Resources: {max(oci_res_count, 14)}. Cloud Guard: Enabled. Security Zone: Root & Production. Root Compartment Exposure: Direct resources detected in Root Compartment requiring isolation into dedicated child compartments.",
-                        "remediation": f"Isolate workload resources from Root Compartment into dedicated child compartments under tenancy {tenancy_ocid}, and attach standard Security Zone recipes.",
-                        "provider": "oraclecloud",
-                        "resource": {"name": f"OCI Tenancy ({tenancy_ocid[:24]}...)"},
-                    })
+                    oci_provs = list(Provider.objects.filter(provider="oraclecloud"))
+                    if oci_provs:
+                        oci_res_count = Resource.objects.filter(provider__provider="oraclecloud").count()
+                        matching_findings.append({
+                            "finding_id": "OCI-TENANCY-SUMMARY",
+                            "uid": "oraclecloud-tenancy-summary",
+                            "check_id": "oraclecloud_inventory_summary",
+                            "check_title": "OCI inventory summary",
+                            "severity": "",
+                            "status": "INFO",
+                            "status_extended": (
+                                "Connected OCI tenancies: "
+                                + ", ".join(f"{p.alias or p.uid} ({p.uid})" for p in oci_provs[:5])
+                                + f". Resources inventoried by the last scans: {oci_res_count}."
+                            ),
+                            "remediation": "",
+                            "provider": "oraclecloud",
+                            "resource": {"name": "OCI tenancy"},
+                        })
                 except Exception as o_err:
                     logger.debug("OCI telemetry inclusion error: %s", o_err)
 
@@ -992,11 +1127,11 @@ def _retrieve_relevant_findings(
                                     "finding_id": f"COMPLIANCE-{tp_norm.upper()}-CIS",
                                     "uid": f"{tp_norm}-cis-benchmark",
                                     "check_id": f"{tp_norm}_cis_benchmark_score",
-                                    "check_title": f"{tp_norm.upper()} CIS Foundations Benchmark Posture",
+                                    "check_title": f"{tp_norm.upper()} check pass rate (no compliance framework scored yet)",
                                     "severity": "HIGH" if score_pct < 80 else "MEDIUM",
                                     "status": "FAIL" if tp_fail > 0 else "PASS",
-                                    "status_extended": f"Provider: {tp_norm.upper()}. Framework: CIS Benchmark v2.0.0. Evaluated Controls: {tp_total} ({tp_pass} Passed, {tp_fail} Failed). Compliance Score: {score_pct}%.",
-                                    "remediation": f"Remediate {tp_fail} failing security configurations in {tp_norm.upper()} across Identity, Network VCN, and Storage compartments.",
+                                    "status_extended": f"Provider: {tp_norm.upper()}. No compliance framework overview exists yet; across all scanned checks: {tp_total} results ({tp_pass} PASS, {tp_fail} FAIL), pass rate {score_pct}%. This is not a CIS benchmark score.",
+                                    "remediation": "",
                                     "provider": tp_norm,
                                     "resource": {"name": f"{tp_norm.upper()} Tenancy Assessment"},
                                 })
@@ -1086,72 +1221,91 @@ def _retrieve_relevant_findings(
                 else:
                     base_qs = base_qs.filter(scan__provider__provider__iexact=provider)
 
-            # Keyword matching: extract meaningful terms from question
-            words = [w.strip("?,.:;\"'()[]") for w in question.split() if len(w.strip("?,.:;\"'()[]")) > 2]
+            # Keyword matching: meaningful terms only (question words and filler never match).
             stop_words = {
-                "analyze", "finding", "what", "risk", "and", "how", "we", "remediate",
-                "the", "with", "for", "show", "give", "tell", "about", "which", "are",
-                "from", "that", "this", "can", "our", "all", "does", "have", "first", "today",
-                "high", "critical", "medium", "low", "find", "infrastructure", "environment",
-                "account", "accounts", "missing", "enforce", "enforcement", "status", "check", "user", "users"
+                "analyze", "analyse", "finding", "findings", "what", "whats", "risk", "risks", "and", "how", "we", "remediate",
+                "the", "with", "for", "show", "give", "tell", "about", "which", "are", "from", "that", "this", "these",
+                "can", "our", "all", "does", "have", "has", "first", "today", "high", "critical", "medium", "low", "find",
+                "infrastructure", "environment", "account", "accounts", "missing", "enforce", "enforcement", "status",
+                "check", "checks", "user", "users", "you", "your", "why", "when", "where", "who", "should", "would",
+                "could", "will", "please", "explain", "list", "any", "there", "into", "need", "want", "know", "get",
+                "fix", "issue", "issues", "problem", "problems", "security", "secure", "cloud", "my", "me", "is", "it",
+                "its", "was", "were", "been", "being", "did", "do", "not", "but", "out", "more", "most", "some", "than",
+                "then", "them", "they", "also", "just", "like", "make", "made", "use", "used", "using", "provide",
+                "details", "detail", "step", "steps", "help", "summary", "summarize", "current", "currently",
+                "compliance", "score", "posture", "overall", "report", "briefing", "top", "biggest", "main",
             }
-            meaningful_keywords = [w for w in words if w.lower() not in stop_words]
+            words = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9_\-]{2,}", question)
+            search_kws = list(dict.fromkeys(
+                w for w in words
+                if w.lower() not in stop_words and w.lower() not in ("administrator", "administrators", "admin", "admins")
+            ))[:8]
 
-            if meaningful_keywords and len(matching_findings) < limit:
-                search_kws = [k for k in meaningful_keywords if len(k) >= 2 and k.lower() not in ("administrator", "administrators", "admin", "admins")]
-                if not search_kws:
-                    search_kws = meaningful_keywords
+            def _add_ranked(qs, relevance_tag, cap):
+                """One row per (check_id, status), keeping a count of affected resources."""
+                rows = {}
+                order = []
+                for f in qs:
+                    key = (f.check_id, f.status)
+                    if key in rows:
+                        rows[key]["affected_resources"] = rows[key].get("affected_resources", 1) + 1
+                        continue
+                    if len(order) >= cap or f.id in matching_ids:
+                        continue
+                    item = _serialize_finding(f, relevance=relevance_tag)
+                    item["affected_resources"] = 1
+                    rows[key] = item
+                    order.append(key)
+                for key in order:
+                    matching_findings.append(rows[key])
+                    matching_ids.add(rows[key]["finding_id"])
 
+            status_order = Case(
+                When(status="FAIL", then=Value(0)),
+                When(status="MANUAL", then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+            severity_order = Case(
+                When(severity="critical", then=Value(0)),
+                When(severity="high", then=Value(1)),
+                When(severity="medium", then=Value(2)),
+                When(severity="low", then=Value(3)),
+                default=Value(4),
+                output_field=IntegerField(),
+            )
+
+            if search_kws:
                 q_obj = Q()
+                kw_score = Value(0, output_field=IntegerField())
                 for kw in search_kws:
-                    if len(kw) <= 2:
-                        q_obj |= (
-                            Q(check_id__icontains=f"_{kw}")
-                            | Q(check_id__istartswith=f"{kw}_")
-                            | Q(status_extended__icontains=kw)
-                            | Q(resources__name__icontains=kw)
-                            | Q(uid__icontains=kw)
-                        )
-                    else:
-                        q_obj |= (
-                            Q(check_id__icontains=kw)
-                            | Q(status_extended__icontains=kw)
-                            | Q(uid__icontains=kw)
-                            | Q(resources__name__icontains=kw)
-                            | Q(check_metadata__icontains=kw)
-                        )
-
-                matched_qs = base_qs.exclude(id__in=matching_ids).filter(q_obj).distinct()[: (limit - len(matching_findings))]
-                for f in matched_qs:
-                    matching_ids.add(f.id)
-                    matching_findings.append(_serialize_finding(f))
-
-            # Always populate remaining slots with active findings so the AI telemetry is never empty
-            if len(matching_findings) < limit:
-                remaining_limit = limit - len(matching_findings)
-                severity_order = Case(
-                    When(severity="critical", then=Value(0)),
-                    When(severity="high", then=Value(1)),
-                    When(severity="medium", then=Value(2)),
-                    When(severity="low", then=Value(3)),
-                    default=Value(4),
-                    output_field=IntegerField(),
+                    kw_q = (
+                        Q(check_id__icontains=kw)
+                        | Q(status_extended__icontains=kw)
+                        | Q(uid__icontains=kw)
+                        | Q(resources__name__icontains=kw)
+                    )
+                    q_obj |= kw_q
+                    kw_score = kw_score + Case(When(kw_q, then=Value(1)), default=Value(0), output_field=IntegerField())
+                matched_ids = list(
+                    base_qs.exclude(id__in=matching_ids).filter(q_obj).values_list("id", flat=True).distinct()[:400]
                 )
-                status_order = Case(
-                    When(status="FAIL", then=Value(0)),
-                    When(status="MANUAL", then=Value(1)),
-                    default=Value(2),
-                    output_field=IntegerField(),
+                matched_qs = (
+                    base_qs.filter(id__in=matched_ids)
+                    .annotate(kw_hits=kw_score, status_rank=status_order, severity_rank=severity_order)
+                    .order_by("-kw_hits", "status_rank", "severity_rank", "-inserted_at")
                 )
-                fill_qs = (
-                    base_qs.exclude(id__in=matching_ids)
-                    .annotate(status_rank=status_order, severity_rank=severity_order)
-                    .order_by("status_rank", "severity_rank")[:remaining_limit]
-                )
+                _add_ranked(matched_qs, "match", 10)
 
-                for f in fill_qs:
-                    matching_ids.add(f.id)
-                    matching_findings.append(_serialize_finding(f))
+            # Background: highest-severity open findings, labelled so the model only uses them
+            # for questions about overall risk (they used to make every answer look the same).
+            fill_qs = (
+                base_qs.exclude(id__in=matching_ids)
+                .filter(status="FAIL", muted=False)
+                .annotate(severity_rank=severity_order)
+                .order_by("severity_rank", "-inserted_at")[:150]
+            )
+            _add_ranked(fill_qs, "background", 6)
 
             return matching_findings
     except Exception as e:

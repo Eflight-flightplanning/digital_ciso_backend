@@ -280,6 +280,9 @@ SECRET_FIELDS = {"idcs_client_secret", "fusion_password"}
 
 class ConnectionView(OcisBase):
     def get(self, request):
+        # Pod URL, client ID and usernames are connection settings, not assessment
+        # results: read-only accounts don't get them.
+        self.require(request, "manage_providers")
         return Response(connections.public_view(self.tenant_id(request)))
 
     def put(self, request):
@@ -310,6 +313,7 @@ class ConnectionView(OcisBase):
 class ConnectionTestView(OcisBase):
     def post(self, request):
         """An OAuth token and one Users read for IDCS; one HCM REST read for Fusion."""
+        self.require(request, "manage_providers")
         tid = self.tenant_id(request)
         target = request.data.get("target")
         try:

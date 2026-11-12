@@ -470,6 +470,53 @@ class VLLMAzureProvider(AIProvider):
             confidence=float(data.get("confidence", 0.85)),
         )
 
+    def _chat_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        history: list[dict[str, str]] | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 1800,
+    ) -> tuple[str, str | None]:
+        """Plain-text chat completion. Returns (content, error)."""
+        url = f"{self.base_url}/chat/completions"
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
+        messages = [{"role": "system", "content": system_prompt}, *(history or []), {"role": "user", "content": user_prompt}]
+
+        # vLLM max_model_len is 8192 for the Qwen deployment: keep input + output inside it.
+        est_input_tokens = int(sum(len(m["content"]) for m in messages) / 3.2) + 64
+        while est_input_tokens > 6000 and len(messages) > 2:
+            messages.pop(1)  # drop the oldest history turn first
+            est_input_tokens = int(sum(len(m["content"]) for m in messages) / 3.2) + 64
+        safe_max_tokens = max(400, min(max_tokens, 7900 - est_input_tokens))
+
+        payload: dict[str, Any] = {
+            "model": self._resolve_model_name(),
+            "messages": messages,
+            "temperature": temperature,
+            "top_p": 0.9,
+            "max_tokens": safe_max_tokens,
+            # Discourage looping and copying earlier answers.
+            "presence_penalty": 0.3,
+            "frequency_penalty": 0.3,
+            # Qwen3: answer directly instead of emitting a <think> block that eats the token budget.
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        timeout = httpx.Timeout(connect=5.0, read=min(self.timeout or 120.0, 120.0), write=15.0, pool=10.0)
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(url, json=payload, headers=headers)
+                if response.status_code == 400 and "chat_template_kwargs" in response.text:
+                    payload.pop("chat_template_kwargs")  # older vLLM build
+                    response = client.post(url, json=payload, headers=headers)
+                if response.is_error:
+                    logger.error("vLLM error response (%s): %s", response.status_code, response.text[:500])
+                response.raise_for_status()
+                return str(response.json()["choices"][0]["message"].get("content") or ""), None
+        except Exception as e:
+            logger.error("vLLM advisor request to %s failed: %s", url, e)
+            return "", f"{type(e).__name__}: {e}"
+
     def answer_advisor_query(
         self,
         question: str,
@@ -477,416 +524,50 @@ class VLLMAzureProvider(AIProvider):
         history: list[dict[str, str]] | None = None,
         connected_providers: list[dict[str, Any]] | None = None,
         compliance_scores: list[dict[str, Any]] | None = None,
+        scope: dict[str, Any] | None = None,
     ) -> AdvisorOutput:
-        """Answer CISO security queries using dynamic live LLM generation augmented with verified remediation templates."""
-        # 0. Sanitize untrusted cloud resource data
-        relevant_findings = sanitizer.sanitize_list(relevant_findings) if relevant_findings else relevant_findings
-        connected_providers = sanitizer.sanitize_list(connected_providers) if connected_providers else connected_providers
+        """Answer a security question from live data; never a canned or invented answer."""
+        from .advisor import build_user_prompt, clean_history, extract_answer, finding_refs, grounded_fallback
 
-        # 1. Separate pinned findings from general context findings
-        pinned_findings = [f for f in (relevant_findings or []) if f.get("_pinned")]
-        general_findings = [f for f in (relevant_findings or []) if not f.get("_pinned")]
-        _primary_finding = (pinned_findings or general_findings or [None])[0]
+        findings = sanitizer.sanitize_list(relevant_findings) if relevant_findings else []
+        providers = sanitizer.sanitize_list(connected_providers) if connected_providers else []
+        scores = compliance_scores or []
 
-        primary_template_block: str | None = None
-        if _primary_finding:
-            cid = _primary_finding.get("check_id", "").lower().strip()
-            template = get_remediation(cid)
+        raw, error = self._chat_text(
+            ADVISOR_SYSTEM_PROMPT,
+            build_user_prompt(question, findings, providers, scores, scope=scope),
+            history=clean_history(history),
+        )
+        answer = extract_answer(raw)
+        if not answer:
+            if not error:
+                error = "the model returned an empty answer"
+            logger.warning("Spectra advisor fell back to data-only reply: %s", error)
+            return AdvisorOutput(
+                answer=grounded_fallback(question, findings, providers, scores, scope=scope, reason=error),
+                finding_references=finding_refs(findings),
+                confidence=0.0,
+            )
+
+        # A verified remediation playbook, only for a finding the user explicitly referenced
+        # (never for background findings, which used to append unrelated playbooks).
+        pinned = [f for f in findings if f.get("_pinned")]
+        asks_fix = re.search(r"\b(fix|remediat|resolve|mitigat|how (do|can|to))", question, re.IGNORECASE)
+        if pinned and asks_fix:
+            template = get_remediation(str(pinned[0].get("check_id", "")).lower().strip())
             if template:
-                f_res = (
-                    _primary_finding.get("resource", {}).get("name")
-                    if isinstance(_primary_finding.get("resource"), dict)
-                    else (_primary_finding.get("resource") or "target-resource")
-                )
-                primary_template_block = render_remediation_block(
+                res = pinned[0].get("resource")
+                res_name = (res.get("name") if isinstance(res, dict) else res) or "<resource>"
+                answer = f"{answer.rstrip()}\n\n" + render_remediation_block(
                     template,
-                    resource=f_res,
-                    region=_primary_finding.get("region") or "eastus",
-                    subscription_id=_primary_finding.get("subscription_id") or "sub-id",
-                    rg=_primary_finding.get("resource_group") or "rg-production",
-                    account_id=_primary_finding.get("account_id") or "123456789012",
-                    compartment_id=_primary_finding.get("compartment_id") or "ocid1.compartment.oc1..example",
-                    tenancy_id=_primary_finding.get("tenancy_id") or "ocid1.tenancy.oc1..example",
-                    resource_id=_primary_finding.get("resource_id") or f_res,
+                    resource=res_name,
+                    region="<region>",
+                    subscription_id="<subscription-id>",
+                    rg="<resource-group>",
+                    account_id="<account-id>",
+                    compartment_id="<compartment-ocid>",
+                    tenancy_id="<tenancy-ocid>",
+                    resource_id=res_name,
                 )
 
-        # 2. Prepare slim findings
-        _SLIM_KEYS = ("finding_id", "provider", "check_id", "check_title", "severity", "status", "resource", "remediation")
-
-        def _slim(f: dict) -> dict:
-            return {k: f[k] for k in _SLIM_KEYS if k in f}
-
-        slim_pinned = [_slim(f) for f in pinned_findings[:2]]
-        slim_general = [] if slim_pinned else [_slim(f) for f in general_findings[:4]]
-        context_str = json.dumps(slim_general, indent=1) if slim_general else "[]"
-        prov_str = json.dumps([{"provider": p.get("provider"), "alias": p.get("alias")} for p in (connected_providers or [])[:4]], indent=1) if connected_providers else "[]"
-
-        # 3. Format live compliance scores context
-        comp_str = ""
-        if compliance_scores:
-            comp_lines = []
-            for c in compliance_scores[:12]:
-                comp_lines.append(
-                    f"- {c.get('framework')} ({c.get('compliance_id')}): Control Score {c.get('score')}% "
-                    f"({c.get('passed')} Passed, {c.get('failed')} Failed, {c.get('manual')} Manual / Resource Not Available, Total: {c.get('total')})"
-                )
-            comp_str = "\nLive Compliance & Benchmark Telemetry:\n" + "\n".join(comp_lines) + "\n"
-
-        # 4. Derive primary cloud provider and check for multi-cloud / overview query
-        q_lower = (question or "").lower()
-        is_overview_query = any(w in q_lower for w in ("multi-cloud", "multicloud", "briefing", "posture", "ciso", "executive", "overall", "all cloud", "across", "compare", "score", "compliance", "cis score", "sla", "readiness"))
-
-        _primary_cloud = None
-        for f in (slim_pinned + slim_general):
-            _primary_cloud = f.get("provider")
-            if _primary_cloud:
-                break
-
-        if not _primary_cloud and connected_providers:
-            _primary_cloud = connected_providers[0].get("provider")
-
-        if not _primary_cloud:
-            if any(k in q_lower for k in ("azure", "entra", "defender", "virtual machine", "vnet", "nsg", "microsoft")):
-                _primary_cloud = "azure"
-            elif any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod")):
-                _primary_cloud = "oracle_saas"
-            elif any(k in q_lower for k in ("oci", "oracle cloud", "compartment", "vcn")):
-                _primary_cloud = "oraclecloud"
-            elif any(k in q_lower for k in ("aws", "amazon", "s3", "ec2")):
-                _primary_cloud = "aws"
-            elif any(k in q_lower for k in ("gcp", "google cloud")):
-                _primary_cloud = "gcp"
-
-        _CLOUD_LABELS = {
-            "azure": "Microsoft Azure",
-            "aws": "Amazon Web Services (AWS)",
-            "gcp": "Google Cloud Platform (GCP)",
-            "oraclecloud": "Oracle Cloud Infrastructure (OCI)",
-            "oci": "Oracle Cloud Infrastructure (OCI)",
-            "oracle_saas": "Oracle Fusion SaaS (ERP/HCM)",
-            "kubernetes": "Kubernetes (K8s)",
-            "k8s": "Kubernetes (K8s)",
-        }
-
-        if is_overview_query:
-            _cloud_hint = "\nScope: Multi-Cloud Governance & Security Posture across all connected cloud environments (Oracle Cloud, Azure, Oracle Fusion SaaS, AWS, GCP).\n"
-        else:
-            _cloud_hint = (
-                f"\nCloud Environment: {_CLOUD_LABELS.get(_primary_cloud, str(_primary_cloud).upper())}"
-                f" — generate {_primary_cloud}-specific CLI, Terraform, and portal steps ONLY.\n"
-                if _primary_cloud else ""
-            )
-
-        # Build pinned-finding block
-        if primary_template_block:
-            remediation_instruction = (
-                "A verified remediation playbook for this exact finding already exists and will be "
-                "appended automatically after your response. Write a concise Direct Answer, "
-                "Security Risk analysis, and Compliance mapping (2-3 short paragraphs)."
-            )
-        else:
-            remediation_instruction = (
-                "Analyse it directly and provide the security risk and step-by-step remediation (CLI, Terraform, Console)."
-            )
-        pinned_section = ""
-        if slim_pinned:
-            pinned_section = (
-                "\n\nLIVE FINDING DATA:\n"
-                + json.dumps(slim_pinned, indent=1)
-                + f"\nINSTRUCTION: {remediation_instruction}\n"
-            )
-
-        user_prompt = (
-            f"Connected Environments:\n{prov_str}\n"
-            f"{_cloud_hint}"
-            f"{comp_str}"
-            f"{pinned_section}\n"
-            f"Active Findings Telemetry:\n{context_str}\n\n"
-            f"User Question:\n{question}"
-        )
-
-        data = self._call_vllm_chat(
-            system_prompt=ADVISOR_SYSTEM_PROMPT,
-            user_prompt=user_prompt,
-            temperature=0.1,
-            max_tokens=2200,
-            history=history,
-        )
-        if data.get("_ai_unavailable"):
-            logger.warning(
-                "vLLM endpoint (%s) is unavailable: %s. Engaging Spectra telemetry synthesis engine.",
-                self.base_url,
-                data.get("error"),
-            )
-            raw_ans = ""
-            ans = ""
-        else:
-            raw_ans = data.get("answer", data.get("raw_text", "")).strip()
-            ans = self._clean_thinking_trace(raw_ans)
-
-        # Check if the output is still contaminated by leaked scratchpad or empty
-        low_ans = ans.lower()
-        looks_like_reasoning = any(low_ans.startswith(p) for p in (
-            "the user is asking", "the user asked", "constraint:", "critical output rule",
-            "conflict resolution", "let me think", "i need to be careful", "looking at the"
-        )) or "critical output rule:" in low_ans
-
-        if not ans or len(ans) <= 35 or looks_like_reasoning:
-            if any(k in q_lower for k in ("sox", "itgc", "nis2", "readiness", "evaluate cis", "compliance readiness", "compliance posture")):
-                ans = self._synthesize_compliance_readiness_assessment(
-                    question=question,
-                    compliance_scores=compliance_scores or [],
-                    findings=relevant_findings or [],
-                    connected_providers=connected_providers or [],
-                )
-            elif is_overview_query and any(w in q_lower for w in ("briefing", "posture", "ciso", "executive", "overall", "sla")):
-                ans = self._synthesize_executive_briefing(
-                    connected_providers=connected_providers or [],
-                    compliance_scores=compliance_scores or [],
-                    findings=relevant_findings or [],
-                )
-            elif any(w in q_lower for w in ("cis score", "compliance score", "score of", "what is my cis")):
-                ans = self._synthesize_compliance_score_answer(
-                    question=question,
-                    compliance_scores=compliance_scores or [],
-                )
-            elif any(q_lower == g or q_lower.startswith(g + " ") or q_lower.startswith(g + "?") for g in ["hey", "hello", "hi", "help", "who are you", "what can you do"]):
-                ans = "Hello! I am Spectra, your Autonomous AI Security Copilot. I'm ready to assist with multi-cloud security posture, compliance benchmarks, toxic attack paths, and step-by-step remediations. How can I help you today?"
-            elif primary_template_block:
-                ans = f"Analysis of `{_primary_finding.get('check_title') or _primary_finding.get('check_id', 'this finding')}`:"
-            else:
-                ans = self._synthesize_contextual_advisory(
-                    question=question,
-                    findings=relevant_findings or [],
-                    connected_providers=connected_providers or [],
-                    compliance_scores=compliance_scores or [],
-                )
-
-        # Append the deterministic, verified remediation playbook
-        if primary_template_block:
-            ans = f"{ans.rstrip()}\n\n{primary_template_block}"
-
-        refs = data.get("finding_references", [])
-        if not refs and relevant_findings:
-            real_findings = [f for f in relevant_findings if not str(f.get("finding_id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS", "AZURE-TENANCY"))]
-            refs = [
-                {
-                    "id": f.get("finding_id", ""),
-                    "name": f.get("check_title", f.get("check_id", "")),
-                    "severity": f.get("severity", "high"),
-                    "provider": f.get("provider", _primary_cloud or "oraclecloud"),
-                }
-                for f in real_findings[:4]
-            ]
-        elif refs:
-            refs = [r for r in refs if not str(r.get("id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS", "AZURE-TENANCY"))]
-            f_map = {f.get("finding_id"): f.get("provider") for f in (relevant_findings or [])}
-            for r in refs:
-                if not r.get("provider"):
-                    r["provider"] = f_map.get(r.get("id")) or _primary_cloud or "oraclecloud"
-
-        return AdvisorOutput(
-            answer=ans,
-            finding_references=refs,
-            confidence=float(data.get("confidence", 0.95)),
-        )
-
-    @classmethod
-    def _synthesize_compliance_score_answer(cls, question: str, compliance_scores: list[dict[str, Any]]) -> str:
-        q_low = question.lower()
-        target = "azure" if "azure" in q_low else ("oraclecloud" if any(k in q_low for k in ("oci", "oracle cloud", "oraclecloud")) else ("oracle_saas" if "saas" in q_low else None))
-
-        relevant = [
-            c for c in compliance_scores
-            if (not target or target in c.get("compliance_id", "").lower() or target in c.get("framework", "").lower())
-            and ("cis" in c.get("compliance_id", "").lower() or "cis" in c.get("framework", "").lower())
-        ]
-        if not relevant:
-            relevant = [c for c in compliance_scores if "cis" in c.get("compliance_id", "").lower() or "cis" in c.get("framework", "").lower()]
-        if not relevant:
-            relevant = compliance_scores[:4]
-
-        if not relevant:
-            return "No compliance scan telemetry is currently recorded for this cloud provider. Please run a compliance posture scan to calculate your CIS benchmark score."
-
-        provider_name = "Microsoft Azure" if target == "azure" else ("Oracle Cloud Infrastructure (OCI)" if target == "oraclecloud" else "Multi-Cloud")
-        lines = [f"## CIS Benchmark Compliance Score: {provider_name}\n"]
-        for c in relevant:
-            lines.append(
-                f"- **{c.get('framework')}** ({c.get('version') or 'v3.0'}): **{c.get('score')}% Control Score**\n"
-                f"  - **Passed Controls**: `{c.get('passed')}`\n"
-                f"  - **Violations / Failed**: `{c.get('failed')}`\n"
-                f"  - **Manual Audits / Resource Not Available**: `{c.get('manual')}`\n"
-                f"  - **Total Framework Controls**: `{c.get('total')}`\n"
-            )
-        lines.append(
-            "> [!NOTE]\n"
-            "> The compliance score is calculated strictly as `Passed / (Passed + Failed) * 100`. "
-            "Controls where the target resource is un-deployed or requires manual verification are categorized under Manual / Resource Not Available."
-        )
-        return "\n".join(lines)
-
-    @classmethod
-    def _synthesize_executive_briefing(
-        cls,
-        connected_providers: list[dict[str, Any]],
-        compliance_scores: list[dict[str, Any]],
-        findings: list[dict[str, Any]],
-    ) -> str:
-        prov_names = ", ".join([p.get("alias") or p.get("provider", "").upper() for p in connected_providers]) or "Oracle Fusion SaaS, Oracle Cloud (OCI), Azure"
-
-        critical_f = [f for f in findings if str(f.get("severity", "")).lower() == "critical"]
-        high_f = [f for f in findings if str(f.get("severity", "")).lower() == "high"]
-        med_f = [f for f in findings if str(f.get("severity", "")).lower() == "medium"]
-
-        cis_scores = [c for c in compliance_scores if "cis" in c.get("compliance_id", "").lower() or "cis" in c.get("framework", "").lower()]
-        other_scores = [c for c in compliance_scores if not ("cis" in c.get("compliance_id", "").lower() or "cis" in c.get("framework", "").lower())]
-
-        sections = [
-            f"# Executive CISO Security Briefing: Multi-Cloud Posture & Governance\n",
-            f"**Target Scope:** {prov_names}  \n"
-            f"**Audit Status:** Active Multi-Cloud Telemetry Ingested  \n",
-            f"## 1. Executive Summary\n",
-            f"An analysis of connected cloud environments indicates an active multi-cloud security footprint across **Oracle Cloud (OCI)**, **Microsoft Azure**, and **Oracle Fusion SaaS**. "
-            f"While core compute perimeters maintain good baseline controls, significant exposure vectors exist in identity role segregation, unencrypted volume storage, and audit logging retention thresholds.\n",
-            f"## 2. Top Critical Exposure Paths & Risks\n",
-        ]
-
-        top_risks = critical_f[:2] + high_f[:2] + med_f[:2]
-        if top_risks:
-            for i, r in enumerate(top_risks[:4], 1):
-                res_name = r.get("resource", {}).get("name") if isinstance(r.get("resource"), dict) else r.get("resource", "Cloud Resource")
-                sections.append(
-                    f"{i}. **{r.get('check_title') or r.get('check_id')}** [{str(r.get('severity', 'HIGH')).upper()}]\n"
-                    f"   - **Impacted Resource:** `{res_name}` ({str(r.get('provider', '')).upper()})\n"
-                    f"   - **Risk Vector:** Misconfiguration increases lateral movement potential and violates least-privilege boundaries.\n"
-                )
-        else:
-            sections.append(
-                "1. **Identity & Access Management (IAM / Entra ID):** Over-privileged administrative credentials and missing conditional access policies.\n"
-                "2. **Storage & Data Encryption:** Storage assets lacking customer-managed key (CMK/Vault) defense-in-depth.\n"
-                "3. **Audit Trail Retention:** Centralized security logging retention below regulatory 365-day thresholds.\n"
-            )
-
-        sections.append("## 3. Compliance & Benchmark Readiness\n")
-        if cis_scores or other_scores:
-            sections.append("| Framework Standard | Control Score | Passed | Failed | Manual / Resource N/A | Total |")
-            sections.append("| :--- | :---: | :---: | :---: | :---: | :---: |")
-            for c in (cis_scores[:4] + other_scores[:4]):
-                sections.append(f"| **{c.get('framework')}** | **{c.get('score')}%** | {c.get('passed')} | {c.get('failed')} | {c.get('manual')} | {c.get('total')} |")
-            sections.append("")
-        else:
-            sections.append("- **CIS Benchmarks (Azure & OCI):** Baseline evaluated across active compartments.")
-            sections.append("- **SOC 2 Type II & NIS2:** Governance readiness in progress.\n")
-
-        sections.extend([
-            "## 4. Prioritized Remediation SLAs\n",
-            "- **Critical Severity (P0) - SLA: 24 Hours**: Remediate public ingress exposure, unauthenticated web applications, and privileged account access.",
-            "- **High Severity (P1) - SLA: 7 Days**: Enforce customer-managed encryption (Vault/KMS), disable legacy metadata endpoints (IMDSv2), and activate Cloud Guard.",
-            "- **Medium Severity (P2) - SLA: 30 Days**: Resolve Segregation of Duties (SoD) conflicts, expand diagnostic flow logging, and close audit retention gaps.",
-        ])
-
-        return "\n".join(sections)
-
-    @classmethod
-    def _synthesize_compliance_readiness_assessment(
-        cls,
-        question: str,
-        compliance_scores: list[dict[str, Any]],
-        findings: list[dict[str, Any]],
-        connected_providers: list[dict[str, Any]],
-    ) -> str:
-        prov_names = ", ".join([p.get("alias") or p.get("provider", "").upper() for p in connected_providers]) or "Oracle Cloud (OCI), Microsoft Azure, Oracle Fusion SaaS"
-
-        # Calculate live framework metrics from database
-        cis_scores = [c for c in compliance_scores if "cis" in c.get("compliance_id", "").lower() or "cis" in c.get("framework", "").lower()]
-        sox_scores = [c for c in compliance_scores if any(k in c.get("compliance_id", "").lower() or k in c.get("framework", "").lower() for k in ("sox", "itgc", "saas", "fusion"))]
-        other_scores = [c for c in compliance_scores if c not in cis_scores and c not in sox_scores]
-
-        def get_avg_score(score_list, default=82):
-            if not score_list:
-                return default
-            vals = [s.get("score", default) for s in score_list]
-            return round(sum(vals) / len(vals))
-
-        cis_avg = get_avg_score(cis_scores, 84)
-        sox_avg = get_avg_score(sox_scores, 78)
-        nis2_avg = round((cis_avg * 0.6) + (sox_avg * 0.4))
-
-        # Check findings for failing controls in key domains
-        iam_fails = len([f for f in findings if any(k in (f.get("check_id") or "").lower() for k in ("iam", "user", "role", "entra", "mfa", "privilege")) and f.get("status") == "FAIL"])
-        net_fails = len([f for f in findings if any(k in (f.get("check_id") or "").lower() for k in ("nsg", "vcn", "security_group", "ingress", "port", "network")) and f.get("status") == "FAIL"])
-        storage_fails = len([f for f in findings if any(k in (f.get("check_id") or "").lower() for k in ("storage", "bucket", "blob", "encryption", "kms", "vault")) and f.get("status") == "FAIL"])
-        audit_fails = len([f for f in findings if any(k in (f.get("check_id") or "").lower() for k in ("log", "audit", "trail", "monitor", "retention")) and f.get("status") == "FAIL"])
-
-        sections = [
-            f"# Executive Compliance Readiness Assessment: CIS, SOX ITGC & NIS2\n",
-            f"**Evaluation Scope:** {prov_names}  \n",
-            f"**Assurance Telemetry:** Continuous Automated Ingestion (Live State)  \n\n",
-            f"An integrated assessment of your multi-cloud environment against official **Center for Internet Security (CIS) Benchmarks**, **Sarbanes-Oxley Information Technology General Controls (SOX ITGC)**, and the **EU NIS2 Directive (2022/2555)** demonstrates active governance with specific remediation targets required prior to formal audit attestation.\n",
-            f"## 1. Executive Compliance Scorecard & Matrix\n",
-            f"| Regulatory / Benchmark Standard | Scope / Target | Pass Rate | Audit Status | Primary Control Focus |",
-            f"| :--- | :--- | :---: | :---: | :--- |",
-            f"| **CIS Foundations Benchmarks** | Multi-Cloud Fleet (OCI / Azure / AWS) | **{cis_avg}%** | {'COMPLIANT' if cis_avg >= 80 else 'NEEDS ATTENTION'} | Compartment Isolation, VCN Ingress, CMK Vault |",
-            f"| **SOX ITGC (Sarbanes-Oxley)** | ERP, SaaS Pods & Databases | **{sox_avg}%** | {'COMPLIANT' if sox_avg >= 80 else 'NEEDS ATTENTION'} | Logical Access, Segregation of Duties (SoD), Audit Trail |",
-            f"| **NIS2 Directive (EU 2022/2555)** | Critical Infrastructure & Resilience | **{nis2_avg}%** | {'READY' if nis2_avg >= 80 else 'IN PROGRESS'} | Art. 21 Risk Management, Incident Handling, Supply Chain |",
-            f"",
-            f"## 2. In-Depth Framework Readiness Evaluation\n",
-            f"### A. CIS Foundations Benchmarks ({cis_avg}% Posture)",
-            f"- **Identity & Access Management (IAM):** Core tenant root access is protected. Remaining gaps involve enforcing multi-factor authentication (MFA) on legacy service principals and rotating API signing keys older than 90 days (`{iam_fails}` active identity findings).",
-            f"- **Network Perimeter & Defense-in-Depth:** Ingress rules on Security Lists and Network Security Groups (NSGs) inspected. Port restrictions (SSH 22, RDP 3389) are enforced across production tiers with `{net_fails}` edge exposure checks flagged for review.",
-            f"- **Data-at-Rest & Vault Protection:** Default provider-managed encryption is active. Upgrading object storage buckets and block volumes to Customer-Managed Keys (KMS/Vault) is required to meet Level 2 CIS profile compliance (`{storage_fails}` storage checks).",
-            f"",
-            f"### B. SOX ITGC — Information Technology General Controls ({sox_avg}% Posture)",
-            f"- **Logical Access & Access Governance:** Evaluated across Oracle Cloud Infrastructure and Oracle Fusion SaaS (ERP/HCM). Role assignments require periodic re-certification to eliminate toxic Segregation of Duties (SoD) combinations between transactional entry and approval workflows.",
-            f"- **Change Management & Separation of Environments:** Code deployments and infrastructure changes follow version-controlled release pipelines. Production and non-production compartments are logically segmented.",
-            f"- **Audit Logging & Tamper-Resistant Storage:** Diagnostic logging is active across database instances and API gateways. Retention configurations must be extended from 90 days to 365 days to satisfy financial audit recordkeeping (`{audit_fails}` logging checks).",
-            f"",
-            f"### C. NIS2 Directive Readiness ({nis2_avg}% Posture)",
-            f"- **Article 21 Cybersecurity Risk Management:** Continuous automated cloud security posture evaluation satisfies core continuous vulnerability handling requirements.",
-            f"- **Business Continuity & Incident Handling:** Geo-redundant backups and recovery procedures are validated across database and storage services.",
-            f"- **Supply Chain Security:** Cloud provider IAM federation policies and external vendor integration permissions are scoped to least-privilege role boundaries.",
-            f"",
-            f"## 3. Prioritized Remediation Action Plan (CISO Roadmap)\n",
-            f"1. **P0 - Immediate (24-Hour SLA):** Restrict remaining direct public ingress to administrative services and eliminate public bucket access.",
-            f"2. **P1 - Short-Term (7-Day SLA):** Transition high-value transactional storage buckets to Customer-Managed Keys (Vault) and enforce MFA across all admin roles.",
-            f"3. **P2 - Medium-Term (30-Day SLA):** Resolve cross-role Segregation of Duties (SoD) conflicts in Oracle Fusion SaaS and expand log retention to 365 days.",
-        ]
-        return "\n".join(sections)
-
-    @classmethod
-    def _synthesize_contextual_advisory(
-        cls,
-        question: str,
-        findings: list[dict[str, Any]],
-        connected_providers: list[dict[str, Any]],
-        compliance_scores: list[dict[str, Any]],
-    ) -> str:
-        prov_list = ", ".join([p.get("alias") or p.get("provider", "").upper() for p in connected_providers]) or "Multi-Cloud Fleet"
-        matching = [f for f in findings if not str(f.get("finding_id", "")).startswith(("COMPLIANCE-", "OCI-TENANCY", "ORACLE-SAAS"))]
-
-        lines = [
-            f"### Spectra Threat & Posture Advisory\n",
-            f"**Query:** {question}  \n",
-            f"**Environment Scope:** {prov_list}  \n\n",
-            f"Based on real-time security telemetry ingested across your cloud environments:\n"
-        ]
-
-        if matching:
-            lines.append("#### Relevant Active Telemetry & Findings:")
-            for f in matching[:3]:
-                title = f.get("check_title") or f.get("check_id") or "Security Control"
-                sev = str(f.get("severity", "medium")).upper()
-                status = f.get("status", "FAIL")
-                remed = f.get("remediation") or "Apply security benchmark recommendations."
-                res_name = f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else f.get("resource", "cloud-resource")
-                lines.append(f"- **{title}** (`{sev}`) · Status: `{status}`")
-                lines.append(f"  - Target Resource: `{res_name}`")
-                lines.append(f"  - Remediation Action: {remed}\n")
-        else:
-            lines.append("No active critical policy violations were directly correlated with this specific query scope. Your security perimeter maintains active continuous assurance.")
-
-        lines.append("\n**CISO Recommendation:** Maintain automated compliance scanning and enforce least-privilege access across all cloud compartments.")
-        return "\n".join(lines)
-
-
+        return AdvisorOutput(answer=answer, finding_references=finding_refs(findings), confidence=0.85)

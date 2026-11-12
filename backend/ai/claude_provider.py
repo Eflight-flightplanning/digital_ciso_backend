@@ -315,51 +315,32 @@ class ClaudeProvider(AIProvider):
         history: list[dict[str, str]] | None = None,
         connected_providers: list[dict[str, Any]] | None = None,
         compliance_scores: list[dict[str, Any]] | None = None,
+        scope: dict[str, Any] | None = None,
     ) -> AdvisorOutput:
-        """Answer a security advisor question grounded in findings with multi-turn history."""
-        finding_summaries = [
-            {
-                "id": f.get("finding_id"),
-                "uid": f.get("uid"),
-                "check_id": f.get("check_id"),
-                "severity": f.get("severity"),
-                "status": f.get("status"),
-                "summary": f.get("check_title"),
-                "details": f.get("status_extended"),
-                "remediation": f.get("remediation"),
-                "resource": f.get("resource", {}).get("name") if isinstance(f.get("resource"), dict) else f.get("resource"),
-            }
-            for f in relevant_findings[:35]
-        ]
+        """Answer a security question from live data; never a canned or invented answer."""
+        from .advisor import build_user_prompt, clean_history, extract_answer, finding_refs, grounded_fallback
 
-        active_envs = [
-            {"provider": p.get("provider"), "alias": p.get("alias", p.get("provider"))}
-            for p in (connected_providers or [])
-        ]
-
-        user_message = json.dumps(
-            {
-                "question": question,
-                "connected_environments": active_envs if active_envs else [{"provider": "azure", "alias": "eflight-azure"}],
-                "findings_context": finding_summaries,
-                "findings_count": len(finding_summaries),
-                "prompt_version": ADVISOR_PROMPT_VERSION,
-                "instruction": (
-                    "Deliver an intelligent, concise, executive, and technically grounded response in GitHub Markdown. "
-                    "If the asked cloud provider is not in connected_environments, clearly state it is not connected and reference their active environment."
-                ),
-            },
-            default=str,
-        )
-
-        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, MAX_TOKENS_ADVISOR, history=history)
-        data = self._parse_json(raw)
-
-        return AdvisorOutput(
-            answer=data.get("answer", ""),
-            finding_references=data.get("finding_references", []),
-            confidence=float(data.get("confidence", 0.95)),
-        )
+        scores = compliance_scores or []
+        providers = connected_providers or []
+        findings = relevant_findings or []
+        error = None
+        try:
+            raw = self._call(
+                ADVISOR_SYSTEM_PROMPT,
+                build_user_prompt(question, findings, providers, scores, scope=scope),
+                MAX_TOKENS_ADVISOR,
+                history=clean_history(history),
+            )
+        except Exception as e:  # provider/network failure
+            raw, error = "", f"{type(e).__name__}: {e}"
+        answer = extract_answer(raw)
+        if not answer:
+            return AdvisorOutput(
+                answer=grounded_fallback(question, findings, providers, scores, scope=scope, reason=error or "empty model answer"),
+                finding_references=finding_refs(findings),
+                confidence=0.0,
+            )
+        return AdvisorOutput(answer=answer, finding_references=finding_refs(findings), confidence=0.85)
 
 
 # ─────────────────────────────────────────────────────────────

@@ -74,6 +74,7 @@ class OpenAIProvider(AIProvider):
         user_message: str,
         max_tokens: int = 1500,
         history: list[dict[str, str]] | None = None,
+        json_mode: bool = True,
     ) -> str:
         """Call OpenAI with automatic model fallback and multi-turn history."""
         models_to_try = [self._model] + [m for m in DEFAULT_FALLBACK_MODELS if m != self._model]
@@ -93,9 +94,9 @@ class OpenAIProvider(AIProvider):
                 response = self._client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    temperature=0.1,
+                    temperature=0.1 if json_mode else 0.3,
                     max_tokens=max_tokens,
-                    response_format={"type": "json_object"},
+                    **({"response_format": {"type": "json_object"}} if json_mode else {"presence_penalty": 0.3, "frequency_penalty": 0.3}),
                 )
                 return response.choices[0].message.content or "{}"
             except Exception as e:
@@ -194,14 +195,32 @@ class OpenAIProvider(AIProvider):
         relevant_findings: list[dict[str, Any]],
         history: list[dict[str, str]] | None = None,
         connected_providers: list[dict[str, Any]] | None = None,
+        compliance_scores: list[dict[str, Any]] | None = None,
+        scope: dict[str, Any] | None = None,
     ) -> AdvisorOutput:
-        context_str = json.dumps(relevant_findings[:35], indent=2) if relevant_findings else "[]"
-        prov_str = json.dumps(connected_providers, indent=2) if connected_providers else "[]"
-        user_message = f"Connected Environments:\n{prov_str}\n\nActive Findings Telemetry:\n{context_str}\n\nUser Question:\n{question}"
-        raw = self._call(ADVISOR_SYSTEM_PROMPT, user_message, 1500, history=history)
-        data = self._parse_json(raw)
-        return AdvisorOutput(
-            answer=data.get("answer", data.get("raw_text", "Analysis completed.")),
-            finding_references=data.get("finding_references", []),
-            confidence=float(data.get("confidence", 0.95)),
-        )
+        """Answer a security question from live data; never a canned or invented answer."""
+        from .advisor import build_user_prompt, clean_history, extract_answer, finding_refs, grounded_fallback
+
+        scores = compliance_scores or []
+        providers = connected_providers or []
+        findings = relevant_findings or []
+        error = None
+        try:
+            raw = self._call(
+                ADVISOR_SYSTEM_PROMPT,
+                build_user_prompt(question, findings, providers, scores, scope=scope),
+                1800,
+                history=clean_history(history),
+                json_mode=False,
+            )
+        except Exception as e:  # provider/network failure
+            raw, error = "", f"{type(e).__name__}: {e}"
+        answer = extract_answer(raw)
+        if not answer:
+            return AdvisorOutput(
+                answer=grounded_fallback(question, findings, providers, scores, scope=scope, reason=error or "empty model answer"),
+                finding_references=finding_refs(findings),
+                confidence=0.0,
+            )
+        return AdvisorOutput(answer=answer, finding_references=finding_refs(findings), confidence=0.85)
+
