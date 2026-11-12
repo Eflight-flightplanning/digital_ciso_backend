@@ -106,14 +106,16 @@ class Command(BaseCommand):
                 role_name = "admin" if (getattr(user, "is_superuser", False) or user.email in [e for e, _ in admin_users]) else "member"
                 role = Role.objects.using(MainRouter.admin_db).filter(tenant_id=tenant.id, name=role_name).first()
                 if not role:
+                    # Only admins get admin rights; a plain member can run scans, nothing more.
+                    is_admin_role = role_name == "admin"
                     role = Role.objects.using(MainRouter.admin_db).create(
                         name=role_name,
                         tenant_id=tenant.id,
-                        manage_users=True,
-                        manage_account=True,
-                        manage_billing=True,
-                        manage_providers=True,
-                        manage_integrations=True,
+                        manage_users=is_admin_role,
+                        manage_account=is_admin_role,
+                        manage_billing=is_admin_role,
+                        manage_providers=is_admin_role,
+                        manage_integrations=is_admin_role,
                         manage_scans=True,
                         unlimited_visibility=True,
                     )

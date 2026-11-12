@@ -49,8 +49,10 @@ class HasPermissions(BasePermission):
             # tenant OWNER is trusted without an explicit role.
             return bool(mem and mem.role == Membership.RoleChoices.OWNER)
 
+        from api.rbac.read_only import role_grants
+
         return all(
-            any(getattr(role, permission.value, False) for role in user_roles)
+            any(role_grants(role, permission.value) for role in user_roles)
             for permission in required_permissions
         )
 
@@ -77,8 +79,14 @@ def is_admin_or_owner(user: User, tenant_id: str) -> bool:
     except Exception:
         pass
     try:
+        from api.rbac.read_only import role_is_read_only
+
         roles = list(user.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id))
         for r in roles:
+            # Read-only roles (e.g. "All Clouds Read-Only Auditor") may see everything
+            # but are never admins, whatever their name or flags say.
+            if role_is_read_only(r):
+                continue
             if getattr(r, "unlimited_visibility", False):
                 return True
             r_name = (getattr(r, "name", "") or "").lower()

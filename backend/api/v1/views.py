@@ -130,10 +130,10 @@ from api.models import (
     TenantComplianceSummary,
     ThreatScoreSnapshot,
     User,
-    UserMfa,
     UserRoleRelationship,
 )
 from api.pagination import ComplianceOverviewPagination
+from api.rbac.read_only import WRITE_PERMISSION_FIELDS, role_name_is_read_only
 from api.rbac.permissions import (
     HasPermissions,
     Permissions,
@@ -1007,14 +1007,6 @@ class UserViewSet(BaseUserViewset):
 
         return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
-        if kwargs["pk"] != str(self.request.user.id):
-            raise ValidationError("Only the current user can be deleted.")
-
-        user = self.get_object()
-        user.delete(using=MainRouter.admin_db)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @extend_schema(
         parameters=[
             OpenApiParameter(
@@ -1055,6 +1047,7 @@ class UserViewSet(BaseUserViewset):
                 raise PermissionDenied("Registration is not allowed for this email domain.")
 
         role_param = serializer.validated_data.pop("role", None)
+        actor_is_owner_or_super = False
 
         # Adding a user to an existing tenant is an admin action: an ordinary
         # authenticated member must not be able to mint admin accounts.
@@ -1081,6 +1074,24 @@ class UserViewSet(BaseUserViewset):
                         is_owner = True
                 if not is_owner and (not _tid or not _perm.has_permission(request, _view)):
                     raise PermissionDenied("You do not have permission to create users.")
+                actor_is_owner_or_super = is_owner
+            else:
+                actor_is_owner_or_super = True
+
+        assigned_role_name = (
+            role_param
+            or request.data.get("role")
+            or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
+            or "Member"
+        ).strip()
+        role_is_read_only = role_name_is_read_only(assigned_role_name)
+        r_lower = assigned_role_name.lower()
+        # A read-only name always wins: "Read-Only Admin" is an auditor, not an admin.
+        role_is_admin = not role_is_read_only and (
+            r_lower in ("admin", "security admin", "administrator", "owner")
+        )
+        if role_is_admin and request.user.is_authenticated and not actor_is_owner_or_super:
+            raise PermissionDenied("Only a tenant owner can create administrator accounts.")
 
         # Proceed with creating the user and membership
         create_kwargs = dict(serializer.validated_data)
@@ -1091,13 +1102,6 @@ class UserViewSet(BaseUserViewset):
         if not user.must_change_password:
             user.must_change_password = True
             user.save(using=MainRouter.admin_db, update_fields=["must_change_password"])
-
-        assigned_role_name = (
-            role_param
-            or request.data.get("role")
-            or (request.data.get("data", {}).get("attributes", {}).get("role") if isinstance(request.data, dict) else None)
-            or "Member"
-        )
 
         request_tenant_id = (
             getattr(request, "tenant_id", None)
@@ -1125,7 +1129,7 @@ class UserViewSet(BaseUserViewset):
                 )
             )
 
-        if assigned_role_name in ("Admin", "Security Admin", "Administrator", "OWNER"):
+        if role_is_admin:
             membership_role = Membership.RoleChoices.OWNER
         else:
             membership_role = Membership.RoleChoices.MEMBER
@@ -1145,33 +1149,29 @@ class UserViewSet(BaseUserViewset):
             invitation.state = Invitation.State.ACCEPTED
             invitation.save(using=MainRouter.admin_db)
         else:
+            # Exact name match only: a substring match could hand "Auditor" the
+            # permissions of some other role that merely contains that word.
             role = Role.objects.using(MainRouter.admin_db).filter(
                 tenant_id=tenant.id, name__iexact=assigned_role_name
-            ).first() or Role.objects.using(MainRouter.admin_db).filter(
-                tenant_id=tenant.id, name__icontains=assigned_role_name
             ).first()
 
             if not role:
-                r_lower = assigned_role_name.lower()
-                is_adm = "admin" in r_lower or "owner" in r_lower
-                is_auditor = (
-                    "auditor" in r_lower
-                    or "viewer" in r_lower
-                    or "read-only" in r_lower
-                    or "readonly" in r_lower
-                )
-                can_manage_scans = not is_auditor
                 role = Role.objects.using(MainRouter.admin_db).create(
                     tenant_id=tenant.id,
                     name=assigned_role_name,
-                    unlimited_visibility=is_adm,
-                    manage_users=is_adm,
-                    manage_account=is_adm,
-                    manage_billing=is_adm,
-                    manage_providers=is_adm,
-                    manage_integrations=is_adm,
-                    manage_scans=is_adm or can_manage_scans,
+                    unlimited_visibility=role_is_admin,
+                    manage_users=role_is_admin,
+                    manage_account=role_is_admin,
+                    manage_billing=role_is_admin,
+                    manage_providers=role_is_admin,
+                    manage_integrations=role_is_admin,
+                    manage_scans=not role_is_read_only,
                 )
+            elif role_is_read_only and any(getattr(role, f, False) for f in WRITE_PERMISSION_FIELDS):
+                # Existing read-only-named role that was saved with write flags.
+                for f in WRITE_PERMISSION_FIELDS:
+                    setattr(role, f, False)
+                role.save(using=MainRouter.admin_db)
 
             UserRoleRelationship.objects.using(MainRouter.admin_db).update_or_create(
                 user=user,
@@ -1196,83 +1196,107 @@ class UserViewSet(BaseUserViewset):
             except Exception as e:
                 logger.warning(f"Could not send welcome email to {user.email}: {e}")
 
-        return Response(data=UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        ctx = self.get_serializer_context()
+        ctx["tenant_id"] = str(tenant.id)
+        return Response(data=UserSerializer(user, context=ctx).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Remove a user from the caller's tenant.
+
+        The target must be a member of the caller's tenant. If the target also
+        belongs to other tenants, only this tenant's membership and roles are
+        removed; otherwise the account itself is deleted.
+        """
+        import uuid as _uuid
+
+        from api.models import UserMfa
+
         if not request.user or not request.user.is_authenticated:
             raise PermissionDenied("Authentication required to remove users.")
 
-        # 1. Resolve tenant ID & permissions
-        _tid = (
-            getattr(request, "tenant_id", None)
-            or (request.auth.get("tenant_id") if hasattr(request.auth, "get") else None)
-            or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
+        tenant_id = getattr(request, "tenant_id", None) or (
+            request.auth.get("tenant_id") if hasattr(request.auth, "get") else None
         )
-        if not _tid:
-            admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
-            if admin_membership:
-                _tid = str(admin_membership.tenant_id)
-        request.tenant_id = _tid
+        if not tenant_id:
+            raise PermissionDenied("Tenant ID is not present in token.")
+        tenant_id = str(tenant_id)
+        request.tenant_id = tenant_id
 
-        is_super = getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False)
-        if not is_super:
-            is_owner = False
-            if _tid:
-                mem = Membership.objects.using(MainRouter.admin_db).filter(user=request.user, tenant_id=_tid).first()
-                if mem and mem.role == Membership.RoleChoices.OWNER:
-                    is_owner = True
-            if not is_owner:
-                _perm = HasPermissions()
-                _view = type("V", (), {"required_permissions": [Permissions.MANAGE_USERS]})()
-                if not _perm.has_permission(request, _view):
-                    raise PermissionDenied("You do not have permission to remove users.")
+        admin_db = MainRouter.admin_db
+        is_super = bool(
+            getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False)
+        )
+        actor_is_owner = Membership.objects.using(admin_db).filter(
+            user=request.user, tenant_id=tenant_id, role=Membership.RoleChoices.OWNER
+        ).exists()
+        if not (is_super or actor_is_owner):
+            _view = type("V", (), {"required_permissions": [Permissions.MANAGE_USERS]})()
+            if not HasPermissions().has_permission(request, _view):
+                raise PermissionDenied("You do not have permission to remove users.")
 
-        # 2. Look up target user by pk (UUID or email), query param, or payload
+        # Target: by pk (UUID or email), ?id= / ?email=, or {"email": ...} body.
         raw_val = (
             kwargs.get("pk")
             or request.query_params.get("id")
             or request.query_params.get("email")
             or (request.data.get("email") if isinstance(request.data, dict) else None)
         )
+        if not raw_val:
+            raise NotFound("User account not found.")
+        val_str = str(raw_val).strip()
+        users = User.objects.using(admin_db)
+        try:
+            target = users.filter(id=_uuid.UUID(val_str)).first()
+        except (ValueError, TypeError):
+            target = users.filter(email__iexact=val_str).first()
 
-        user_instance = None
-        if raw_val:
-            val_str = str(raw_val).strip()
-            import uuid
-            try:
-                val_uuid = uuid.UUID(val_str)
-                user_instance = User.objects.using(MainRouter.admin_db).filter(id=val_uuid).first()
-            except (ValueError, TypeError):
-                user_instance = User.objects.using(MainRouter.admin_db).filter(email__iexact=val_str).first()
-
-        if not user_instance:
-            try:
-                user_instance = self.get_object()
-            except Exception:
-                pass
-
-        if not user_instance:
+        # Never reach across tenants: the target must belong to the caller's tenant.
+        target_membership = (
+            Membership.objects.using(admin_db).filter(user=target, tenant_id=tenant_id).first()
+            if target
+            else None
+        )
+        if not target or not target_membership:
             raise NotFound("User account not found.")
 
-        if request.user.is_authenticated and user_instance.email.lower() == request.user.email.lower():
-            raise ValidationError("You cannot remove your own active administrator account while logged in.")
+        if target.id == request.user.id:
+            raise ValidationError("You cannot remove your own account while logged in.")
 
-        user_id = user_instance.id
-        email = user_instance.email
+        if target_membership.role == Membership.RoleChoices.OWNER:
+            if not (is_super or actor_is_owner):
+                raise PermissionDenied("Only a tenant owner can remove another owner.")
+            other_owners = (
+                Membership.objects.using(admin_db)
+                .filter(tenant_id=tenant_id, role=Membership.RoleChoices.OWNER)
+                .exclude(user=target)
+                .exists()
+            )
+            if not other_owners:
+                raise ValidationError("You cannot remove the last owner of this organization.")
 
-        # 3. Clean up related dependencies in admin_db before deleting the user
-        UserMfa.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
-        Membership.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
-        UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
-        try:
-            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
-            OutstandingToken.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
-        except Exception:
-            pass
+        user_id, email = target.id, target.email
+        with transaction.atomic(using=admin_db):
+            UserRoleRelationship.objects.using(admin_db).filter(
+                user=target, tenant_id=tenant_id
+            ).delete()
+            target_membership.delete(using=admin_db)
 
-        user_instance.delete(using=MainRouter.admin_db)
+            if Membership.objects.using(admin_db).filter(user=target).exists():
+                # Still a member elsewhere: keep the account, just drop it from this tenant.
+                logger.info("Removed user %s (%s) from tenant %s", email, user_id, tenant_id)
+            else:
+                UserMfa.objects.using(admin_db).filter(user=target).delete()
+                UserRoleRelationship.objects.using(admin_db).filter(user=target).delete()
+                try:
+                    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
-        logger.info("Successfully removed user account %s (%s)", email, user_id)
+                    OutstandingToken.objects.using(admin_db).filter(user=target).delete()
+                except Exception:
+                    pass
+                target.delete(using=admin_db)
+                logger.info("Deleted user account %s (%s)", email, user_id)
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["delete"], url_path="remove")

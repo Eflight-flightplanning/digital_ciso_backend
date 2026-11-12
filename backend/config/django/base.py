@@ -134,6 +134,7 @@ MIDDLEWARE = [
     "api.middleware.APILoggingMiddleware",
     "api.middleware.AdminIPAllowlistMiddleware",
     "api.middleware.ApiSecurityHeadersMiddleware",
+    "api.middleware.ReadOnlyRoleMiddleware",
 ]
 
 SITE_ID = 1

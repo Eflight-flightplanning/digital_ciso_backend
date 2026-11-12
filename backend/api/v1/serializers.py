@@ -230,7 +230,9 @@ class BaseTokenSerializer(serializers.Serializer):
                 raise ValidationError("Invalid credentials")
             if not user.is_active:
                 raise ValidationError("Invalid credentials")
-        elif user is None:
+            # Correct password: earlier typos must not count toward a later lockout.
+            cache.delete(lock_key)
+        elif user is None or not user.is_active:
             raise ValidationError("Invalid credentials")
 
         # Intercept if user is required to change their temporary password first
@@ -427,12 +429,29 @@ class UserSerializer(BaseModelSerializerV1):
         many=True, read_only=True, source="roles", method_name="get_roles"
     )
     role = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+    is_read_only = serializers.SerializerMethodField()
 
-    def get_role(self, instance) -> str:
+    def _tenant_id(self):
         tenant_id = self.context.get("tenant_id")
         if not tenant_id:
             request = self.context.get("request")
             tenant_id = getattr(request, "tenant_id", None)
+        return tenant_id
+
+    def get_permissions(self, instance) -> dict:
+        from api.rbac.read_only import effective_permissions
+
+        return effective_permissions(instance, self._tenant_id())
+
+    def get_is_read_only(self, instance) -> bool:
+        from api.rbac.read_only import user_is_read_only
+
+        tenant_id = self._tenant_id()
+        return bool(tenant_id) and user_is_read_only(instance, tenant_id)
+
+    def get_role(self, instance) -> str:
+        tenant_id = self._tenant_id()
         if tenant_id:
             from api.db_router import MainRouter
             from api.models import Membership
@@ -453,6 +472,8 @@ class UserSerializer(BaseModelSerializerV1):
             "company_name",
             "date_joined",
             "role",
+            "permissions",
+            "is_read_only",
             "memberships",
             "roles",
         ]
