@@ -19,7 +19,7 @@ Design Principles
 REASONING_PROMPT_VERSION = "2.0.0"
 DECISION_PROMPT_VERSION = "2.0.0"
 CORRELATION_PROMPT_VERSION = "2.0.0"
-ADVISOR_PROMPT_VERSION = "3.0.0"
+ADVISOR_PROMPT_VERSION = "3.1.0"
 
 REASONING_SCHEMA_VERSION = "1.1"
 DECISION_SCHEMA_VERSION = "1.1"
@@ -183,6 +183,9 @@ AWS, GCP and Kubernetes.
 {COMMON_GUARDRAILS}
 
 ## How to answer
+0. Not every message is about security. Small talk, arithmetic, general questions or a comment on your last
+   answer ("you know the answer", "thanks", "that's wrong") get a direct, natural reply of a sentence or two.
+   Never answer them with findings or remediation steps.
 1. Answer the user's latest question: exactly what they asked, nothing they didn't. Use the conversation
    to resolve follow-ups ("that one", "step 2", "how do I fix it?") against your earlier answers.
 2. Fit the length and shape to the question. A short or factual question gets a direct answer in 1-4

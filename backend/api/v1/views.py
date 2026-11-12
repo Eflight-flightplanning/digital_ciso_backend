@@ -1169,10 +1169,14 @@ class UserViewSet(BaseUserViewset):
                     manage_integrations=role_is_admin,
                     manage_scans=not role_is_read_only,
                 )
-            elif role_is_read_only and any(getattr(role, f, False) for f in WRITE_PERMISSION_FIELDS):
-                # Existing read-only-named role that was saved with write flags.
+            elif role_is_read_only and (
+                role.unlimited_visibility or any(getattr(role, f, False) for f in WRITE_PERMISSION_FIELDS)
+            ):
+                # Existing read-only-named role saved by older code with write flags or
+                # unlimited visibility (which showed every cloud, whatever the role name).
                 for f in WRITE_PERMISSION_FIELDS:
                     setattr(role, f, False)
+                role.unlimited_visibility = False
                 role.save(using=MainRouter.admin_db)
 
             UserRoleRelationship.objects.using(MainRouter.admin_db).update_or_create(
@@ -1259,8 +1263,17 @@ class UserViewSet(BaseUserViewset):
             if target
             else None
         )
-        if not target or not target_membership:
-            raise NotFound("User account not found.")
+        if not target:
+            logger.warning("User delete: no user matches %r (tenant %s, actor %s)", val_str, tenant_id, request.user.id)
+            raise NotFound("This user no longer exists. Refresh the page.")
+        if not target_membership:
+            logger.warning(
+                "User delete: %s is not a member of tenant %s (member of: %s; actor %s)",
+                target.id, tenant_id,
+                list(Membership.objects.using(admin_db).filter(user=target).values_list("tenant_id", flat=True)),
+                request.user.id,
+            )
+            raise NotFound("This user is not a member of the organization you are signed in to.")
 
         if target.id == request.user.id:
             raise ValidationError("You cannot remove your own account while logged in.")

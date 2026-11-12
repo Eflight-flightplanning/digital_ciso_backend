@@ -57,6 +57,7 @@ class ApiCase(TestCase):
         self.addCleanup(stack.close)
         stack.enter_context(mock.patch("oracle_cis.views.OcisBase.tenant_id", lambda view, request: self.tenant))
         stack.enter_context(mock.patch("oracle_cis.views.has_perm", lambda request, name: name in self.perms))
+        stack.enter_context(mock.patch("oracle_cis.views.can_view_oracle_saas", lambda request, tenant_id: getattr(self, "sees_saas", True)))
         stack.enter_context(mock.patch("oracle_cis.connections.tenant_label", lambda tid: "idcs-test"))
         stack.enter_context(mock.patch("oracle_cis.connections.idcs_client", lambda tid: FakeIdcs()))
         stack.enter_context(mock.patch("oracle_cis.connections.fusion_client", lambda tid: NO_FUSION))
@@ -261,3 +262,16 @@ class PaymentDeltaApiTests(ApiCase):
             self.start_run()
         self.assertEqual(OcisSnapshot.objects.filter(tenant_id=TENANT).count(), 1)
 
+
+
+class OtherCloudRoleTests(ApiCase):
+    """A role scoped to other clouds (e.g. an Azure-only auditor) gets nothing from this dashboard."""
+
+    perms = set()
+    sees_saas = False
+
+    def test_every_endpoint_refused(self):
+        for path in ("/api/v1/oracle-cis/health", "/api/v1/oracle-cis/runs", "/api/v1/oracle-cis/runs/latest",
+                     "/api/v1/oracle-cis/controls", "/api/v1/oracle-cis/identities"):
+            self.assertEqual(self.client.get(path).status_code, 403, path)
+        self.assertEqual(self.client.post("/api/v1/oracle-cis/runs", {}, format="json").status_code, 403)

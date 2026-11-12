@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 
 from api.db_router import MainRouter
@@ -129,6 +130,21 @@ def get_role(user: User, tenant_id: str) -> Role:
                 manage_providers=True,
             )
         raise PermissionDenied("User has no role in this tenant.")
+    return _without_read_only_visibility(role)
+
+
+def _without_read_only_visibility(role: Role) -> Role:
+    """Read-only roles never have unlimited visibility.
+
+    Roles created by older code were saved with unlimited_visibility=True whatever
+    their name ("Azure CIS Read-Only Auditor" included), so a read-only account saw
+    every cloud. Their visibility comes from provider groups or the clouds named in
+    the role (get_providers); "All Clouds" read-only roles still see everything.
+    """
+    from api.rbac.read_only import role_name_is_read_only
+
+    if getattr(role, "unlimited_visibility", False) and role_name_is_read_only(getattr(role, "name", "")):
+        role.unlimited_visibility = False
     return role
 
 
@@ -143,8 +159,11 @@ def get_providers(role: Role) -> QuerySet[Provider]:
     4. If 'all' is explicitly in the role name, return all providers in the tenant.
     5. If no matches or provider groups, return empty queryset.
     """
+    from api.rbac.read_only import role_name_is_read_only
+
     tenant_id = role.tenant_id
     role_name = (getattr(role, "name", "") or "").lower()
+    read_only = role_name_is_read_only(role_name)
 
     # 1. Provider groups association
     provider_groups = role.provider_groups.all()
@@ -155,9 +174,11 @@ def get_providers(role: Role) -> QuerySet[Provider]:
 
     # 2. Unlimited visibility / admin / all clouds
     if (
-        getattr(role, "unlimited_visibility", False)
-        or "admin" in role_name
-        or "owner" in role_name
+        (not read_only and (
+            getattr(role, "unlimited_visibility", False)
+            or "admin" in role_name
+            or "owner" in role_name
+        ))
         or "all clouds" in role_name
         or "all providers" in role_name
         or "fleet" in role_name
@@ -197,8 +218,41 @@ def get_providers(role: Role) -> QuerySet[Provider]:
             provider__in=detected_providers,
         ).distinct()
 
-    # 4. Explicit 'all' in role name (e.g. 'All Clouds Read-Only Auditor')
-    if "all" in role_name:
+    # 4. Explicit 'all' as a word in the role name (e.g. 'All Clouds Read-Only Auditor')
+    if re.search(r"\ball\b", role_name):
         return Provider.objects.filter(tenant_id=tenant_id)
 
     return Provider.objects.none()
+
+
+def visible_provider_types(user: User, tenant_id) -> set | None:
+    """Provider types (azure, oraclecloud, oracle_saas, ...) the user's role may see.
+
+    None means unrestricted (superusers, owners, admin roles). Same rule as the API
+    viewsets: get_role() + get_providers().
+    """
+    if is_admin_or_owner(user, str(tenant_id)):
+        return None
+    role = get_role(user, str(tenant_id))
+    if getattr(role, "unlimited_visibility", False):
+        return None
+    types = {
+        str(p).lower()
+        for p in get_providers(role).using(MainRouter.admin_db).values_list("provider", flat=True)
+    }
+    # Clouds named in the role count even before that provider is connected
+    # (e.g. the Oracle SaaS dashboard works off its own connection settings).
+    name = (getattr(role, "name", "") or "").lower()
+    if "all clouds" in name or "all providers" in name or re.search(r"\ball\b", name):
+        types.add("*")
+    if "saas" in name or "fusion" in name:
+        types.add("oracle_saas")
+    return types
+
+
+def can_view_provider_type(user: User, tenant_id, provider_type: str) -> bool:
+    try:
+        types = visible_provider_types(user, tenant_id)
+    except PermissionDenied:
+        return False
+    return types is None or "*" in types or provider_type in types

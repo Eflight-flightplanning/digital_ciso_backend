@@ -39,6 +39,13 @@ def remediation_live():
     return os.environ.get("ORACLE_CIS_REMEDIATION_LIVE", "false").strip().lower() in ("1", "true", "yes", "on")
 
 
+def can_view_oracle_saas(request, tenant_id):
+    """Whether the caller's role covers Oracle SaaS (platform RBAC; patched in this app's tests)."""
+    from api.rbac.permissions import can_view_provider_type
+
+    return can_view_provider_type(request.user, tenant_id, "oracle_saas")
+
+
 def has_perm(request, name):
     from api.rbac.permissions import HasPermissions, Permissions
 
@@ -60,6 +67,12 @@ class OcisBase(APIView):
         if tenant is None:
             raise PermissionDenied("No organisation found for this user.")
         return tenant.id
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        # Roles scoped to other clouds (e.g. "Azure CIS Read-Only Auditor") never see Oracle SaaS.
+        if not can_view_oracle_saas(request, self.tenant_id(request)):
+            raise PermissionDenied("Your role has no access to Oracle SaaS.")
 
     @staticmethod
     def actor(request):

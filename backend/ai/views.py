@@ -667,6 +667,18 @@ class AIAdvisorQueryView(TenantScopedAPIView):
             except Exception as ce:
                 logger.warning("Could not fetch compliance overviews for advisor: %s", ce)
 
+            # Read-only / scoped roles: only the clouds the role can see (same rule as the API).
+            allowed_providers = _visible_provider_types(request, tenant_id)
+            if allowed_providers is not None:
+                connected_providers = [p for p in connected_providers if p["provider"] in allowed_providers]
+                compliance_scores = [s for s in compliance_scores if s.get("provider") in allowed_providers]
+                if scope_name and scope_name not in allowed_providers:
+                    return Response(
+                        {"errors": [{"status": "403", "title": "Forbidden", "detail": "Your role has no access to this environment."}]},
+                        status=403,
+                        content_type="application/vnd.api+json",
+                    )
+
             scope = None
             if scope_name == "oracle_saas":
                 connected_providers = [p for p in connected_providers if p["provider"] == "oracle_saas"]
@@ -680,7 +692,8 @@ class AIAdvisorQueryView(TenantScopedAPIView):
 
             # Retrieve relevant findings from DB — compact summaries only
             relevant_findings = _retrieve_relevant_findings(
-                request, clean_question, provider=provider_filter, history=history, scope=scope_name
+                request, clean_question, provider=provider_filter, history=history, scope=scope_name,
+                allowed_providers=allowed_providers,
             )
 
             ai_provider = get_ai_provider(tenant_id=tenant_id)
@@ -707,6 +720,22 @@ _CIS_STOP = {
     "controls", "cis", "oracle", "saas", "fusion", "failing", "failed", "fail", "pass", "passed", "status",
     "risk", "risks", "findings", "finding", "list", "explain", "please", "assessment", "benchmark", "score",
 }
+
+
+def _visible_provider_types(request, tenant_id: str | None) -> set[str] | None:
+    """Provider types the caller's role may see, or None for full visibility (admins, owners)."""
+    if not tenant_id:
+        return None
+    try:
+        from api.rbac.permissions import visible_provider_types
+
+        types = visible_provider_types(request.user, tenant_id)
+        if types is not None and "*" in types:
+            return None
+        return types
+    except Exception as e:
+        logger.warning("Could not resolve provider visibility for Spectra: %s", e)
+        return set()  # fail closed
 
 
 def _oracle_saas_scope(tenant_id: str | None, question: str) -> dict[str, Any]:
@@ -800,6 +829,7 @@ def _retrieve_relevant_findings(
     provider: str | None = None,
     history: list[dict[str, str]] | None = None,
     scope: str | None = None,
+    allowed_providers: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve relevant findings from DB for AI Advisor context.
 
@@ -845,6 +875,15 @@ def _retrieve_relevant_findings(
             cm = rls_transaction(tenant_id)
         else:
             cm = nullcontext()
+
+        def _vis(qs):
+            """Only findings from clouds the role can see (None = unrestricted)."""
+            if allowed_providers is None:
+                return qs
+            return qs.filter(scan__provider__provider__in=list(allowed_providers))
+
+        def _can_see(prov: str) -> bool:
+            return allowed_providers is None or prov in allowed_providers
 
         with cm:
             # --- UUID pinned lookup: extract any UUIDs from the question and fetch them directly ---
@@ -945,7 +984,7 @@ def _retrieve_relevant_findings(
             # 1. Directly resolve any UUIDs found in the question from the database
             if pinned_ids:
                 try:
-                    pinned_qs = Finding.all_objects.filter(id__in=pinned_ids).select_related("scan", "scan__provider").prefetch_related("resources")
+                    pinned_qs = _vis(Finding.all_objects).filter(id__in=pinned_ids).select_related("scan", "scan__provider").prefetch_related("resources")
                     for pf in pinned_qs:
                         if pf.id not in matching_ids:
                             matching_ids.add(pf.id)
@@ -961,11 +1000,11 @@ def _retrieve_relevant_findings(
             found_candidate = bool(matching_findings)
             for cand in target_candidates:
                 try:
-                    exact_f = Finding.all_objects.filter(
+                    exact_f = _vis(Finding.all_objects).filter(
                         Q(check_id__iexact=cand) | Q(uid__icontains=cand)
                     ).select_related("scan", "scan__provider").prefetch_related("resources").first()
                     if not exact_f:
-                        exact_f = Finding.all_objects.filter(
+                        exact_f = _vis(Finding.all_objects).filter(
                             Q(check_id__icontains=cand)
                         ).select_related("scan", "scan__provider").prefetch_related("resources").first()
                     if exact_f and exact_f.id not in matching_ids:
@@ -985,7 +1024,7 @@ def _retrieve_relevant_findings(
                     })
 
             # Ingest Oracle Fusion SaaS / ERP / Identity Telemetry ONLY when explicitly targeted for SaaS and NOT for other clouds
-            is_saas_query = scope == "oracle_saas" or (
+            is_saas_query = _can_see("oracle_saas") and scope == "oracle_saas" or _can_see("oracle_saas") and (
                 (provider is None or provider == "oracle_saas")
                 and provider not in ("azure", "aws", "gcp", "oraclecloud", "oci", "kubernetes", "github", "m365")
                 and any(k in q_lower for k in ("oracle saas", "fusion", "erp", "hcm", "sod", "toxic combination", "consultant", "superuser", "dormant", "oracle erp"))
@@ -1032,7 +1071,7 @@ def _retrieve_relevant_findings(
                     logger.debug("SaaS telemetry inclusion error: %s", s_err)
 
             # Ingest OCI Infrastructure / Tenancy Architecture Telemetry for OCI queries
-            is_oci_query = (
+            is_oci_query = _can_see("oraclecloud") and (
                 (provider is None or provider in ("oraclecloud", "oci"))
                 and provider not in ("azure", "aws", "gcp", "kubernetes", "github", "m365")
                 and any(k in q_lower for k in ("oci", "oracle cloud", "oraclecloud", "tenancy", "compartment", "vcn", "security zone", "cloud guard", "object storage", "bucket"))
@@ -1072,7 +1111,7 @@ def _retrieve_relevant_findings(
             if _compliance_trigger_re.search(q_lower):
                 try:
                     from api.models import ComplianceOverview
-                    comp_qs = ComplianceOverview.all_objects.select_related("scan__provider").all()
+                    comp_qs = _vis(ComplianceOverview.all_objects.select_related("scan__provider").all())
                     if provider:
                         comp_qs = comp_qs.filter(
                             Q(scan__provider__provider__iexact=provider)
@@ -1109,10 +1148,10 @@ def _retrieve_relevant_findings(
 
                     # If no explicit compliance overview rows exist for requested provider, compute live from findings
                     target_provs = [provider] if provider else ["oraclecloud", "azure", "aws", "gcp", "oracle_saas"]
-                    for tp in target_provs:
+                    for tp in [tp for tp in target_provs if _can_see("oraclecloud" if tp == "oci" else tp)]:
                         tp_norm = "oraclecloud" if tp == "oci" else tp
                         if not any(k.startswith(tp_norm) or k.startswith(tp) for k in comp_map):
-                            tp_findings = Finding.all_objects.filter(
+                            tp_findings = _vis(Finding.all_objects).filter(
                                 Q(scan__provider__provider__iexact=tp_norm)
                                 | Q(scan__provider__provider__iexact=tp)
                                 | Q(uid__icontains=tp_norm)
@@ -1138,7 +1177,7 @@ def _retrieve_relevant_findings(
                 except Exception as ce:
                     logger.debug("Compliance overview inclusion error: %s", ce)
 
-            base_qs = Finding.all_objects.select_related(
+            base_qs = _vis(Finding.all_objects.all()).select_related(
                 "scan", "scan__provider"
             ).prefetch_related("resources")
 
@@ -1234,6 +1273,10 @@ def _retrieve_relevant_findings(
                 "then", "them", "they", "also", "just", "like", "make", "made", "use", "used", "using", "provide",
                 "details", "detail", "step", "steps", "help", "summary", "summarize", "current", "currently",
                 "compliance", "score", "posture", "overall", "report", "briefing", "top", "biggest", "main",
+                "answer", "answers", "know", "knew", "think", "really", "sure", "okay", "thanks", "thank", "yes",
+                "right", "wrong", "correct", "mean", "again", "same", "said", "say", "says", "did", "doing", "done",
+                "good", "great", "nice", "fine", "well", "now", "here", "one", "two", "thing", "things", "something",
+                "anything", "everything", "question", "questions", "ask", "asked", "talk", "work", "working",
             }
             words = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9_\-]{2,}", question)
             search_kws = list(dict.fromkeys(

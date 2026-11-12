@@ -47,6 +47,27 @@ _GREETING = re.compile(
     re.IGNORECASE,
 )
 
+# Questions about overall risk / priorities: the only ones that get "background" findings.
+_OVERVIEW_WORDS = re.compile(
+    r"\b(risk|risks|riskiest|risky|priorit\w*|posture|overall|overview|summar\w*|briefing|executive|"
+    r"top|biggest|worst|most (critical|important|urgent|severe)|where (do|should) (i|we) start|"
+    r"what should (i|we) (fix|do)|health|attack surface|exposure|state of)\b",
+    re.IGNORECASE,
+)
+# Anything that makes a message about security or this organisation's environment.
+_SECURITY_WORDS = re.compile(
+    r"\b(secur\w*|risk\w*|finding\w*|vuln\w*|cve|exploit\w*|threat\w*|attack\w*|patch\w*|fix\w*|remediat\w*|"
+    r"mitigat\w*|harden\w*|mfa|2fa|password\w*|credential\w*|ssh|rdp|port\w*|firewall\w*|nsg|vcn|vnet|subnet\w*|"
+    r"iam|role\w*|users?|accounts?|access|privileg\w*|admin\w*|superuser\w*|sod|segregation|dormant|ghost|"
+    r"audit\w*|log\w*|encrypt\w*|keys?|key ?vault|secret\w*|certificat\w*|tls|ssl|bucket\w*|storage|blob|"
+    r"public|internet|exposed|network\w*|identit\w*|polic\w*|cis|complian\w*|benchmark\w*|control\w*|"
+    r"oracle|azure|oci|aws|gcp|saas|fusion|erp|hcm|kubernetes|k8s|scan\w*|resource\w*|vms?|virtual machine\w*|"
+    r"databases?|sql|tenan\w*|subscription\w*|compartment\w*|defender|guard|alert\w*|incident\w*|"
+    r"jira|ticket\w*|playbook\w*|terraform|cli|cloud\w*|provider\w*|severity|critical|high|medium|"
+    r"status|pass(ed|ing)?|fail(ed|ing|ure)?|score\w*|framework\w*|iso|soc ?2?|nist|pci|nca|sox|itgc)\b",
+    re.IGNORECASE,
+)
+
 PROVIDER_LABELS = {
     "azure": "Microsoft Azure",
     "aws": "AWS",
@@ -78,6 +99,14 @@ def wants_compliance(question: str) -> bool:
 
 def is_greeting(question: str) -> bool:
     return bool(_GREETING.match(question or ""))
+
+
+def wants_overview(question: str) -> bool:
+    return bool(_OVERVIEW_WORDS.search(question or ""))
+
+
+def is_security_question(question: str) -> bool:
+    return bool(_SECURITY_WORDS.search(question or ""))
 
 
 # ---------------------------------------------------------------- history
@@ -178,6 +207,18 @@ def build_user_prompt(
             continue
         groups.setdefault(relevance(f), []).append(f)
 
+    overview = wants_overview(question)
+    compliance = wants_compliance(question)
+    matched = bool(groups["pinned"] or groups["match"] or (scope or {}).get("matched"))
+    # Small talk, arithmetic, a comment on the last answer: no findings at all. A small model
+    # otherwise answers from whatever finding is in the prompt (e.g. "you know the answer" got
+    # an SSH remediation for the top background finding).
+    small_talk = not matched and not overview and not compliance and not is_security_question(question)
+    if not overview:
+        groups["background"] = []
+    if small_talk:
+        groups["summary"] = []
+
     lines: list[str] = ["CONTEXT (this organisation's live data; the only source for facts about their environment)", ""]
 
     if scope:
@@ -207,7 +248,7 @@ def build_user_prompt(
     if not_found:
         lines += ["", f"## Not found\nThe user referenced `{not_found[0]}`, which does not exist in the scan data."]
 
-    if scores and (wants_compliance(question) or not (groups["pinned"] or groups["match"])):
+    if scores and (compliance or overview):
         lines += ["", "## Compliance scores (latest scan per provider; score = passed / (passed + failed))"]
         for s in _relevant_scores(question, scores)[:15]:
             lines.append(
@@ -215,7 +256,7 @@ def build_user_prompt(
                 f"{s.get('score')}% ({s.get('passed')} passed, {s.get('failed')} failed, {s.get('manual')} manual, {s.get('total')} total)"
             )
 
-    for block in (scope or {}).get("sections") or []:
+    for block in [] if small_talk else (scope or {}).get("sections") or []:
         lines += ["", block]
 
     sections = (
@@ -232,8 +273,12 @@ def build_user_prompt(
         lines += ["", title]
         lines += [_finding_line(f) for f in rows[: caps[key]]]
 
-    if not (groups["pinned"] or groups["match"] or (scope or {}).get("matched")):
-        lines += ["", "(No findings in the scan data match this question directly.)"]
+    if small_talk:
+        lines += ["", "(This message is not about the security data. Reply to it directly, naturally and briefly, "
+                      "using the conversation if it refers to it. Do not bring up findings, scores or remediation.)"]
+    elif not matched and not overview:
+        lines += ["", "(No findings in the scan data match this question directly. Answer from the conversation and "
+                      "general security knowledge, and say that nothing in the scan data matches if that matters.)"]
 
     context = "\n".join(lines)
     if len(context) > MAX_CONTEXT_CHARS:
