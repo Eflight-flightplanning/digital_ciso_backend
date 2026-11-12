@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Shield,
@@ -33,7 +33,9 @@ import {
   useRemediationExecutions,
   useCompliance,
   useAttackPaths,
+  useCurrentUser,
 } from "@/hooks/use-api";
+import { authStore } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1019,6 +1021,52 @@ function FindingsDonutChart({
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { data: currentUserRaw } = useCurrentUser();
+  const storedUser = authStore.getUser();
+  const currentUser = (currentUserRaw as Record<string, any>) || storedUser;
+  const userRole = String(
+    currentUser?.role ||
+    (currentUser?.is_read_only ? "Read-Only Auditor" : "Member")
+  );
+  const isReadOnly =
+    Boolean(currentUser?.is_read_only) ||
+    /read-only|auditor|viewer/.test(userRole.toLowerCase());
+
+  // Derive cloud & framework audit scope from user's assigned role
+  const roleScope = useMemo(() => {
+    const r = userRole.toLowerCase();
+    let cloudScope: "OCI" | "AZURE" | "AWS" | "GCP" | "ORACLE_SAAS" | "ALL" = "ALL";
+    let cloudLabel = "All Fleet Clouds";
+    if (r.includes("all clouds") || r.includes("all-clouds") || r.includes("multi-cloud")) {
+      cloudScope = "ALL";
+      cloudLabel = "All Fleet Clouds";
+    } else if (r.includes("oci") || r.includes("oraclecloud")) {
+      cloudScope = "OCI";
+      cloudLabel = "Oracle Cloud (OCI)";
+    } else if (r.includes("azure")) {
+      cloudScope = "AZURE";
+      cloudLabel = "Microsoft Azure";
+    } else if (r.includes("aws")) {
+      cloudScope = "AWS";
+      cloudLabel = "Amazon Web Services (AWS)";
+    } else if (r.includes("gcp")) {
+      cloudScope = "GCP";
+      cloudLabel = "Google Cloud Platform (GCP)";
+    } else if (r.includes("saas") || r.includes("fusion")) {
+      cloudScope = "ORACLE_SAAS";
+      cloudLabel = "Oracle SaaS (HCM/ERP)";
+    }
+
+    let frameworkScope = "CIS Benchmark";
+    if (r.includes("soc")) frameworkScope = "SOC 2";
+    else if (r.includes("iso")) frameworkScope = "ISO 27001";
+    else if (r.includes("nist")) frameworkScope = "NIST 800-53";
+    else if (r.includes("pci")) frameworkScope = "PCI-DSS";
+    else if (r.includes("nca")) frameworkScope = "NCA ECC";
+
+    return { cloudScope, cloudLabel, frameworkScope };
+  }, [userRole]);
+
   const { data: findingsRaw, isLoading: findingsLoading, refetch: refetchFindings } = useFindings();
   const { data: providersRaw, isLoading: providersLoading, refetch: refetchProviders } = useProviders();
   const { data: resourcesRaw } = useResources();
@@ -1046,6 +1094,21 @@ export function DashboardPage() {
   const rawFindings = findingsRaw?.items ?? [];
   const providers = (providersRaw?.items as Array<Record<string, unknown>>) ?? [];
   const resources = resourcesRaw?.items ?? [];
+
+  // Auto-scope environment to auditor's assigned cloud on initial load
+  const hasAutoScoped = useRef(false);
+  useEffect(() => {
+    if (!hasAutoScoped.current && roleScope.cloudScope !== "ALL" && providers.length > 0) {
+      const match = providers.find((p: any) => {
+        const pType = String(p.provider || p.provider_type || "").toUpperCase();
+        return pType.includes(roleScope.cloudScope);
+      });
+      if (match) {
+        setSelectedProviderId(String(match.id));
+        hasAutoScoped.current = true;
+      }
+    }
+  }, [roleScope.cloudScope, providers]);
 
   // Filter by selected provider if not ALL
   const filteredFindings = useMemo(() => {
@@ -1352,16 +1415,66 @@ export function DashboardPage() {
               <span>Sync State</span>
             </button>
 
-            {/* Launch Scan Button */}
-            <Link
-              to="/scans"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all active:scale-95"
-            >
-              <Zap className="h-3.5 w-3.5" />
-              <span>Launch Scan</span>
-            </Link>
+            {/* Action Button: Audit View for Read-Only, Launch Scan for Admins */}
+            {isReadOnly ? (
+              <Link
+                to="/scans"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 border border-border/80 px-4 py-2 text-xs font-semibold text-foreground hover:bg-surface-3 transition-all shadow-sm"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
+                <span>Audit Mode &bull; View Scans</span>
+              </Link>
+            ) : (
+              <Link
+                to="/scans"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-all active:scale-95"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span>Launch Scan</span>
+              </Link>
+            )}
           </div>
         </div>
+
+        {/* ── Read-Only Audit Scope Banner ── */}
+        {isReadOnly && (
+          <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4.5 backdrop-blur-sm shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 shrink-0">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-display text-sm font-bold text-foreground">
+                    Audit Mode &bull; {userRole}
+                  </span>
+                  <span className="mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 uppercase">
+                    Read-Only
+                  </span>
+                  <span className="mono text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-foreground/80 border border-border">
+                    {roleScope.cloudLabel} Scope
+                  </span>
+                  <span className="mono text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-foreground/80 border border-border">
+                    {roleScope.frameworkScope}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Viewing security posture telemetry, continuous assessment findings, and compliance frameworks scoped to your assigned auditor role.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                to="/scans"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 border border-border/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-3 transition-colors shadow-sm"
+              >
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                <span>View Scan History &rarr;</span>
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* ── Top 4 KPI Metrics Row with Startup Count-ups ── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1379,7 +1492,9 @@ export function DashboardPage() {
               </span>
             </div>
             <div className="text-xs text-muted-foreground">
-              {providersCount} cloud accounts actively guarded
+              {selectedProviderObj
+                ? `Guarding ${selectedProviderObj.alias}`
+                : `${providersCount} cloud accounts actively guarded`}
             </div>
           </div>
 
@@ -1404,9 +1519,13 @@ export function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{onlineCount} of {providersCount} online</span>
+              <span>
+                {selectedProviderObj
+                  ? `Selected: ${selectedProviderObj.alias}`
+                  : `${onlineCount} of ${providersCount} online`}
+              </span>
               <Link to="/providers" className="text-primary font-semibold hover:underline">
-                Manage →
+                {isReadOnly ? "View →" : "Manage →"}
               </Link>
             </div>
           </div>

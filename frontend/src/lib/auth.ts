@@ -12,6 +12,8 @@ export interface User {
   name?: string;
   company_name?: string;
   role?: string;
+  is_read_only?: boolean;
+  permissions?: Record<string, boolean>;
   tenant_id?: string;
   date_joined?: string;
 }
@@ -181,7 +183,8 @@ export const authStore = {
         name: cleanName,
         email: email,
         company_name: providedCompany || tokenPayload?.company_name || "Enterprise Security Pod",
-        role: (tokenPayload?.roles && tokenPayload?.roles[0]) || "Security Administrator",
+        role: (tokenPayload?.roles && tokenPayload?.roles[0]) || (tokenPayload?.is_read_only ? "Read-Only Auditor" : "Member"),
+        is_read_only: Boolean(tokenPayload?.is_read_only),
         tenant_id: tokenPayload?.tenant_id || "3e59acc5-3bdd-499e-8fd1-3e53b0a6ca47",
         date_joined: new Date().toISOString(),
       };

@@ -131,7 +131,7 @@ function ThemeToggle() {
 
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [user, setUser] = useState<{ name?: string; role?: string } | null>(null);
+  const [user, setUser] = useState<{ name?: string; role?: string; is_read_only?: boolean } | null>(null);
 
   useEffect(() => {
     setUser(authStore.getState().user);
@@ -142,7 +142,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   }, []);
 
   const userRoleStr = String(user?.role || "").toLowerCase();
-  const isAdmin = userRoleStr.includes("admin") || userRoleStr.includes("owner");
+  const isReadOnly = Boolean(user?.is_read_only) || /read-only|auditor|viewer/.test(userRoleStr);
+  const isAdmin = !isReadOnly && (userRoleStr.includes("admin") || userRoleStr.includes("owner"));
   const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
 
   const visibleSections = useMemo(() => {
@@ -281,7 +282,8 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
   const navigate = useNavigate();
   const user = authStore.getState().user;
   const userRoleStr = String(user?.role || "").toLowerCase();
-  const isAdmin = userRoleStr.includes("admin") || userRoleStr.includes("owner");
+  const isReadOnly = Boolean(user?.is_read_only) || /read-only|auditor|viewer/.test(userRoleStr);
+  const isAdmin = !isReadOnly && (userRoleStr.includes("admin") || userRoleStr.includes("owner"));
   const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
 
   const visibleSections = navSections
@@ -339,7 +341,14 @@ export function AppShell({
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    is_read_only?: boolean;
+    permissions?: Record<string, boolean>;
+  } | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   // Server-verified session guard: nothing in browser storage proves a login.
@@ -363,7 +372,18 @@ export function AppShell({
       if (cancelled) return;
       const attrs = res?.data?.attributes ?? res?.attributes ?? res;
       if (!res?.data?.id && !attrs?.email) return deny();
-      setCurrentUser({ name: attrs?.name, email: attrs?.email });
+      const resolvedRole = attrs?.role || (attrs?.is_read_only ? "Read-Only Auditor" : "Member");
+      const userObj = {
+        id: String(res?.data?.id || attrs?.id || ""),
+        name: attrs?.name,
+        email: attrs?.email,
+        role: resolvedRole,
+        is_read_only: Boolean(attrs?.is_read_only),
+        permissions: attrs?.permissions,
+        company_name: attrs?.company_name,
+      };
+      authStore.setUser(userObj, token);
+      setCurrentUser(userObj);
       setIsReady(true);
     })().catch(deny);
     return () => {
@@ -416,8 +436,11 @@ export function AppShell({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">
-                <span className="font-bold block">{currentUser?.name || "Security Admin"}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">{currentUser?.email || "admin@securityplatform.com"}</span>
+                <span className="font-bold block">{currentUser?.name || "User"}</span>
+                <span className="text-[10px] text-muted-foreground font-mono block truncate">{currentUser?.email}</span>
+                <span className="mt-1 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                  {currentUser?.role || (currentUser?.is_read_only ? "Read-Only Auditor" : "Member")}
+                </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

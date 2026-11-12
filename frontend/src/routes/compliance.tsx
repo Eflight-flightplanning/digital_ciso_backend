@@ -66,6 +66,15 @@ function rebrandFrameworkName(name: string): string {
   return name.replace(/\bProwler\s*/gi, "Digital CISO ").replace(/\s+/g, " ").trim();
 }
 
+// Provider types with their own dedicated dashboard; kept out of Compliance entirely
+// (dropdown, API query and framework cards).
+const COMPLIANCE_EXCLUDED_PROVIDERS = new Set(["oracle_saas"]);
+
+function isExcludedComplianceId(complianceId: string): boolean {
+  const id = complianceId.toLowerCase();
+  return id.includes("oracle_saas") || id.includes("oraclesaas");
+}
+
 function providerDisplayName(value: string): string {
   const map: Record<string, string> = {
     aws: "AWS",
@@ -165,7 +174,11 @@ function CompliancePage() {
     if (userRoleStr.includes("aws")) detected.push("aws");
     if (userRoleStr.includes("gcp") || userRoleStr.includes("google")) detected.push("gcp");
     if (userRoleStr.includes("kubernetes") || userRoleStr.includes("k8s")) detected.push("kubernetes");
-    return detected.length > 0 ? detected : null;
+    const visible = detected.filter((p) => !COMPLIANCE_EXCLUDED_PROVIDERS.has(p));
+    // A role scoped only to excluded providers (e.g. Oracle SaaS) sees nothing here,
+    // rather than falling through to "all providers".
+    if (detected.length > 0 && visible.length === 0) return [];
+    return visible.length > 0 ? visible : null;
   }, [isAdmin, userRoleStr]);
 
   const allowedFrameworkScope = useMemo(() => {
@@ -215,6 +228,7 @@ function CompliancePage() {
     list.forEach((p) => {
       const value = String(p.provider || "").toLowerCase();
       if (!value || seen.has(value)) return;
+      if (COMPLIANCE_EXCLUDED_PROVIDERS.has(value)) return;
       if (allowedProviderTypes && !allowedProviderTypes.includes(value)) return;
       seen.set(value, { value, alias: String(p.alias || p.name || providerDisplayName(value)) });
     });
@@ -224,6 +238,7 @@ function CompliancePage() {
   // Real backend requires either a scan_id or a provider filter — no "give me everything" mode.
   const complianceParams = useMemo(() => {
     const params: Record<string, string> = {};
+    if (allowedProviderTypes && allowedProviderTypes.length === 0) return undefined;
     if (allowedProviderTypes && allowedProviderTypes.length === 1) {
       params["filter[provider_type]"] = allowedProviderTypes[0];
       return params;
@@ -256,6 +271,8 @@ function CompliancePage() {
       .filter((item) => {
         const id = String(item.id || item.compliance_id || "").toLowerCase();
         const fw = String(item.framework || "").toLowerCase();
+        // Oracle SaaS has its own dashboard.
+        if (isExcludedComplianceId(id) || fw.includes("oracle saas")) return false;
         // Only hide OCI NCA scan cards if a dedicated NCA assessment has completed and provided cards
         const hasDedicatedNca = Boolean(ncaOverview?.latest?.summary?.by_framework && Object.keys(ncaOverview.latest.summary.by_framework).length > 0);
         if (hasDedicatedNca && /nca_(ecc|cscc|ccc)/.test(id) && (id.includes("oraclecloud") || id.includes("oci"))) return false;

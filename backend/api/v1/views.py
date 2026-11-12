@@ -298,7 +298,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_control
+from django.views.decorators.cache import cache_control, never_cache
 from django_celery_beat.models import PeriodicTask
 from drf_spectacular.settings import spectacular_settings
 from drf_spectacular.types import OpenApiTypes
@@ -878,7 +878,9 @@ def _get_request_invitation_token(request):
         description="Fetch detailed information about the authenticated user.",
     ),
 )
-@method_decorator(CACHE_DECORATOR, name="list")
+# No CACHE_DECORATOR here: a cached user list keeps showing removed users (and
+# hides new ones) for up to CACHE_MAX_AGE after the change.
+@method_decorator(never_cache, name="list")
 class UserViewSet(BaseUserViewset):
     serializer_class = UserSerializer
     http_method_names = ["get", "post", "patch", "delete"]

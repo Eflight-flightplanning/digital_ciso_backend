@@ -160,14 +160,26 @@ def generate_tokens(user: User, tenant_id: str) -> dict:
 
     # Set roles claim into refresh and access token
     from api.db_router import MainRouter
-    roles = list(user.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id).values_list("name", flat=True))
-    if not roles:
-        from api.models import Membership
-        mem = Membership.objects.using(MainRouter.admin_db).filter(user=user, tenant_id=tenant_id).first()
-        if mem and mem.role == Membership.RoleChoices.OWNER:
-            roles = ["Owner"]
+    from api.models import Membership, UserRoleRelationship
+    import uuid
+    try:
+        tid = tenant_id if isinstance(tenant_id, uuid.UUID) else uuid.UUID(str(tenant_id)) if tenant_id else None
+    except (ValueError, TypeError):
+        tid = None
+
+    roles = []
+    if tid:
+        rel = UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user, tenant_id=tid).select_related("role").first()
+        if rel and rel.role and rel.role.name:
+            roles = [rel.role.name]
         else:
-            roles = ["Member"]
+            mem = Membership.objects.using(MainRouter.admin_db).filter(user=user, tenant_id=tid).first()
+            if mem and mem.role == Membership.RoleChoices.OWNER:
+                roles = ["Owner"]
+            else:
+                roles = ["Member"]
+    else:
+        roles = ["Member"]
     refresh["roles"] = roles
 
     # Set the nbf (not before) claim to the iat (issued at) claim. At this moment, simplejwt does not provide a
@@ -454,13 +466,19 @@ class UserSerializer(BaseModelSerializerV1):
         tenant_id = self._tenant_id()
         if tenant_id:
             from api.db_router import MainRouter
-            from api.models import Membership
-            mem = Membership.objects.using(MainRouter.admin_db).filter(user=instance, tenant_id=tenant_id).first()
-            if mem and mem.role == Membership.RoleChoices.OWNER:
-                return "Owner"
-            role_obj = instance.roles.using(MainRouter.admin_db).filter(tenant_id=tenant_id).first()
-            if role_obj:
-                return role_obj.name
+            from api.models import Membership, UserRoleRelationship
+            import uuid
+            try:
+                tid = tenant_id if isinstance(tenant_id, uuid.UUID) else uuid.UUID(str(tenant_id))
+            except (ValueError, TypeError):
+                tid = None
+            if tid:
+                rel = UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=instance, tenant_id=tid).select_related("role").first()
+                if rel and rel.role and rel.role.name:
+                    return rel.role.name
+                mem = Membership.objects.using(MainRouter.admin_db).filter(user=instance, tenant_id=tid).first()
+                if mem and mem.role == Membership.RoleChoices.OWNER:
+                    return "Owner"
         return "Member"
 
     class Meta:
@@ -572,18 +590,24 @@ class UserCreateSerializer(BaseWriteSerializer):
         if tenant_id:
             from api.models import Membership, Role, UserRoleRelationship
             from api.db_router import MainRouter
+            import uuid
+
+            try:
+                tid = tenant_id if isinstance(tenant_id, uuid.UUID) else uuid.UUID(str(tenant_id))
+            except (ValueError, TypeError):
+                tid = tenant_id
 
             is_admin = (role_name or "").lower() == "admin"
             Membership.objects.using(MainRouter.admin_db).update_or_create(
                 user=user,
-                tenant_id=tenant_id,
+                tenant_id=tid,
                 defaults={"role": Membership.RoleChoices.OWNER if is_admin else Membership.RoleChoices.MEMBER},
             )
             if role_name:
                 role = Role.objects.using(MainRouter.admin_db).filter(
-                    tenant_id=tenant_id, name__iexact=role_name
+                    tenant_id=tid, name__iexact=role_name
                 ).first() or Role.objects.using(MainRouter.admin_db).filter(
-                    tenant_id=tenant_id, name__icontains=role_name
+                    tenant_id=tid, name__icontains=role_name
                 ).first()
                 if not role:
                     r_lower = role_name.lower()
@@ -596,7 +620,7 @@ class UserCreateSerializer(BaseWriteSerializer):
                     )
                     can_manage_scans = not is_auditor
                     role = Role.objects.using(MainRouter.admin_db).create(
-                        tenant_id=tenant_id,
+                        tenant_id=tid,
                         name=role_name,
                         unlimited_visibility=is_adm,
                         manage_users=is_adm,
@@ -609,7 +633,7 @@ class UserCreateSerializer(BaseWriteSerializer):
                 if role:
                     UserRoleRelationship.objects.using(MainRouter.admin_db).update_or_create(
                         user=user,
-                        tenant_id=tenant_id,
+                        tenant_id=tid,
                         defaults={"role": role},
                     )
 

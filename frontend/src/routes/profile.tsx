@@ -42,9 +42,12 @@ function ProfilePage() {
       ? userEmail.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
       : "");
 
+  const userRole = user.role || (user.is_read_only ? "Read-Only Auditor" : "Security Administrator");
+  const isAuditRole = Boolean(user.is_read_only) || /read-only|auditor|viewer/.test(String(userRole).toLowerCase());
+
   const [name, setName] = useState(userName);
   const [email, setEmail] = useState(userEmail);
-  const [title, setTitle] = useState(user.title || "Security Administrator");
+  const [title, setTitle] = useState(user.title || userRole);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -155,9 +158,9 @@ function ProfilePage() {
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">{title}</p>
           <div className="mt-2.5">
-            <Chip tone="critical">
+            <Chip tone={isAuditRole ? "neutral" : "critical"}>
               <Shield className="h-3 w-3 inline mr-1" />
-              Security Administrator
+              {userRole}
             </Chip>
           </div>
 

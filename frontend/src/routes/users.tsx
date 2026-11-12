@@ -182,6 +182,8 @@ export function UsersPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [localUsers, setLocalUsers] = useState<Array<Record<string, any>>>([]);
+  // Users removed in this session; hidden immediately even if a refetch is slow.
+  const [removedEmails, setRemovedEmails] = useState<string[]>([]);
 
   // Parse fetched users from API cleanly (no dummy data)
   const fetchedItems: Array<Record<string, any>> = Array.isArray(apiUsers?.items)
@@ -242,6 +244,8 @@ export function UsersPage() {
       });
     }
   });
+
+  removedEmails.forEach((e) => combinedUsersMap.delete(e));
 
   const userList = Array.from(combinedUsersMap.values()).map((u) => ({
     ...u,
@@ -327,6 +331,8 @@ export function UsersPage() {
       return;
     }
     setDeleting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
     try {
       let targetId = userToDelete.id;
       if (!targetId || targetId === "admin-current") {
@@ -344,6 +350,7 @@ export function UsersPage() {
       } else {
         await api.delete(`/users/${encodeURIComponent(userToDelete.email)}`);
       }
+      setRemovedEmails((prev) => [...prev, userToDelete.email.toLowerCase()]);
       setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
       setSuspendedEmails((prev) => prev.filter((e) => e.toLowerCase() !== userToDelete.email.toLowerCase()));
       setSuccessMsg(`User ${userToDelete.name || userToDelete.email} was removed successfully.`);
@@ -387,6 +394,22 @@ export function UsersPage() {
         )
       }
     >
+      {/* Delete results: the modal's own messages are only visible while it is open. */}
+      {!modalOpen && errorMsg && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="font-bold cursor-pointer" aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      {!modalOpen && successMsg && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-400">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} className="font-bold cursor-pointer" aria-label="Dismiss">✕</button>
+        </div>
+      )}
+
       {/* ── Users Table ── */}
       <Panel index={0} className="p-0">
         <DataTable
