@@ -113,3 +113,19 @@
   .ocis .no-print { display: none !important; }
   .ocis tr { break-inside: avoid; }
 }
+
+/* Spectra AI answers (Markdown) */
+.ocis .ocis-md { color: var(--oc-ink); line-height: 1.55; overflow-wrap: anywhere; }
+.ocis .ocis-md > * + * { margin-top: 0.5rem; }
+.ocis .ocis-md h1, .ocis .ocis-md h2, .ocis .ocis-md h3, .ocis .ocis-md h4 { font-weight: 600; margin-top: 0.75rem; }
+.ocis .ocis-md h1 { font-size: 1.05rem; } .ocis .ocis-md h2 { font-size: 1rem; } .ocis .ocis-md h3, .ocis .ocis-md h4 { font-size: 0.9rem; }
+.ocis .ocis-md ul { list-style: disc; padding-left: 1.25rem; } .ocis .ocis-md ol { list-style: decimal; padding-left: 1.25rem; }
+.ocis .ocis-md li + li { margin-top: 0.2rem; }
+.ocis .ocis-md code { font-family: ui-monospace, monospace; font-size: 0.8em; background: var(--oc-bg-alt); border: 1px solid var(--oc-line); border-radius: 0.25rem; padding: 0 0.25rem; }
+.ocis .ocis-md pre { background: var(--oc-bg-alt); border: 1px solid var(--oc-line); border-radius: 0.375rem; padding: 0.625rem; overflow-x: auto; }
+.ocis .ocis-md pre code { border: 0; padding: 0; background: none; }
+.ocis .ocis-md blockquote { border-left: 2px solid var(--oc-gold); padding-left: 0.75rem; color: var(--oc-ink-soft); }
+.ocis .ocis-md table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.8rem; }
+.ocis .ocis-md th, .ocis .ocis-md td { border: 1px solid var(--oc-line); padding: 0.25rem 0.5rem; text-align: left; }
+.ocis .ocis-md th { background: var(--oc-bg-alt); font-weight: 600; }
+.ocis .ocis-md a { color: var(--oc-red); text-decoration: underline; }

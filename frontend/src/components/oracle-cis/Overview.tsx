@@ -108,8 +108,15 @@ export default function Overview() {
           <div className="card p-8 text-center">
             <h2 className="text-base">No assessment yet</h2>
             <p className="mt-2 text-sm text-oc-ink-soft">
-              Run the first assessment to see results. Check the{" "}
-              <button type="button" className="text-link" onClick={() => go("connection")}>Connection</button> first.
+              Run the first assessment to see results.
+              {perms.manage_providers ? (
+                <>
+                  {" "}Check the{" "}
+                  <button type="button" className="text-link" onClick={() => go("connection")}>Connection</button> first.
+                </>
+              ) : (
+                " An administrator needs to set up the connection first."
+              )}
             </p>
           </div>
         )}

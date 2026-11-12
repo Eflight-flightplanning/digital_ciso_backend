@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { Health, IdentityKind } from "./types";
 
-export type Page = "overview" | "identities" | "history" | "report" | "connection" | "setup";
+export type Page = "overview" | "identities" | "history" | "report" | "spectra" | "connection" | "setup";
 
 interface SessionValue {
   /** Platform RBAC as reported by the API: manage_scans, manage_providers, manage_integrations. */

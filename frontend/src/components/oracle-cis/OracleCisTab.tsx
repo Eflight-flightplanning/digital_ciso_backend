@@ -12,14 +12,17 @@ import Identities from "./Identities";
 import Overview from "./Overview";
 import Report from "./Report";
 import Setup from "./Setup";
+import Spectra from "./Spectra";
 
-const NAV: { page: Page; label: string }[] = [
+const NAV: { page: Page; label: string; admin?: boolean }[] = [
   { page: "overview", label: "Overview" },
   { page: "identities", label: "Identity risks" },
   { page: "history", label: "History" },
   { page: "report", label: "Report" },
-  { page: "connection", label: "Connection" },
-  { page: "setup", label: "Settings" },
+  { page: "spectra", label: "Spectra AI" },
+  // Connection settings: only for accounts that can manage providers (hidden from read-only).
+  { page: "connection", label: "Connection", admin: true },
+  { page: "setup", label: "Settings", admin: true },
 ];
 
 function RevealToggle() {
@@ -46,13 +49,17 @@ function RevealToggle() {
 }
 
 function Body({ fullPage }: { fullPage: boolean }) {
-  const { page, go } = useSession();
+  const { page: requested, go, perms } = useSession();
+  const canManage = perms.manage_providers;
+  const nav = NAV.filter((n) => !n.admin || canManage);
+  // Never render an admin-only page for an account that can't see it.
+  const page = NAV.find((n) => n.page === requested)?.admin && !canManage ? "overview" : requested;
   return (
     <>
       <div className="no-print border-b border-oc-line bg-oc-card">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4">
           <nav className="flex flex-1 flex-wrap items-stretch gap-1 self-stretch" aria-label="CIS assessment">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <button
                 key={n.page}
                 type="button"
@@ -86,6 +93,7 @@ function Body({ fullPage }: { fullPage: boolean }) {
       {page === "identities" && <Identities />}
       {page === "history" && <History />}
       {page === "report" && <Report />}
+      {page === "spectra" && <Spectra />}
       {page === "connection" && <Connection />}
       {page === "setup" && <Setup />}
     </>

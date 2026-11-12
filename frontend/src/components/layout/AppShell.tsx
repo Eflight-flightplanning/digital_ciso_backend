@@ -29,6 +29,7 @@ import {
 import { Wordmark } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import { authStore } from "@/lib/auth";
+import { useProviders } from "@/hooks/use-api";
 import { apiRequest, getAuthToken, refreshAccessToken, setAuthToken } from "@/lib/api-client";
 import {
   CommandDialog,
@@ -129,6 +130,18 @@ function ThemeToggle() {
   );
 }
 
+/**
+ * Oracle Fusion SaaS shows only when the role can see an Oracle SaaS provider. The provider
+ * list comes from the API, which already scopes it to the role, so this follows the role's
+ * real access instead of guessing from its name.
+ */
+function useCanAccessSaaS(isAdmin: boolean): boolean {
+  const { data } = useProviders();
+  if (isAdmin) return true;
+  const items = (data?.items as Array<Record<string, any>> | undefined) ?? [];
+  return items.some((p) => String(p.provider ?? p.attributes?.provider ?? "").toLowerCase() === "oracle_saas");
+}
+
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [user, setUser] = useState<{ name?: string; role?: string; is_read_only?: boolean } | null>(null);
@@ -144,7 +157,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const userRoleStr = String(user?.role || "").toLowerCase();
   const isReadOnly = Boolean(user?.is_read_only) || /read-only|auditor|viewer/.test(userRoleStr);
   const isAdmin = !isReadOnly && (userRoleStr.includes("admin") || userRoleStr.includes("owner"));
-  const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
+  const canAccessSaaS = useCanAccessSaaS(isAdmin);
 
   const visibleSections = useMemo(() => {
     return navSections
@@ -284,7 +297,7 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
   const userRoleStr = String(user?.role || "").toLowerCase();
   const isReadOnly = Boolean(user?.is_read_only) || /read-only|auditor|viewer/.test(userRoleStr);
   const isAdmin = !isReadOnly && (userRoleStr.includes("admin") || userRoleStr.includes("owner"));
-  const canAccessSaaS = isAdmin || userRoleStr.includes("all") || userRoleStr.includes("saas") || userRoleStr.includes("fusion") || (!userRoleStr.includes("azure") && !userRoleStr.includes("aws") && !userRoleStr.includes("gcp") && !userRoleStr.includes("oci") && !userRoleStr.includes("oraclecloud"));
+  const canAccessSaaS = useCanAccessSaaS(isAdmin);
 
   const visibleSections = navSections
     .map((section) => {

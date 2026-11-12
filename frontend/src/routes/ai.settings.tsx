@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { authStore } from "@/lib/auth";
 import {
   Sparkles,
   BrainCircuit,
@@ -26,6 +27,15 @@ import { api, jsonApiBody } from "@/lib/api-client";
 import { useLLMConfigs } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/ai/settings")({
+  // Settings are for roles that can change the platform; read-only roles go to the dashboard.
+  beforeLoad: () => {
+    if (typeof window === "undefined") return;
+    const u = authStore.getState().user;
+    const role = String(u?.role || "").toLowerCase();
+    if (u?.is_read_only || /read-only|read only|readonly|auditor|viewer/.test(role)) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: AISettingsPage,
 });
 

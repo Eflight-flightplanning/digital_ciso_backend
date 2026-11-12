@@ -215,11 +215,14 @@ export function useAIAdvisorQuery() {
       question,
       provider,
       history,
+      scope,
     }: {
       question: string;
       provider?: string;
       history?: Array<{ role: string; content: string }>;
-    }) => api.post("/ai/advisor/query", { question, provider, history }, { jsonApi: false }),
+      /** Lock Spectra to one product, e.g. "oracle_saas" inside the Oracle SaaS dashboard. */
+      scope?: "oracle_saas";
+    }) => api.post("/ai/advisor/query", { question, provider, history, scope }, { jsonApi: false }),
   });
 }
 

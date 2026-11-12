@@ -1246,14 +1246,11 @@ function AIDecisionsPage() {
                     <button
                       type="button"
                       disabled
-                      title="Read-Only Auditor: Ticket dispatch is restricted to Admins and Security Analysts."
+                      title="Ticket dispatch needs a role that can manage integrations."
                       className="inline-flex items-center gap-2 rounded-xl bg-muted/60 px-4 py-2.5 text-xs font-semibold text-muted-foreground border border-border/50 cursor-not-allowed opacity-80"
                     >
                       <Ticket className="h-4 w-4 text-muted-foreground" />
                       <span>Dispatch Jira Ticket</span>
-                      <span className="rounded bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
-                        Read-Only
-                      </span>
                     </button>
                   )}
                 </div>

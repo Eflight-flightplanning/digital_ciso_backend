@@ -256,6 +256,10 @@ export function UsersPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (roleTier !== "Admin" && !isCustomRole && selectedClouds.length === 0) {
+      setErrorMsg("Select the clouds this user may see (or Select all).");
+      return;
+    }
     if (!newEmail || !newName || !newPassword) {
       setErrorMsg("Please fill in all required fields (Full Name, Work Email, Role, Password).");
       return;
@@ -357,6 +361,19 @@ export function UsersPage() {
       queryClient.invalidateQueries({ queryKey: qk.users() });
       refetch();
     } catch (err: any) {
+      // The row may be stale (removed in another tab or earlier): if a fresh list no longer
+      // has the user, the removal the admin wanted has happened.
+      const fresh = await refetch().catch(() => null);
+      const freshItems: Array<Record<string, any>> = Array.isArray(fresh?.data?.items) ? fresh!.data!.items : [];
+      const stillThere = freshItems.some(
+        (u) => String(u.email || u.attributes?.email || "").toLowerCase() === userToDelete.email.toLowerCase(),
+      );
+      if (fresh?.data && !stillThere) {
+        setRemovedEmails((prev) => [...prev, userToDelete.email.toLowerCase()]);
+        setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
+        setSuccessMsg(`User ${userToDelete.name || userToDelete.email} was removed.`);
+        return;
+      }
       console.warn("Backend user deletion failed:", err);
       const msg =
         err?.response?.data?.errors?.[0]?.detail ||
