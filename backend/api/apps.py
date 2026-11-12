@@ -63,8 +63,29 @@ class ApiConfig(AppConfig):
             return
 
         # Check if both JWT keys are set; if not, generate them
-        signing_key = env.str(SIGNING_KEY_ENV, default="").strip()
-        verifying_key = env.str(VERIFYING_KEY_ENV, default="").strip()
+        def _clean_key(val: str) -> str:
+            if not val:
+                return ""
+            v = val.strip()
+            if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                v = v[1:-1].strip()
+            return v.replace("\\n", "\n").strip()
+
+        signing_key = _clean_key(env.str(SIGNING_KEY_ENV, default=""))
+        verifying_key = _clean_key(env.str(VERIFYING_KEY_ENV, default=""))
+
+        # If signing_key is set but verifying_key is not, automatically derive verifying_key
+        if signing_key and not verifying_key:
+            try:
+                from cryptography.hazmat.primitives import serialization
+                priv_key_obj = serialization.load_pem_private_key(signing_key.encode("utf-8"), password=None)
+                verifying_key = priv_key_obj.public_key().public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                ).decode("utf-8").strip()
+                logger.info("Derived JWT verifying key automatically from signing key.")
+            except Exception as e:
+                logger.warning(f"Could not derive JWT public key from signing key: {e}")
 
         if not signing_key or not verifying_key:
             logger.info(
@@ -72,6 +93,14 @@ class ApiConfig(AppConfig):
                 "environment variables."
             )
             self._ensure_jwt_keys()
+        else:
+            # Set environment variables and Django settings
+            os.environ[SIGNING_KEY_ENV] = signing_key
+            settings.SIMPLE_JWT["SIGNING_KEY"] = signing_key
+
+            os.environ[VERIFYING_KEY_ENV] = verifying_key
+            settings.SIMPLE_JWT["VERIFYING_KEY"] = verifying_key
+            settings.SIMPLE_JWT["ALGORITHM"] = "RS256"
 
         # Mark as initialized to prevent future executions in this process
         _keys_initialized = True
