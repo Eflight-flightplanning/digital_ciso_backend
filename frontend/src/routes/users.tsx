@@ -117,18 +117,24 @@ export function UsersPage() {
     (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("auth_user") || "{}")?.role : "") ||
     ""
   ).toLowerCase();
-  const isAdmin =
-    Boolean(currentUser.is_superuser) ||
-    Boolean(currentUser.is_staff) ||
-    currentUserRoleStr.includes("admin") ||
-    currentUserRoleStr.includes("owner");
+  // Prefer the effective permissions computed by the backend; fall back to the
+  // role name only for older API responses that don't include them.
+  const currentPerms = (currentUser.permissions || currentUser.attributes?.permissions) as
+    | Record<string, boolean>
+    | undefined;
+  const isAdmin = currentPerms
+    ? Boolean(currentPerms.manage_users) && !currentUser.is_read_only
+    : Boolean(currentUser.is_superuser) ||
+      Boolean(currentUser.is_staff) ||
+      ((currentUserRoleStr.includes("admin") || currentUserRoleStr.includes("owner")) &&
+        !/read-only|readonly|auditor|viewer/.test(currentUserRoleStr));
 
-  const defaultAdminEmail = currentUser.email || jiraConfig?.email || "digitalciso@eflight.aero";
-  const defaultAdminName =
+  const currentAdminEmail = currentUser.email || "";
+  const currentAdminName =
     currentUser.name ||
-    (jiraConfig?.email
-      ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
-      : "Digital CISO Administrator");
+    (currentAdminEmail
+      ? currentAdminEmail.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : "");
 
   const { data: providersData } = useProviders();
 
@@ -151,7 +157,7 @@ export function UsersPage() {
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [roleTier, setRoleTier] = useState<"Admin" | "Member" | "Auditor">("Auditor");
-  const [selectedClouds, setSelectedClouds] = useState<string[]>(["azure"]);
+  const [selectedClouds, setSelectedClouds] = useState<string[]>([]);
   const [frameworkScope, setFrameworkScope] = useState<string>("cis");
   const [customRoleName, setCustomRoleName] = useState<string>("");
   const [isCustomRole, setIsCustomRole] = useState(false);
@@ -160,7 +166,6 @@ export function UsersPage() {
     if (roleTier === "Admin") return;
     setSelectedClouds((prev) => {
       if (prev.includes(cloudId)) {
-        if (prev.length <= 1) return prev; // Keep at least one selected
         return prev.filter((id) => id !== cloudId);
       } else {
         return [...prev, cloudId];
@@ -198,19 +203,7 @@ export function UsersPage() {
     status: string;
   }>();
 
-  // Include current logged in user first if available
-  if (defaultAdminEmail) {
-    combinedUsersMap.set(defaultAdminEmail.toLowerCase(), {
-      id: currentUser.id || "admin-current",
-      email: defaultAdminEmail,
-      name: defaultAdminName,
-      role: currentUser.role || "Admin",
-      lastLogin: "Active Now",
-      status: "Active",
-    });
-  }
-
-  // Add backend users
+  // Add backend users from API
   fetchedItems.forEach((u) => {
     const email = String(u.email || u.attributes?.email || "");
     if (!email) return;
@@ -229,6 +222,18 @@ export function UsersPage() {
       status: u.is_active !== false ? "Active" : "Suspended",
     });
   });
+
+  // Include current logged in user only if not already in fetchedItems and real email is available
+  if (currentAdminEmail && !combinedUsersMap.has(currentAdminEmail.toLowerCase())) {
+    combinedUsersMap.set(currentAdminEmail.toLowerCase(), {
+      id: currentUser.id || "",
+      email: currentAdminEmail,
+      name: currentAdminName || currentAdminEmail.split("@")[0],
+      role: currentUser.role ? String(currentUser.role).charAt(0).toUpperCase() + String(currentUser.role).slice(1) : "Admin",
+      lastLogin: "Active Now",
+      status: "Active",
+    });
+  }
 
   // Add newly created local users
   localUsers.forEach((u) => {
@@ -328,6 +333,8 @@ export function UsersPage() {
       return;
     }
     setDeleting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
     try {
       let targetId = userToDelete.id;
       if (!targetId || targetId === "admin-current") {
@@ -343,7 +350,8 @@ export function UsersPage() {
       if (targetId && targetId !== "admin-current") {
         await api.delete(`/users/${targetId}`);
       } else {
-        await api.delete(`/users/${encodeURIComponent(userToDelete.email)}`);
+        // `/users/<email>` never matches the router (emails contain dots); use the remove action.
+        await api.delete(`/users/remove?email=${encodeURIComponent(userToDelete.email)}`);
       }
       setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
       setSuspendedEmails((prev) => prev.filter((e) => e.toLowerCase() !== userToDelete.email.toLowerCase()));
@@ -388,6 +396,21 @@ export function UsersPage() {
         )
       }
     >
+      {!modalOpen && errorMsg && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="font-bold cursor-pointer">✕</button>
+        </div>
+      )}
+      {!modalOpen && successMsg && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-400">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{successMsg}</span>
+          <button onClick={() => setSuccessMsg(null)} className="font-bold cursor-pointer">✕</button>
+        </div>
+      )}
+
       {/* ── Users Table ── */}
       <Panel index={0} className="p-0">
         <DataTable
@@ -400,74 +423,82 @@ export function UsersPage() {
             "Actions",
           ]}
         >
-          {userList.map((u, i) => (
-            <Row key={u.email} index={i}>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
-                    {u.name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")
-                      .toUpperCase()}
-                  </div>
-                  <span className="text-xs font-semibold text-foreground">
-                    {u.name}
-                  </span>
-                </div>
-              </td>
-              <td className="mono text-xs text-muted-foreground px-4 py-3">
-                {u.email}
-              </td>
-              <td className="px-4 py-3">
-                <Chip
-                  tone={
-                    u.role.includes("Admin") || u.role.includes("Owner")
-                      ? "critical"
-                      : u.role.includes("Analyst") || u.role === "Member"
-                        ? "primary"
-                        : "neutral"
-                  }
-                >
-                  {u.role}
-                </Chip>
-              </td>
-              <td className="mono text-[11px] text-muted-foreground px-4 py-3">
-                {u.lastLogin}
-              </td>
-              <td className="px-4 py-3">
-                <Chip tone={u.status === "Active" ? "success" : "neutral"}>
-                  <Dot tone={u.status === "Active" ? "success" : "neutral"} />
-                  {u.status}
-                </Chip>
-              </td>
-              <td className="px-4 py-3">
-                {isAdmin ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleStatus(u.email)}
-                      className="inline-flex h-7 items-center justify-center rounded bg-surface-2 px-3 text-xs font-medium text-foreground hover:bg-surface-2/80 transition-colors cursor-pointer"
-                    >
-                      {u.status === "Active" ? "Suspend" : "Activate"}
-                    </button>
-
-                    {u.email.toLowerCase() !== defaultAdminEmail.toLowerCase() && (
-                      <button
-                        onClick={() => setDeleteConfirmUser({ id: u.id, email: u.email, name: u.name })}
-                        className="inline-flex h-7 items-center justify-center gap-1 rounded bg-rose-500/10 border border-rose-500/20 px-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
-                        title="Remove User Account"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Remove</span>
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground italic">View Only</span>
-                )}
+          {userList.length === 0 ? (
+            <Row index={0}>
+              <td colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                No team members registered yet. Click &quot;Add Team Member&quot; to create user accounts.
               </td>
             </Row>
-          ))}
+          ) : (
+            userList.map((u, i) => (
+              <Row key={u.email} index={i}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 font-display text-[11px] font-bold text-foreground ring-1 ring-border">
+                      {u.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">
+                      {u.name}
+                    </span>
+                  </div>
+                </td>
+                <td className="mono text-xs text-muted-foreground px-4 py-3">
+                  {u.email}
+                </td>
+                <td className="px-4 py-3">
+                  <Chip
+                    tone={
+                      u.role.includes("Admin") || u.role.includes("Owner")
+                        ? "critical"
+                        : u.role.includes("Analyst") || u.role === "Member"
+                          ? "primary"
+                          : "neutral"
+                    }
+                  >
+                    {u.role}
+                  </Chip>
+                </td>
+                <td className="mono text-[11px] text-muted-foreground px-4 py-3">
+                  {u.lastLogin}
+                </td>
+                <td className="px-4 py-3">
+                  <Chip tone={u.status === "Active" ? "success" : "neutral"}>
+                    <Dot tone={u.status === "Active" ? "success" : "neutral"} />
+                    {u.status}
+                  </Chip>
+                </td>
+                <td className="px-4 py-3">
+                  {isAdmin ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleStatus(u.email)}
+                        className="inline-flex h-7 items-center justify-center rounded bg-surface-2 px-3 text-xs font-medium text-foreground hover:bg-surface-2/80 transition-colors cursor-pointer"
+                      >
+                        {u.status === "Active" ? "Suspend" : "Activate"}
+                      </button>
+
+                      {(!currentAdminEmail || u.email.toLowerCase() !== currentAdminEmail.toLowerCase()) && (
+                        <button
+                          onClick={() => setDeleteConfirmUser({ id: u.id, email: u.email, name: u.name })}
+                          className="inline-flex h-7 items-center justify-center gap-1 rounded bg-rose-500/10 border border-rose-500/20 px-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                          title="Remove User Account"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">View Only</span>
+                  )}
+                </td>
+              </Row>
+            ))
+          )}
         </DataTable>
       </Panel>
 
@@ -608,10 +639,10 @@ export function UsersPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedClouds(["azure"])}
+                        onClick={() => setSelectedClouds([])}
                         className="px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-2 text-muted-foreground hover:text-foreground border border-border transition-colors cursor-pointer"
                       >
-                        Reset
+                        Clear
                       </button>
                     </div>
                   )}

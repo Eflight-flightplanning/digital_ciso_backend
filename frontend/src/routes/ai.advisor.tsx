@@ -487,12 +487,14 @@ function AIAdvisorPage() {
   const currentUser = (currentUserRaw as Record<string, any>) || {};
   const userDisplayName =
     currentUser.name ||
-    (jiraConfig?.email
-      ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
-      : "Akhilesh Merugu");
+    (currentUser.email
+      ? currentUser.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : (jiraConfig?.email
+        ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+        : "Security User"));
 
   const userInitials = useMemo(() => {
-    if (!userDisplayName) return "AM";
+    if (!userDisplayName) return "SU";
     const parts = userDisplayName.trim().split(" ");
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return userDisplayName.slice(0, 2).toUpperCase();

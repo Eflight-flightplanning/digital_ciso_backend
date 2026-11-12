@@ -35,16 +35,16 @@ function ProfilePage() {
 
   const user = (userRaw as Record<string, any>) || {};
 
-  const defaultEmail = user.email || jiraConfig?.email || "akhilesh.merugu@pravahya.com";
-  const defaultName =
+  const userEmail = user.email || "";
+  const userName =
     user.name ||
-    (jiraConfig?.email
-      ? jiraConfig.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
-      : "Akhilesh Merugu");
+    (userEmail
+      ? userEmail.split("@")[0].replace(".", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+      : "");
 
-  const [name, setName] = useState(defaultName);
-  const [email] = useState(defaultEmail);
-  const [title, setTitle] = useState(user.title || "Cloud Security Architect & Lead Administrator");
+  const [name, setName] = useState(userName);
+  const [email, setEmail] = useState(userEmail);
+  const [title, setTitle] = useState(user.title || "Security Administrator");
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -55,11 +55,12 @@ function ProfilePage() {
   // Sync state if user data loads
   useEffect(() => {
     if (user.name) setName(user.name);
+    if (user.email) setEmail(user.email);
     if (user.title) setTitle(user.title);
-  }, [user.name, user.title]);
+  }, [user.name, user.email, user.title]);
 
   const initials = useMemo(() => {
-    if (!name) return "AM";
+    if (!name) return "U";
     const parts = name.trim().split(" ");
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return name.slice(0, 2).toUpperCase();
@@ -166,7 +167,7 @@ function ProfilePage() {
                 <Building2 className="h-3.5 w-3.5" /> Workspace:
               </span>
               <span className="font-semibold text-foreground">
-                {user.company_name || (jiraConfig?.base_url ? new URL(jiraConfig.base_url).hostname : "Pravahya Enterprise")}
+                {user.company_name || (jiraConfig?.base_url ? new URL(jiraConfig.base_url).hostname : "Enterprise Workspace")}
               </span>
             </div>
 
