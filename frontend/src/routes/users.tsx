@@ -82,18 +82,18 @@ function computeDynamicRole(
     framework === "cis"
       ? "CIS"
       : framework === "nca"
-      ? "NCA"
-      : framework === "soc2"
-      ? "SOC2"
-      : framework === "pci"
-      ? "PCI-DSS"
-      : framework === "iso"
-      ? "ISO27001"
-      : framework === "hipaa"
-      ? "HIPAA"
-      : framework === "nist"
-      ? "NIST"
-      : "";
+        ? "NCA"
+        : framework === "soc2"
+          ? "SOC2"
+          : framework === "pci"
+            ? "PCI-DSS"
+            : framework === "iso"
+              ? "ISO27001"
+              : framework === "hipaa"
+                ? "HIPAA"
+                : framework === "nist"
+                  ? "NIST"
+                  : "";
 
   const tierSuffix = tier === "Auditor" ? "Read-Only Auditor" : "Security Analyst";
 
@@ -117,17 +117,11 @@ export function UsersPage() {
     (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("auth_user") || "{}")?.role : "") ||
     ""
   ).toLowerCase();
-  // Prefer the effective permissions computed by the backend; fall back to the
-  // role name only for older API responses that don't include them.
-  const currentPerms = (currentUser.permissions || currentUser.attributes?.permissions) as
-    | Record<string, boolean>
-    | undefined;
-  const isAdmin = currentPerms
-    ? Boolean(currentPerms.manage_users) && !currentUser.is_read_only
-    : Boolean(currentUser.is_superuser) ||
-      Boolean(currentUser.is_staff) ||
-      ((currentUserRoleStr.includes("admin") || currentUserRoleStr.includes("owner")) &&
-        !/read-only|readonly|auditor|viewer/.test(currentUserRoleStr));
+  const isAdmin =
+    Boolean(currentUser.is_superuser) ||
+    Boolean(currentUser.is_staff) ||
+    currentUserRoleStr.includes("admin") ||
+    currentUserRoleStr.includes("owner");
 
   const currentAdminEmail = currentUser.email || "";
   const currentAdminName =
@@ -296,7 +290,7 @@ export function UsersPage() {
 
       setLocalUsers((prev) => [...prev, newUserObj]);
       setSuccessMsg(`User ${newName} successfully created! Credentials and setup instructions have been emailed to ${newEmail}.`);
-      
+
       // Invalidate API queries to refresh backend user list
       queryClient.invalidateQueries({ queryKey: qk.users() });
       refetch();
@@ -333,8 +327,6 @@ export function UsersPage() {
       return;
     }
     setDeleting(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
     try {
       let targetId = userToDelete.id;
       if (!targetId || targetId === "admin-current") {
@@ -350,8 +342,7 @@ export function UsersPage() {
       if (targetId && targetId !== "admin-current") {
         await api.delete(`/users/${targetId}`);
       } else {
-        // `/users/<email>` never matches the router (emails contain dots); use the remove action.
-        await api.delete(`/users/remove?email=${encodeURIComponent(userToDelete.email)}`);
+        await api.delete(`/users/${encodeURIComponent(userToDelete.email)}`);
       }
       setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
       setSuspendedEmails((prev) => prev.filter((e) => e.toLowerCase() !== userToDelete.email.toLowerCase()));
@@ -396,21 +387,6 @@ export function UsersPage() {
         )
       }
     >
-      {!modalOpen && errorMsg && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="font-bold cursor-pointer">✕</button>
-        </div>
-      )}
-      {!modalOpen && successMsg && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-400">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{successMsg}</span>
-          <button onClick={() => setSuccessMsg(null)} className="font-bold cursor-pointer">✕</button>
-        </div>
-      )}
-
       {/* ── Users Table ── */}
       <Panel index={0} className="p-0">
         <DataTable
@@ -592,11 +568,10 @@ export function UsersPage() {
                       key={t.tier}
                       type="button"
                       onClick={() => setRoleTier(t.tier)}
-                      className={`flex flex-col text-left p-3 rounded-xl border transition-all cursor-pointer ${
-                        roleTier === t.tier
-                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                          : "border-border bg-surface-2 hover:border-border/80"
-                      }`}
+                      className={`flex flex-col text-left p-3 rounded-xl border transition-all cursor-pointer ${roleTier === t.tier
+                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
+                        : "border-border bg-surface-2 hover:border-border/80"
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className={`font-bold text-xs ${roleTier === t.tier ? "text-primary" : "text-foreground"}`}>
@@ -629,11 +604,10 @@ export function UsersPage() {
                       <button
                         type="button"
                         onClick={handleSelectAllClouds}
-                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
-                          selectedClouds.length === CLOUD_PROVIDER_OPTIONS.length
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-surface-2 text-muted-foreground hover:text-foreground border border-border"
-                        }`}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${selectedClouds.length === CLOUD_PROVIDER_OPTIONS.length
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-surface-2 text-muted-foreground hover:text-foreground border border-border"
+                          }`}
                       >
                         All Clouds (Fleet)
                       </button>
@@ -665,22 +639,20 @@ export function UsersPage() {
                         <div
                           key={cloud.id}
                           onClick={() => toggleCloud(cloud.id)}
-                          className={`relative flex flex-col justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                            isSelected
-                              ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
-                              : "border-border bg-surface-2 hover:border-border/80 hover:bg-surface-2/80 opacity-70"
-                          }`}
+                          className={`relative flex flex-col justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none ${isSelected
+                            ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40"
+                            : "border-border bg-surface-2 hover:border-border/80 hover:bg-surface-2/80 opacity-70"
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-1.5">
                             <span className="font-bold text-xs text-foreground truncate">
                               {cloud.name}
                             </span>
                             <div
-                              className={`flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0 ${
-                                isSelected
-                                  ? "border-primary bg-primary text-primary-foreground"
-                                  : "border-muted-foreground/40 bg-surface"
-                              }`}
+                              className={`flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0 ${isSelected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-muted-foreground/40 bg-surface"
+                                }`}
                             >
                               {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
                             </div>
@@ -762,8 +734,8 @@ export function UsersPage() {
                         {roleTier === "Admin"
                           ? "All Fleet Clouds"
                           : selectedClouds.length === CLOUD_PROVIDER_OPTIONS.length
-                          ? "All Fleet Clouds"
-                          : selectedClouds.map((id) => CLOUD_PROVIDER_OPTIONS.find((c) => c.id === id)?.short).join(", ")}
+                            ? "All Fleet Clouds"
+                            : selectedClouds.map((id) => CLOUD_PROVIDER_OPTIONS.find((c) => c.id === id)?.short).join(", ")}
                       </strong>
                     </span>
                   </div>
@@ -795,8 +767,8 @@ export function UsersPage() {
                         {roleTier === "Auditor"
                           ? "Read-Only (No Scans/Edits)"
                           : roleTier === "Member"
-                          ? "Analyst (Scans & AI)"
-                          : "Full Administrator"}
+                            ? "Analyst (Scans & AI)"
+                            : "Full Administrator"}
                       </strong>
                     </span>
                   </div>
