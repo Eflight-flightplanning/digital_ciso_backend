@@ -130,6 +130,7 @@ from api.models import (
     TenantComplianceSummary,
     ThreatScoreSnapshot,
     User,
+    UserMfa,
     UserRoleRelationship,
 )
 from api.pagination import ComplianceOverviewPagination
@@ -1201,30 +1202,82 @@ class UserViewSet(BaseUserViewset):
         if not request.user or not request.user.is_authenticated:
             raise PermissionDenied("Authentication required to remove users.")
 
-        if not getattr(request.user, "is_superuser", False) and not getattr(request.user, "is_staff", False):
-            tenant_id = getattr(request, "tenant_id", None)
-            role = None
-            if tenant_id:
-                try:
-                    role = get_role(request.user, tenant_id)
-                except Exception:
-                    pass
-            if not role or not getattr(role, Permissions.MANAGE_USERS.value, False):
-                raise PermissionDenied("You do not have permission to remove users.")
+        # 1. Resolve tenant ID & permissions
+        _tid = (
+            getattr(request, "tenant_id", None)
+            or (request.auth.get("tenant_id") if hasattr(request.auth, "get") else None)
+            or (getattr(request.auth, "payload", {}).get("tenant_id") if hasattr(request, "auth") and hasattr(request.auth, "payload") else None)
+        )
+        if not _tid:
+            admin_membership = Membership.objects.using(MainRouter.admin_db).filter(user=request.user).order_by("-date_joined").first()
+            if admin_membership:
+                _tid = str(admin_membership.tenant_id)
+        request.tenant_id = _tid
 
-        user_instance = self.get_object()
+        is_super = getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False)
+        if not is_super:
+            is_owner = False
+            if _tid:
+                mem = Membership.objects.using(MainRouter.admin_db).filter(user=request.user, tenant_id=_tid).first()
+                if mem and mem.role == Membership.RoleChoices.OWNER:
+                    is_owner = True
+            if not is_owner:
+                _perm = HasPermissions()
+                _view = type("V", (), {"required_permissions": [Permissions.MANAGE_USERS]})()
+                if not _perm.has_permission(request, _view):
+                    raise PermissionDenied("You do not have permission to remove users.")
+
+        # 2. Look up target user by pk (UUID or email), query param, or payload
+        raw_val = (
+            kwargs.get("pk")
+            or request.query_params.get("id")
+            or request.query_params.get("email")
+            or (request.data.get("email") if isinstance(request.data, dict) else None)
+        )
+
+        user_instance = None
+        if raw_val:
+            val_str = str(raw_val).strip()
+            import uuid
+            try:
+                val_uuid = uuid.UUID(val_str)
+                user_instance = User.objects.using(MainRouter.admin_db).filter(id=val_uuid).first()
+            except (ValueError, TypeError):
+                user_instance = User.objects.using(MainRouter.admin_db).filter(email__iexact=val_str).first()
+
+        if not user_instance:
+            try:
+                user_instance = self.get_object()
+            except Exception:
+                pass
+
+        if not user_instance:
+            raise NotFound("User account not found.")
+
         if request.user.is_authenticated and user_instance.email.lower() == request.user.email.lower():
             raise ValidationError("You cannot remove your own active administrator account while logged in.")
 
         user_id = user_instance.id
         email = user_instance.email
 
+        # 3. Clean up related dependencies in admin_db before deleting the user
+        UserMfa.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
         Membership.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
         UserRoleRelationship.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
+        try:
+            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+            OutstandingToken.objects.using(MainRouter.admin_db).filter(user=user_instance).delete()
+        except Exception:
+            pass
+
         user_instance.delete(using=MainRouter.admin_db)
 
-        logger.info("Removed user account %s (%s)", email, user_id)
+        logger.info("Successfully removed user account %s (%s)", email, user_id)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["delete"], url_path="remove")
+    def remove(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
 
 @extend_schema_view(

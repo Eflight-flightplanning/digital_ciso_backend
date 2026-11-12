@@ -277,9 +277,11 @@ export function UsersPage() {
         },
       };
 
-      await api.post("/users", payload);
+      const res: any = await api.post("/users", payload);
+      const createdId = res?.data?.id || res?.data?.data?.id || res?.id || "";
 
       const newUserObj = {
+        id: createdId,
         email: newEmail,
         name: newName,
         role: chosenRole,
@@ -327,18 +329,35 @@ export function UsersPage() {
     }
     setDeleting(true);
     try {
-      if (userToDelete.id && userToDelete.id !== "admin-current") {
-        await api.delete(`/users/${userToDelete.id}`);
+      let targetId = userToDelete.id;
+      if (!targetId || targetId === "admin-current") {
+        const found = fetchedItems.find((u: any) => {
+          const e = String(u.email || u.attributes?.email || "").toLowerCase();
+          return e === userToDelete.email.toLowerCase();
+        });
+        if (found) {
+          targetId = String(found.id || found.attributes?.id || "");
+        }
+      }
+
+      if (targetId && targetId !== "admin-current") {
+        await api.delete(`/users/${targetId}`);
       } else {
-        await api.delete(`/users`, { data: { email: userToDelete.email } });
+        await api.delete(`/users/${encodeURIComponent(userToDelete.email)}`);
       }
       setLocalUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== userToDelete.email.toLowerCase()));
       setSuspendedEmails((prev) => prev.filter((e) => e.toLowerCase() !== userToDelete.email.toLowerCase()));
+      setSuccessMsg(`User ${userToDelete.name || userToDelete.email} was removed successfully.`);
       queryClient.invalidateQueries({ queryKey: qk.users() });
       refetch();
     } catch (err: any) {
       console.warn("Backend user deletion failed:", err);
-      setErrorMsg(err?.message || "Failed to remove user account. Permission denied.");
+      const msg =
+        err?.response?.data?.errors?.[0]?.detail ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to remove user account. Permission denied.";
+      setErrorMsg(msg);
     } finally {
       setDeleting(false);
       setDeleteConfirmUser(null);
