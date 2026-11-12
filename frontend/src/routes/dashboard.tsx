@@ -1022,7 +1022,11 @@ function FindingsDonutChart({
 export function DashboardPage() {
   const navigate = useNavigate();
   const { data: currentUserRaw } = useCurrentUser();
-  const storedUser = authStore.getUser();
+  const storedUser =
+    authStore.getState().user ||
+    (typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("auth_user") || "null")
+      : null);
   const currentUser = (currentUserRaw as Record<string, any>) || storedUser;
   const userRole = String(
     currentUser?.role ||

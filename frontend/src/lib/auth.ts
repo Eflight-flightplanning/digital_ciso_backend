@@ -59,6 +59,10 @@ export const authStore = {
     return currentAuth;
   },
 
+  getUser(): User | null {
+    return currentAuth.user || getStoredUser();
+  },
+
   subscribe(listener: (state: AuthState) => void) {
     listeners.add(listener);
     return () => listeners.delete(listener);
