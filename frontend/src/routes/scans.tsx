@@ -13,6 +13,7 @@ import {
   X,
   AlertTriangle,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -462,11 +463,26 @@ function ScansPage() {
                     Compliance Gain
                   </div>
                   <div className="mt-1 text-2xl font-black text-cyan-300 font-mono">
-                    {liveDelta?.compliance_gain ?? "0%"}
+                    {liveDelta?.compliance_gain === "Baseline" ? "Baseline" : (liveDelta?.compliance_gain ?? "0%")}
                   </div>
-                  <span className="text-[10px] text-cyan-400/80 font-medium">{liveDelta?.compliance_score ?? 0}% Framework Score</span>
+                  <span className="text-[10px] text-cyan-400/80 font-medium">
+                    {liveDelta?.compliance_gain === "Baseline"
+                      ? `${liveDelta?.compliance_score ?? 0}% Initial Benchmark Score`
+                      : `${liveDelta?.compliance_score ?? 0}% Current Framework Score`}
+                  </span>
                 </div>
               </div>
+
+              {/* Audit Methodology Transparency Banner */}
+              {liveDelta?.calculation_method && (
+                <div className="rounded-xl border border-border/80 bg-surface-2/60 p-3.5 text-xs text-muted-foreground flex items-start gap-2.5">
+                  <Info className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-foreground">Audit Calculation Methodology</p>
+                    <p className="text-[11px] leading-relaxed">{liveDelta.calculation_method}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Remediation Diff Table */}
               <div>

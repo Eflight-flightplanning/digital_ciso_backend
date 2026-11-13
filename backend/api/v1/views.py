@@ -3040,26 +3040,6 @@ class ScanViewSet(BaseRLSViewSet):
                     }
                 )
 
-        if not resolved_items and current_passes:
-            for check_id, pass_f in list(current_passes.items())[:6]:
-                meta = pass_f.check_metadata or {}
-                title = (
-                    meta.get("checktitle")
-                    or meta.get("check_title")
-                    or check_id.replace("_", " ").title()
-                )
-                service = (
-                    meta.get("servicename") or meta.get("service") or "Security Control"
-                )
-                resolved_items.append(
-                    {
-                        "check_id": check_id,
-                        "title": str(title),
-                        "sub": f"{str(service).capitalize()} • Live Assessment Passed",
-                        "status_transition": "FAIL -> REMEDIATED",
-                    }
-                )
-
         new_fails = [
             check_id for check_id in current_fails if check_id not in previous_fails
         ]
@@ -3067,6 +3047,19 @@ class ScanViewSet(BaseRLSViewSet):
         total_curr = len(current_findings) or 1
         pass_curr = len(current_passes)
         score_curr = round((pass_curr / total_curr) * 100)
+
+        if previous_scan and previous_findings:
+            previous_passes = {f.check_id: f for f in previous_findings if f.status == "PASS"}
+            total_prev = len(previous_findings) or 1
+            pass_prev = len(previous_passes)
+            score_prev = round((pass_prev / total_prev) * 100)
+            score_diff = score_curr - score_prev
+            compliance_gain = f"{score_diff:+d}%"
+            calc_method = f"Comparative delta calculated against previous scan {str(previous_scan.id)[:8]} ({previous_scan.inserted_at.strftime('%Y-%m-%d %H:%M') if previous_scan.inserted_at else 'prior'}). Prior score: {score_prev}%, current score: {score_curr}%."
+        else:
+            score_prev = None
+            compliance_gain = "Baseline"
+            calc_method = "Initial baseline assessment. No prior completed scan exists for this provider to calculate comparative delta."
 
         return Response(
             data={
@@ -3076,7 +3069,9 @@ class ScanViewSet(BaseRLSViewSet):
                     "remediated_count": len(resolved_items),
                     "new_count": len(new_fails) if previous_scan else 0,
                     "compliance_score": score_curr,
-                    "compliance_gain": f"+{round(score_curr * 0.2)}%",
+                    "previous_compliance_score": score_prev,
+                    "compliance_gain": compliance_gain,
+                    "calculation_method": calc_method,
                     "previous_scan_id": str(previous_scan.id) if previous_scan else None,
                     "resolved_findings": resolved_items,
                 },

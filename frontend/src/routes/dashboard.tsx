@@ -36,6 +36,8 @@ import {
   useCurrentUser,
 } from "@/hooks/use-api";
 import { authStore } from "@/lib/auth";
+import { frameworkInScope, roleFrameworkScope } from "@/lib/role-scope";
+import { extractFindingProvider, normalizeProvider } from "./findings";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -927,10 +929,12 @@ function SpeedometerGauge({ score }: { score: number }) {
 function FindingsDonutChart({
   passCount,
   failCount,
+  manualCount = 0,
   mutedCount,
 }: {
   passCount: number;
   failCount: number;
+  manualCount?: number;
   mutedCount: number;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -939,10 +943,11 @@ function FindingsDonutChart({
     return () => clearTimeout(t);
   }, []);
 
-  const isZero = passCount === 0 && failCount === 0 && mutedCount === 0;
-  const total = Math.max(1, passCount + failCount + mutedCount);
+  const isZero = passCount === 0 && failCount === 0 && manualCount === 0 && mutedCount === 0;
+  const total = Math.max(1, passCount + failCount + manualCount + mutedCount);
   const passPct = (passCount / total) * 100;
   const failPct = (failCount / total) * 100;
+  const manualPct = (manualCount / total) * 100;
   const mutedPct = (mutedCount / total) * 100;
 
   const animatedPct = useCountUp(Math.round(passPct), 4500, mounted);
@@ -952,6 +957,7 @@ function FindingsDonutChart({
 
   const passDash = mounted ? (passPct / 100) * circ : 0;
   const failDash = mounted ? (failPct / 100) * circ : 0;
+  const manualDash = mounted ? (manualPct / 100) * circ : 0;
   const mutedDash = mounted ? (mutedPct / 100) * circ : 0;
 
   return (
@@ -995,6 +1001,19 @@ function FindingsDonutChart({
           style={{ transition: "all 4.5s cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
 
+        {/* Manual Segment (Amber 4.5s transition) */}
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke="#f59e0b"
+          strokeWidth="10"
+          strokeDasharray={`${manualDash} ${circ}`}
+          strokeDashoffset={-(passDash + failDash)}
+          style={{ transition: "all 4.5s cubic-bezier(0.16, 1, 0.3, 1)" }}
+        />
+
         {/* Muted Segment (4.5s transition) */}
         <circle
           cx="50"
@@ -1005,7 +1024,7 @@ function FindingsDonutChart({
           className="text-slate-400"
           strokeWidth="10"
           strokeDasharray={`${mutedDash} ${circ}`}
-          strokeDashoffset={-(passDash + failDash)}
+          strokeDashoffset={-(passDash + failDash + manualDash)}
           style={{ transition: "all 4.5s cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
       </svg>
@@ -1064,13 +1083,51 @@ export function DashboardPage() {
   const providers = (providersRaw?.items as Array<Record<string, unknown>>) ?? [];
   const resources = resourcesRaw?.items ?? [];
 
+  const frameworkScope = useMemo(() => roleFrameworkScope(), []);
+  const providerOptions = useMemo(() => {
+    const labels: Record<string, [string, string]> = {
+      azure: ["AZURE", "Azure"],
+      oraclecloud: ["OCI", "Oracle Cloud (OCI)"],
+      oracle_saas: ["ORACLE_SAAS", "Oracle SaaS / ERP"],
+      aws: ["AWS", "AWS"],
+      gcp: ["GCP", "GCP"],
+      kubernetes: ["K8S", "Kubernetes"],
+    };
+    const seen = new Map<string, string>();
+    for (const p of (providersRaw?.items as Array<Record<string, any>> | undefined) ?? []) {
+      const type = String(p.provider ?? p.attributes?.provider ?? "").toLowerCase();
+      const opt = labels[type];
+      if (opt && !seen.has(opt[0])) seen.set(opt[0], opt[1]);
+    }
+    return Array.from(seen, ([value, label]) => ({ value, label }));
+  }, [providersRaw]);
+  const allowedProviderValues = useMemo(() => new Set(providerOptions.map((o) => o.value)), [providerOptions]);
+
+  // Scoped findings aligning perfectly with findings.tsx, reports, and compliance
+  const scopedFindings = useMemo(() => {
+    return rawFindings.filter((f: any) => {
+      const prov = extractFindingProvider(f);
+      if (providersRaw?.items && providerOptions.length > 0 && !allowedProviderValues.has(normalizeProvider(prov))) {
+        return false;
+      }
+      if (frameworkScope) {
+        const keys = Object.keys(f.compliance || {});
+        const saasCis = frameworkScope === "cis" && normalizeProvider(prov) === "ORACLE_SAAS";
+        if (!saasCis && !keys.some((k) => frameworkInScope(k, frameworkScope))) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [rawFindings, providersRaw, providerOptions, allowedProviderValues, frameworkScope]);
+
   // Filter by selected provider if not ALL
   const filteredFindings = useMemo(() => {
-    if (selectedProviderId === "ALL") return rawFindings;
+    if (selectedProviderId === "ALL") return scopedFindings;
     const selectedProvider = providers.find((p) => String(p.id) === String(selectedProviderId));
     const selectedType = String(selectedProvider?.provider || selectedProvider?.provider_type || "").toLowerCase();
 
-    return rawFindings.filter((f: any) => {
+    return scopedFindings.filter((f: any) => {
       // 1. Direct provider_id UUID matching
       const fProvId = String(f.provider_id || f.provider?.id || f.scan?.provider_id || f.scan?.provider?.id || "");
       if (fProvId && fProvId === String(selectedProviderId)) return true;
@@ -1106,7 +1163,7 @@ export function DashboardPage() {
 
       return fType === selectedType || fType.includes(selectedType);
     });
-  }, [rawFindings, selectedProviderId, providers]);
+  }, [scopedFindings, selectedProviderId, providers]);
 
   const selectedProviderObj = useMemo(() => {
     if (selectedProviderId === "ALL") return null;
@@ -1197,18 +1254,28 @@ export function DashboardPage() {
     return results;
   }, [dashboardComplianceData]);
 
-  // Real live numbers from database findings
+  // Real live numbers from database findings (exact count reconciliation with findings & export)
   const realPass = filteredFindings.filter((f: any) => f.status === "PASS").length;
   const realFail = filteredFindings.filter((f: any) => f.status === "FAIL").length;
+  const realManual = filteredFindings.filter((f: any) => f.status === "MANUAL").length;
   const realMuted = filteredFindings.filter((f: any) => f.status === "MUTED").length;
-  const realCritical = filteredFindings.filter((f: any) => f.severity === "critical").length;
-  const realHigh = filteredFindings.filter((f: any) => f.severity === "high").length;
-  const realMedium = filteredFindings.filter((f: any) => f.severity === "medium").length;
-  const realLow = filteredFindings.filter((f: any) => f.severity === "low").length;
+
+  // Active Unresolved Security Failures (Open Violations)
+  const openCritical = filteredFindings.filter((f: any) => f.status === "FAIL" && f.severity === "critical").length;
+  const openHigh = filteredFindings.filter((f: any) => f.status === "FAIL" && f.severity === "high").length;
+  const openMedium = filteredFindings.filter((f: any) => f.status === "FAIL" && f.severity === "medium").length;
+  const openLow = filteredFindings.filter((f: any) => f.status === "FAIL" && f.severity === "low").length;
+
+  // Total Evaluated Control Catalog Coverage (PASS + FAIL + MANUAL)
+  const catalogCritical = filteredFindings.filter((f: any) => f.severity === "critical").length;
+  const catalogHigh = filteredFindings.filter((f: any) => f.severity === "high").length;
+  const catalogMedium = filteredFindings.filter((f: any) => f.severity === "medium").length;
+  const catalogLow = filteredFindings.filter((f: any) => f.severity === "low").length;
 
   const totalFindingsCount = filteredFindings.length;
   const totalOpenFail = realFail;
   const totalPassCount = realPass;
+  const totalManualCount = realManual;
   const totalMutedCount = realMuted;
 
   // Posture Score calculation directly from live findings
@@ -1218,7 +1285,7 @@ export function DashboardPage() {
 
   // Dynamic Threat Score calculation directly from live exploitability & failed vulnerabilities
   const threatScore = totalFindingsCount > 0
-    ? Math.min(100, Math.max(0, Math.round(100 - postureScore + (realCritical > 0 ? 8 : 0))))
+    ? Math.min(100, Math.max(0, Math.round(100 - postureScore + (openCritical > 0 ? 8 : 0))))
     : 0;
 
   const threatRiskLevel = threatScore >= 70 ? "Critical Risk" : threatScore >= 45 ? "High Risk" : threatScore >= 25 ? "Moderate" : "Low Risk";
@@ -1358,6 +1425,7 @@ export function DashboardPage() {
   // Animated Triage Counts
   const animPassCount = useCountUp(totalPassCount, 4200, dashboardReady);
   const animFailCount = useCountUp(totalOpenFail, 4200, dashboardReady);
+  const animManualCount = useCountUp(totalManualCount, 3200, dashboardReady);
   const animMutedCount = useCountUp(totalMutedCount, 3200, dashboardReady);
 
   return (
@@ -1539,52 +1607,61 @@ export function DashboardPage() {
           <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/80 p-5 backdrop-blur-sm shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Open Findings
+                Open Violations
               </span>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              <AlertTriangle className="h-4 w-4 text-rose-400" />
             </div>
             <div className="my-3 flex items-baseline justify-between">
               <span className="font-mono text-3xl font-black text-foreground">
                 {animOpenFail.toLocaleString()}
               </span>
-              <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-400 border border-rose-500/20">
-                {realCritical > 0 ? `${realCritical} Critical` : realHigh > 0 ? `${realHigh} High Risk` : "0 Open"}
+              <span
+                className="inline-flex items-center rounded-full bg-rose-500/10 px-2.5 py-0.5 text-[11px] font-bold text-rose-400 border border-rose-500/20"
+                title={`Active unresolved findings: ${openCritical} Critical and ${openHigh} High out of ${catalogCritical} Critical and ${catalogHigh} High controls in benchmark catalog`}
+              >
+                {openCritical} Critical · {openHigh} High
               </span>
             </div>
-            {/* Multi-color Stacked Severity Bar — real percentages, 0% stays 0% instead of a fake minimum width */}
+            {/* Multi-color Stacked Severity Bar — real percentages of OPEN failures */}
             <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
               <div
                 style={{
-                  width: dashboardReady && totalOpenFail > 0 ? `${(realCritical / totalOpenFail) * 100}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(openCritical / totalOpenFail) * 100}%` : "0%",
                   transition: "width 3.8s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
                 className="bg-rose-500"
-                title="Critical"
+                title={`Open Critical: ${openCritical} (${totalOpenFail > 0 ? Math.round((openCritical / totalOpenFail) * 100) : 0}%)`}
               />
               <div
                 style={{
-                  width: dashboardReady && totalOpenFail > 0 ? `${(realHigh / totalOpenFail) * 100}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(openHigh / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s",
                 }}
                 className="bg-orange-400"
-                title="High"
+                title={`Open High: ${openHigh} (${totalOpenFail > 0 ? Math.round((openHigh / totalOpenFail) * 100) : 0}%)`}
               />
               <div
                 style={{
-                  width: dashboardReady && totalOpenFail > 0 ? `${(realMedium / totalOpenFail) * 100}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(openMedium / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.4s cubic-bezier(0.16, 1, 0.3, 1) 0.4s",
                 }}
                 className="bg-amber-400"
-                title="Medium"
+                title={`Open Medium: ${openMedium} (${totalOpenFail > 0 ? Math.round((openMedium / totalOpenFail) * 100) : 0}%)`}
               />
               <div
                 style={{
-                  width: dashboardReady && totalOpenFail > 0 ? `${(realLow / totalOpenFail) * 100}%` : "0%",
+                  width: dashboardReady && totalOpenFail > 0 ? `${(openLow / totalOpenFail) * 100}%` : "0%",
                   transition: "width 4.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s",
                 }}
                 className="bg-sky-400"
-                title="Low"
+                title={`Open Low: ${openLow} (${totalOpenFail > 0 ? Math.round((openLow / totalOpenFail) * 100) : 0}%)`}
               />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+              <span title="Catalog controls evaluated across active frameworks">Catalog: {catalogCritical} Crit · {catalogHigh} High</span>
+              <Link to="/findings" className="text-primary font-semibold hover:underline">
+                Review {totalOpenFail} Open →
+              </Link>
             </div>
           </div>
         </div>
@@ -1718,10 +1795,11 @@ export function DashboardPage() {
                 <FindingsDonutChart
                   passCount={totalPassCount}
                   failCount={totalOpenFail}
+                  manualCount={totalManualCount}
                   mutedCount={totalMutedCount}
                 />
 
-                <div className="space-y-2 text-xs font-mono">
+                <div className="space-y-1.5 text-xs font-mono">
                   <div className="flex items-center justify-between gap-4">
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -1738,6 +1816,15 @@ export function DashboardPage() {
                     </span>
                     <span className="font-bold text-foreground">
                       {animFailCount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="h-2 w-2 rounded-full bg-amber-400" />
+                      Manual:
+                    </span>
+                    <span className="font-bold text-foreground" title="Controls requiring manual verification or organizational policy review">
+                      {animManualCount}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">

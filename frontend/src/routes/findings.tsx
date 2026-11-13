@@ -12,7 +12,9 @@ import {
   Zap,
   Copy,
   Check,
+  CheckCircle2,
   Terminal,
+  Lock,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui-kit/primitives";
 import { useFindings, useAnalyzeFinding, useProviders } from "@/hooks/use-api";
 import { frameworkInScope, roleFrameworkScope } from "@/lib/role-scope";
+import { authStore } from "@/lib/auth";
 
 export interface Finding {
   id: string;
@@ -35,6 +38,7 @@ export interface Finding {
   status_extended?: string;
   resource: string;
   resource_id?: string;
+  scan_id?: string;
   provider: string;
   region: string;
   service: string;
@@ -113,7 +117,7 @@ export const Route = createFileRoute("/findings")({
   component: FindingsPage,
 });
 
-function extractFindingProvider(f: any): string {
+export function extractFindingProvider(f: any): string {
   const meta = f.check_metadata || f.raw_result || {};
   let p = "";
   if (typeof f.provider === "string" && f.provider && f.provider !== "[object Object]") p = f.provider.toUpperCase();
@@ -163,7 +167,7 @@ function extractFindingProvider(f: any): string {
 }
 
 /** A finding's provider label as a dropdown value (AZURE, OCI, ORACLE_SAAS, AWS, GCP, K8S). */
-function normalizeProvider(p: string): string {
+export function normalizeProvider(p: string): string {
   const u = (p || "").toUpperCase();
   if (u === "AZ") return "AZURE";
   if (u === "ORACLECLOUD") return "OCI";
@@ -313,6 +317,7 @@ function FindingsPage() {
           status_extended: String(f.status_extended || ""),
           resource,
           resource_id: String(f.resource_uid || f.resource_id || uid),
+          scan_id: String(f.scan_id || f.scan?.id || ""),
           provider: prov,
           region,
           service,
@@ -549,20 +554,16 @@ function FindingsPage() {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  const currentUser = authStore.user;
+  const userRoleStr = String(currentUser?.role || (currentUser?.is_read_only ? "Read-Only Auditor" : "Member")).toLowerCase();
+  const isReadOnly = Boolean(currentUser?.is_read_only) || /read-only|auditor|viewer/.test(userRoleStr);
+
   const handleToggleMute = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isReadOnly) return;
     setMutedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
-
-  const handleRemediate = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRemediatingId(id);
-    setTimeout(() => {
-      setRemediatingId(null);
-      setRemediatedIds((prev) => [...prev, id]);
-    }, 1500);
   };
 
   return (
@@ -572,13 +573,57 @@ function FindingsPage() {
       actions={
         <button
           onClick={() => {
+            const headers = [
+              "Finding_ID",
+              "Control_ID",
+              "Control_Requirement_Title",
+              "Severity",
+              "Status",
+              "Observed_Evidence_and_Configuration",
+              "Compliance_Frameworks",
+              "Provider",
+              "Region",
+              "Service",
+              "Resource_UID",
+              "Scan_ID",
+              "Assessment_Timestamp",
+              "Remediation_Guidance",
+              "Audit_Verification_Method",
+            ];
             const csv =
-              "Finding_ID,Title,Severity,Status,Provider,Region,Service,Resource,Remediation_Plan\n" +
+              headers.join(",") +
+              "\n" +
               filtered
-                .map(
-                  (f) =>
-                    `"${formatFindingId(f.id)}","${f.title.replace(/"/g, '""')}","${f.severity.toUpperCase()}","${f.status}","${f.provider}","${f.region}","${f.service}","${f.resource.replace(/"/g, '""')}","${(f.remediation || '').replace(/"/g, '""')}"`
-                )
+                .map((f) => {
+                  const compList = Object.entries(f.compliance || {})
+                    .map(([fw, reqs]) => `${fw}${reqs?.length ? ` (${reqs.join("; ")})` : ""}`)
+                    .join(" | ");
+                  const evidence = (f.status_extended || `Evaluated ${f.service} check on ${f.resource}`).replace(/"/g, '""');
+                  const rem = (f.remediation || "Follow CIS standard remediation").replace(/"/g, '""');
+                  const title = f.title.replace(/"/g, '""');
+                  const resUid = (f.resource_id || f.resource).replace(/"/g, '""');
+                  const checkId = (f.check_id || "CHECK-001").replace(/"/g, '""');
+                  const scanId = (f.scan_id || "scan-live-audit").replace(/"/g, '""');
+                  const auditMethod = f.status === "MANUAL" ? "Manual Operational Review" : "Automated Cloud API Telemetry";
+
+                  return [
+                    `"${formatFindingId(f.id)}"`,
+                    `"${checkId}"`,
+                    `"${title}"`,
+                    `"${f.severity.toUpperCase()}"`,
+                    `"${f.status}"`,
+                    `"${evidence}"`,
+                    `"${compList.replace(/"/g, '""')}"`,
+                    `"${f.provider}"`,
+                    `"${f.region}"`,
+                    `"${f.service}"`,
+                    `"${resUid}"`,
+                    `"${scanId}"`,
+                    `"${f.scanned || new Date().toISOString()}"`,
+                    `"${rem}"`,
+                    `"${auditMethod}"`,
+                  ].join(",");
+                })
                 .join("\n");
             const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
             const url = URL.createObjectURL(blob);
@@ -820,8 +865,13 @@ function FindingsPage() {
                         <p className="truncate text-xs font-semibold text-foreground" title={f.title}>
                           {f.title}
                         </p>
+                        {f.status === "FAIL" && f.status_extended ? (
+                          <p className="truncate text-[10px] text-rose-400 font-medium" title={f.status_extended}>
+                            Violation: {f.status_extended}
+                          </p>
+                        ) : null}
                         <p className="mono truncate text-[10px] text-muted-foreground" title={f.resource}>
-                          {f.resource}
+                          Target: {f.resource}
                         </p>
                         {Object.keys(f.compliance || {}).length > 0 && (() => {
                           const allTags = Object.keys(f.compliance);
@@ -936,24 +986,69 @@ function FindingsPage() {
                                 <span>Ask Spectra</span>
                               </Link>
 
-                              <button
-                                onClick={(e) => handleRemediate(f.id, e)}
-                                disabled={isRemediating || f.status === "PASS"}
-                                className={`inline-flex h-9 min-w-[180px] items-center justify-center gap-2 rounded-lg px-5 text-xs font-semibold shadow-sm transition-all active:scale-95 ${
-                                  f.status === "PASS"
-                                    ? "bg-success/20 text-success border border-success/30 cursor-default"
-                                    : "bg-critical text-destructive-foreground hover:bg-critical/90"
-                                }`}
-                              >
-                                <Zap className={`h-3.5 w-3.5 ${isRemediating ? "animate-spin" : ""}`} />
-                                <span>
-                                  {isRemediating
-                                    ? "Executing..."
-                                    : f.status === "PASS"
-                                      ? "Remediated ✓"
-                                      : "Remediate via Phantom"}
+                              {isReadOnly ? (
+                                <div
+                                  className="inline-flex h-9 min-w-[190px] items-center justify-center gap-2 rounded-lg border border-border/80 bg-surface-2/60 px-4 text-xs font-medium text-muted-foreground cursor-not-allowed"
+                                  title="Auditor Account (Read-Only Mode): Cloud mutations and manual status overrides are disabled. Remediation requires SecOps/Admin authorization."
+                                >
+                                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span>Audit Mode (Read-Only)</span>
+                                </div>
+                              ) : f.status === "PASS" ? (
+                                <div className="inline-flex h-9 min-w-[170px] items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-400 border border-emerald-500/20 cursor-default">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  <span>Verified Compliant</span>
+                                </div>
+                              ) : (
+                                <Link
+                                  to="/ai/decisions"
+                                  search={{ finding_id: f.id, provider: f.provider.toLowerCase() }}
+                                  className="inline-flex h-9 min-w-[190px] items-center justify-center gap-2 rounded-lg bg-critical px-4 text-xs font-semibold text-destructive-foreground shadow-sm hover:bg-critical/90 active:scale-95 transition-all"
+                                  title="Review verified remediation plan, CLI command, and HITL human approval gate"
+                                >
+                                  <Zap className="h-3.5 w-3.5" />
+                                  <span>Aegis Playbook & HITL →</span>
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Audit Control Evaluation Standard vs Observed Violation Breakdown */}
+                          <div className="mt-3 rounded-xl border border-border/80 bg-surface-2/40 p-3.5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <ShieldAlert className="h-4 w-4 text-primary" />
+                                <span className="text-xs font-bold text-foreground">Audit Evaluation & Control Standard</span>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                                f.status === "FAIL"
+                                  ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                                  : f.status === "PASS"
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              }`}>
+                                {f.status === "FAIL" ? "Violation Detected (FAIL)" : f.status === "PASS" ? "Compliant (PASS)" : "Manual Verification Required"}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                              <div className="rounded-lg bg-surface/70 border border-border/60 p-2.5">
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">
+                                  Expected Security Standard / Requirement
                                 </span>
-                              </button>
+                                <p className="font-semibold text-foreground">{f.title}</p>
+                                <p className="text-[11px] text-muted-foreground mt-1">Control ID: <code className="text-primary font-mono">{f.check_id || f.id}</code></p>
+                              </div>
+
+                              <div className="rounded-lg bg-surface/70 border border-border/60 p-2.5">
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">
+                                  Observed Infrastructure Configuration & Evidence
+                                </span>
+                                <p className={`font-semibold ${f.status === "FAIL" ? "text-rose-400" : "text-emerald-400"}`}>
+                                  {f.status_extended || (f.status === "PASS" ? "Verified compliant with benchmark requirements." : "Configuration requires manual operational verification.")}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-1">Resource: <code className="font-mono">{f.resource}</code></p>
+                              </div>
                             </div>
                           </div>
 
