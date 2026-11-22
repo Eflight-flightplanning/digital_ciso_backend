@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import { CrossIcon, InfoIcon, TickIcon } from "./icons";
-import { fmtDate } from "./status";
 import { useSession } from "./context";
 import type { ConnField, ConnSecret, ConnectionsView } from "./types";
 
@@ -99,16 +98,6 @@ export default function Connections() {
     <div className="mx-auto flex max-w-[860px] flex-col gap-5 px-4 py-5">
       <div>
         <h1 className="text-xl">Connection</h1>
-        <p className="mt-1 text-sm text-oc-ink-soft">
-          Where the assessment reads from. The details are saved, encrypted, on your organisation's Oracle SaaS provider (Providers page), so the
-          Prowler Oracle SaaS scan and this assessment share one connection. Secrets are never shown again; leave a secret blank to keep the saved one.
-        </p>
-        {d?.provider && (
-          <p className="mt-1 text-xs text-oc-ink-soft">
-            Provider <span className="font-semibold text-oc-ink">{d.provider.alias}</span> ({d.provider.uid})
-            {d.updated_at ? ` · last changed ${fmtDate(d.updated_at)}` : ""}.
-          </p>
-        )}
         {d && !d.provider && <p className="mt-1 text-xs text-oc-ink-soft">No Oracle SaaS provider yet: saving creates one.</p>}
       </div>
 

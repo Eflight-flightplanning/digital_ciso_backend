@@ -35,8 +35,7 @@ export default function Report() {
 
   return (
     <div className="ocis-report mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5">
-      <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-oc-ink-soft">Print-friendly report. The print dialog can save it as PDF; it always prints in the light theme.</p>
+      <div className="no-print flex flex-wrap items-center justify-end gap-3">
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-outline btn-small" onClick={() => download("csv")}>Export CSV</button>
           <button type="button" className="btn-outline btn-small" onClick={() => download("json")}>Export JSON</button>
