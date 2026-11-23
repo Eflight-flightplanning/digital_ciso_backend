@@ -6,6 +6,7 @@ from api.models import (
     LighthouseTenantConfiguration,
     Membership,
     Provider,
+    ProviderSecret,
     Tenant,
     TenantAPIKey,
     User,
@@ -118,3 +119,17 @@ def cleanup_lighthouse_defaults_before_delete(sender, instance, **kwargs):  # no
 
     if updated:
         tenant_cfg.save()
+
+
+@receiver(post_delete, sender=ProviderSecret)
+def delete_cloud_keys_from_vault(sender, instance, **kwargs):  # noqa: F841
+    # Keys kept in Key Vault go with their cloud account (api/cloud_keys_vault.py).
+    from api import cloud_keys_vault
+
+    name = cloud_keys_vault.name_from_reference(instance._raw_secret())
+    if not name:
+        return
+    try:
+        cloud_keys_vault.delete(name)
+    except Exception:  # noqa: BLE001 - the account is gone either way; the vault entry is logged for clean-up
+        logging.getLogger(__name__).exception("Could not delete cloud keys %s from Key Vault", name)

@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import type { Result, Severity, Status } from "./types";
 import { SEVERITY_LABEL } from "./types";
-import { ClipboardIcon, CrossIcon, InfoIcon, TickIcon, WarnIcon } from "./icons";
+import { ClipboardIcon, CrossIcon, TickIcon, WarnIcon } from "./icons";
 
 const CHIP: Record<Status, { cls: string; icon: ReactElement; label: string }> = {
   PASS: { cls: "chip-PASS", icon: <TickIcon />, label: "PASS" },
@@ -79,31 +79,6 @@ export function LevelBadge({ level }: { level: string }) {
     <span className="badge" title={`CIS profile ${level === "L1" ? "Level 1" : "Level 2"}`}>
       {level === "L1" ? "Level 1" : "Level 2"}
     </span>
-  );
-}
-
-/** Notes required under certain results. */
-export function ResultNotes({ result }: { result: Result }) {
-  const idp = ["2.1", "2.2"].includes(result.control_id) && /external identity provider/i.test(result.reason);
-  const unverified = /Provisional|NOT assessed/.test(result.reason);
-  if (!idp && !unverified) return null;
-  return (
-    <div className="mt-2 flex flex-col gap-2">
-      {idp && (
-        <div className="flex gap-2 rounded border border-oc-line bg-oc-bg-alt p-2.5 text-sm text-oc-ink">
-          <InfoIcon className="mt-0.5 shrink-0" />
-          <span>
-            Sign-in is federated to an external identity provider. Network restrictions there are the control point and
-            must be checked in that provider.
-          </span>
-        </div>
-      )}
-      {unverified && (
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-oc-ink-soft">
-          <WarnIcon width={12} height={12} /> Not verified from here
-        </p>
-      )}
-    </div>
   );
 }
 

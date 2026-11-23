@@ -11,7 +11,6 @@ import { ArrowIcon, LockIcon } from "./icons";
 import Identities from "./Identities";
 import Overview from "./Overview";
 import Report from "./Report";
-import Setup from "./Setup";
 import Spectra from "./Spectra";
 
 const NAV: { page: Page; label: string; admin?: boolean }[] = [
@@ -22,7 +21,6 @@ const NAV: { page: Page; label: string; admin?: boolean }[] = [
   { page: "spectra", label: "Spectra AI" },
   // Connection settings: only for accounts that can manage providers (hidden from read-only).
   { page: "connection", label: "Connection", admin: true },
-  { page: "setup", label: "Settings", admin: true },
 ];
 
 function RevealToggle() {
@@ -95,7 +93,6 @@ function Body({ fullPage }: { fullPage: boolean }) {
       {page === "report" && <Report />}
       {page === "spectra" && <Spectra />}
       {page === "connection" && <Connection />}
-      {page === "setup" && <Setup />}
     </>
   );
 }

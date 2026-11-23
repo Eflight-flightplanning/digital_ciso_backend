@@ -105,6 +105,7 @@ function ProvidersPage() {
   const [awsExternalId, setAwsExternalId] = useState("");
   const [awsAccessKey, setAwsAccessKey] = useState("");
   const [awsSecretKey, setAwsSecretKey] = useState("");
+  const [awsSessionToken, setAwsSessionToken] = useState("");
   const [awsRegion, setAwsRegion] = useState("us-east-1");
 
   // Azure Fields
@@ -150,6 +151,7 @@ function ProvidersPage() {
     setAwsExternalId("");
     setAwsAccessKey("");
     setAwsSecretKey("");
+    setAwsSessionToken("");
     setAzureTenantId("");
     setAzureClientId("");
     setAzureClientSecret("");
@@ -194,13 +196,22 @@ function ProvidersPage() {
       let secretType = "static";
 
       if (activeTab === "AWS") {
-        uid = awsAuthMode === "role" ? awsRoleArn : awsAccessKey;
+        uid = (awsAuthMode === "role" ? awsRoleArn : awsAccessKey).trim();
         if (awsAuthMode === "role" && awsRoleArn) {
           secretType = "role";
-          secretPayload = { role_arn: awsRoleArn, external_id: awsExternalId };
+          secretPayload = {
+            role_arn: awsRoleArn.trim(),
+            external_id: awsExternalId.trim() || undefined,
+            aws_region: awsRegion,
+          };
         } else if (awsAccessKey && awsSecretKey) {
           secretType = "static";
-          secretPayload = { aws_access_key_id: awsAccessKey, aws_secret_access_key: awsSecretKey };
+          secretPayload = {
+            aws_access_key_id: awsAccessKey.trim(),
+            aws_secret_access_key: awsSecretKey.trim(),
+            ...(awsSessionToken.trim() ? { aws_session_token: awsSessionToken.trim() } : {}),
+            aws_region: awsRegion,
+          };
         }
       } else if (activeTab === "AZURE") {
         uid = azureSubscriptionId || azureClientId;
@@ -678,6 +689,16 @@ function ProvidersPage() {
                             placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
                             value={awsSecretKey}
                             onChange={(e) => setAwsSecretKey(e.target.value)}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="section-label mb-1 block">AWS Session Token (Optional - required for temporary SSO / ASIA... keys)</label>
+                          <input
+                            type="password"
+                            placeholder="IQoJb3JpZ2luX2VjE... (Leave empty if using permanent IAM credentials)"
+                            value={awsSessionToken}
+                            onChange={(e) => setAwsSessionToken(e.target.value)}
                             className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
                           />
                         </div>

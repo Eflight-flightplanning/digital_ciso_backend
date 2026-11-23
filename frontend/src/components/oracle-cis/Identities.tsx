@@ -205,10 +205,6 @@ export default function Identities() {
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5">
       <div>
         <h1 className="text-xl">Identity risks: dormant, active and ghost-employee accounts</h1>
-        <p className="mt-2 max-w-[760px] text-sm text-oc-ink-soft">
-          Full account lists behind CIS 1.14 and 5.3.7 from the latest run{d?.run ? ` (#${d.run.id}, ${fmtDate(d.run.finished_at)})` : ""}. Raise a
-          Jira ticket per account (the platform's Jira integration) and stage or execute the Fusion remediation.
-        </p>
       </div>
 
       <IdentityBanners summary={d?.summary} onPick={setKind} />

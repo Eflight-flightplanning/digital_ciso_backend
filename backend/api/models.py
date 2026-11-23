@@ -2703,23 +2703,45 @@ class ProviderSecret(RowLevelSecurityProtectedModel):
 
 
 
+    def _raw_secret(self) -> bytes:
+
+        if isinstance(self._secret, memoryview):
+
+            return self._secret.tobytes()
+
+        if isinstance(self._secret, str):
+
+            return self._secret.encode()
+
+        return self._secret
+
+
+
     @property
 
     def secret(self):
 
-        if isinstance(self._secret, memoryview):
+        # Keys kept in Key Vault leave only a reference here (api/cloud_keys_vault.py).
 
-            encrypted_bytes = self._secret.tobytes()
+        from api import cloud_keys_vault
 
-        elif isinstance(self._secret, str):
 
-            encrypted_bytes = self._secret.encode()
 
-        else:
+        pending = getattr(self, "_pending_vault_secret", None)
 
-            encrypted_bytes = self._secret
+        if pending is not None:
 
-        decrypted_data = fernet.decrypt(encrypted_bytes)
+            return dict(pending)
+
+        raw = self._raw_secret()
+
+        name = cloud_keys_vault.name_from_reference(raw)
+
+        if name:
+
+            return cloud_keys_vault.get(name)
+
+        decrypted_data = fernet.decrypt(raw)
 
         return json.loads(decrypted_data.decode())
 
@@ -2729,9 +2751,61 @@ class ProviderSecret(RowLevelSecurityProtectedModel):
 
     def secret(self, value):
 
+        from api import cloud_keys_vault
+
+
+
+        if cloud_keys_vault.enabled():
+
+            # Written to Key Vault when the row is saved; the row keeps only the reference.
+
+            self._pending_vault_secret = dict(value)
+
+            self._secret = cloud_keys_vault.reference(self.id)
+
+            return
+
+        self._pending_vault_secret = None
+
         encrypted_data = fernet.encrypt(json.dumps(value).encode())
 
         self._secret = encrypted_data
+
+
+
+    def save(self, *args, **kwargs):
+
+        from api import cloud_keys_vault
+
+
+
+        pending = getattr(self, "_pending_vault_secret", None)
+
+        if pending is None:
+
+            return super().save(*args, **kwargs)
+
+        name = cloud_keys_vault.secret_name(self.id)
+
+        adding = self._state.adding
+
+        cloud_keys_vault.put(name, pending)  # first, so a saved row never points at a missing secret
+
+        try:
+
+            result = super().save(*args, **kwargs)
+
+        except Exception:
+
+            if adding:
+
+                cloud_keys_vault.delete(name)
+
+            raise
+
+        self._pending_vault_secret = None
+
+        return result
 
 
 

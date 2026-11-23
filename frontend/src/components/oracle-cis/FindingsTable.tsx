@@ -1,6 +1,6 @@
 import type { Result } from "./types";
 import { SECTIONS, SEVERITIES } from "./types";
-import { FlagBadges, ResultNotes, SeverityBadge, StatusChip } from "./status";
+import { FlagBadges, SeverityBadge, StatusChip } from "./status";
 
 export interface Filters {
   status: string; // "" = all controls, or a status
@@ -73,18 +73,6 @@ export function FilterBar({ filters, setFilters }: { filters: Filters; setFilter
   );
 }
 
-function CompactNotes({ result }: { result: Result }) {
-  const idp = ["2.1", "2.2"].includes(result.control_id) && /external identity provider/i.test(result.reason);
-  const unverified = /Provisional|NOT assessed/.test(result.reason);
-  if (result.not_assessed || (!idp && !unverified)) return null;
-  return (
-    <span className="mt-1 flex flex-wrap gap-1">
-      {idp && <span className="badge" title="Sign-in is federated: the external identity provider is the control point">Federated sign-in</span>}
-      {unverified && <span className="badge" title="Part of this control cannot be verified from the identity domain">Not verified from here</span>}
-    </span>
-  );
-}
-
 export function FindingsTable({ results, onOpen, compact = false }: { results: Result[]; onOpen?: (r: Result) => void; compact?: boolean }) {
   const rows = results;
   if (!rows.length) return <p className="py-8 text-center text-sm text-oc-ink-soft">No controls match these filters.</p>;
@@ -140,7 +128,6 @@ export function FindingsTable({ results, onOpen, compact = false }: { results: R
               </td>
               <td className="py-2.5 text-oc-ink-soft [overflow-wrap:anywhere]">
                 <span className={compact ? "" : "line-clamp-2"}>{r.reason}</span>
-                {compact ? !r.not_assessed && <ResultNotes result={r} /> : <CompactNotes result={r} />}
               </td>
             </tr>
           ))}

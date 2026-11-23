@@ -5,7 +5,7 @@ import type { Result } from "./types";
 import { SEVERITY_LABEL } from "./types";
 import { Evidence } from "./Evidence";
 import { CrossIcon } from "./icons";
-import { FlagBadges, LevelBadge, ResultNotes, SeverityBadge, StatusChip, fmtDate } from "./status";
+import { FlagBadges, LevelBadge, SeverityBadge, StatusChip, fmtDate } from "./status";
 
 export function DetailPanel({ result, onClose }: { result: Result; onClose: () => void }) {
   const controls = useQuery({ queryKey: ["oracle-cis", "controls"], queryFn: api.controls, staleTime: Infinity });
@@ -55,7 +55,6 @@ export function DetailPanel({ result, onClose }: { result: Result; onClose: () =
                 {result.evidence?.check_error ? ` (check error: ${String(result.evidence.check_error)})` : ""}
               </p>
             )}
-            <ResultNotes result={result} />
           </section>
 
           {meta && !result.not_assessed && result.status !== "PASS" && (

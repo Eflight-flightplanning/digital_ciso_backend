@@ -61,6 +61,9 @@ class Command(BaseCommand):
                     if not token:
                         counts["empty"] += 1
                         continue
+                    if token.startswith(b"kv:"):  # kept in Key Vault, not encrypted here
+                        counts["empty"] += 1
+                        continue
                     try:
                         primary.decrypt(token)
                         counts["current"] += 1

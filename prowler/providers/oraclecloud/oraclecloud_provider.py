@@ -218,7 +218,12 @@ class OraclecloudProvider(Provider):
             )
 
         # Audit Metadata
-        self._audit_metadata = Audit_Metadata()
+        self._audit_metadata = Audit_Metadata(
+            services_scanned=0,
+            expected_checks=[],
+            completed_checks=0,
+            audit_progress=0,
+        )
 
         Provider.set_global_provider(self)
 

@@ -72,13 +72,37 @@ def build_prowler_provider(
 def _build_aws(credentials: dict, account_id: str):
     from prowler.providers.aws.aws_provider import AwsProvider
 
-    return AwsProvider(
-        aws_access_key_id=credentials.get("access_key_id") or os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=credentials.get("secret_access_key") or os.getenv("AWS_SECRET_ACCESS_KEY"),
-        aws_session_token=credentials.get("session_token") or os.getenv("AWS_SESSION_TOKEN"),
-        role_arn=credentials.get("role_arn"),
-        audit_config={},
+    access_key = (
+        credentials.get("aws_access_key_id")
+        or credentials.get("access_key_id")
+        or os.getenv("AWS_ACCESS_KEY_ID")
     )
+    secret_key = (
+        credentials.get("aws_secret_access_key")
+        or credentials.get("secret_access_key")
+        or os.getenv("AWS_SECRET_ACCESS_KEY")
+    )
+    session_token = (
+        credentials.get("aws_session_token")
+        or credentials.get("session_token")
+        or os.getenv("AWS_SESSION_TOKEN")
+    )
+    role_arn = credentials.get("role_arn")
+    external_id = credentials.get("external_id")
+
+    kwargs = {}
+    if access_key:
+        kwargs["aws_access_key_id"] = str(access_key).strip()
+    if secret_key:
+        kwargs["aws_secret_access_key"] = str(secret_key).strip()
+    if session_token:
+        kwargs["aws_session_token"] = str(session_token).strip()
+    if role_arn:
+        kwargs["role_arn"] = str(role_arn).strip()
+    if external_id:
+        kwargs["external_id"] = str(external_id).strip()
+
+    return AwsProvider(**kwargs)
 
 
 def _build_azure(credentials: dict, account_id: str):

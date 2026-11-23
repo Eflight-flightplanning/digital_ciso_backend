@@ -20,6 +20,7 @@ from .jira_views import (
 from .report_views import ExecutiveReportView
 from ai.mcp_views import MCPGatewayView
 from ai.urls import ai_urlpatterns
+from api.provisioning import ProvisionedTenantView, ProvisionTenantView
 from api.v1.views import (
     TenantLLMConfigViewSet,
     FindingAIAnalysisViewSet,
@@ -158,6 +159,9 @@ urlpatterns = [
     path("tokens/first-login-password-change", FirstLoginPasswordChangeView.as_view(), name="token-first-login-password-change"),
     path("tokens/refresh", CustomTokenRefreshView.as_view(), name="token-refresh"),
     path("tokens/logout", CustomTokenLogoutView.as_view(), name="token-logout"),
+    # Digital CISO admin panel only: creates a customer's tenant and its API key (api/provisioning.py)
+    path("provisioning/tenants", ProvisionTenantView.as_view(), name="provisioning-tenants"),
+    path("provisioning/tenants/<uuid:tenant_id>", ProvisionedTenantView.as_view(), name="provisioning-tenant"),
     path("tokens/switch", CustomTokenSwitchTenantView.as_view(), name="token-switch"),
     path(
         "providers/secrets",

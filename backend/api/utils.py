@@ -306,6 +306,28 @@ def get_prowler_provider_kwargs(
                 "erp_base_url": erp_base_url,
                 "erp_type": secret.get("erp_type", "FUSION_ERP"),
             }
+    elif provider.provider == Provider.ProviderChoices.AWS.value:
+        aws_raw = dict(prowler_provider_kwargs)
+        access_key = aws_raw.pop("aws_access_key_id", None) or aws_raw.pop("access_key_id", None)
+        secret_key = aws_raw.pop("aws_secret_access_key", None) or aws_raw.pop("secret_access_key", None)
+        session_token = aws_raw.pop("aws_session_token", None) or aws_raw.pop("session_token", None)
+        role_arn = aws_raw.pop("role_arn", None)
+        external_id = aws_raw.pop("external_id", None)
+        region = aws_raw.pop("aws_region", None) or aws_raw.pop("region", None)
+
+        prowler_provider_kwargs = {}
+        if access_key:
+            prowler_provider_kwargs["aws_access_key_id"] = str(access_key).strip()
+        if secret_key:
+            prowler_provider_kwargs["aws_secret_access_key"] = str(secret_key).strip()
+        if session_token:
+            prowler_provider_kwargs["aws_session_token"] = str(session_token).strip()
+        if role_arn:
+            prowler_provider_kwargs["role_arn"] = str(role_arn).strip()
+        if external_id:
+            prowler_provider_kwargs["external_id"] = str(external_id).strip()
+        if region and str(region).strip():
+            prowler_provider_kwargs["regions"] = {str(region).strip()}
     elif provider.provider == Provider.ProviderChoices.IMAGE.value:
         # Detect whether uid is a registry URL (e.g. "docker.io/andoniaf") or
         # a concrete image reference (e.g. "docker.io/andoniaf/myimage:latest").
@@ -420,6 +442,35 @@ def prowler_provider_connection_test(provider: Provider) -> Connection:
             "raise_on_exception": False,
         }
         return prowler_provider.test_connection(**okta_kwargs)
+    elif provider.provider == Provider.ProviderChoices.AWS.value:
+        aws_raw = dict(prowler_provider_kwargs)
+        access_key = aws_raw.pop("aws_access_key_id", None) or aws_raw.pop("access_key_id", None)
+        secret_key = aws_raw.pop("aws_secret_access_key", None) or aws_raw.pop("secret_access_key", None)
+        session_token = aws_raw.pop("aws_session_token", None) or aws_raw.pop("session_token", None)
+        role_arn = aws_raw.pop("role_arn", None)
+        external_id = aws_raw.pop("external_id", None)
+        region = aws_raw.pop("aws_region", None) or aws_raw.pop("region", None)
+
+        test_kwargs = {"raise_on_exception": False}
+        if access_key:
+            test_kwargs["aws_access_key_id"] = str(access_key).strip()
+        if secret_key:
+            test_kwargs["aws_secret_access_key"] = str(secret_key).strip()
+        if session_token:
+            test_kwargs["aws_session_token"] = str(session_token).strip()
+        if role_arn:
+            test_kwargs["role_arn"] = str(role_arn).strip()
+        if external_id:
+            test_kwargs["external_id"] = str(external_id).strip()
+        if region and str(region).strip():
+            test_kwargs["aws_region"] = str(region).strip()
+
+        # Only pass provider_id if it's a valid 12-digit AWS account ID
+        clean_uid = str(provider.uid).strip() if provider.uid else ""
+        if clean_uid.isdigit() and len(clean_uid) == 12:
+            test_kwargs["provider_id"] = clean_uid
+
+        return prowler_provider.test_connection(**test_kwargs)
     elif provider.provider == Provider.ProviderChoices.IMAGE.value:
         image_kwargs = {
             "image": provider.uid,

@@ -340,6 +340,22 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Client files: "local" keeps a folder per client, "azure" a private Blob Storage container per client.
 # Azure signs in with the app's managed identity. Never add a storage key, connection string or SAS token.
 CLIENT_STORAGE_BACKEND = env("CLIENT_STORAGE_BACKEND", default="local")
+
+# Tenant provisioning for the Digital CISO admin panel (api/provisioning.py). Only an Entra app
+# token from an allowed identity, with the app role below, may create tenants. None is a secret.
+PROVISIONING_ENTRA_TENANT_ID = env("PROVISIONING_ENTRA_TENANT_ID", default="")
+PROVISIONING_AUDIENCE = env("PROVISIONING_AUDIENCE", default="")  # this app's Application ID URI or client id
+PROVISIONING_ALLOWED_CALLERS = env.list("PROVISIONING_ALLOWED_CALLERS", default=[])  # object ids of the panel's identity
+PROVISIONING_REQUIRED_ROLE = env("PROVISIONING_REQUIRED_ROLE", default="Tenants.Provision")
+PROVISIONING_API_KEY_DAYS = env.int("PROVISIONING_API_KEY_DAYS", default=365)
+# Local development only, and only with DEBUG on: a long random value the panel sends instead of a token.
+PROVISIONING_DEV_TOKEN = env("PROVISIONING_DEV_TOKEN", default="")
+
+# Customers' cloud keys (api/cloud_keys_vault.py): "database" keeps them encrypted in the database
+# (default, local development); "azure_keyvault" keeps them in the cloud-keys Key Vault. None is a secret.
+CLOUD_KEYS_BACKEND = env("CLOUD_KEYS_BACKEND", default="database")
+CLOUD_KEYS_VAULT_URL = env("CLOUD_KEYS_VAULT_URL", default="")
+CLOUD_KEYS_MANAGED_IDENTITY_CLIENT_ID = env("CLOUD_KEYS_MANAGED_IDENTITY_CLIENT_ID", default="")  # user-assigned identity only
 AZURE_STORAGE_ACCOUNT_URL = env("AZURE_STORAGE_ACCOUNT_URL", default="")
 AZURE_STORAGE_MANAGED_IDENTITY_CLIENT_ID = env("AZURE_STORAGE_MANAGED_IDENTITY_CLIENT_ID", default="")
 # Set these three to give each client its own encryption scope and Key Vault key.

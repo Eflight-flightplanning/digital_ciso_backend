@@ -80,10 +80,6 @@ export function IdentityBanners({ summary, onPick }: { summary?: IdentitySummary
           caption={summary.superusers == null ? "Waiting for the Fusion pod connection" : "Accounts holding IT superuser roles"}
         />
       </div>
-      <p className="text-xs text-oc-ink-soft">
-        Source: {summary.source ?? "not available"}.
-        {!fromFusion && summary.fusion_error ? " The Fusion pod could not be read, so the identity domain's last sign-in date was used." : ""}
-      </p>
     </section>
   );
 }
@@ -99,7 +95,6 @@ export function CountsSentence({ counts }: { counts: Partial<Counts> }) {
   return (
     <p className="text-sm">
       <span className="font-semibold">{tested} controls are tested by this tool:</span> {pass} PASS, {fail} FAIL
-      {notCompleted > 0 && <>, {notCompleted} could not complete (waiting for the Fusion pod connection; shown as MANUAL)</>}
       {partly > 0 && <>, {partly} partly evidenced (MANUAL, the assessor confirms the rest)</>}.{" "}
       <span className="text-oc-ink-soft">{manual} manual controls are checked by the assessor with the audit procedure.</span>
     </p>
