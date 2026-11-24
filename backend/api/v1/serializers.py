@@ -1236,6 +1236,44 @@ class ProviderCreateSerializer(RLSSerializer, BaseWriteSerializer):
             },
         }
 
+    def validate(self, attrs):
+        provider = attrs.get("provider")
+        uid = str(attrs.get("uid", "")).strip()
+        secret = attrs.get("secret") or {}
+
+        if provider == Provider.ProviderChoices.AWS.value:
+            # 1. If uid is an IAM ARN or secret contains role_arn, extract the 12-digit account ID
+            arn_to_check = uid if uid.startswith("arn:") else secret.get("role_arn", "")
+            if arn_to_check:
+                arn_match = re.search(r":(\d{12}):", str(arn_to_check))
+                if arn_match:
+                    attrs["uid"] = arn_match.group(1)
+                    uid = attrs["uid"]
+
+            # 2. If uid is not 12 digits and static credentials are provided, try auto-resolving account ID via STS
+            if not (uid.isdigit() and len(uid) == 12) and isinstance(secret, dict):
+                access_key = secret.get("aws_access_key_id") or secret.get("access_key_id")
+                secret_key = secret.get("aws_secret_access_key") or secret.get("secret_access_key")
+                session_token = secret.get("aws_session_token") or secret.get("session_token")
+                region = secret.get("aws_region") or secret.get("region") or "us-east-1"
+                if access_key and secret_key:
+                    try:
+                        import boto3
+                        session = boto3.Session(
+                            aws_access_key_id=str(access_key).strip(),
+                            aws_secret_access_key=str(secret_key).strip(),
+                            aws_session_token=str(session_token).strip() if session_token else None,
+                            region_name=str(region).strip(),
+                        )
+                        caller_identity = session.client("sts").get_caller_identity()
+                        discovered_account = caller_identity.get("Account")
+                        if discovered_account and len(discovered_account) == 12 and discovered_account.isdigit():
+                            attrs["uid"] = discovered_account
+                    except Exception:
+                        pass
+
+        return super().validate(attrs)
+
     def create(self, validated_data):
         secret = validated_data.pop("secret", None)
         secret_type = validated_data.pop("secret_type", "static")
@@ -2185,14 +2223,14 @@ class AlibabaCloudRoleAssumptionProviderSecret(serializers.Serializer):
 
 class AWSRoleAssumptionProviderSecret(serializers.Serializer):
     role_arn = serializers.CharField()
-    external_id = serializers.CharField()
-    role_session_name = serializers.CharField(required=False)
+    external_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    role_session_name = serializers.CharField(required=False, allow_blank=True)
     session_duration = serializers.IntegerField(
         required=False, min_value=900, max_value=43200
     )
-    aws_access_key_id = serializers.CharField(required=False)
-    aws_secret_access_key = serializers.CharField(required=False)
-    aws_session_token = serializers.CharField(required=False)
+    aws_access_key_id = serializers.CharField(required=False, allow_blank=True)
+    aws_secret_access_key = serializers.CharField(required=False, allow_blank=True)
+    aws_session_token = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         resource_name = "provider-secrets"

@@ -101,6 +101,7 @@ function ProvidersPage() {
 
   // AWS Fields
   const [awsAuthMode, setAwsAuthMode] = useState<"role" | "keys">("role");
+  const [awsAccountId, setAwsAccountId] = useState("");
   const [awsRoleArn, setAwsRoleArn] = useState("");
   const [awsExternalId, setAwsExternalId] = useState("");
   const [awsAccessKey, setAwsAccessKey] = useState("");
@@ -147,6 +148,7 @@ function ProvidersPage() {
     setAlias("");
     setErrorMsg(null);
     setSuccessMsg(null);
+    setAwsAccountId("");
     setAwsRoleArn("");
     setAwsExternalId("");
     setAwsAccessKey("");
@@ -196,12 +198,19 @@ function ProvidersPage() {
       let secretType = "static";
 
       if (activeTab === "AWS") {
-        uid = (awsAuthMode === "role" ? awsRoleArn : awsAccessKey).trim();
+        let accountId = awsAccountId.trim();
+        if (!accountId && awsAuthMode === "role" && awsRoleArn) {
+          const match = awsRoleArn.match(/arn:aws[a-z0-9-]*:iam::(\d{12}):/i);
+          if (match) {
+            accountId = match[1];
+          }
+        }
+        uid = (accountId || (awsAuthMode === "role" ? awsRoleArn : awsAccessKey)).trim();
         if (awsAuthMode === "role" && awsRoleArn) {
           secretType = "role";
           secretPayload = {
             role_arn: awsRoleArn.trim(),
-            external_id: awsExternalId.trim() || undefined,
+            ...(awsExternalId.trim() ? { external_id: awsExternalId.trim() } : {}),
             aws_region: awsRegion,
           };
         } else if (awsAccessKey && awsSecretKey) {
@@ -653,7 +662,25 @@ function ProvidersPage() {
                             required
                             placeholder="arn:aws:iam::123456789012:role/SecurityAuditRole"
                             value={awsRoleArn}
-                            onChange={(e) => setAwsRoleArn(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAwsRoleArn(val);
+                              const match = val.match(/arn:aws[a-z0-9-]*:iam::(\d{12}):/i);
+                              if (match && !awsAccountId) {
+                                setAwsAccountId(match[1]);
+                              }
+                            }}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="section-label mb-1 block">AWS Account ID (12 Digits - Auto-detected)</label>
+                          <input
+                            type="text"
+                            maxLength={12}
+                            placeholder="123456789012"
+                            value={awsAccountId}
+                            onChange={(e) => setAwsAccountId(e.target.value.replace(/\D/g, ""))}
                             className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
                           />
                         </div>
@@ -701,6 +728,20 @@ function ProvidersPage() {
                             onChange={(e) => setAwsSessionToken(e.target.value)}
                             className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
                           />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="section-label mb-1 block">AWS Account ID (12 Digits - Optional)</label>
+                          <input
+                            type="text"
+                            maxLength={12}
+                            placeholder="123456789012 (auto-discovered if left blank)"
+                            value={awsAccountId}
+                            onChange={(e) => setAwsAccountId(e.target.value.replace(/\D/g, ""))}
+                            className="h-10 w-full rounded-lg border border-border bg-surface-2/60 px-3.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          />
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Enter your 12-digit AWS Account ID, or leave blank to automatically detect it from your credentials.
+                          </p>
                         </div>
                       </div>
                     )}

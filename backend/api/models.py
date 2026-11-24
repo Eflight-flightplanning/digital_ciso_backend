@@ -628,17 +628,25 @@ class Provider(RowLevelSecurityProtectedModel):
 
     def validate_aws_uid(value):
 
-        if not re.match(r"^\d{12}$", value):
+        val = str(value).strip()
 
-            raise ModelValidationError(
+        if re.match(r"^\d{12}$", val):
 
-                detail="AWS provider ID must be exactly 12 digits.",
+            return
 
-                code="aws-uid",
+        if re.match(r"^arn:aws[a-z0-9-]*:iam::\d{12}:", val):
 
-                pointer="/data/attributes/uid",
+            return
 
-            )
+        raise ModelValidationError(
+
+            detail="AWS provider ID must be exactly 12 digits (or a valid AWS IAM Role ARN containing a 12-digit Account ID).",
+
+            code="aws-uid",
+
+            pointer="/data/attributes/uid",
+
+        )
 
 
 
@@ -1058,6 +1066,16 @@ class Provider(RowLevelSecurityProtectedModel):
             # authenticated org domain.
 
             self.uid = self.uid.strip().lower()
+
+        elif self.provider == self.ProviderChoices.AWS and self.uid:
+
+            self.uid = str(self.uid).strip()
+
+            arn_match = re.match(r"^arn:aws[a-z0-9-]*:iam::(?P<account_id>\d{12}):", self.uid)
+
+            if arn_match:
+
+                self.uid = arn_match.group("account_id")
 
         getattr(self, f"validate_{self.provider}_uid")(self.uid)
 
