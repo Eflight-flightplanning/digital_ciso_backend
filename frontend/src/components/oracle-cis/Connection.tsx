@@ -7,26 +7,17 @@ import type { ConnField, ConnSecret, ConnectionsView } from "./types";
 
 type Target = "idcs" | "fusion";
 
-const secretHint = (f: ConnSecret) =>
-  f.source === "provider" ? "Saved (hidden). Type to replace" : f.source === "env" ? "Set in the server .env (hidden). Type to override" : "";
-
-function Source({ f }: { f: ConnField | ConnSecret }) {
-  const label = f.source === "provider" ? "Saved on provider" : f.source === "env" ? "From server .env" : "Not set";
-  return <span className={`badge ${f.source ? "" : "opacity-70"}`}>{label}</span>;
-}
+const secretHint = (f: ConnSecret) => (f.source ? "Saved (hidden). Type to replace" : "");
 
 function Field({
-  id, label, hint, value, onChange, field, type = "text", placeholder, disabled,
+  id, label, hint, value, onChange, type = "text", placeholder, disabled,
 }: {
   id: string; label: string; hint?: string; value: string; onChange: (v: string) => void;
   field: ConnField | ConnSecret; type?: string; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium">{label}</label>
-        <Source f={field} />
-      </div>
+      <label htmlFor={id} className="text-sm font-medium">{label}</label>
       <input
         id={id}
         className="field"
