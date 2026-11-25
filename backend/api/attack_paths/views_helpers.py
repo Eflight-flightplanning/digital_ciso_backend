@@ -331,8 +331,8 @@ def _build_real_telemetry_graph(
         elif prov_type in ("oracle_saas", "fusion"):
             pod_id = f"saas_pod_{provider_id[:8]}"
             add_node(pod_id, ["OracleSaaSAccount"], {
-                "name": str(prov.alias or "Oracle Fusion ERP / HCM Pod (fa-etar-dev13)"),
-                "pod_url": prov.uid or "https://fa-etar-dev13-saasfademo1.fa.ocs.oraclecloud.com",
+                "name": str(prov.alias or "Oracle Fusion ERP / HCM Pod (fa-nvta-dev07)"),
+                "pod_url": prov.uid or "https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example",
             })
 
             user_id = f"saas_user_{provider_id[:8]}"

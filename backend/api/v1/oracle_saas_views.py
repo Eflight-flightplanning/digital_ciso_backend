@@ -160,7 +160,7 @@ class OracleSaasSyncLiveView(APIView):
                                 "guid": guid,
                                 "username": uname,
                                 "display_name": uname,
-                                "email": f"{uname.lower()}@fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com",
+                                "email": f"{uname.lower()}@norvanta.aero",
                                 "person_number": person_no or "N/A",
                                 "department": "General Enterprise",
                                 "job_title": "Fusion Cloud User",
@@ -171,7 +171,7 @@ class OracleSaasSyncLiveView(APIView):
                                 "risk_level": "MEDIUM",
                                 "roles": ["ORA_FND_APPLICATION_USER"],
                                 "sod_conflicts": [],
-                                "is_superuser": uname.upper() in ("CURTIS.FEITTY", "ALAN.COOK"),
+                                "is_superuser": False,  # roles are not read by the live sync
                             })
                     sync_details.append(f"Ingested {len(raw_accounts)} accounts from live HCM API")
             except Exception as e:
@@ -239,7 +239,7 @@ class OracleSaasInactiveSyncView(APIView):
         return Response({
             "status": "SUCCESS",
             "sync_method": sync_method,
-            "job_id": job_id or 9895455,
+            "job_id": job_id,
             "days_threshold": days,
             "count": len(filtered_users),
             "users": filtered_users,
@@ -306,7 +306,7 @@ class OracleSaasSyncHcmUsersView(APIView):
                     except Exception:
                         pass
 
-                email = acc.get("Email") or f"{uname.lower()}@fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com"
+                email = acc.get("Email") or f"{uname.lower()}@norvanta.aero"
 
                 enriched_users.append({
                     "id": f"USR-HCM-{idx+1:03d}",

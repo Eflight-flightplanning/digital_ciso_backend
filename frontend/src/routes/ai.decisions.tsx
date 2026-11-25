@@ -441,9 +441,9 @@ function generateProviderRemediation(
     if (c.includes("audit") || c.includes("trail") || c.includes("logging")) {
       return {
         recommended_fix: metaRec || `Enable Oracle Fusion Cloud ERP Business Object Audit Trail across Financials (GL, AP, AR) and HCM modules.`,
-        cli_command: metaCli || `curl -X POST "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/fscmRestApi/resources/11.13.18.05/auditConfigs" \\\n  -u "SEC_ADMIN:<PASSWORD>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"auditLevel": "VERBOSE", "modules": ["FINANCIALS", "PROCUREMENT", "HCM"]}'`,
-        code_snippet: metaTerraform || `resource "oracle_cloud_audit_config" "fusion_erp_audit" {\n  pod_url            = "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com"\n  modules            = ["GL", "AP", "AR", "HCM"]\n  enabled            = true\n  log_retention_days = 365\n}`,
-        console_steps: `1. Sign in to Oracle Fusion Cloud ERP (https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com) as a Security Administrator.\n2. Open Navigator -> Tools -> Audit Reports.\n3. Click 'Audit Configuration' -> Select Oracle Fusion Applications product modules (General Ledger, Payables, Receivables, Human Capital Management).\n4. Enable Business Object Audit Trail for sensitive financial transactions, supplier bank accounts, and salary changes.\n5. Click 'Save and Close' to enforce audit immutability.`,
+        cli_command: metaCli || `curl -X POST "https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example/fscmRestApi/resources/11.13.18.05/auditConfigs" \\\n  -u "SEC_ADMIN:<PASSWORD>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"auditLevel": "VERBOSE", "modules": ["FINANCIALS", "PROCUREMENT", "HCM"]}'`,
+        code_snippet: metaTerraform || `resource "oracle_cloud_audit_config" "fusion_erp_audit" {\n  pod_url            = "https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example"\n  modules            = ["GL", "AP", "AR", "HCM"]\n  enabled            = true\n  log_retention_days = 365\n}`,
+        console_steps: `1. Sign in to Oracle Fusion Cloud ERP (https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example) as a Security Administrator.\n2. Open Navigator -> Tools -> Audit Reports.\n3. Click 'Audit Configuration' -> Select Oracle Fusion Applications product modules (General Ledger, Payables, Receivables, Human Capital Management).\n4. Enable Business Object Audit Trail for sensitive financial transactions, supplier bank accounts, and salary changes.\n5. Click 'Save and Close' to enforce audit immutability.`,
         validation_steps: [
           `Verify audit report execution in Navigator -> Tools -> Audit Reports.`,
           `Rescan ERP in platform to confirm PASS.`
@@ -454,7 +454,7 @@ function generateProviderRemediation(
     if (c.includes("sod") || c.includes("toxic") || c.includes("conflict")) {
       return {
         recommended_fix: metaRec || `Decouple conflicting Segregation of Duties (SoD) roles for '${rName}' (e.g., Accounts Payable Specialist + General Ledger Manager) in Oracle Fusion Security Console.`,
-        cli_command: metaCli || `curl -X DELETE "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/hcmRestApi/resources/11.13.18.05/userRoles/${rName}/roles/AP_SPECIALIST" \\\n  -u "SEC_ADMIN:<PASSWORD>"`,
+        cli_command: metaCli || `curl -X DELETE "https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example/hcmRestApi/resources/11.13.18.05/userRoles/${rName}/roles/AP_SPECIALIST" \\\n  -u "SEC_ADMIN:<PASSWORD>"`,
         code_snippet: metaTerraform || `resource "oracle_saas_sod_policy" "ap_gl_segregation" {\n  policy_name = "Segregate_AP_GL_Roles"\n  disallowed_role_combinations = [\n    ["ORA_AP_ACCOUNTS_PAYABLE_SPECIALIST_JOB", "ORA_GL_GENERAL_ACCOUNTING_MANAGER_JOB"]\n  ]\n  enforce_strict = true\n}`,
         console_steps: `1. Log in to Oracle Fusion Applications -> Open Navigator -> Tools -> Security Console.\n2. In the Users tab, search for the user flagged with SoD conflict ('${rName}').\n3. Click 'Edit' -> View Assigned Roles.\n4. Remove the conflicting role (e.g., decouple Accounts Payable Specialist from General Ledger Manager).\n5. Enforce dual-authorization workflow for invoice creation and payment release -> Click 'Save and Close'.`,
         validation_steps: [
@@ -466,7 +466,7 @@ function generateProviderRemediation(
     }
     return {
       recommended_fix: metaRec || `Remediate ERP Identity & Access Finding for '${rName}': Deactivate dormant account (${rUid}) or decouple conflicting Segregation of Duties (SoD) roles in Oracle Fusion ERP Security Console.`,
-      cli_command: metaCli || `# Oracle Fusion Cloud ERP REST API Remediation\ncurl -X POST "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com/fscmRestApi/resources/11.13.18.05/userAccounts/${rUid}/action/suspend" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer \${ORACLE_SAAS_JWT_TOKEN}"`,
+      cli_command: metaCli || `# Oracle Fusion Cloud ERP REST API Remediation\ncurl -X POST "https://fa-nvta-dev07-saasnvtademo1.ds-fa.vendorpdemos.example/fscmRestApi/resources/11.13.18.05/userAccounts/${rUid}/action/suspend" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer \${ORACLE_SAAS_JWT_TOKEN}"`,
       code_snippet: metaTerraform || `# Oracle ERP Automation Payload (REST API Spec)\n{\n  "name": "deactivateUserAccount",\n  "parameters": [\n    {\n      "username": "${rName}",\n      "userGuid": "${rUid}",\n      "suspended": true,\n      "revokedRoles": ["ORA_FND_IT_SECURITY_MANAGER_JOB", "ORA_ASM_APPLICATION_ADMINISTRATOR_JOB"]\n    }\n  ]\n}`,
       console_steps: `1. Log in to Oracle Fusion Cloud ERP as an IT Security Manager.\n2. Open Navigator -> Tools -> Security Console.\n3. In the Users tab, search for user '${rName}' (${rUid}).\n4. Click 'Edit' -> Check 'Lock User Account' / toggle Active status to Inactive.\n5. Click 'Save and Close' -> Run the 'Send Pending LDAP Requests' scheduled process.`,
       validation_steps: [
