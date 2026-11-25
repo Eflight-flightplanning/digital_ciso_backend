@@ -72,8 +72,8 @@ class OracleSaasOverviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        creds = get_env_credentials()
-        users = load_pod_users(request_tenant_id(request))
+        tenant_id = request_tenant_id(request)
+        users = load_pod_users(tenant_id)
 
         total_users = len(users) if users else 0
         inactive_30d = len([u for u in users if u.get("days_inactive", 0) >= 30])
@@ -96,15 +96,22 @@ class OracleSaasOverviewView(APIView):
         else:
             compliance_score = 82
 
-        pod_url = creds.get("pod_url") or "https://fa-etar-dev13-saasfademo1.ds-fa.oraclepdemos.com"
-        username = creds.get("username") or "CURTIS.FEITTY"
+        # The tenant's saved Oracle SaaS connection (provider, else .env), as on the Connection page.
+        try:
+            from oracle_cis import connections as ocis_conn
+
+            conn = ocis_conn.resolved(tenant_id)
+            pod_url, username = conn["fusion_pod_url"][0], conn["fusion_username"][0]
+        except Exception as e:
+            logger.debug("Oracle SaaS connection unavailable for overview: %s", e)
+            pod_url = username = ""
 
         return Response({
-            "pod_url": pod_url,
-            "pod_status": "CONNECTED",
+            "pod_url": pod_url or "Not configured",
+            "pod_status": "CONNECTED" if pod_url and username else "NOT_CONFIGURED",
             "auth_mode": "BASIC_AUTH",
-            "active_principal": username,
-            "last_synced": "Scheduled Inactive Users ESS Sync (Job 9895455)",
+            "active_principal": username or "Not configured",
+            "last_synced": "Scheduled Inactive Users ESS Sync",
             "kpis": {
                 "total_monitored_users": total_users,
                 "inactive_users_30d": inactive_30d,
